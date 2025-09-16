@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block title %}MUD Game{% endblock %}
+{% block head %}
+<style>
+body, html {
+    height: 100%;
+}
+.cover-bg {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #3e2723 0%, #a0522d 100%);
+    background-color: #4b2e05;
+    background-blend-mode: multiply;
+    color: #fff3e0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.cover-container {
+    max-width: 42em;
+    padding: 2rem 2.5rem;
+    background: rgba(40, 20, 5, 0.92);
+    border-radius: 1.5rem;
+    box-shadow: 0 0 32px 0 #000a;
+    text-align: center;
+}
+.cover-title {
+    font-family: 'Cinzel', serif;
+    font-size: 3rem;
+    letter-spacing: 0.05em;
+    color: #ffb74d;
+    text-shadow: 0 2px 8px #000a;
+}
+.cover-lead {
+    font-size: 1.3rem;
+    color: #ffe0b2;
+    margin-bottom: 2rem;
+}
+.cover-btns .btn {
+    min-width: 120px;
+    font-size: 1.1rem;
+    margin: 0 0.5rem;
+}
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap" rel="stylesheet">
+{% endblock %}
+{% block content %}
+<div class="cover-bg">
+    <div class="cover-container">
+        <h1 class="cover-title mb-4">Adventure MUD</h1>
+        <p class="cover-lead">Step into a world of dungeons, dragons, and daring heroes. Create your character, join friends, and explore a living world that changes every week. Will you become a legend?</p>
+        <div class="cover-btns mb-3">
+            <a href="/login" class="btn btn-lg btn-warning fw-bold">Login</a>
+            <a href="/register" class="btn btn-lg btn-outline-light fw-bold">Register</a>
+        </div>
+        <footer class="mt-4 small text-secondary">&copy; 2025 Adventure MUD</footer>
+    </div>
+</div>
+{% endblock %}

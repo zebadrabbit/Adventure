@@ -1,0 +1,58 @@
+{% extends 'dashboard_base.html' %}
+
+{% block dashboard_content %}
+
+<div id="lobby-chat-widget">
+    <div id="lobby-chat-header" onclick="toggleLobbyChat()">
+        <i class="bi bi-chat-dots"></i> <span style="font-size:1rem;">Lobby Chat</span>
+        <span class="chat-toggle"><i class="bi bi-chevron-up" id="lobby-chat-chevron"></i></span>
+    </div>
+    <div id="lobby-chat-messages"></div>
+    <form id="lobby-chat-form" autocomplete="off">
+        <input type="text" id="lobby-chat-input" class="form-control" placeholder="Type a message..." maxlength="200" required />
+        <button type="submit" id="lobby-chat-send" class="btn btn-primary"><i class="bi bi-send"></i></button>
+    </form>
+</div>
+
+{% block title %}Dashboard - MUD Game{% endblock %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <!-- Character creation card -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-success">
+            <div class="card-header bg-success text-white">
+                <i class="bi bi-plus-circle me-2"></i>Create a Character
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-2">
+                        <label for="name" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    <div class="mb-2">
+                        <label for="char_class" class="form-label">Class</label>
+                        <select class="form-select" id="char_class" name="char_class" required>
+                            <option value="fighter">Fighter</option>
+                            <option value="rogue">Rogue</option>
+                            <option value="mage">Mage</option>
+                            <option value="cleric">Cleric</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">Create Character</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="mt-4 text-center">
+        <a href="#" class="btn btn-lg btn-warning fw-bold px-5" id="begin-adventure">Begin Adventure!</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='chat-widget.js') }}"></script>
+{% endblock %}
+

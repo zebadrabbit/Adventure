@@ -1,0 +1,54 @@
+/* dashboard.css: Styles for dashboard, cards, party, and chat widget */
+
+:root {
+  --mud-orange: #BA5624;
+  --mud-grey: #C0C5C1;
+  --mud-purple: #6C3A5C;
+  --mud-dark: #153131;
+  --mud-olive: #6F732F;
+  --mud-bg: #10191a;
+  --mud-bg-dark: #153131;
+}
+body {
+  background: var(--mud-bg-dark);
+  min-height: 100vh;
+  color: var(--mud-grey);
+  padding-top: 4.5rem;
+}
+.navbar {
+  border-radius: 0 0 1rem 1rem;
+  margin-bottom: 1.5rem;
+  background: var(--mud-dark) !important;
+}
+.card {
+  background: #182124;
+  color: var(--mud-grey);
+}
+.card-header {
+  background: var(--mud-dark);
+  color: var(--mud-grey);
+}
+/* Accent buttons */
+.btn-primary, #lobby-chat-send {
+  background: var(--mud-orange);
+  border-color: var(--mud-orange);
+}
+.btn-primary:hover, #lobby-chat-send:hover {
+  background: #a94c1e;
+  border-color: #a94c1e;
+}
+/* Party selection checkboxes */
+.form-check-input:checked {
+  background-color: var(--mud-olive);
+  border-color: var(--mud-olive);
+}
+/* Character class color accents */
+.class-fighter { background: var(--mud-orange) !important; color: #fff !important; }
+.class-rogue { background: var(--mud-olive) !important; color: #fff !important; }
+.class-mage { background: var(--mud-purple) !important; color: #fff !important; }
+.class-cleric { background: var(--mud-grey) !important; color: #222 !important; }
+.border-fighter { border: 2px solid var(--mud-orange) !important; }
+.border-rogue { border: 2px solid var(--mud-olive) !important; }
+.border-mage { border: 2px solid var(--mud-purple) !important; }
+.border-cleric { border: 2px solid var(--mud-grey) !important; }
+.border-default { border: 2px solid #444 !important; }
