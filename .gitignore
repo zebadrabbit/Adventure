@@ -1,0 +1,6 @@
+# Ignore SQLite database and Python cache
+instance/mud.db
+__pycache__/
+*.pyc
+.env
+.venv/
