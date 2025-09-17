@@ -10,6 +10,8 @@ import queue
 import signal
 import sys
 from app import app, socketio, db
+import logging
+from logging.handlers import RotatingFileHandler
 from app.models.models import User, Item
 from werkzeug.security import generate_password_hash
 
@@ -18,18 +20,55 @@ from werkzeug.security import generate_password_hash
 admin_event_queue = queue.Queue()
 app.config['ADMIN_EVENT_QUEUE'] = admin_event_queue
 
-def start_server(host='0.0.0.0', port=5000):
-    """Start the Socket.IO server and ensure DB tables exist."""
+def start_server(host='0.0.0.0', port=5000, debug: bool = False):
+    """Start the Socket.IO server and ensure DB tables exist.
+
+    When debug=True, Flask's debugger and reloader provide verbose tracebacks.
+    Also configures application logging to a rotating file and console.
+    """
     with app.app_context():
         db.create_all()
         seed_items()
+        _configure_logging()
     try:
         print(f"[INFO] Starting Socket.IO server on {host}:{port} (async_mode={socketio.async_mode})")
         # Let Flask-SocketIO choose appropriate server (eventlet/gevent/werkzeug)
-        socketio.run(app, host=host, port=port)
+    socketio.run(app, host=host, port=port, debug=debug)
     except KeyboardInterrupt:
         print("\n[INFO] Server stopped by user (Ctrl+C)")
         sys.exit(0)
+
+def _configure_logging():
+    """Configure logging to both console and a rotating file in instance/.
+
+    The file path will be instance/app.log. Retains a few backups to avoid growth.
+    """
+    log_dir = app.instance_path
+    try:
+        os.makedirs(log_dir, exist_ok=True)
+    except OSError:
+        pass
+    log_path = os.path.join(log_dir, 'app.log')
+
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+
+    # Rotating file handler
+    file_handler = RotatingFileHandler(log_path, maxBytes=1_000_000, backupCount=3)
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s'))
+
+    # Console handler (for terminals/tasks that show output)
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    console.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s'))
+
+    # Avoid duplicate handlers if reconfigured
+    for h in list(root.handlers):
+        root.removeHandler(h)
+
+    root.addHandler(file_handler)
+    root.addHandler(console)
 
 def start_admin_shell():
     """Initialize application context and start the admin shell loop."""

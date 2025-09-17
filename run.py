@@ -107,6 +107,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default=None,
         help="Database URI (default: env DATABASE_URL or sqlite:///instance/mud.db)",
     )
+    server_parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable Flask debug mode with verbose error pages",
+    )
     server_parser.set_defaults(command="server")
 
     # admin subcommand
@@ -205,7 +210,8 @@ def main(argv: list[str]) -> int:
     else:
         print("[INFO] Listening for connections... Press Ctrl+C to stop.")
         # Note: db_uri is read by the Flask app on import via app config/env
-        start_server(host=host, port=port)
+    debug = bool(getattr(args, "debug", False) or os.getenv("FLASK_DEBUG") == "1")
+    start_server(host=host, port=port, debug=debug)
         return 0
 
 

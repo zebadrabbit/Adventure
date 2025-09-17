@@ -13,6 +13,8 @@ from flask_socketio import SocketIO
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+import logging
+import uuid
 
 # Load .env if present so `SECRET_KEY`, `DATABASE_URL`, etc. can be supplied
 # without exporting shell variables during development.
@@ -67,3 +69,11 @@ from app.websockets import game, lobby
 
 def create_app():
     return app
+
+# Error handling: in non-debug mode, show a simple 500 page and log details
+@app.errorhandler(500)
+def internal_error(e):
+    error_id = uuid.uuid4().hex[:8]
+    logging.exception("Unhandled exception (id=%s)", error_id)
+    from flask import render_template
+    return render_template('500.html', error_id=error_id), 500

@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block title %}Server Error{% endblock %}
+{% block content %}
+<div class="text-center my-5">
+  <h1 class="display-5">Something went wrong</h1>
+  <p class="lead">An unexpected error occurred. The issue has been logged.</p>
+  <p class="text-muted">Please try again in a moment.</p>
+  <a href="{{ url_for('main.index') }}" class="btn btn-primary mt-3">Back Home</a>
+  {% if error_id %}
+  <div class="small text-muted mt-3">Error ID: {{ error_id }}</div>
+  {% endif %}
+  <div class="small text-muted mt-1">If this keeps happening, please contact support.</div>
+</div>
+{% endblock %}
