@@ -50,40 +50,6 @@
             </div>
         </div>
     </div>
-    <!-- Account & Settings card -->
-    <div class="col-md-6 col-lg-4" id="account-settings">
-        <div class="card h-100 shadow-sm border-info">
-            <div class="card-header bg-info text-white">
-                <i class="bi bi-person-gear me-2"></i>Account & Settings
-            </div>
-            <div class="card-body">
-                <form method="POST" class="mb-3">
-                    <input type="hidden" name="form" value="update_email">
-                    <label for="email" class="form-label">Email (for offline notifications)</label>
-                    <input type="email" class="form-control" id="email" name="email" placeholder="you@example.com" value="{{ user_email or '' }}">
-                    <div class="form-text">Optional. Leave blank to remove.</div>
-                    <button type="submit" class="btn btn-info mt-2">Save Email</button>
-                </form>
-                <hr>
-                <form method="POST">
-                    <input type="hidden" name="form" value="change_password">
-                    <div class="mb-2">
-                        <label for="current_password" class="form-label">Current password</label>
-                        <input type="password" class="form-control" id="current_password" name="current_password" required>
-                    </div>
-                    <div class="mb-2">
-                        <label for="new_password" class="form-label">New password</label>
-                        <input type="password" class="form-control" id="new_password" name="new_password" minlength="6" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="confirm_password" class="form-label">Confirm new password</label>
-                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" minlength="6" required>
-                    </div>
-                    <button type="submit" class="btn btn-warning">Change Password</button>
-                </form>
-            </div>
-        </div>
-    </div>
     <!-- Account & Settings card is defined above -->
 </div>
 
