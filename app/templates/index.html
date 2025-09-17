@@ -1,46 +1,10 @@
 {% extends 'base.html' %}
 {% block title %}MUD Game{% endblock %}
+{% block navbar %}{% endblock %}
+{% block navbar_padding %}{% endblock %}
 {% block head %}
-<style>
-body, html {
-    height: 100%;
-}
-.cover-bg {
-    min-height: 100vh;
-    background: linear-gradient(135deg, #3e2723 0%, #a0522d 100%);
-    background-color: #4b2e05;
-    background-blend-mode: multiply;
-    color: #fff3e0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.cover-container {
-    max-width: 42em;
-    padding: 2rem 2.5rem;
-    background: rgba(40, 20, 5, 0.92);
-    border-radius: 1.5rem;
-    box-shadow: 0 0 32px 0 #000a;
-    text-align: center;
-}
-.cover-title {
-    font-family: 'Cinzel', serif;
-    font-size: 3rem;
-    letter-spacing: 0.05em;
-    color: #ffb74d;
-    text-shadow: 0 2px 8px #000a;
-}
-.cover-lead {
-    font-size: 1.3rem;
-    color: #ffe0b2;
-    margin-bottom: 2rem;
-}
-.cover-btns .btn {
-    min-width: 120px;
-    font-size: 1.1rem;
-    margin: 0 0.5rem;
-}
-</style>
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='home.css') }}?v=20250917">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap" rel="stylesheet">
 {% endblock %}
 {% block content %}

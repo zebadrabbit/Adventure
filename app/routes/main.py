@@ -1,3 +1,4 @@
+"""Core application routes: home page and character dashboard."""
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
@@ -16,15 +17,22 @@ def index():
 @bp.route('/dashboard', methods=['GET', 'POST'])
 @login_required
 def dashboard():
+    """Display the user's characters and handle character creation.
+
+    On POST: create a character with base stats inferred from the chosen class.
+    On GET: list existing characters with a derived class label based on stats.
+    """
     if request.method == 'POST':
         name = request.form['name']
         char_class = request.form['char_class']
         # Define base stats for each class
         base_stats = {
-            'fighter': {'str': 16, 'con': 15, 'dex': 10, 'cha': 8, 'int': 8, 'wis': 8, 'mana': 5, 'hp': 20},
-            'rogue':   {'str': 10, 'con': 10, 'dex': 16, 'cha': 14, 'int': 10, 'wis': 8, 'mana': 8, 'hp': 14},
+            'fighter': {'str': 16, 'con': 15, 'dex': 10, 'cha': 8,  'int': 8,  'wis': 8,  'mana': 5,  'hp': 20},
+            'rogue':   {'str': 10, 'con': 10, 'dex': 16, 'cha': 14, 'int': 10, 'wis': 8,  'mana': 8,  'hp': 14},
             'mage':    {'str': 8,  'con': 10, 'dex': 10, 'cha': 10, 'int': 16, 'wis': 15, 'mana': 20, 'hp': 10},
-            'cleric':  {'str': 12, 'con': 12, 'dex': 8,  'cha': 10, 'int': 10, 'wis': 16, 'mana': 12, 'hp': 16}
+            'cleric':  {'str': 12, 'con': 12, 'dex': 8,  'cha': 10, 'int': 10, 'wis': 16, 'mana': 12, 'hp': 16},
+            'ranger':  {'str': 12, 'con': 12, 'dex': 16, 'cha': 10, 'int': 10, 'wis': 14, 'mana': 8,  'hp': 16},
+            'druid':   {'str': 10, 'con': 12, 'dex': 10, 'cha': 10, 'int': 12, 'wis': 16, 'mana': 16, 'hp': 14}
         }
         stats = base_stats.get(char_class, base_stats['fighter'])
         character = Character(
@@ -44,18 +52,24 @@ def dashboard():
         'fighter': lambda s: s['str'] >= s['dex'] and s['str'] >= s['int'] and s['str'] >= s['wis'],
         'rogue':   lambda s: s['dex'] >= s['str'] and s['dex'] >= s['int'] and s['dex'] >= s['wis'],
         'mage':    lambda s: s['int'] >= s['str'] and s['int'] >= s['dex'] and s['int'] >= s['wis'],
+        'ranger':  lambda s: s['dex'] >= s['str'] and s['wis'] >= s['int'],
+        'druid':   lambda s: s['wis'] >= s['str'] and s['wis'] >= s['dex'] and s['wis'] >= s['int'],
         'cleric':  lambda s: True  # fallback
     }
     char_list = []
     for c in characters:
         stats = json.loads(c.stats)
-        # Determine class
+        # Determine class label from stats heuristics
         if class_map['fighter'](stats):
             class_name = 'Fighter'
         elif class_map['rogue'](stats):
             class_name = 'Rogue'
         elif class_map['mage'](stats):            
             class_name = 'Mage'
+        elif class_map['ranger'](stats):
+            class_name = 'Ranger'
+        elif class_map['druid'](stats):
+            class_name = 'Druid'
         else:
             class_name = 'Cleric'
         char_list.append({

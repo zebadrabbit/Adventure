@@ -13,12 +13,11 @@ body {
   background: var(--mud-bg-dark);
   min-height: 100vh;
   color: var(--mud-grey);
-  padding-top: 4.5rem;
 }
 .navbar {
   border-radius: 0 0 1rem 1rem;
   margin-bottom: 1.5rem;
-  background: var(--mud-dark) !important;
+  background: var(--bs-dark) !important;
 }
 .card {
   background: #182124;
@@ -28,19 +27,19 @@ body {
   background: var(--mud-dark);
   color: var(--mud-grey);
 }
-/* Accent buttons */
+/* Accent buttons use theme primary */
 .btn-primary, #lobby-chat-send {
-  background: var(--mud-orange);
-  border-color: var(--mud-orange);
+  background: var(--bs-primary);
+  border-color: var(--bs-primary);
 }
 .btn-primary:hover, #lobby-chat-send:hover {
-  background: #a94c1e;
-  border-color: #a94c1e;
+  background: rgba(var(--bs-primary-rgb), 0.9);
+  border-color: rgba(var(--bs-primary-rgb), 0.9);
 }
 /* Party selection checkboxes */
 .form-check-input:checked {
-  background-color: var(--mud-olive);
-  border-color: var(--mud-olive);
+  background-color: var(--bs-success);
+  border-color: var(--bs-success);
 }
 /* Character class color accents */
 .class-fighter { background: var(--mud-orange) !important; color: #fff !important; }

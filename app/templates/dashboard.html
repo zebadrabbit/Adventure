@@ -3,8 +3,8 @@
 {% block dashboard_content %}
 
 <div id="lobby-chat-widget">
-    <div id="lobby-chat-header" onclick="toggleLobbyChat()">
-        <i class="bi bi-chat-dots"></i> <span style="font-size:1rem;">Lobby Chat</span>
+    <div id="lobby-chat-header" data-action="toggle-lobby-chat">
+        <i class="bi bi-chat-dots"></i> <span class="chat-title">Lobby Chat</span>
         <span class="chat-toggle"><i class="bi bi-chevron-up" id="lobby-chat-chevron"></i></span>
     </div>
     <div id="lobby-chat-messages"></div>
@@ -25,10 +25,15 @@
             </div>
             <div class="card-body">
                 <form method="POST">
-                    <div class="mb-2">
-                        <label for="name" class="form-label">Name</label>
-                        <input type="text" class="form-control" id="name" name="name" required>
-                    </div>
+                                        <div class="mb-2">
+                                                <label for="name" class="form-label">Name</label>
+                                                <div class="input-group">
+                                                    <input type="text" class="form-control" id="name" name="name" placeholder="Your hero's name" required aria-label="Character name" aria-describedby="randomize-name">
+                                                    <button class="btn btn-outline-secondary" type="button" id="randomize-name" title="Randomize name">
+                                                        <i class="bi bi-dice-5"></i>
+                                                    </button>
+                                                </div>
+                                        </div>
                     <div class="mb-2">
                         <label for="char_class" class="form-label">Class</label>
                         <select class="form-select" id="char_class" name="char_class" required>
@@ -36,6 +41,8 @@
                             <option value="rogue">Rogue</option>
                             <option value="mage">Mage</option>
                             <option value="cleric">Cleric</option>
+                            <option value="ranger">Ranger</option>
+                            <option value="druid">Druid</option>
                         </select>
                     </div>
                     <button type="submit" class="btn btn-success w-100">Create Character</button>
@@ -54,5 +61,6 @@
 {% block scripts %}
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="{{ url_for('static', filename='chat-widget.js') }}"></script>
+    <script src="{{ url_for('static', filename='character.js') }}?v=20250917"></script>
 {% endblock %}
 

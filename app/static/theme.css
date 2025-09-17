@@ -1,0 +1,51 @@
+/* theme.css: Site-wide Bootstrap color overrides */
+
+:root {
+  /* Primary palette overrides */
+  --bs-primary: #5a3825;   /* warm brown */
+  --bs-secondary: #7c6f57; /* muted khaki */
+  --bs-success: #4d7c3a;   /* moss green */
+  --bs-danger: #8c2f2f;    /* deep red */
+  --bs-warning: #c4a24c;   /* golden */
+  --bs-info: #3d5a7a;      /* slate blue */
+  --bs-light: #d9c9a9;     /* sand */
+  --bs-dark: #1a1a1a;      /* near-black */
+
+  /* Matching RGB values for components that use rgba(var(--bs-*-rgb), ..) */
+  --bs-primary-rgb: 90, 56, 37;
+  --bs-secondary-rgb: 124, 111, 87;
+  --bs-success-rgb: 77, 124, 58;
+  --bs-danger-rgb: 140, 47, 47;
+  --bs-warning-rgb: 196, 162, 76;
+  --bs-info-rgb: 61, 90, 122;
+  --bs-light-rgb: 217, 201, 169;
+  --bs-dark-rgb: 26, 26, 26;
+}
+
+/* Optional: Tweak default body background/text to fit the dark theme better */
+body {
+  background-color: #0f0f10;
+  color: #e6e1d5;
+}
+
+/* Ensure navbar and footer align with the dark palette */
+.navbar.bg-dark,
+.navbar-dark { background-color: rgba(var(--bs-dark-rgb), 1) !important; }
+.navbar .navbar-brand { color: var(--bs-light); }
+.navbar .nav-link { color: rgba(255,255,255,.8); }
+.navbar .nav-link.active,
+.navbar .nav-link:hover { color: #fff; }
+
+/* Buttons leverage Bootstrap's CSS vars; these ensure consistency if needed */
+.btn-primary {
+  --bs-btn-color: #fff;
+  --bs-btn-bg: var(--bs-primary);
+  --bs-btn-border-color: var(--bs-primary);
+  --bs-btn-hover-bg: rgba(var(--bs-primary-rgb), 0.9);
+  --bs-btn-hover-border-color: rgba(var(--bs-primary-rgb), 0.9);
+}
+
+.btn-secondary {
+  --bs-btn-bg: var(--bs-secondary);
+  --bs-btn-border-color: var(--bs-secondary);
+}

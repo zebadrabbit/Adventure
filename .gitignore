@@ -1,6 +1,34 @@
-# Ignore SQLite database and Python cache
-instance/mud.db
+# Python bytecode
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+
+# SQLite / instance data
+instance/
+*.db
+
+# Environments
 .env
 .venv/
+env/
+venv/
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Test / coverage
+.pytest_cache/
+.coverage*
+.tox/
+.nox/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Logs
+*.log

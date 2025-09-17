@@ -35,6 +35,7 @@
   user-select: none;
   min-height: 40px;
 }
+#lobby-chat-header .chat-title { font-size: 1rem; }
 #lobby-chat-header .chat-toggle {
   margin-left: auto;
   font-size: 1.1rem;

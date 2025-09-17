@@ -1,0 +1,11 @@
+/* auth.css: Shared styles for login/register cards */
+
+.auth-page {
+  min-height: 80vh;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  border-radius: 1rem;
+}

@@ -1,3 +1,7 @@
+"""Authentication routes: login, register, logout.
+
+Emits login/logout events to the admin shell via an in-app queue when available.
+"""
 
 from flask import Blueprint, render_template, redirect, url_for, request, flash, current_app
 from flask_login import login_user, logout_user, login_required
@@ -13,6 +17,7 @@ def load_user(user_id):
 
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
+    """Login form; on POST verifies credentials and logs the user in."""
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
@@ -29,6 +34,7 @@ def login():
 
 @bp.route('/register', methods=['GET', 'POST'])
 def register():
+    """Registration form; on POST creates a new user and logs them in."""
     if request.method == 'POST':
         username = request.form['username']
         password = generate_password_hash(request.form['password'])
@@ -45,6 +51,7 @@ def register():
 @bp.route('/logout')
 @login_required
 def logout():
+    """Logs the current user out and redirects to the login page."""
     username = None
     if hasattr(current_app, 'login_manager') and hasattr(current_app.login_manager, '_login_callback'):
         # Try to get username for event
