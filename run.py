@@ -78,7 +78,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--version",
         action="version",
-        version="Adventure MUD Server 0.1.0",
+        version="Adventure MUD Server 0.2.0",
     )
 
     subparsers = parser.add_subparsers(dest="command")
@@ -210,8 +210,8 @@ def main(argv: list[str]) -> int:
     else:
         print("[INFO] Listening for connections... Press Ctrl+C to stop.")
         # Note: db_uri is read by the Flask app on import via app config/env
-    debug = bool(getattr(args, "debug", False) or os.getenv("FLASK_DEBUG") == "1")
-    start_server(host=host, port=port, debug=debug)
+        debug = bool(getattr(args, "debug", False) or os.getenv("FLASK_DEBUG") == "1")
+        start_server(host=host, port=port, debug=debug)
         return 0
 
 

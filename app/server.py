@@ -14,6 +14,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from app.models.models import User, Item
 from werkzeug.security import generate_password_hash
+import os
 
 # Global event queue for admin shell. The Flask app reads this to publish
 # events (e.g., auth route emits) to the admin shell printer thread.
@@ -28,12 +29,13 @@ def start_server(host='0.0.0.0', port=5000, debug: bool = False):
     """
     with app.app_context():
         db.create_all()
+        _run_migrations()
         seed_items()
         _configure_logging()
     try:
         print(f"[INFO] Starting Socket.IO server on {host}:{port} (async_mode={socketio.async_mode})")
         # Let Flask-SocketIO choose appropriate server (eventlet/gevent/werkzeug)
-    socketio.run(app, host=host, port=port, debug=debug)
+        socketio.run(app, host=host, port=port, debug=debug)
     except KeyboardInterrupt:
         print("\n[INFO] Server stopped by user (Ctrl+C)")
         sys.exit(0)
@@ -74,7 +76,9 @@ def start_admin_shell():
     """Initialize application context and start the admin shell loop."""
     with app.app_context():
         db.create_all()
+        _run_migrations()
         seed_items()
+        _configure_logging()
     admin_shell()
 
 def seed_items():
@@ -225,3 +229,23 @@ Examples:
             continue
         else:
             print("[ERROR] Unknown or malformed command. Type 'help' for a list of commands.")
+
+
+def _run_migrations():
+    """Very lightweight migration helper for SQLite.
+
+    Adds missing columns using ALTER TABLE if needed. This is safe for
+    SQLite and keeps the project simple without Alembic.
+    """
+    from sqlalchemy import inspect, text
+    inspector = inspect(db.engine)
+    # Add 'email' column to user if missing
+    user_cols = {c['name'] for c in inspector.get_columns('user')}
+    if 'email' not in user_cols:
+        try:
+            db.session.execute(text('ALTER TABLE user ADD COLUMN email VARCHAR(120)'))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            # If this fails (e.g., on non-SQLite), ignore silently; model has the column
+            pass

@@ -1,0 +1,31 @@
+{% extends 'dashboard_base.html' %}
+
+{% block title %}Adventure Setup - MUD Game{% endblock %}
+
+{% block dashboard_content %}
+<div class="row">
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-header">
+        <strong><i class="bi bi-map me-2"></i>Adventure Briefing</strong>
+      </div>
+      <div class="card-body">
+        {% if party and party|length > 0 %}
+          <p class="text-muted">You're about to disembark with the following party:</p>
+          <ul>
+            {% for m in party %}
+              <li><strong>{{ m.name }}</strong> — {{ m.class }}, HP {{ m.hp }}, Mana {{ m.mana }}</li>
+            {% endfor %}
+          </ul>
+          <p class="small text-muted">Tip: You can return to the dashboard to adjust your party anytime.</p>
+          <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary"><i class="bi bi-arrow-left-circle"></i> Back to Dashboard</a>
+          <a href="#" class="btn btn-primary disabled"><i class="bi bi-play"></i> Start Quest (coming soon)</a>
+        {% else %}
+          <div class="alert alert-warning">No party selected. Go back and pick up to 4 characters.</div>
+          <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
