@@ -56,6 +56,62 @@
 <div class="mt-4 text-center">
         <a href="#" class="btn btn-lg btn-warning fw-bold px-5" id="begin-adventure">Begin Adventure!</a>
 </div>
+
+<hr class="my-5">
+
+<div class="row g-4">
+    {% for c in characters %}
+    <div class="col-12 col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-default">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-person-fill me-2"></i>{{ c.name }}</span>
+                <span class="badge bg-primary">{{ c.class_name }}</span>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-6">
+                        <h6 class="text-uppercase text-muted">Stats</h6>
+                        <ul class="list-unstyled small mb-3">
+                            <li>STR: {{ c.stats.str }}</li>
+                            <li>DEX: {{ c.stats.dex }}</li>
+                            <li>INT: {{ c.stats.int }}</li>
+                            <li>WIS: {{ c.stats.wis }}</li>
+                            <li>CHA: {{ c.stats.cha }}</li>
+                            <li>CON: {{ c.stats.con }}</li>
+                            <li>HP: {{ c.stats.hp }}</li>
+                            <li>Mana: {{ c.stats.mana }}</li>
+                        </ul>
+                    </div>
+                    <div class="col-6">
+                        <h6 class="text-uppercase text-muted">Coins</h6>
+                        <ul class="list-unstyled small mb-3">
+                            <li><i class="bi bi-coin"></i> Gold: {{ c.coins.gold }}</li>
+                            <li><i class="bi bi-coin"></i> Silver: {{ c.coins.silver }}</li>
+                            <li><i class="bi bi-coin"></i> Copper: {{ c.coins.copper }}</li>
+                        </ul>
+                    </div>
+                </div>
+                <h6 class="text-uppercase text-muted">Inventory</h6>
+                {% if c.inventory and c.inventory|length > 0 %}
+                    <ul class="small mb-0">
+                        {% for it in c.inventory %}
+                            <li>{{ it.name }} <span class="text-muted">({{ it.type }})</span></li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="text-muted small">No items</div>
+                {% endif %}
+            </div>
+            <div class="card-footer d-flex justify-content-between">
+                <form action="{{ url_for('main.delete_character', char_id=c.id) }}" method="post" onsubmit="return confirm('Delete {{ c.name }}?');">
+                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Delete</button>
+                </form>
+                <a href="#" class="btn btn-sm btn-outline-secondary disabled"><i class="bi bi-gear"></i> Manage</a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
 {% endblock %}
 
 {% block scripts %}

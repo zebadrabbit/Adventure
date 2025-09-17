@@ -39,3 +39,22 @@ class Character(db.Model):
     gear = db.Column(db.Text, nullable=True)    # JSON string for gear
     items = db.Column(db.Text, nullable=True)   # JSON string for items
     # Add more fields as needed
+
+
+class Item(db.Model):
+    """Catalog of items that can appear in inventories.
+
+    Attributes:
+        id: Primary key
+        slug: Unique identifier used to reference from JSON payloads
+        name: Display name
+        type: Category (e.g., 'weapon', 'armor', 'potion', 'tool')
+        description: Short description
+        value_copper: Integer value in copper coins
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    slug = db.Column(db.String(80), unique=True, nullable=False)
+    name = db.Column(db.String(120), nullable=False)
+    type = db.Column(db.String(40), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    value_copper = db.Column(db.Integer, default=0, nullable=False)

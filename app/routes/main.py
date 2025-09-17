@@ -23,8 +23,8 @@ def dashboard():
     On GET: list existing characters with a derived class label based on stats.
     """
     if request.method == 'POST':
-        name = request.form['name']
-        char_class = request.form['char_class']
+    name = request.form['name']
+    char_class = request.form['char_class']
         # Define base stats for each class
         base_stats = {
             'fighter': {'str': 16, 'con': 15, 'dex': 10, 'cha': 8,  'int': 8,  'wis': 8,  'mana': 5,  'hp': 20},
@@ -35,12 +35,24 @@ def dashboard():
             'druid':   {'str': 10, 'con': 12, 'dex': 10, 'cha': 10, 'int': 12, 'wis': 16, 'mana': 16, 'hp': 14}
         }
         stats = base_stats.get(char_class, base_stats['fighter'])
+        # Starting coins: gold/silver/copper
+        coins = {'gold': 5, 'silver': 20, 'copper': 50}
+        # Starter items by class (slugs refer to Item.slug)
+        starter_items = {
+            'fighter': ['short-sword', 'wooden-shield', 'potion-healing'],
+            'rogue':   ['dagger', 'lockpicks', 'potion-healing'],
+            'mage':    ['oak-staff', 'potion-mana', 'potion-mana'],
+            'cleric':  ['oak-staff', 'potion-healing', 'potion-mana'],
+            'ranger':  ['hunting-bow', 'dagger', 'potion-healing'],
+            'druid':   ['herbal-pouch', 'potion-healing', 'potion-mana']
+        }
+        items = starter_items.get(char_class, starter_items['fighter'])
         character = Character(
             user_id=current_user.id,
             name=name,
-            stats=json.dumps(stats),
+            stats=json.dumps({**stats, **coins}),
             gear=json.dumps([]),
-            items=json.dumps([])
+            items=json.dumps(items)
         )
         db.session.add(character)
         db.session.commit()
@@ -59,6 +71,24 @@ def dashboard():
     char_list = []
     for c in characters:
         stats = json.loads(c.stats)
+        coins = {
+            'gold': stats.pop('gold', 0),
+            'silver': stats.pop('silver', 0),
+            'copper': stats.pop('copper', 0)
+        }
+        # Resolve inventory items
+        try:
+            item_slugs = json.loads(c.items) if c.items else []
+        except Exception:
+            item_slugs = []
+        from app.models.models import Item
+        items = Item.query.filter(Item.slug.in_(item_slugs)).all() if item_slugs else []
+        items_by_slug = {i.slug: i for i in items}
+        inventory = []
+        for slug in item_slugs:
+            it = items_by_slug.get(slug)
+            if it:
+                inventory.append({'slug': it.slug, 'name': it.name, 'type': it.type})
         # Determine class label from stats heuristics
         if class_map['fighter'](stats):
             class_name = 'Fighter'
@@ -76,6 +106,8 @@ def dashboard():
             'id': c.id,
             'name': c.name,
             'stats': stats,
+            'coins': coins,
+            'inventory': inventory,
             'class_name': class_name
         })
     return render_template('dashboard.html', characters=char_list)

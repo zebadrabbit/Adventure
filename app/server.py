@@ -10,7 +10,7 @@ import queue
 import signal
 import sys
 from app import app, socketio, db
-from app.models.models import User
+from app.models.models import User, Item
 from werkzeug.security import generate_password_hash
 
 # Global event queue for admin shell. The Flask app reads this to publish
@@ -22,6 +22,7 @@ def start_server(host='0.0.0.0', port=5000):
     """Start the Socket.IO server and ensure DB tables exist."""
     with app.app_context():
         db.create_all()
+        seed_items()
     try:
         print(f"[INFO] Starting Socket.IO server on {host}:{port} (async_mode={socketio.async_mode})")
         # Let Flask-SocketIO choose appropriate server (eventlet/gevent/werkzeug)
@@ -34,7 +35,34 @@ def start_admin_shell():
     """Initialize application context and start the admin shell loop."""
     with app.app_context():
         db.create_all()
+        seed_items()
     admin_shell()
+
+def seed_items():
+    """Seed initial catalog items if they don't already exist."""
+    existing = {i.slug for i in Item.query.all()}
+    seeds = [
+        # Weapons/Armor
+        dict(slug='short-sword', name='Short Sword', type='weapon', description='A simple steel short sword.', value_copper=500),
+        dict(slug='dagger', name='Dagger', type='weapon', description='A lightweight dagger.', value_copper=250),
+        dict(slug='oak-staff', name='Oak Staff', type='weapon', description='A sturdy oak staff for channeling magic.', value_copper=400),
+        dict(slug='wooden-shield', name='Wooden Shield', type='armor', description='A round wooden shield.', value_copper=300),
+        dict(slug='leather-armor', name='Leather Armor', type='armor', description='Basic protective leather armor.', value_copper=600),
+        # Potions/Consumables
+        dict(slug='potion-healing', name='Potion of Healing', type='potion', description='Restores a small amount of HP.', value_copper=150),
+        dict(slug='potion-mana', name='Potion of Mana', type='potion', description='Restores a small amount of mana.', value_copper=150),
+        # Tools
+        dict(slug='lockpicks', name='Lockpicks', type='tool', description='Useful for opening tricky locks.', value_copper=200),
+        dict(slug='hunting-bow', name='Hunting Bow', type='weapon', description='A simple bow for hunting.', value_copper=550),
+        dict(slug='herbal-pouch', name='Herbal Pouch', type='tool', description='Druidic herbs and salves.', value_copper=180),
+    ]
+    created = 0
+    for s in seeds:
+        if s['slug'] not in existing:
+            db.session.add(Item(**s))
+            created += 1
+    if created:
+        db.session.commit()
 
 def admin_shell():
     """
