@@ -41,14 +41,15 @@
                 <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                   <span class="avatar-circle me-2">{{ current_user.username[0]|upper }}</span>
                   <span class="d-none d-sm-inline">{{ current_user.username }}</span>
-                  {% if getattr(current_user, 'role', 'user') != 'user' %}
-                    <span class="badge bg-secondary ms-2 d-none d-md-inline">{{ current_user.role|capitalize }}</span>
+                  {% set user_role = current_user.role|default('user', true) %}
+                  {% if user_role != 'user' %}
+                    <span class="badge bg-secondary ms-2 d-none d-md-inline">{{ user_role|capitalize }}</span>
                   {% endif %}
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
                   <li><a class="dropdown-item" href="{{ url_for('main.dashboard') }}"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
                   <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#accountModal"><i class="bi bi-person-gear me-2"></i>Account & Settings</a></li>
-                  {% if getattr(current_user, 'role', 'user') == 'admin' %}
+                  {% if user_role == 'admin' %}
                   <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#serverSettingsModal"><i class="bi bi-gear-wide-connected me-2"></i>Server Settings</a></li>
                   {% endif %}
                   <li><hr class="dropdown-divider"></li>
@@ -87,7 +88,8 @@
     {% block scripts %}{% endblock %}
     {% if current_user.is_authenticated %}
       {% include 'partials/account_modal.html' %}
-      {% if getattr(current_user, 'role', 'user') == 'admin' %}
+      {% set user_role = current_user.role|default('user', true) %}
+      {% if user_role == 'admin' %}
         {% include 'partials/server_settings_modal.html' %}
       {% endif %}
     {% endif %}
