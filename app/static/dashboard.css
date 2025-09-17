@@ -19,6 +19,12 @@ body {
   margin-bottom: 1.5rem;
   background: var(--bs-dark) !important;
 }
+.navbar-search {
+  background: #0f1518;
+  color: var(--mud-grey);
+  border-color: #2a343a;
+}
+.navbar-search::placeholder { color: #6c757d; }
 .card {
   background: #182124;
   color: var(--mud-grey);
@@ -63,4 +69,18 @@ body {
               0 0 2rem rgba(255, 165, 0, 0.25);
   border-color: var(--bs-warning) !important;
   transform: translateY(-2px);
+}
+
+/* Avatar circle (initial) */
+.avatar-circle {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #2d3a40;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.8rem;
 }
