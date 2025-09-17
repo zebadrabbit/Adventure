@@ -1,5 +1,6 @@
 {% extends 'dashboard_base.html' %}
 
+
 {% block dashboard_content %}
 
 <div id="lobby-chat-widget">
@@ -16,47 +17,9 @@
 
 {% block title %}Dashboard - MUD Game{% endblock %}
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <!-- Character creation card -->
-    <div class="col-md-6 col-lg-4">
-        <div class="card h-100 shadow-sm border-success">
-            <div class="card-header bg-success text-white">
-                <i class="bi bi-plus-circle me-2"></i>Create a Character
-            </div>
-            <div class="card-body">
-                <form method="POST">
-                                        <div class="mb-2">
-                                                <label for="name" class="form-label">Name</label>
-                                                <div class="input-group">
-                                                    <input type="text" class="form-control" id="name" name="name" placeholder="Your hero's name" required aria-label="Character name" aria-describedby="randomize-name">
-                                                    <button class="btn btn-outline-secondary" type="button" id="randomize-name" title="Randomize name">
-                                                        <i class="bi bi-dice-5"></i>
-                                                    </button>
-                                                </div>
-                                        </div>
-                    <div class="mb-2">
-                        <label for="char_class" class="form-label">Class</label>
-                        <select class="form-select" id="char_class" name="char_class" required>
-                            <option value="fighter">Fighter</option>
-                            <option value="rogue">Rogue</option>
-                            <option value="mage">Mage</option>
-                            <option value="cleric">Cleric</option>
-                            <option value="ranger">Ranger</option>
-                            <option value="druid">Druid</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="btn btn-success w-100">Create Character</button>
-                </form>
-            </div>
-        </div>
-    </div>
-    <!-- Account & Settings card is defined above -->
-</div>
-
-
-<!-- Party selection & begin card -->
-<div class="row mt-3">
-    <div class="col-md-8 col-lg-6">
+<!-- Party selection & begin card (moved to top, full width) -->
+<div class="row mb-4">
+    <div class="col-12">
         <div class="card shadow-sm border-warning">
             <div class="card-header bg-warning">
                 <strong><i class="bi bi-people-fill me-2"></i>Your Party</strong>
@@ -74,6 +37,43 @@
             </div>
         </div>
     </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <!-- Character creation card -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-success">
+            <div class="card-header bg-success text-white">
+                <i class="bi bi-plus-circle me-2"></i>Create a Character
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-2">
+                        <label for="name" class="form-label">Name</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="name" name="name" placeholder="Your hero's name" required aria-label="Character name" aria-describedby="randomize-name">
+                            <button class="btn btn-outline-secondary" type="button" id="randomize-name" title="Randomize name">
+                                <i class="bi bi-dice-5"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label for="char_class" class="form-label">Class</label>
+                        <select class="form-select" id="char_class" name="char_class" required>
+                            <option value="fighter">Fighter</option>
+                            <option value="rogue">Rogue</option>
+                            <option value="mage">Mage</option>
+                            <option value="cleric">Cleric</option>
+                            <option value="ranger">Ranger</option>
+                            <option value="druid">Druid</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">Create Character</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <!-- Account & Settings card is defined above -->
 </div>
 
 <hr class="my-5">
