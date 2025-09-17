@@ -22,6 +22,8 @@ class User(UserMixin, db.Model):
     password = db.Column(db.String(200), nullable=False)
     # Optional contact email for notifications
     email = db.Column(db.String(120), nullable=True)
+    # Role for authorization: 'admin' | 'mod' | 'user'
+    role = db.Column(db.String(20), nullable=False, default='user')
     # Add more fields as needed
 
 class Character(db.Model):

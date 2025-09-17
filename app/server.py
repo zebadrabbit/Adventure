@@ -190,7 +190,8 @@ Examples:
                 else:
                     print("Registered users:")
                     for u in users:
-                        print(f"  - {u.username}")
+                        r = getattr(u, 'role', 'user')
+                        print(f"  - {u.username} [{r}]")
             continue
         elif parts[0] == 'reset' and len(parts) == 4 and parts[1] == 'password':
             username = parts[2]
@@ -227,6 +228,21 @@ Examples:
                     db.session.commit()
                     print(f"[OK] User '{username}' deleted.")
             continue
+        elif parts[0] == 'set' and len(parts) == 4 and parts[1] == 'role':
+            username = parts[2]
+            role = parts[3]
+            if role not in ('admin', 'mod', 'user'):
+                print("[ERROR] Role must be one of: admin, mod, user")
+                continue
+            with app.app_context():
+                user = User.query.filter_by(username=username).first()
+                if not user:
+                    print(f"[ERROR] User '{username}' does not exist.")
+                else:
+                    user.role = role
+                    db.session.commit()
+                    print(f"[OK] Role for '{username}' set to {role}.")
+            continue
         else:
             print("[ERROR] Unknown or malformed command. Type 'help' for a list of commands.")
 
@@ -248,4 +264,14 @@ def _run_migrations():
         except Exception:
             db.session.rollback()
             # If this fails (e.g., on non-SQLite), ignore silently; model has the column
+            pass
+    # Add 'role' column if missing
+    inspector = inspect(db.engine)
+    user_cols = {c['name'] for c in inspector.get_columns('user')}
+    if 'role' not in user_cols:
+        try:
+            db.session.execute(text("ALTER TABLE user ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user'"))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
             pass
