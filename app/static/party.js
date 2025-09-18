@@ -1,16 +1,16 @@
 // party.js - Manage party selection on dashboard
 // Allows selecting up to 4 characters, updates summary and hidden inputs
 
+
 (function() {
   const maxParty = 4;
   const selects = Array.from(document.querySelectorAll('.party-select'));
   const countEl = document.getElementById('party-count');
-  const summaryEl = document.getElementById('party-summary');
   const hiddenContainer = document.getElementById('party-hidden-inputs');
   const beginBtn = document.getElementById('begin-adventure-btn');
   const cards = Array.from(document.querySelectorAll('.character-card'));
 
-  if (!summaryEl || !beginBtn) return;
+  if (!countEl || !beginBtn) return;
 
   function getSelected() {
     return selects.filter(cb => cb.checked).map(cb => ({
@@ -36,14 +36,6 @@
     const n = sel.length;
     countEl.textContent = n.toString();
     beginBtn.disabled = n === 0 || n > maxParty;
-
-    // Build a small summary
-    if (n === 0) {
-      summaryEl.textContent = 'Select up to 4 characters from your roster below.';
-    } else {
-      const parts = sel.map(s => `${s.name} (${s.klass})`);
-      summaryEl.textContent = `Party: ${parts.join(', ')}`;
-    }
     renderHiddenInputs(sel);
 
     // Enforce limit by disabling other unchecked boxes

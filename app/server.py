@@ -263,7 +263,6 @@ def _run_migrations():
             db.session.commit()
         except Exception:
             db.session.rollback()
-            # If this fails (e.g., on non-SQLite), ignore silently; model has the column
             pass
     # Add 'role' column if missing
     inspector = inspect(db.engine)
@@ -271,6 +270,22 @@ def _run_migrations():
     if 'role' not in user_cols:
         try:
             db.session.execute(text("ALTER TABLE user ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user'"))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            pass
+    # Add 'xp' and 'level' columns to character if missing
+    char_cols = {c['name'] for c in inspector.get_columns('character')}
+    if 'xp' not in char_cols:
+        try:
+            db.session.execute(text('ALTER TABLE character ADD COLUMN xp INTEGER NOT NULL DEFAULT 0'))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            pass
+    if 'level' not in char_cols:
+        try:
+            db.session.execute(text('ALTER TABLE character ADD COLUMN level INTEGER NOT NULL DEFAULT 1'))
             db.session.commit()
         except Exception:
             db.session.rollback()

@@ -65,7 +65,11 @@ app.register_blueprint(auth.bp)
 app.register_blueprint(main.bp)
 
 # Import websocket handlers so their event decorators register with Socket.IO
+
 from app.websockets import game, lobby
+
+print("Registered routes:")
+print(app.url_map)
 
 def create_app():
     return app

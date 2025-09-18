@@ -78,7 +78,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--version",
         action="version",
-        version="Adventure MUD Server 0.2.0",
+    version="Adventure MUD Server 0.2.1",
     )
 
     subparsers = parser.add_subparsers(dest="command")

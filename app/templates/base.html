@@ -30,11 +30,6 @@
               </li>
               {% endif %}
             </ul>
-            {% if current_user.is_authenticated %}
-            <form class="d-none d-md-flex me-3" role="search" method="GET" action="{{ url_for('main.dashboard') }}">
-              <input class="form-control navbar-search" type="search" placeholder="Search..." aria-label="Search" name="q" value="{{ request.args.get('q','') }}">
-            </form>
-            {% endif %}
             <ul class="navbar-nav ms-auto mb-2 mb-md-0 align-items-center">
               {% if current_user.is_authenticated %}
               <li class="nav-item dropdown">

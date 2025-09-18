@@ -1,0 +1,3 @@
+{% macro svg_icon(name, size=24, cls="", style="") %}
+  <img src="{{ url_for('static', filename='iconography/' ~ name ~ '.svg') }}" width="{{ size }}" height="{{ size }}" class="icon-svg {{ cls }}" alt="{{ name }} icon" loading="lazy"{% if style %} style="{{ style }}"{% endif %} />
+{% endmacro %}

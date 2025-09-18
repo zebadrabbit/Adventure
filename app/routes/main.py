@@ -1,13 +1,90 @@
+
+
 """Core application routes: home page and character dashboard."""
 
+import random
+import json
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from flask_login import login_required, current_user
 from app.models.models import Character, User
+from app.models.xp import xp_for_level
 from app import db
-import json
-from werkzeug.security import check_password_hash, generate_password_hash
+
 
 bp = Blueprint('main', __name__)
+
+@bp.route('/licenses')
+def licenses():
+    return render_template('licenses.html')
+
+@bp.route('/privacy')
+def privacy():
+    return render_template('privacy.html')
+
+@bp.route('/terms')
+def terms():
+    return render_template('terms.html')
+
+@bp.route('/conduct')
+def conduct():
+    return render_template('conduct.html')
+
+@bp.route('/autofill_characters', methods=['POST'])
+@login_required
+def autofill_characters():
+    """Create random characters for autofill if user has < 4."""
+    needed = 4 - Character.query.filter_by(user_id=current_user.id).count()
+    created = 0
+    if needed > 0:
+        # Use the same pools as character.js
+        name_pools = {
+            'fighter': ['Brakus','Durgan','Freya','Gunnar','Hilda','Korrin','Magda','Roderic','Sable','Thrain','Viggo','Wulfric'],
+            'rogue':   ['Ash','Briar','Cipher','Dax','Eve','Fable','Gale','Hex','Iris','Jinx','Kestrel','Lark'],
+            'mage':    ['Aelwyn','Belisar','Cyrene','Daelon','Eldrin','Faelith','Galen','Hypatia','Ilyria','Jorahm','Kaelis','Lunara'],
+            'cleric':  ['Ansel','Benedict','Cyril','Delphine','Elias','Fiora','Gideon','Honora','Isidore','Jorah','Lucien','Mariel'],
+            'ranger':  ['Arden','Briar','Cedar','Dawn','Ember','Flint','Grove','Hawk','Ivy','Jasper','Kieran','Linden'],
+            'druid':   ['Alder','Birch','Clover','Dew','Elder','Fern','Gale','Hazel','Iris','Juniper','Kestrel','Laurel']
+        }
+        classes = list(name_pools.keys())
+        base_stats = {
+            'fighter': {'str': 16, 'con': 15, 'dex': 10, 'cha': 8,  'int': 8,  'wis': 8,  'mana': 5,  'hp': 20},
+            'rogue':   {'str': 10, 'con': 10, 'dex': 16, 'cha': 14, 'int': 10, 'wis': 8,  'mana': 8,  'hp': 14},
+            'mage':    {'str': 8,  'con': 10, 'dex': 10, 'cha': 10, 'int': 16, 'wis': 15, 'mana': 20, 'hp': 10},
+            'cleric':  {'str': 12, 'con': 12, 'dex': 8,  'cha': 10, 'int': 10, 'wis': 16, 'mana': 12, 'hp': 16},
+            'ranger':  {'str': 12, 'con': 12, 'dex': 16, 'cha': 10, 'int': 10, 'wis': 14, 'mana': 8,  'hp': 16},
+            'druid':   {'str': 10, 'con': 12, 'dex': 10, 'cha': 10, 'int': 12, 'wis': 16, 'mana': 16, 'hp': 14}
+        }
+        coins = {'gold': 5, 'silver': 20, 'copper': 50}
+        starter_items = {
+            'fighter': ['short-sword', 'wooden-shield', 'potion-healing'],
+            'rogue':   ['dagger', 'lockpicks', 'potion-healing'],
+            'mage':    ['oak-staff', 'potion-mana', 'potion-mana'],
+            'cleric':  ['oak-staff', 'potion-healing', 'potion-mana'],
+            'ranger':  ['hunting-bow', 'dagger', 'potion-healing'],
+            'druid':   ['herbal-pouch', 'potion-healing', 'potion-mana']
+        }
+        for _ in range(needed):
+            char_class = random.choice(classes)
+            name = random.choice(name_pools[char_class])
+            stats = base_stats[char_class]
+            items = starter_items[char_class]
+            character = Character(
+                user_id=current_user.id,
+                name=name,
+                stats=json.dumps({**stats, **coins, 'class': char_class}),
+                gear=json.dumps([]),
+                items=json.dumps(items),
+                xp=0,
+                level=1
+            )
+            db.session.add(character)
+            created += 1
+        db.session.commit()
+    return {"created": created}
+bp = Blueprint('main', __name__)
+
+import json
+from werkzeug.security import check_password_hash, generate_password_hash
 
 @bp.route('/')
 def index():
@@ -117,7 +194,9 @@ def dashboard():
             # heuristic misclassification when rendering later
             stats=json.dumps({**stats, **coins, 'class': char_class}),
             gear=json.dumps([]),
-            items=json.dumps(items)
+            items=json.dumps(items),
+            xp=0,
+            level=1
         )
         db.session.add(character)
         db.session.commit()
@@ -190,7 +269,10 @@ def dashboard():
             'stats': stats,
             'coins': coins,
             'inventory': inventory,
-            'class_name': class_name
+            'class_name': class_name,
+            'xp': getattr(c, 'xp', 0),
+            'level': getattr(c, 'level', 1),
+            'xp_next': xp_for_level(getattr(c, 'level', 1) + 1)
         })
     if _backfilled:
         db.session.commit()

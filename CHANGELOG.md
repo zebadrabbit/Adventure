@@ -1,3 +1,16 @@
+# Changelog
+
+## [0.2.0] - 2025-09-18
+### Added
+- Chatbox UI: Title bar removed, collapse button moved to tab row.
+- Chatbox: Input box now anchored at the bottom, improved layout.
+
+### Changed
+- Chatbox uses flex layout for better usability and appearance.
+
+### Fixed
+- Chatbox expand/collapse works with new tabbed UI.
+- Chatbox color scheme matches dashboard.
 Changelog
 =========
 

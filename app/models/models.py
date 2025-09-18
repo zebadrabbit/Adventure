@@ -42,6 +42,8 @@ class Character(db.Model):
     stats = db.Column(db.Text, nullable=False)  # JSON string for stats
     gear = db.Column(db.Text, nullable=True)    # JSON string for gear
     items = db.Column(db.Text, nullable=True)   # JSON string for items
+    xp = db.Column(db.Integer, nullable=False, default=0)
+    level = db.Column(db.Integer, nullable=False, default=1)
     # Add more fields as needed
 
 
