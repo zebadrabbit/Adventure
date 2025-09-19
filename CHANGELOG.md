@@ -1,3 +1,9 @@
+# [0.2.1] - 2025-09-19
+### Changed
+- Enforce 4-player party selection limit in dashboard.js
+- Disable checkboxes after 4 are selected
+- Enable Begin Adventure button only when 1-4 are selected
+- Character card click toggles selection and syncs with checkbox
 # Changelog
 
 ## [0.2.0] - 2025-09-18
