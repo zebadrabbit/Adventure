@@ -118,8 +118,15 @@ os.environ.setdefault('PYTHONPATH', str(PROJECT_ROOT))
 
 # Import application lazily
 try:
-    from app import app, db
+    # Import module then extract Flask app instance; fall back to factory
+    import app as app_module  # noqa: F401
+    from app import db, create_app  # type: ignore
     from app.models.models import User
+    # Attempt to access app_module.app if present
+    flask_app = getattr(app_module, 'app', None)
+    if flask_app is None or not hasattr(flask_app, 'app_context'):
+        # Use factory
+        flask_app = create_app()
 except Exception as e:
     print(c("Failed to import app – ensure dependencies installed (pip install -r requirements.txt).", C.RED))
     print(e)
@@ -134,7 +141,7 @@ except Exception as e:
     print(c(f"Warning: could not run runtime migrations automatically: {e}", C.YELLOW))
 
 created_admin = False
-with app.app_context():
+with flask_app.app_context():
     db.create_all()
     if create_admin.lower() == 'y':
         existing = User.query.filter_by(username=admin_username).first()
