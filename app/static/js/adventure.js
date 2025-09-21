@@ -1,6 +1,9 @@
 // Adventure page dungeon logic extracted from adventure.html
 (function(){
   const TILE_SIZE = 64;
+  // Visibility (fog-of-war) radius in tiles (Manhattan distance). Tiles beyond
+  // this distance from the player are hidden (no fill, no stroke, not interactive).
+  const VISIBILITY_RADIUS = 3; // Adjust to 2 or 3 depending on desired depth
   document.addEventListener('DOMContentLoaded', function() {
     const output = document.getElementById('dungeon-output');
   // Position element removed per design update (compass + log only)
@@ -61,6 +64,10 @@
             if (window.dungeonPlayerMarker && window.dungeonMap && Number.isFinite(pxY) && Number.isFinite(pxX)) {
               window.dungeonPlayerMarker.setLatLng([pxY, pxX]);
               window.dungeonMap.panTo([pxY, pxX], { animate: true });
+              // Update fog-of-war visibility after movement
+              if (Array.isArray(data.pos)) {
+                try { updateDungeonVisibility(data.pos[0], data.pos[1]); } catch(e) { /* noop */ }
+              }
             }
         }
         if (data && Array.isArray(data.exits)) {
@@ -121,6 +128,41 @@
     });
 
     // Initial exits fetched after map load (see loadDungeonMap)
+
+    // Applies visibility rules to all stored tile layers based on player (px,py).
+    function updateDungeonVisibility(px, py) {
+      if (!window.dungeonTileLayers) return;
+      const layers = window.dungeonTileLayers;
+      const radius = VISIBILITY_RADIUS;
+      const maxManhattan = radius; // manhattan distance threshold
+      for (const key in layers) {
+        const layer = layers[key];
+        if (!layer || !layer._dungeon) continue;
+        const dx = Math.abs(layer._dungeon.x - px);
+        const dy = Math.abs(layer._dungeon.y - py);
+        const dist = dx + dy; // manhattan distance
+        if (dist <= maxManhattan) {
+          // Reveal tile
+            layer.setStyle({
+              fillOpacity: 0.7,
+              weight: 1,
+              color: '#303030',
+              stroke: true,
+              fillColor: layer._dungeon.color
+            });
+            if (layer._dungeon.tooltip && !layer._dungeon.tooltipBound) {
+              layer.bindTooltip(layer._dungeon.tooltip, {permanent: false, direction: 'top', offset: [0, -8]});
+              layer._dungeon.tooltipBound = true;
+            }
+        } else {
+          // Hide tile (fog)
+          layer.setStyle({ fillOpacity: 0, weight: 0, stroke: false });
+          if (layer._tooltip) { // Leaflet internal handle
+            try { layer.unbindTooltip(); layer._dungeon.tooltipBound = false; } catch(e) {}
+          }
+        }
+      }
+    }
 
     function loadDungeonMap() {
       const mapDiv = document.getElementById('dungeon-map');
@@ -211,8 +253,16 @@
               rect.setStyle({ pane: 'tilePane', stroke: true, weight: 1, fillOpacity: 0.7 });
               rect._path.setAttribute('width', TILE_SIZE);
               rect._path.setAttribute('height', TILE_SIZE);
-              rect.bindTooltip(tooltip, {permanent: false, direction: 'top', offset: [0, -8]});
+              // Store tile layer reference for fog-of-war updates
+              if (!window.dungeonTileLayers) window.dungeonTileLayers = {};
+              rect._dungeon = { x, y, color, tooltip, tooltipBound: false };
+              window.dungeonTileLayers[`${x},${y}`] = rect;
             }
+          }
+
+          // After all tiles added, apply initial visibility based on player position
+          if (playerPos) {
+            try { updateDungeonVisibility(playerPos[0], playerPos[1]); } catch(e) { /* noop */ }
           }
 
           if (playerPos) {
@@ -271,6 +321,10 @@
               if (data && Array.isArray(data.exits)) {
                 availableExits = data.exits.map(e => e.toLowerCase());
                 renderExitButtons();
+              }
+              // If position returned differs (e.g., server corrected), update fog
+              if (data && Array.isArray(data.pos) && data.pos.length >= 2) {
+                try { updateDungeonVisibility(data.pos[0], data.pos[1]); } catch(e) {}
               }
             })
             .catch(err => console.error('[dungeon] state error', err));

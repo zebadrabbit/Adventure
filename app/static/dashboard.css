@@ -98,3 +98,8 @@ body {
   font-weight: 700;
   font-size: 0.8rem;
 }
+
+/* Fog-of-war hidden tile helper (currently not applied directly but reserved for potential future UI tweaks) */
+.fog-tile {
+  pointer-events: none;
+}
