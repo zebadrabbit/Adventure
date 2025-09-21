@@ -17,6 +17,40 @@
   const MEMORY_FILL_COLOR = '#060606'; // dim color base for memory tiles
   document.addEventListener('DOMContentLoaded', function() {
     const output = document.getElementById('dungeon-output');
+    // ------------------------------------------------------------
+    // Seen tile persistence + throttled save (localStorage)
+    // ------------------------------------------------------------
+    const SEEN_STORAGE_PREFIX = 'adventureSeenTiles:';
+    const SEEN_SAVE_THROTTLE_MS = 1500;
+    let lastSeenSave = 0;
+
+    function seenStorageKey() {
+      return SEEN_STORAGE_PREFIX + (window.currentDungeonSeed != null ? window.currentDungeonSeed : 'default');
+    }
+
+    function loadSeenTilesFromStorage() {
+      try {
+        const raw = localStorage.getItem(seenStorageKey());
+        if (!raw) return new Set();
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) return new Set(arr);
+      } catch(e) { /* ignore parse/storage errors */ }
+      return new Set();
+    }
+
+    function saveSeenTiles(seenSet) {
+      try {
+        const arr = Array.from(seenSet);
+        localStorage.setItem(seenStorageKey(), JSON.stringify(arr));
+      } catch(e) { /* ignore quota or storage errors */ }
+    }
+
+    function saveSeenTilesThrottled(seenSet) {
+      const now = performance.now();
+      if (now - lastSeenSave < SEEN_SAVE_THROTTLE_MS) return;
+      lastSeenSave = now;
+      saveSeenTiles(seenSet);
+    }
   // Position element removed per design update (compass + log only)
   // Legacy exits button container removed
   const moveNorthBtn = document.getElementById('btn-move-n');
@@ -144,8 +178,11 @@
     function updateDungeonVisibility(px, py) {
       if (!window.dungeonTileLayers) return;
       if (!window.dungeonSeenTiles) window.dungeonSeenTiles = new Set();
+      if (!window.dungeonTileRenderState) window.dungeonTileRenderState = {}; // per-tile cached style classification
       const seen = window.dungeonSeenTiles;
+      const renderState = window.dungeonTileRenderState;
       const layers = window.dungeonTileLayers;
+      let seenChanged = false;
       for (const key in layers) {
         const layer = layers[key];
         if (!layer || !layer._dungeon) continue;
@@ -155,14 +192,18 @@
 
         if (dist <= INNER_VIS_RADIUS) {
           // Mark as seen
-          seen.add(key);
-          layer.setStyle({
-            fillOpacity: 0.72,
-            weight: 1,
-            color: '#2e2e2e',
-            stroke: true,
-            fillColor: layer._dungeon.color
-          });
+          if (!seen.has(key)) { seen.add(key); seenChanged = true; }
+          const prev = renderState[key];
+          if (!prev || prev.mode !== 'visible') {
+            layer.setStyle({
+              fillOpacity: 0.72,
+              weight: 1,
+              color: '#2e2e2e',
+              stroke: true,
+              fillColor: layer._dungeon.color
+            });
+            renderState[key] = { mode: 'visible' };
+          }
           if (layer._dungeon.tooltip && !layer._dungeon.tooltipBound) {
             layer.bindTooltip(layer._dungeon.tooltip, {permanent: false, direction: 'top', offset: [0, -8]});
             layer._dungeon.tooltipBound = true;
@@ -189,46 +230,60 @@
           if (wasSeen) {
             fogOpacity = Math.min(fogOpacity, MEMORY_DIM_OPACITY + 0.15); // memory slightly lighter than fresh fog
           }
-          layer.setStyle({
-            fillOpacity: fogOpacity,
-            weight: 0,
-            stroke: false,
-            fillColor: '#000000',
-            color: '#000000'
-          });
+            const roundedOpacity = Math.round(fogOpacity * 100) / 100; // reduce churn from tiny float deltas
+            const prev = renderState[key];
+            if (!prev || prev.mode !== 'fog' || prev.o !== roundedOpacity) {
+              layer.setStyle({
+                fillOpacity: fogOpacity,
+                weight: 0,
+                stroke: false,
+                fillColor: '#000000',
+                color: '#000000'
+              });
+              renderState[key] = { mode: 'fog', o: roundedOpacity };
+            }
           if (layer._dungeon.tooltipBound) {
             try { layer.unbindTooltip(); } catch(e) {}
             layer._dungeon.tooltipBound = false;
           }
           // Mark tiles moderately close (inside fog region) as seen so they persist when you move away
-          if (dist <= INNER_VIS_RADIUS + 2) seen.add(key);
+          if (dist <= INNER_VIS_RADIUS + 2 && !seen.has(key)) { seen.add(key); seenChanged = true; }
           continue;
         }
 
         // Outside fog full radius. If seen before, render memory; else dark.
         const wasSeen = seen.has(key);
         if (wasSeen) {
-          layer.setStyle({
-            fillOpacity: MEMORY_DIM_OPACITY,
-            weight: MEMORY_STROKE ? 0.3 : 0,
-            stroke: MEMORY_STROKE,
-            color: '#0a0a0a',
-            fillColor: MEMORY_FILL_COLOR
-          });
+          const prev = renderState[key];
+          if (!prev || prev.mode !== 'memory') {
+            layer.setStyle({
+              fillOpacity: MEMORY_DIM_OPACITY,
+              weight: MEMORY_STROKE ? 0.3 : 0,
+              stroke: MEMORY_STROKE,
+              color: '#0a0a0a',
+              fillColor: MEMORY_FILL_COLOR
+            });
+            renderState[key] = { mode: 'memory' };
+          }
         } else {
-          layer.setStyle({
-            fillOpacity: 0.94,
-            weight: 0,
-            stroke: false,
-            fillColor: '#000000',
-            color: '#000000'
-          });
+          const prev = renderState[key];
+          if (!prev || prev.mode !== 'dark') {
+            layer.setStyle({
+              fillOpacity: 0.94,
+              weight: 0,
+              stroke: false,
+              fillColor: '#000000',
+              color: '#000000'
+            });
+            renderState[key] = { mode: 'dark' };
+          }
         }
         if (layer._dungeon.tooltipBound) {
           try { layer.unbindTooltip(); } catch(e) {}
           layer._dungeon.tooltipBound = false;
       }
     }
+      if (seenChanged) saveSeenTilesThrottled(seen);
     }
 
     function loadDungeonMap() {
@@ -241,6 +296,8 @@
             const badge = document.getElementById('dungeon-seed-badge');
             if (badge) badge.textContent = 'seed: ' + data.seed;
             window.currentDungeonSeed = data.seed;
+            // Load persisted seen tiles now that seed known
+            window.dungeonSeenTiles = loadSeenTilesFromStorage();
           }
           const grid = data.grid; // row-major: grid[y][x]
           const height = data.height;
