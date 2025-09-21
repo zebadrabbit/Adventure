@@ -6,10 +6,10 @@
   // FOG_FULL_RADIUS: outer limit where fog reaches maximum darkness. Tiles beyond this still rendered
   // but nearly opaque black (kept so map shape perception is limited). Increase for larger explored area preview.
   // Opacity scales from MIN_FOG_OPACITY at inner edge to MAX_FOG_OPACITY at outer edge.
-  const INNER_VIS_RADIUS = 3;      // fully visible core
-  const FOG_FULL_RADIUS = 14;      // distance at which fog becomes fully dark (larger fog extent)
-  const MIN_FOG_OPACITY = 0.15;    // near inner edge (letting some map color hint through)
-  const MAX_FOG_OPACITY = 0.90;    // near outer edge (almost black)
+  const INNER_VIS_RADIUS = 6;      // expanded fully visible core
+  const FOG_FULL_RADIUS = 22;      // expanded gradient reach
+  const MIN_FOG_OPACITY = 0.05;    // very light veil near inner edge
+  const MAX_FOG_OPACITY = 0.55;    // softer outer fog (keep some spatial hint)
   document.addEventListener('DOMContentLoaded', function() {
     const output = document.getElementById('dungeon-output');
   // Position element removed per design update (compass + log only)
