@@ -6,13 +6,15 @@
   // FOG_FULL_RADIUS: outer limit where fog reaches maximum darkness. Tiles beyond this still rendered
   // but nearly opaque black (kept so map shape perception is limited). Increase for larger explored area preview.
   // Opacity scales from MIN_FOG_OPACITY at inner edge to MAX_FOG_OPACITY at outer edge.
-  const INNER_VIS_RADIUS = 7;      // slightly larger fully visible core
-  const FOG_FULL_RADIUS = 24;      // extended gradient reach
-  const MIN_FOG_OPACITY = 0.25;    // darker near inner boundary
-  const MAX_FOG_OPACITY = 0.85;    // darker outer fog
-  const FOG_STEPS = 6;             // number of stepped bands in gradient region
-  const FOG_NOISE_AMPLITUDE = 0.10; // max +/- added to opacity per tile for irregularity
-  const FOG_NOISE_SCALE = 5;        // controls how often noise changes spatially
+  // Fog parameters (smooth radial gradient + noise + memory)
+  const INNER_VIS_RADIUS = 8;       // fully visible radius (Euclidean)
+  const FOG_FULL_RADIUS = 26;       // where fog reaches max opacity
+  const MIN_FOG_OPACITY = 0.18;     // minimum fog opacity just outside inner radius
+  const MAX_FOG_OPACITY = 0.82;     // maximum fog opacity at/after full radius
+  const FOG_NOISE_AMPLITUDE = 0.08; // max +/- added to opacity per tile for irregularity
+  const MEMORY_DIM_OPACITY = 0.35;  // opacity for previously seen but currently out-of-range tiles
+  const MEMORY_STROKE = false;      // memory tiles get no stroke edge
+  const MEMORY_FILL_COLOR = '#060606'; // dim color base for memory tiles
   document.addEventListener('DOMContentLoaded', function() {
     const output = document.getElementById('dungeon-output');
   // Position element removed per design update (compass + log only)
@@ -141,20 +143,23 @@
     // Applies visibility rules to all stored tile layers based on player (px,py).
     function updateDungeonVisibility(px, py) {
       if (!window.dungeonTileLayers) return;
+      if (!window.dungeonSeenTiles) window.dungeonSeenTiles = new Set();
+      const seen = window.dungeonSeenTiles;
       const layers = window.dungeonTileLayers;
       for (const key in layers) {
         const layer = layers[key];
         if (!layer || !layer._dungeon) continue;
-        const dx = Math.abs(layer._dungeon.x - px);
-        const dy = Math.abs(layer._dungeon.y - py);
-        const dist = dx + dy; // Manhattan distance for diamond-shaped visibility
+        const dx = layer._dungeon.x - px;
+        const dy = layer._dungeon.y - py;
+        const dist = Math.sqrt(dx*dx + dy*dy); // Euclidean for circular falloff
 
         if (dist <= INNER_VIS_RADIUS) {
-          // Fully visible original tile
+          // Mark as seen
+          seen.add(key);
           layer.setStyle({
-            fillOpacity: 0.7,
+            fillOpacity: 0.72,
             weight: 1,
-            color: '#303030',
+            color: '#2e2e2e',
             stroke: true,
             fillColor: layer._dungeon.color
           });
@@ -165,54 +170,65 @@
           continue;
         }
 
-        // Gradient fog region (with banded stepping + deterministic noise)
+        const span = FOG_FULL_RADIUS - INNER_VIS_RADIUS;
         if (dist <= FOG_FULL_RADIUS) {
-          const span = FOG_FULL_RADIUS - INNER_VIS_RADIUS;
-          const relLinear = span > 0 ? (dist - INNER_VIS_RADIUS) / span : 1;
-          // Apply stepping
-          const stepIndex = Math.min(FOG_STEPS - 1, Math.max(0, Math.floor(relLinear * FOG_STEPS)));
-          const relStepped = stepIndex / (FOG_STEPS - 1 || 1);
-          let fogOpacity = MIN_FOG_OPACITY + (MAX_FOG_OPACITY - MIN_FOG_OPACITY) * relStepped;
-          // Deterministic hash noise (no RNG) using coordinates and step index
+          const rel = span > 0 ? (dist - INNER_VIS_RADIUS) / span : 1;
+          let fogOpacity = MIN_FOG_OPACITY + (MAX_FOG_OPACITY - MIN_FOG_OPACITY) * rel;
+          // Noise (deterministic) per tile + mild radial attenuation (less noise near center)
           const ix = layer._dungeon.x;
           const iy = layer._dungeon.y;
-          let h = (ix * 73856093) ^ (iy * 19349663) ^ (stepIndex * 83492791);
-          h = (h >>> 0) % 104729; // prime modulus
+          let h = (ix * 73856093) ^ (iy * 19349663) ^ (FOG_FULL_RADIUS * 83492791);
+          h = (h >>> 0) % 104729;
           const noise = ((h / 104729) - 0.5) * 2; // [-1,1]
-          const attenuation = 1 - Math.min(1, (dist - INNER_VIS_RADIUS) / (FOG_FULL_RADIUS - INNER_VIS_RADIUS + 0.00001));
-          const noiseFactor = (FOG_NOISE_AMPLITUDE * attenuation);
-          fogOpacity += noise * noiseFactor;
+          const attenuation = 1 - Math.max(0, (INNER_VIS_RADIUS - dist) / INNER_VIS_RADIUS);
+          fogOpacity += noise * FOG_NOISE_AMPLITUDE * attenuation;
           if (fogOpacity < MIN_FOG_OPACITY) fogOpacity = MIN_FOG_OPACITY;
           else if (fogOpacity > MAX_FOG_OPACITY) fogOpacity = MAX_FOG_OPACITY;
-          // Slight variation in stroke visibility per band
-          const stroke = stepIndex <= 1; // only inner two bands retain subtle edge
+          // If previously seen, blend toward memory dim color slightly
+          const wasSeen = seen.has(key);
+          if (wasSeen) {
+            fogOpacity = Math.min(fogOpacity, MEMORY_DIM_OPACITY + 0.15); // memory slightly lighter than fresh fog
+          }
           layer.setStyle({
             fillOpacity: fogOpacity,
-            weight: stroke ? 0.4 : 0,
-            color: '#050505',
-            stroke,
-            fillColor: '#000000'
+            weight: 0,
+            stroke: false,
+            fillColor: '#000000',
+            color: '#000000'
           });
           if (layer._dungeon.tooltipBound) {
             try { layer.unbindTooltip(); } catch(e) {}
             layer._dungeon.tooltipBound = false;
           }
+          // Mark tiles moderately close (inside fog region) as seen so they persist when you move away
+          if (dist <= INNER_VIS_RADIUS + 2) seen.add(key);
           continue;
         }
 
-        // Beyond full fog radius: fully dark but keep minute variation for continuity
-        layer.setStyle({
-          fillOpacity: 0.92,
-          weight: 0,
-          stroke: false,
-          fillColor: '#000000',
-          color: '#000000'
-        });
+        // Outside fog full radius. If seen before, render memory; else dark.
+        const wasSeen = seen.has(key);
+        if (wasSeen) {
+          layer.setStyle({
+            fillOpacity: MEMORY_DIM_OPACITY,
+            weight: MEMORY_STROKE ? 0.3 : 0,
+            stroke: MEMORY_STROKE,
+            color: '#0a0a0a',
+            fillColor: MEMORY_FILL_COLOR
+          });
+        } else {
+          layer.setStyle({
+            fillOpacity: 0.94,
+            weight: 0,
+            stroke: false,
+            fillColor: '#000000',
+            color: '#000000'
+          });
+        }
         if (layer._dungeon.tooltipBound) {
           try { layer.unbindTooltip(); } catch(e) {}
           layer._dungeon.tooltipBound = false;
-        }
       }
+    }
     }
 
     function loadDungeonMap() {
