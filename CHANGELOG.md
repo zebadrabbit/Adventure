@@ -1,3 +1,9 @@
+# [0.3.5] - UNRELEASED
+### Added
+### Changed
+### Fixed
+### Notes
+
 # [0.3.4] - 2025-09-21
 ### Added
 - Lightweight SVG normalization hook (`optimize_svgs`) stripping non-license comments and trimming whitespace across 2,693 SVG icon assets.
