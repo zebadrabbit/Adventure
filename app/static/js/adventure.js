@@ -6,10 +6,13 @@
   // FOG_FULL_RADIUS: outer limit where fog reaches maximum darkness. Tiles beyond this still rendered
   // but nearly opaque black (kept so map shape perception is limited). Increase for larger explored area preview.
   // Opacity scales from MIN_FOG_OPACITY at inner edge to MAX_FOG_OPACITY at outer edge.
-  const INNER_VIS_RADIUS = 6;      // expanded fully visible core
-  const FOG_FULL_RADIUS = 22;      // expanded gradient reach
-  const MIN_FOG_OPACITY = 0.05;    // very light veil near inner edge
-  const MAX_FOG_OPACITY = 0.55;    // softer outer fog (keep some spatial hint)
+  const INNER_VIS_RADIUS = 7;      // slightly larger fully visible core
+  const FOG_FULL_RADIUS = 24;      // extended gradient reach
+  const MIN_FOG_OPACITY = 0.25;    // darker near inner boundary
+  const MAX_FOG_OPACITY = 0.85;    // darker outer fog
+  const FOG_STEPS = 6;             // number of stepped bands in gradient region
+  const FOG_NOISE_AMPLITUDE = 0.10; // max +/- added to opacity per tile for irregularity
+  const FOG_NOISE_SCALE = 5;        // controls how often noise changes spatially
   document.addEventListener('DOMContentLoaded', function() {
     const output = document.getElementById('dungeon-output');
   // Position element removed per design update (compass + log only)
@@ -162,19 +165,32 @@
           continue;
         }
 
-        // Gradient fog region
+        // Gradient fog region (with banded stepping + deterministic noise)
         if (dist <= FOG_FULL_RADIUS) {
           const span = FOG_FULL_RADIUS - INNER_VIS_RADIUS;
-          const rel = span > 0 ? (dist - INNER_VIS_RADIUS) / span : 1;
-          // Clamp and compute opacity
-            let fogOpacity = MIN_FOG_OPACITY + (MAX_FOG_OPACITY - MIN_FOG_OPACITY) * rel;
-            if (fogOpacity < MIN_FOG_OPACITY) fogOpacity = MIN_FOG_OPACITY;
-            else if (fogOpacity > MAX_FOG_OPACITY) fogOpacity = MAX_FOG_OPACITY;
+          const relLinear = span > 0 ? (dist - INNER_VIS_RADIUS) / span : 1;
+          // Apply stepping
+          const stepIndex = Math.min(FOG_STEPS - 1, Math.max(0, Math.floor(relLinear * FOG_STEPS)));
+          const relStepped = stepIndex / (FOG_STEPS - 1 || 1);
+          let fogOpacity = MIN_FOG_OPACITY + (MAX_FOG_OPACITY - MIN_FOG_OPACITY) * relStepped;
+          // Deterministic hash noise (no RNG) using coordinates and step index
+          const ix = layer._dungeon.x;
+          const iy = layer._dungeon.y;
+          let h = (ix * 73856093) ^ (iy * 19349663) ^ (stepIndex * 83492791);
+          h = (h >>> 0) % 104729; // prime modulus
+          const noise = ((h / 104729) - 0.5) * 2; // [-1,1]
+          const attenuation = 1 - Math.min(1, (dist - INNER_VIS_RADIUS) / (FOG_FULL_RADIUS - INNER_VIS_RADIUS + 0.00001));
+          const noiseFactor = (FOG_NOISE_AMPLITUDE * attenuation);
+          fogOpacity += noise * noiseFactor;
+          if (fogOpacity < MIN_FOG_OPACITY) fogOpacity = MIN_FOG_OPACITY;
+          else if (fogOpacity > MAX_FOG_OPACITY) fogOpacity = MAX_FOG_OPACITY;
+          // Slight variation in stroke visibility per band
+          const stroke = stepIndex <= 1; // only inner two bands retain subtle edge
           layer.setStyle({
             fillOpacity: fogOpacity,
-            weight: 0.5,
-            color: '#000000',
-            stroke: true,
+            weight: stroke ? 0.4 : 0,
+            color: '#050505',
+            stroke,
             fillColor: '#000000'
           });
           if (layer._dungeon.tooltipBound) {
@@ -184,9 +200,9 @@
           continue;
         }
 
-        // Beyond full fog radius: almost fully blacked out
+        // Beyond full fog radius: fully dark but keep minute variation for continuity
         layer.setStyle({
-          fillOpacity: 0.95,
+          fillOpacity: 0.92,
           weight: 0,
           stroke: false,
           fillColor: '#000000',
