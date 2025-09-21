@@ -281,35 +281,61 @@ class Dungeon:
 
     def _enforce_room_tunnel_separation(self, grid):
         x, y, _ = self.size
-        # Rule refinement (2025-09-21): We want strict separation so that a room is only
-        # accessible via explicit door cells, BUT we allow an exception where multiple
-        # distinct tunnels may legitimately connect to different sides of (or points on)
-        # the same room. Instead of sealing every tunnel cell adjacent to a room into a
-        # wall (original behavior), we now promote qualifying tunnel endpoints into doors.
-        # Qualifying tunnel endpoint criteria:
-        #   - Cell type is 'tunnel'.
-        #   - Adjacent to exactly one room cell (prevents ambiguous multi-room joins).
-        #   - Has at least one other neighboring tunnel/door so it is part of a corridor.
-        # Otherwise the tunnel cell is converted to a wall to preserve visual separation.
+        # Rule refinement (2025-09-21, updated 2025-09-21b): Prevent strings of doors.
+        # Original refinement promoted any tunnel endpoint adjacent to exactly one room
+        # (with at least one tunnel/door neighbor) into a door. This produced long
+        # chains of consecutive door cells when a corridor hugged a room wall.
+        # Revised criteria for promoting a tunnel to a door:
+        #   1. Cell type is 'tunnel'.
+        #   2. Adjacent to exactly one room cell.
+        #   3. Corridor context indicates an entry / junction, not an inline corridor.
+        #      We classify corridor context via the set of tunnel/door neighbors:
+        #        - If there are 0 walkable (tunnel/door) neighbors: ignore (becomes wall below).
+        #        - If exactly 1 walkable neighbor: dead-end into the room -> promote to door.
+        #        - If exactly 2 walkable neighbors:
+        #              * If they are opposite (straight line) -> KEEP AS TUNNEL (avoid chain)
+        #              * If they are orthogonal (turn / junction) -> promote to door.
+        #        - If 3+ walkable neighbors -> intersection near room -> promote.
+        #   4. Otherwise leave as tunnel (not wall) to preserve corridor continuity.
+        # Any tunnel adjacent to one or more rooms that does not meet door criteria and
+        # is NOT a straight inline corridor segment becomes a wall (seals improper adjacency).
         for ix in range(x):
             for iy in range(y):
                 if grid[ix][iy][0].cell_type != 'tunnel':
                     continue
                 room_neighbors = 0
-                tunnel_link = False
+                walk_dirs = []  # directions that are tunnel/door
+                room_dir = None
                 for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
                     nx, ny = ix+dx, iy+dy
                     if 0 <= nx < x and 0 <= ny < y:
                         ct = grid[nx][ny][0].cell_type
                         if ct == 'room':
                             room_neighbors += 1
+                            room_dir = (dx, dy)
                         elif ct in {'tunnel','door'}:
-                            tunnel_link = True
-                if room_neighbors == 1 and tunnel_link:
-                    # Promote to door (allows multiple doors if multiple corridors terminate here)
-                    grid[ix][iy][0] = DungeonCell('door')
+                            walk_dirs.append((dx,dy))
+                if room_neighbors == 1:
+                    promote = False
+                    wc = len(walk_dirs)
+                    if wc == 1:
+                        promote = True  # dead-end into room
+                    elif wc == 2:
+                        # Check if opposite (straight line) or orthogonal (junction/turn)
+                        (dx1,dy1),(dx2,dy2) = walk_dirs
+                        if not (dx1 == -dx2 and dy1 == -dy2):
+                            promote = True  # turn or bend near room
+                        else:
+                            promote = False  # inline corridor along wall -> keep tunnel
+                    elif wc >= 3:
+                        promote = True  # intersection near room
+                    if promote:
+                        grid[ix][iy][0] = DungeonCell('door')
+                    else:
+                        # Keep as tunnel (do not seal) to preserve corridor; NOT promoted to door
+                        pass
                 elif room_neighbors > 0:
-                    # Adjacent to room(s) but not a proper corridor endpoint -> seal
+                    # Adjacent to multiple rooms (merge) or ambiguous -> seal to wall
                     grid[ix][iy][0] = DungeonCell('wall')
 
     def _guarantee_room_doors(self, grid, room_id_grid):

@@ -238,6 +238,9 @@ Key variables:
 
 ## Explored Tiles Persistence (Fog-of-War Memory)
 
+### Door Placement Normalization
+The dungeon generator enforces that door tiles appear as discrete entrance points rather than continuous bands. A refinement (2025-09-21) prevents creation of straight chains of adjacent door cells along a single room wall by distinguishing true entry/junction endpoints from inline corridor segments. Inline segments remain tunnels; only corridor dead‑ends, bends, intersections, or single endpoints adjacent to exactly one room become doors.
+
 Explored dungeon tiles are stored per user and seed to allow long-term mapping memory across sessions and devices.
 
 Storage layers:
