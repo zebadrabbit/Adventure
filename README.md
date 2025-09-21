@@ -332,3 +332,11 @@ Caching:
 This project follows Semantic Versioning (SemVer): MAJOR.MINOR.PATCH.
 
 See CHANGELOG.md for a curated list of notable changes per release.
+
+### Automated Version Bump
+An automated workflow (`auto-bump.yml`) examines the latest commit message on pushes to `main`. If the commit uses a Conventional Commit type (e.g., `feat:`, `fix:`, `perf:`) and the `VERSION` file was not modified in that commit, it will:
+1. Decide bump type (`feat`/`perf` -> minor, `fix`/others -> patch).
+2. Run the bump script (`scripts/bump_version.py <type>`).
+3. Commit and push the updated `VERSION` (and `CHANGELOG.md` if modified).
+
+To skip auto-bump, either include a manual version bump in your PR (changing `VERSION`) or use a non-triggering type (like `docs:`) when appropriate.

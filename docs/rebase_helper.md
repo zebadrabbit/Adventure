@@ -87,3 +87,21 @@ alias grb='git fetch origin && git rebase -i origin/main'
 
 ---
 Maintainers may request history cleanup before merge to keep `main` bisect-friendly.
+
+## Scripted Helper (`scripts/rebase_helper.sh`)
+
+For convenience a portable Bash helper is included:
+
+```bash
+scripts/rebase_helper.sh            # rebase current branch onto origin/main
+scripts/rebase_helper.sh upstream/feature-x
+scripts/rebase_helper.sh --autosquash  # include fixup!/squash! autosquash
+```
+
+Safety features:
+- Refuses to run on `main`.
+- Aborts if working tree not clean.
+- Verifies upstream ref exists.
+- Provides next-step instructions after success (test & push).
+
+If conflicts occur, resolve them then run `git rebase --continue` manually. The script exits non‑zero when conflicts are present.

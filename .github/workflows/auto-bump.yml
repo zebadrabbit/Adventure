@@ -1,0 +1,56 @@
+name: Auto Bump Version
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  auto-bump:
+    runs-on: ubuntu-latest
+    if: ${{ github.repository_owner == 'zebadrabbit' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Determine bump necessity
+        id: bump
+        run: |
+          set -e
+          LAST_COMMIT_MSG=$(git log -1 --pretty=%s)
+          echo "Last commit: $LAST_COMMIT_MSG"
+          if git diff --name-only HEAD~1..HEAD | grep -q '^VERSION$'; then
+            echo "Version file already changed in last commit; skipping bump."; echo "bump=no" >> $GITHUB_OUTPUT; exit 0; fi
+          TYPE=patch
+          case "$LAST_COMMIT_MSG" in
+            feat:*) TYPE=minor ;;
+            perf:*) TYPE=minor ;;
+            fix:*) TYPE=patch ;;
+            chore:*) TYPE=patch ;;
+            docs:*) TYPE=patch ;;
+            refactor:*) TYPE=patch ;;
+          esac
+          echo "decided_type=$TYPE" >> $GITHUB_OUTPUT
+          echo "bump=yes" >> $GITHUB_OUTPUT
+      - name: Install deps
+        if: steps.bump.outputs.bump == 'yes'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || true
+      - name: Bump version
+        if: steps.bump.outputs.bump == 'yes'
+        run: |
+          python scripts/bump_version.py ${{ steps.bump.outputs.decided_type }}
+          NEW_VER=$(cat VERSION)
+          git config user.name 'github-actions'
+          git config user.email 'github-actions@github.com'
+          git add VERSION CHANGELOG.md || true
+          git commit -m "chore: auto bump version to ${NEW_VER}" || echo "Nothing to commit"
+          git push
