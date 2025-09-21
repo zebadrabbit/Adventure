@@ -1,7 +1,7 @@
 """
 project: Adventure MUD
 module: dungeon.py
-https://github.com/zebadrabbit/adventure-mud
+https://github.com/zebadrabbit/Adventure
 License: MIT
 
 Procedural dungeon generator and grid logic for Adventure MUD.

@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  build-and-test:
+  build-test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -23,18 +23,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          pip install pre-commit pytest pytest-cov ruff
 
-      - name: Run pre-commit (if configured)
-        run: |
-          if [ -f .pre-commit-config.yaml ]; then
-            pre-commit run --all-files
-          else
-            echo "No pre-commit config found, skipping"
-          fi
+      - name: Run pre-commit
+        run: pre-commit run --all-files
 
       - name: Run tests
+        run: pytest -q --maxfail=1 --disable-warnings --cov=app --cov-report=term-missing
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Enforce minimum coverage
         run: |
-          pytest -q --maxfail=1 --disable-warnings
+          coverage=$(pytest --cov=app --cov-report=term | awk '/TOTAL/ {print $4}' | sed 's/%//') || true
+          echo "Detected coverage: $coverage%"
+          min=60
+          awk -v c=$coverage -v m=$min 'BEGIN { if (c+0 < m) { printf("Coverage %.1f%% below minimum %d%%\n", c, m); exit 1 } }'
 
       - name: Coverage (optional)
         if: always()

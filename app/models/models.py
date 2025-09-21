@@ -1,4 +1,10 @@
-"""Database models used by the Adventure MUD application.
+"""
+project: Adventure MUD
+module: models.py
+https://github.com/zebadrabbit/Adventure
+License: MIT
+
+Database models used by the Adventure MUD application.
 
 Notes:
 - Passwords are stored as hashed values (Werkzeug generate_password_hash).

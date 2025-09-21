@@ -8,6 +8,13 @@
   --mud-olive: #6F732F;
   --mud-bg: #10191a;
   --mud-bg-dark: #153131;
+  /* Class color system */
+  --class-fighter-bg: #7a3314; --class-fighter-fg: #f2e2d8; --class-fighter-border: #b44f21;
+  --class-rogue-bg:   #454a1f; --class-rogue-fg:   #e5e5d1; --class-rogue-border:   #6f732f;
+  --class-mage-bg:    #0f4d63; --class-mage-fg:    #d2f2ff; --class-mage-border:    #196e89;
+  --class-cleric-bg:  #6a6f72; --class-cleric-fg:  #f5f5f5; --class-cleric-border:  #9aa1a5;
+  --class-druid-bg:   #213826; --class-druid-fg:   #d8f2dc; --class-druid-border:   #2f5738;
+  --class-ranger-bg:  #1d4a57; --class-ranger-fg:  #d8eef5; --class-ranger-border:  #2c6b7d;
 }
 body {
   background: var(--mud-bg-dark);
@@ -48,15 +55,22 @@ body {
   border-color: var(--bs-success);
 }
 /* Character class color accents */
-.class-fighter { background: var(--mud-orange) !important; color: #fff !important; }
-.class-rogue { background: var(--mud-olive) !important; color: #fff !important; }
-.class-mage { background: var(--mud-purple) !important; color: #fff !important; }
-.class-cleric { background: var(--mud-grey) !important; color: #222 !important; }
-.border-fighter { border: 2px solid var(--mud-orange) !important; }
-.border-rogue { border: 2px solid var(--mud-olive) !important; }
-.border-mage { border: 2px solid var(--mud-purple) !important; }
-.border-cleric { border: 2px solid var(--mud-grey) !important; }
-.border-default { border: 2px solid #444 !important; }
+/* Revised dark palette for character classes */
+/* Fighter: deep ember, Rogue: muted moss, Mage: twilight cyan, Cleric: soft steel, Druid: forest shadow, Ranger: cold sky */
+.class-fighter { background: var(--class-fighter-bg) !important; color: var(--class-fighter-fg) !important; }
+.class-rogue   { background: var(--class-rogue-bg) !important;   color: var(--class-rogue-fg) !important; }
+.class-mage    { background: var(--class-mage-bg) !important;    color: var(--class-mage-fg) !important; }
+.class-cleric  { background: var(--class-cleric-bg) !important;  color: var(--class-cleric-fg) !important; }
+.class-druid   { background: var(--class-druid-bg) !important;   color: var(--class-druid-fg) !important; }
+.class-ranger  { background: var(--class-ranger-bg) !important;  color: var(--class-ranger-fg) !important; }
+
+.border-fighter { border: 2px solid var(--class-fighter-border) !important; }
+.border-rogue   { border: 2px solid var(--class-rogue-border) !important; }
+.border-mage    { border: 2px solid var(--class-mage-border) !important; }
+.border-cleric  { border: 2px solid var(--class-cleric-border) !important; }
+.border-druid   { border: 2px solid var(--class-druid-border) !important; }
+.border-ranger  { border: 2px solid var(--class-ranger-border) !important; }
+.border-default { border: 2px solid #333 !important; }
 
 /* Selected card glow */
 .character-card {

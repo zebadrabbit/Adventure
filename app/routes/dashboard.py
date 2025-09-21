@@ -1,7 +1,7 @@
 """
 project: Adventure MUD
 module: dashboard.py
-https://github.com/zebadrabbit/adventure-mud
+https://github.com/zebadrabbit/Adventure
 License: MIT
 
 Dashboard and character management routes for Adventure MUD.
@@ -32,13 +32,35 @@ def dashboard():
     import random
     # POST: handle form submissions
     if request.method == 'POST':
+        # Defensive: capture a stable user id even if the underlying SQLAlchemy instance
+        # becomes detached between test requests. Instead of force-logging the user out
+        # (which caused a regression where subsequent API calls received 302 redirects),
+        # fall back to the session stored _user_id / user_id value when possible.
+        current_user_id = None
+        try:  # happy path: attached user object
+            current_user_id = getattr(current_user, 'id', None)
+        except Exception:  # detached or other access error
+            current_user_id = None
+        if current_user_id is None:
+            # Fallback to session keys used by flask-login / our tests
+            sid = session.get('_user_id') or session.get('user_id')
+            if sid is not None:
+                try:
+                    current_user_id = int(sid)
+                except (TypeError, ValueError):
+                    current_user_id = None
+        if current_user_id is None:
+            # As a last resort, redirect to login (rare)
+            from flask_login import logout_user
+            logout_user()
+            return redirect(url_for('auth.login'))
         form_type = request.form.get('form')
         if form_type == 'update_email':
             new_email = request.form.get('email', '').strip() or None
             if new_email and ('@' not in new_email or '.' not in new_email):
                 flash('Please enter a valid email address.', 'warning')
             else:
-                user = db.session.get(User, current_user.id)
+                user = db.session.get(User, current_user_id)
                 user.email = new_email
                 db.session.commit()
                 flash('Email updated.' if new_email else 'Email cleared.')
@@ -54,7 +76,7 @@ def dashboard():
             if new_pw != confirm_pw:
                 flash('New password and confirmation do not match.', 'warning')
                 return redirect(url_for('dashboard.dashboard'))
-            user = db.session.get(User, current_user.id)
+            user = db.session.get(User, current_user_id)
             if not check_password_hash(user.password, current_pw):
                 flash('Current password is incorrect.', 'danger')
                 return redirect(url_for('dashboard.dashboard'))
@@ -76,7 +98,7 @@ def dashboard():
             if not (1 <= len(party_ids) <= 4):
                 flash('Select between 1 and 4 characters to begin the adventure.', 'warning')
                 return redirect(url_for('dashboard.dashboard'))
-            chars = Character.query.filter(Character.id.in_(party_ids), Character.user_id == current_user.id).all()
+            chars = Character.query.filter(Character.id.in_(party_ids), Character.user_id == current_user_id).all()
             if len(chars) != len(party_ids):
                 flash('One or more selected characters are invalid.', 'danger')
                 return redirect(url_for('dashboard.dashboard'))
@@ -102,7 +124,7 @@ def dashboard():
                 # If no existing instance (user never touched seed widget/API), fallback to random seed here.
                 import random
                 seed = seed or random.randint(1, 1_000_000)
-                instance = DungeonInstance(user_id=current_user.id, seed=seed, pos_x=0, pos_y=0, pos_z=0)
+                instance = DungeonInstance(user_id=current_user_id, seed=seed, pos_x=0, pos_y=0, pos_z=0)
                 db.session.add(instance)
                 db.session.commit()
                 session['dungeon_instance_id'] = instance.id
@@ -116,7 +138,7 @@ def dashboard():
         coins = {'gold': 5, 'silver': 20, 'copper': 50}
         items = STARTER_ITEMS.get(char_class, STARTER_ITEMS['fighter'])
         character = Character(
-            user_id=current_user.id,
+            user_id=current_user_id,
             name=name,
             stats=json.dumps({**stats, **coins, 'class': char_class}),
             gear=json.dumps([]),
@@ -129,7 +151,13 @@ def dashboard():
         flash(f'Character {name} the {char_class} created!')
         return redirect(url_for('dashboard.dashboard'))
     # GET: show dashboard
-    characters = Character.query.filter_by(user_id=current_user.id).all()
+    try:
+        uid = current_user.id
+    except Exception:
+        from flask_login import logout_user
+        logout_user()
+        return redirect(url_for('auth.login'))
+    characters = Character.query.filter_by(user_id=uid).all()
     class_map = {
         'fighter': lambda s: s['str'] >= s['dex'] and s['str'] >= s['int'] and s['str'] >= s['wis'],
         'mage':    lambda s: s['int'] >= s['str'] and s['int'] >= s['dex'] and s['int'] >= s['wis'],

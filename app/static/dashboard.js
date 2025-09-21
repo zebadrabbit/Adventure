@@ -1,3 +1,20 @@
+(function() {
+    // --- Config API Fetch ---
+    let config = {};
+    async function fetchConfig() {
+        const [namePools, starterItems, baseStats, classMap] = await Promise.all([
+            fetch('/api/config/name_pools').then(r => r.json()),
+            fetch('/api/config/starter_items').then(r => r.json()),
+            fetch('/api/config/base_stats').then(r => r.json()),
+            fetch('/api/config/class_map').then(r => r.json()),
+        ]);
+        config.namePools = namePools;
+        config.starterItems = starterItems;
+        config.baseStats = baseStats;
+        config.classMap = classMap;
+    }
+    fetchConfig();
+
 // Dashboard and party logic extracted from dashboard.html
 (function() {
     // Party selection logic with limit enforcement and card click
@@ -89,7 +106,7 @@
         cb.addEventListener('change', updatePartyUI);
     });
 
-    // Card click toggles checkbox
+    // Card click toggles checkbox and keeps visual state in sync
     cards.forEach(card => {
         card.addEventListener('click', function(e) {
             // Prevent click on delete/manage buttons from toggling
@@ -100,6 +117,15 @@
                 cb.dispatchEvent(new Event('change', { bubbles: true }));
             }
         });
+        // Keep card visual state in sync with checkbox (for keyboard, autofill, etc.)
+        const cb = card.querySelector('.party-select');
+        if (cb) {
+            cb.addEventListener('change', function() {
+                card.classList.toggle('selected', cb.checked);
+            });
+            // Initial state
+            card.classList.toggle('selected', cb.checked);
+        }
     });
 
     updatePartyUI();
@@ -139,6 +165,7 @@
         seedBtn.addEventListener('click', function(e) {
             e.preventDefault();
             // Generate a random 8-character alphanumeric seed
+            // NOTE: The backend now handles alphanumeric seeds deterministically, so this is correct.
             const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
             let seed = '';
             for (let i = 0; i < 8; i++) {
@@ -147,4 +174,22 @@
             seedInput.value = seed;
         });
     }
-})();
+
+    // Character name randomizer using config
+    const nameInput = document.getElementById('name');
+    const classSelect = document.getElementById('char_class');
+    const randomizeNameBtn = document.getElementById('randomize-name');
+    if (nameInput && classSelect && randomizeNameBtn) {
+        randomizeNameBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
+            if (!config.namePools) await fetchConfig();
+            const cls = classSelect.value;
+            const pool = config.namePools && config.namePools[cls] ? config.namePools[cls] : [];
+            if (pool.length > 0) {
+                const name = pool[Math.floor(Math.random() * pool.length)];
+                nameInput.value = name;
+            }
+        });
+    }
+    })();
+    })();

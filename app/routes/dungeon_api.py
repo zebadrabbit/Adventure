@@ -1,7 +1,7 @@
 """
 project: Adventure MUD
 module: dungeon_api.py
-https://github.com/zebadrabbit/adventure-mud
+https://github.com/zebadrabbit/Adventure
 License: MIT
 
 Dungeon map, movement, and adventure API routes for Adventure MUD.

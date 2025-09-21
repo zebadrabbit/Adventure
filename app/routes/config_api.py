@@ -1,7 +1,7 @@
 """
 project: Adventure MUD
 module: config_api.py
-https://github.com/zebadrabbit/adventure-mud
+https://github.com/zebadrabbit/Adventure
 License: MIT
 
 Game configuration API endpoints for Adventure MUD (name pools, starter items, base stats, class map).

@@ -1,3 +1,19 @@
+# [0.3.4] - 2025-09-21
+### Added
+- Lightweight SVG normalization hook (`optimize_svgs`) stripping non-license comments and trimming whitespace across 2,693 SVG icon assets.
+- CI badge and workflow alignment (`build-test` job id) plus explicit pre-commit + pytest steps.
+- Asset Optimization section in README and architecture docs link retained after branding update.
+
+### Changed
+- Repository renamed from `adventure-mud` to `Adventure`; README heading simplified and prior name noted for continuity.
+- CI workflow hardened: ensures pre-commit dependencies installed; unified job name referenced by badge.
+
+### Fixed
+- Prevents large unintentional SVG whitespace churn by normalizing format at commit time.
+
+### Notes
+- Future enhancement: enforce coverage threshold (placeholder in CI for adding `--cov` gating) and adopt `ruff` for lint (planned next).
+
 # [0.3.3] - 2025-09-21
 ### Added
 - `/api/dungeon/state` endpoint for initial cell description & exits (removes need for blank move request).

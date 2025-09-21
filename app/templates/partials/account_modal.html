@@ -6,7 +6,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <form method="POST" class="mb-3" action="{{ url_for('main.dashboard') }}">
+        <form method="POST" class="mb-3" action="{{ url_for('dashboard.dashboard') }}">
           <input type="hidden" name="form" value="update_email">
           <label for="email-modal" class="form-label">Email (for offline notifications)</label>
           <input type="email" class="form-control" id="email-modal" name="email" placeholder="you@example.com" value="{{ user_email or '' }}">
@@ -16,7 +16,7 @@
           </div>
         </form>
         <hr>
-        <form method="POST" action="{{ url_for('main.dashboard') }}">
+        <form method="POST" action="{{ url_for('dashboard.dashboard') }}">
           <input type="hidden" name="form" value="change_password">
           <div class="mb-2">
             <label for="current_password_modal" class="form-label">Current password</label>

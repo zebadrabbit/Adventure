@@ -31,10 +31,10 @@
       <div class="col-12 col-md-4">
         <h6 class="section-title">Legal</h6>
         <div class="small text-muted">
-          <a href="#">Privacy Policy</a> ·
-          <a href="#">Terms & Conditions</a> ·
-          <a href="#">Code of Conduct</a> ·
-          <a href="/licenses">Licenses & Attribution</a>
+          <a href="{{ url_for('main.privacy') }}">Privacy Policy</a> ·
+          <a href="{{ url_for('main.terms') }}">Terms & Conditions</a> ·
+          <a href="{{ url_for('main.conduct') }}">Code of Conduct</a> ·
+          <a href="{{ url_for('main.licenses') }}">Licenses & Attribution</a>
         </div>
         <p class="tiny text-muted mt-3">&copy; 2025 Adventure MUD. All rights reserved.</p>
       </div>

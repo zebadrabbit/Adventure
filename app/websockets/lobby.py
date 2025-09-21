@@ -19,15 +19,24 @@ def handle_lobby_chat_message(data):
     message = (data or {}).get('message', '').strip()
     if not message:
         return
-    user = getattr(current_user, 'username', 'Anonymous')
+    try:
+        user = getattr(current_user, 'username', 'Anonymous')
+    except Exception:
+        user = 'Anonymous'
     emit('lobby_chat_message', {'user': user, 'message': message}, broadcast=True)
 
 
 @socketio.on('connect')
 def handle_connect():
     try:
-        username = getattr(current_user, 'username', 'Anonymous')
-        role = getattr(current_user, 'role', 'user')
+        try:
+            username = getattr(current_user, 'username', 'Anonymous')
+        except Exception:
+            username = 'Anonymous'
+        try:
+            role = getattr(current_user, 'role', 'user')
+        except Exception:
+            role = 'user'
         sid = request.sid
         online[sid] = {'username': username, 'role': role}
         # join role rooms for targeted broadcasts
@@ -49,20 +58,31 @@ def handle_disconnect():
 
 @socketio.on('admin_online_users')
 def handle_admin_online_users():
-    if getattr(current_user, 'role', 'user') != 'admin':
+    try:
+        role = getattr(current_user, 'role', 'user')
+    except Exception:
+        role = 'user'
+    if role != 'admin':
         return
     emit('admin_online_users', list(online.values()))
 
 
 @socketio.on('admin_broadcast')
 def handle_admin_broadcast(data):
-    if getattr(current_user, 'role', 'user') != 'admin':
+    try:
+        role = getattr(current_user, 'role', 'user')
+    except Exception:
+        role = 'user'
+    if role != 'admin':
         return
     target = (data or {}).get('target', 'global')
     message = (data or {}).get('message', '').strip()
     if not message:
         return
-    from_user = getattr(current_user, 'username', 'Admin')
+    try:
+        from_user = getattr(current_user, 'username', 'Admin')
+    except Exception:
+        from_user = 'Admin'
     payload = {'from': from_user, 'target': target, 'message': message}
     room = 'global'
     if target == 'admins':

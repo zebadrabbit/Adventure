@@ -1,4 +1,10 @@
-"""Flask application factory and core extensions setup.
+"""
+project: Adventure MUD
+module: __init__.py
+https://github.com/zebadrabbit/Adventure
+License: MIT
+
+Flask application factory and core extensions setup.
 
 This module wires together the Flask app, SQLAlchemy, Flask-Login, and
 Flask-SocketIO. Configuration is sourced from environment variables with
@@ -55,14 +61,33 @@ login_manager.login_view = 'auth.login'
 # Let Flask-SocketIO select best async_mode based on installed deps (eventlet/gevent/threading)
 socketio = SocketIO(
     app,
+    # Explicit async mode (eventlet installed) for clarity; can switch to 'gevent' or 'threading' if needed
+    async_mode=os.getenv('SOCKETIO_ASYNC_MODE') or None,  # None lets it auto-select; override via env
     # In dev, allow all origins by default; set explicit origins in production
-    cors_allowed_origins=os.getenv('CORS_ALLOWED_ORIGINS', '*')
+    cors_allowed_origins=os.getenv('CORS_ALLOWED_ORIGINS', '*'),
+    # Engine.IO low-level logging to help diagnose 400 handshake / timeout issues (disable in production)
+    engineio_logger=bool(os.getenv('ENGINEIO_LOGGER', '1') == '1'),
+    # Mitigate rapid reconnect churn by tuning ping timeouts (defaults: ping_interval=25, ping_timeout=20)
+    ping_interval=20,
+    ping_timeout=10,
+    # Allow both transports explicitly; client will attempt websocket upgrade
+    transports=['websocket', 'polling']
 )
+
 
 # Register HTTP blueprints
 from app.routes import auth, main
+from app.routes.dashboard import bp_dashboard
+from app.routes.dungeon_api import bp_dungeon
+from app.routes.seed_api import bp_seed
+from app.routes.config_api import bp_config
+
 app.register_blueprint(auth.bp)
 app.register_blueprint(main.bp)
+app.register_blueprint(bp_dashboard)
+app.register_blueprint(bp_dungeon)
+app.register_blueprint(bp_seed)
+app.register_blueprint(bp_config)
 
 # Import websocket handlers so their event decorators register with Socket.IO
 
@@ -70,6 +95,27 @@ from app.websockets import game, lobby
 
 print("Registered routes:")
 print(app.url_map)
+
+# Cache-busting asset helper: generates a url_for static path with ?v=<mtime>
+from flask import url_for
+import time
+import pathlib
+
+def asset_url(filename: str) -> str:
+    """Return a cache-busted static asset URL by appending the file's mtime.
+
+    Example: asset_url('dashboard.css') -> /static/dashboard.css?v=1695251234
+    Falls back to plain url_for if file not found.
+    """
+    try:
+        static_folder = pathlib.Path(app.static_folder or 'static')
+        file_path = static_folder / filename
+        mtime = int(file_path.stat().st_mtime)
+        return url_for('static', filename=filename) + f'?v={mtime}'
+    except Exception:
+        return url_for('static', filename=filename)
+
+app.jinja_env.globals['asset_url'] = asset_url
 
 def create_app():
     return app

@@ -50,6 +50,17 @@ Minimum expectation for new logic:
 - Regression test capturing any new invariant or bug fix.
 - Avoid tests that rely on timing or real network I/O.
 
+### Coverage & Lint
+- Continuous Integration enforces a minimum coverage threshold (currently 60%). Aim for ≥75% on new or significantly modified modules, and strive for near 100% on pure/deterministic utility code (e.g., XP tables, seed coercion helpers).
+- `ruff` is used for lint/import ordering. Run locally:
+   ```bash
+   ruff check .
+   ```
+   Auto-fix import order & simple issues:
+   ```bash
+   ruff check --fix .
+   ```
+
 Useful selective runs:
 ```bash
 pytest tests/test_seed_persistence.py::test_dashboard_seed_flow -q
@@ -58,8 +69,12 @@ pytest -k multi_door -q
 ```
 
 ## Adding Assets (Icons, Images)
-- Optimize SVGs (e.g., `svgo`) before committing.
-- Do not commit mechanical whitespace-only changes to hundreds of SVGs; revert them to keep diffs reviewable.
+- SVGs are auto-normalized on commit by the `optimize_svgs` pre-commit hook (comment stripping, whitespace trim). Run manually:
+   ```bash
+   python scripts/optimize_svgs.py path/to/icon.svg
+   ```
+- For advanced optimization (path merging, precision reduction) you may still optionally run an external tool like `svgo` before committing.
+- Do not commit mechanical whitespace-only changes to large batches of existing SVGs; revert them to keep diffs reviewable.
 - Group related new icons in a single commit with a rationale.
 
 ## Database
@@ -79,10 +94,37 @@ A good PR includes:
 
 ## Release Checklist (Maintainers)
 1. Ensure CHANGELOG.md updated.
-2. Bump version (if using a version file or tag strategy).
+2. Bump version using the helper script (see Versioning section below).
 3. All tests green in CI.
 4. Review for large accidental asset churn.
 5. Tag and draft release notes.
+
+### Versioning & Bump Script
+Project version lives in the `VERSION` file and is surfaced by the CLI (`python run.py --version`). Use the helper script to manage semantic bumps and auto-insert an UNRELEASED section stub in `CHANGELOG.md`:
+
+```bash
+python scripts/bump_version.py patch   # 0.3.4 -> 0.3.5
+python scripts/bump_version.py minor   # 0.3.4 -> 0.4.0
+python scripts/bump_version.py major   # 0.x.y -> 1.0.0
+python scripts/bump_version.py set 0.3.7  # explicit version
+```
+
+Behavior:
+- Requires a clean git working tree (prevents partial bumps).
+- Updates `VERSION` file.
+- Inserts (or ensures) a `## [UNRELEASED]` section at top of `CHANGELOG.md` if absent.
+- Prints the previous and new version for visibility.
+
+Guidelines:
+- Bump immediately after merging user-visible changes; group small internal changes until a meaningful increment.
+- Only use `major` when making backward incompatible changes.
+- Keep CHANGELOG entries concise: one bullet per logical change (feat/fix/docs/perf/security).
+
+After bumping, commit the result:
+```bash
+git add VERSION CHANGELOG.md
+git commit -m "chore: bump version to $(cat VERSION)"
+```
 
 ## Questions
 Open a discussion or issue if you're unsure about direction or invariants.

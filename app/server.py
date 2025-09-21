@@ -1,4 +1,10 @@
-"""Server bootstrap and admin shell utilities.
+"""
+project: Adventure MUD
+module: server.py
+https://github.com/zebadrabbit/Adventure
+License: MIT
+
+Server bootstrap and admin shell utilities.
 
 Exposes helpers to start the Socket.IO server and an interactive admin shell
 for basic user management. The admin shell can receive events from the app via

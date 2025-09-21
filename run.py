@@ -13,7 +13,14 @@ import signal
 import argparse
 from textwrap import dedent
 
-__version__ = "0.3.3"
+def _load_version() -> str:
+    try:
+        with open("VERSION", "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except Exception:
+        return "0.3.4"
+
+__version__ = _load_version()
 
 try:
     # Optional: load .env automatically if available

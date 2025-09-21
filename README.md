@@ -1,4 +1,8 @@
-# Adventure MUD (Multi-User Dungeon)
+# Adventure
+
+_Formerly: Adventure MUD (Multi-User Dungeon)_
+
+[![CI](https://github.com/zebadrabbit/Adventure/actions/workflows/ci.yml/badge.svg)](https://github.com/zebadrabbit/Adventure/actions/workflows/ci.yml)
 
 A modern web-based multiplayer dungeon adventure game built with Python (Flask, Flask-SocketIO), SQLite, and Bootstrap.
 
@@ -58,16 +62,34 @@ Key automated tests (pytest) protect the generation contract:
 
 Future candidates: cycle length distribution, corridor branching factor bounds, entrance accessibility proofs.
 
+### Coverage
+Continuous Integration enforces a minimum line coverage threshold of **60%** (recent uplift from 50%). The current suite sits around ~76% overall with critical generation logic and XP progression at or near 100%. New contributions should avoid regressing coverage; add focused tests for any new dungeon pipeline branch, seed handling logic, or websocket behavior.
+
+## Architecture Diagram
+
+See `docs/architecture.md` for a high-level Mermaid diagram of core components (Flask blueprints, Socket.IO layer, dungeon generation pipeline, persistence), plus request and movement flows and extension points.
+
+## Asset Optimization
+SVG icon assets are automatically normalized on commit (whitespace + non-license comment stripping) via a lightweight pre-commit hook (`optimize_svgs`). For deeper path/precision optimization you can still run external tools (e.g., svgo) before committing.
+
 ## Contributing & Development
 See [CONTRIBUTING.md](CONTRIBUTING.md) for coding conventions, pre-commit policy (no inline styles/scripts), asset guidelines, and test instructions.
 
 
-## What's New (v0.3.3 latest)
+## What's New (v0.3.4 latest)
+### v0.3.4 (Maintenance & Tooling)
+- Repository renamed to `Adventure` (formerly `adventure-mud`).
+- Added lightweight SVG normalization pre-commit hook (trims/strips non-license comments across ~2.7K icons).
+- CI workflow aligned with badge (job id `build-test`), explicit pre-commit run before tests.
+- README branding & Asset Optimization section added.
+- CHANGELOG entry for maintenance release.
+
+### v0.3.3
 **Release date:** 2025-09-21
 
 Highlights across recent patches (0.3.1 → 0.3.3):
 
-### v0.3.3
+### (From previous release) v0.3.3
 - New `/api/dungeon/state` endpoint for initial cell description & exits (no blank move hack).
 - In-memory dungeon cache (seed,size) → Dungeon object reuse for performance.
 - Pytest test suite (movement & seed determinism) + GitHub Actions CI workflow.

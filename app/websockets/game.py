@@ -20,7 +20,10 @@ def handle_join_game(data):
     if not room:
         return
     join_room(room)
-    user = getattr(current_user, 'username', 'Anonymous')
+    try:
+        user = getattr(current_user, 'username', 'Anonymous')
+    except Exception:
+        user = 'Anonymous'
     emit('status', {'msg': f'{user} has joined the game.'}, room=room)
 
 @socketio.on('leave_game')
@@ -29,7 +32,10 @@ def handle_leave_game(data):
     if not room:
         return
     leave_room(room)
-    user = getattr(current_user, 'username', 'Anonymous')
+    try:
+        user = getattr(current_user, 'username', 'Anonymous')
+    except Exception:
+        user = 'Anonymous'
     emit('status', {'msg': f'{user} has left the game.'}, room=room)
 
 @socketio.on('game_action')

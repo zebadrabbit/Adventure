@@ -24,3 +24,9 @@ repos:
         language: system
         pass_filenames: false
         types: [html]
+      - id: optimize_svgs
+        name: Optimize SVG assets
+        entry: python scripts/optimize_svgs.py
+        language: system
+        files: '\\.(svg)$'
+        stages: [commit]
