@@ -9,6 +9,7 @@ Welcome to the Adventure project documentation. This index links all major docs 
 - [Contributing Guide](CONTRIBUTING.md)
 - [Style Guide](STYLE_GUIDE.md)
 - [Architecture Diagram](architecture.md)
+ - [WebSocket Event Contracts](websocket_events.md)
 
 ## Development
 - Version bump script: `scripts/bump_version.py` (auto-inserts UNRELEASED section into `docs/CHANGELOG.md`).
@@ -18,8 +19,9 @@ Welcome to the Adventure project documentation. This index links all major docs 
 The pipeline is multi-phase and deterministic for a given (seed, size). See sections in the root `README.md` for detailed phase descriptions. Consider adding deeper docs here in future (e.g., heuristics, performance notes, planned feature phases).
 
 ## WebSockets
-- Namespaces: `lobby` and `game`. Admin broadcasts are permission-gated.
-- Future documentation opportunity: message schema & event contract table.
+- Namespaces: `lobby` and `game`.
+- See [WebSocket Event Contracts](websocket_events.md) for current event schemas.
+- Admin broadcasts are permission-gated; non-admin emits to `admin_broadcast` are ignored.
 
 ## Testing & Coverage
 - Pytest suite enforces ≥80% coverage; current coverage ~86% after targeted edge-case tests (seed errors, fallback user id, websocket noop, dungeon edge relocation).

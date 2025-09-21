@@ -359,3 +359,28 @@ An automated workflow (`auto-bump.yml`) examines the latest commit message on pu
 3. Commit and push the updated `VERSION` (and `CHANGELOG.md` if modified).
 
 To skip auto-bump, either include a manual version bump in your PR (changing `VERSION`) or use a non-triggering type (like `docs:`) when appropriate.
+
+### How to Release
+1. Ensure tests & coverage pass locally: `pytest -q` (coverage >= 80%).
+2. Update `docs/CHANGELOG.md` UNRELEASED section with finalized bullets (Added/Changed/Fixed/Notes).
+3. Bump version (choose one):
+   - Patch: `python scripts/bump_version.py patch`
+   - Minor: `python scripts/bump_version.py minor`
+   - Major: `python scripts/bump_version.py major`
+4. Commit bump artifacts:
+   ```bash
+   git add VERSION docs/CHANGELOG.md
+   git commit -m "chore(release): v$(cat VERSION)"
+   ```
+5. Push to main (rebase first if needed): `git pull --rebase && git push`.
+6. Tag the release:
+   ```bash
+   git tag -a v$(cat VERSION) -m "Adventure v$(cat VERSION)"
+   git push --tags
+   ```
+7. Draft or update GitHub Release notes reusing CHANGELOG section.
+8. (Optional) Announce / publish docs update referencing new features.
+
+Notes:
+- Avoid batching unrelated refactors with a release bump commit.
+- For urgent fixes, do a focused patch bump with minimal unrelated changes.

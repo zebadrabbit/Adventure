@@ -56,12 +56,12 @@ def test_seed_instance_update_resets_position(seed_client):
     first_id = r1.get_json()['dungeon_instance_id']
     # Manually move position in DB
     with seed_client.application.app_context():
-        inst = DungeonInstance.query.get(first_id)
+        inst = db.session.get(DungeonInstance, first_id)
         inst.pos_x = 10; inst.pos_y = 10; inst.pos_z = 0
         db.session.commit()
     # Second call updates seed and resets position to 0s
     r2 = seed_client.post('/api/dungeon/seed', json={'seed': 43})
     assert r2.get_json()['dungeon_instance_id'] == first_id, "Expected existing instance to be reused"
     with seed_client.application.app_context():
-        inst2 = DungeonInstance.query.get(first_id)
+        inst2 = db.session.get(DungeonInstance, first_id)
         assert inst2.pos_x == 0 and inst2.pos_y == 0 and inst2.pos_z == 0
