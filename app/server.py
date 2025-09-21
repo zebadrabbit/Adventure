@@ -27,7 +27,7 @@ import os
 admin_event_queue = queue.Queue()
 app.config['ADMIN_EVENT_QUEUE'] = admin_event_queue
 
-def start_server(host='0.0.0.0', port=5000, debug: bool = False):
+def start_server(host='0.0.0.0', port=5000, debug: bool = False):  # pragma: no cover (integration / runtime only)
     """Start the Socket.IO server and ensure DB tables exist.
 
     When debug=True, Flask's debugger and reloader provide verbose tracebacks.
@@ -78,7 +78,7 @@ def _configure_logging():
     root.addHandler(file_handler)
     root.addHandler(console)
 
-def start_admin_shell():
+def start_admin_shell():  # pragma: no cover (interactive)
     """Initialize application context and start the admin shell loop."""
     with app.app_context():
         db.create_all()
@@ -152,12 +152,23 @@ Available commands:
                                                             Reset a user's password
     passwd <username> <new_password>
                                                             Alias for password reset
+    set role <username> <role>  Set a user's role (admin|mod|user)
+    ban <username> [reason..]   Ban a user with optional reason
+    unban <username>            Remove ban
+    list banned                 List banned users
+    show user <username>        Show detailed user info
+    set email <username> <email|none>
+                                                            Set or clear a user's email
+    note user <username> <text> Append a moderation note (timestamped)
 Examples:
   create user alice secret123
   list users
   delete user alice
     reset password alice newSecret456
     passwd alice newSecret456
+    ban alice Spamming chat
+    unban alice
+    note user alice Warned about language
 """)
 
     while True:
@@ -197,7 +208,8 @@ Examples:
                     print("Registered users:")
                     for u in users:
                         r = getattr(u, 'role', 'user')
-                        print(f"  - {u.username} [{r}]")
+                        banned = ' BANNED' if getattr(u, 'banned', False) else ''
+                        print(f"  - {u.username} [{r}]{banned}")
             continue
         elif parts[0] == 'reset' and len(parts) == 4 and parts[1] == 'password':
             username = parts[2]
@@ -249,6 +261,93 @@ Examples:
                     db.session.commit()
                     print(f"[OK] Role for '{username}' set to {role}.")
             continue
+        elif parts[0] == 'ban' and len(parts) >= 2:
+            username = parts[1]
+            reason = ' '.join(parts[2:]).strip() if len(parts) > 2 else None
+            from datetime import datetime
+            with app.app_context():
+                user = User.query.filter_by(username=username).first()
+                if not user:
+                    print(f"[ERROR] User '{username}' does not exist.")
+                else:
+                    user.banned = True
+                    user.ban_reason = reason
+                    user.banned_at = datetime.utcnow()
+                    db.session.commit()
+                    print(f"[OK] User '{username}' banned." + (f" Reason: {reason}" if reason else ''))
+            continue
+        elif parts[0] == 'unban' and len(parts) == 2:
+            username = parts[1]
+            with app.app_context():
+                user = User.query.filter_by(username=username).first()
+                if not user:
+                    print(f"[ERROR] User '{username}' does not exist.")
+                else:
+                    user.banned = False
+                    user.ban_reason = None
+                    user.banned_at = None
+                    db.session.commit()
+                    print(f"[OK] User '{username}' unbanned.")
+            continue
+        elif parts[0] == 'list' and len(parts) == 2 and parts[1] == 'banned':
+            with app.app_context():
+                users = User.query.filter_by(banned=True).all()
+                if not users:
+                    print("[INFO] No banned users.")
+                else:
+                    print("Banned users:")
+                    for u in users:
+                        print(f"  - {u.username}" + (f" ({u.ban_reason})" if u.ban_reason else ''))
+            continue
+        elif parts[0] == 'show' and len(parts) == 3 and parts[1] == 'user':
+            username = parts[2]
+            from datetime import datetime
+            with app.app_context():
+                user = User.query.filter_by(username=username).first()
+                if not user:
+                    print(f"[ERROR] User '{username}' does not exist.")
+                else:
+                    print(f"User: {user.username}")
+                    print(f"  Role: {user.role}")
+                    print(f"  Email: {user.email or '-'}")
+                    print(f"  Banned: {user.banned}")
+                    if user.banned:
+                        print(f"  Banned At: {user.banned_at}")
+                        print(f"  Ban Reason: {user.ban_reason or '-'}")
+                    notes_preview = (user.notes[:120] + '...') if user.notes and len(user.notes) > 120 else (user.notes or '-')
+                    print(f"  Notes: {notes_preview}")
+            continue
+        elif parts[0] == 'set' and len(parts) == 4 and parts[1] == 'email':
+            username = parts[2]
+            email = parts[3]
+            with app.app_context():
+                user = User.query.filter_by(username=username).first()
+                if not user:
+                    print(f"[ERROR] User '{username}' does not exist.")
+                else:
+                    user.email = None if email.lower() == 'none' else email
+                    db.session.commit()
+                    print(f"[OK] Email for '{username}' set to {user.email or 'None'}.")
+            continue
+        elif parts[0] == 'note' and len(parts) >= 3 and parts[1] == 'user':
+            username = parts[2]
+            text = ' '.join(parts[3:]).strip()
+            if not text:
+                print('[ERROR] Note text required.')
+                continue
+            from datetime import datetime
+            with app.app_context():
+                user = User.query.filter_by(username=username).first()
+                if not user:
+                    print(f"[ERROR] User '{username}' does not exist.")
+                else:
+                    stamp = datetime.utcnow().isoformat(timespec='seconds')
+                    existing = user.notes or ''
+                    new_block = f"[{stamp}] {text}\n"
+                    user.notes = (existing + new_block) if existing else new_block
+                    db.session.commit()
+                    print(f"[OK] Note added for '{username}'.")
+            continue
         else:
             print("[ERROR] Unknown or malformed command. Type 'help' for a list of commands.")
 
@@ -276,6 +375,43 @@ def _run_migrations():
     if 'role' not in user_cols:
         try:
             db.session.execute(text("ALTER TABLE user ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user'"))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            pass
+    # Add moderation columns if missing: banned, ban_reason, notes, banned_at
+    inspector = inspect(db.engine)
+    user_cols = {c['name'] for c in inspector.get_columns('user')}
+    if 'banned' not in user_cols:
+        try:
+            db.session.execute(text("ALTER TABLE user ADD COLUMN banned BOOLEAN NOT NULL DEFAULT 0"))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            pass
+    inspector = inspect(db.engine)
+    user_cols = {c['name'] for c in inspector.get_columns('user')}
+    if 'ban_reason' not in user_cols:
+        try:
+            db.session.execute(text("ALTER TABLE user ADD COLUMN ban_reason TEXT"))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            pass
+    inspector = inspect(db.engine)
+    user_cols = {c['name'] for c in inspector.get_columns('user')}
+    if 'notes' not in user_cols:
+        try:
+            db.session.execute(text("ALTER TABLE user ADD COLUMN notes TEXT"))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            pass
+    inspector = inspect(db.engine)
+    user_cols = {c['name'] for c in inspector.get_columns('user')}
+    if 'banned_at' not in user_cols:
+        try:
+            db.session.execute(text("ALTER TABLE user ADD COLUMN banned_at DATETIME"))
             db.session.commit()
         except Exception:
             db.session.rollback()

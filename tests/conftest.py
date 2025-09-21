@@ -38,7 +38,6 @@ def client(test_app):
 def auth_client(test_app, client):
     from werkzeug.security import generate_password_hash
     with test_app.app_context():
-        # Defensive: ensure all tables are created (some tests import app before fixture sets DB URI)
         try:
             db.create_all()
         except Exception:
@@ -48,16 +47,19 @@ def auth_client(test_app, client):
             user = User(username="tester", password=generate_password_hash("pass"))
             db.session.add(user)
             db.session.commit()
+        else:
+            # Always reset password to known value to avoid prior tests altering it
+            user.password = generate_password_hash("pass")
+            db.session.commit()
         inst = DungeonInstance.query.filter_by(user_id=user.id).first()
         if not inst:
             inst = DungeonInstance(user_id=user.id, seed=1234, pos_x=0, pos_y=0, pos_z=0)
             db.session.add(inst)
             db.session.commit()
-        user_id = user.id
         inst_id = inst.id
-    # Emulate logged-in session for flask-login (@login_required checks '_user_id')
+    # Perform actual login so flask-login manages session
+    client.post('/login', data={'username': 'tester', 'password': 'pass'}, follow_redirects=True)
+    # Ensure dungeon instance id in session
     with client.session_transaction() as sess:
-        sess['_user_id'] = str(user_id)  # flask-login default key
-        sess['user_id'] = user_id
         sess['dungeon_instance_id'] = inst_id
     return client

@@ -55,7 +55,7 @@
                 <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                   <span class="avatar-circle me-2">{{ current_user.username[0]|upper }}</span>
                   <span class="d-none d-sm-inline">{{ current_user.username }}</span>
-                  {% set user_role = current_user.role|default('user', true) %}
+                  {% set user_role = (current_user.role if current_user.is_authenticated else 'user')|default('user', true) %}
                   {% if user_role != 'user' %}
                     <span class="badge bg-secondary ms-2 d-none d-md-inline">{{ user_role|capitalize }}</span>
                   {% endif %}
@@ -102,7 +102,7 @@
     {% block scripts %}{% endblock %}
     {% if current_user.is_authenticated %}
       {% include 'partials/account_modal.html' %}
-      {% set user_role = current_user.role|default('user', true) %}
+  {% set user_role = (current_user.role if current_user.is_authenticated else 'user')|default('user', true) %}
       {% if user_role == 'admin' %}
         {% include 'partials/server_settings_modal.html' %}
       {% endif %}

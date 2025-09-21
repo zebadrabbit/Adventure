@@ -51,7 +51,7 @@ Minimum expectation for new logic:
 - Avoid tests that rely on timing or real network I/O.
 
 ### Coverage & Lint
-- Continuous Integration enforces a minimum coverage threshold (currently 60%). Aim for ≥75% on new or significantly modified modules, and strive for near 100% on pure/deterministic utility code (e.g., XP tables, seed coercion helpers).
+- Continuous Integration enforces a minimum coverage threshold (currently 80%). New or significantly modified modules should not lower overall coverage; target ≥80% locally before submitting. Strive for near 100% on pure/deterministic utility code (e.g., XP tables, seed coercion helpers, moderation helpers).
 - `ruff` is used for lint/import ordering. Run locally:
    ```bash
    ruff check .
@@ -80,6 +80,7 @@ pytest -k multi_door -q
 ## Database
 - Migrations currently manual; if you change models, document upgrade path in the PR/commit.
 - Test DB is ephemeral (SQLite). Avoid relying on production-only features.
+ - Lightweight migration helper (`_run_migrations`) adds missing columns idempotently (used for moderation fields like `banned`, `ban_reason`, `notes`, `banned_at`). Tests should exercise new branches when adding fields.
 
 ## Security & Secrets
 - Never commit secrets (.env should be local only).

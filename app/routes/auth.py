@@ -6,16 +6,12 @@ Emits login/logout events to the admin shell via an in-app queue when available.
 from flask import Blueprint, render_template, redirect, url_for, request, flash, current_app
 from flask_login import login_user, logout_user, login_required
 from app.models.models import User
-from app import db, login_manager
+from app import db
 from werkzeug.security import generate_password_hash, check_password_hash
 import hashlib, logging
 
 bp = Blueprint('auth', __name__)
 
-@login_manager.user_loader
-def load_user(user_id):
-    from app import db
-    return db.session.get(User, int(user_id))
 
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -36,6 +32,10 @@ def login():
         if not user and '@' in ident:
             user = User.query.filter(func.lower(User.email) == ident.lower()).first()
         if user:
+            # Block banned users
+            if getattr(user, 'banned', False):
+                flash('Account is banned' + (f": {user.ban_reason}" if getattr(user, 'ban_reason', None) else '.'))
+                return render_template('login.html')
             stored = user.password or ''
             # Detect probable legacy plaintext (Werkzeug hashes start with method prefix like 'pbkdf2:')
             is_legacy_plain = not stored.startswith('pbkdf2:') and not stored.startswith('scrypt:') and not stored.startswith('argon2:')

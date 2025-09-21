@@ -54,9 +54,17 @@ app.config.update(
     SEND_FILE_MAX_AGE_DEFAULT=0,
 )
 
-db = SQLAlchemy(app)
+db = SQLAlchemy(app, session_options={'expire_on_commit': False})
 login_manager = LoginManager(app)
 login_manager.login_view = 'auth.login'
+
+@login_manager.user_loader
+def load_user(user_id):  # pragma: no cover - simple loader
+    from app.models.models import User
+    try:
+        return db.session.get(User, int(user_id))
+    except Exception:
+        return None
 
 # Let Flask-SocketIO select best async_mode based on installed deps (eventlet/gevent/threading)
 socketio = SocketIO(

@@ -38,7 +38,8 @@ jobs:
         run: |
           coverage=$(pytest --cov=app --cov-report=term | awk '/TOTAL/ {print $4}' | sed 's/%//') || true
           echo "Detected coverage: $coverage%"
-          min=60
+          # Minimum enforced coverage threshold (raised from 60 -> 80 after test suite expansion)
+          min=80
           awk -v c=$coverage -v m=$min 'BEGIN { if (c+0 < m) { printf("Coverage %.1f%% below minimum %d%%\n", c, m); exit 1 } }'
 
       - name: Coverage (optional)

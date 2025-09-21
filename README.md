@@ -63,7 +63,7 @@ Key automated tests (pytest) protect the generation contract:
 Future candidates: cycle length distribution, corridor branching factor bounds, entrance accessibility proofs.
 
 ### Coverage
-Continuous Integration enforces a minimum line coverage threshold of **60%** (recent uplift from 50%). The current suite sits around ~76% overall with critical generation logic and XP progression at or near 100%. New contributions should avoid regressing coverage; add focused tests for any new dungeon pipeline branch, seed handling logic, or websocket behavior.
+Continuous Integration enforces a minimum line coverage threshold of **80%** (raised from 60% after broadening test focus to admin shell, websocket edge cases, and moderation features). The suite currently meets or exceeds this mark with critical generation logic and XP progression at or near 100%. New contributions must not drop overall coverage below 80%; add focused tests for any new dungeon pipeline branch, seed handling logic, websocket behavior, or admin moderation path.
 
 ## Architecture Diagram
 
@@ -171,6 +171,25 @@ Admin shell:
 ```bash
 python run.py admin
 ```
+
+### Admin / Moderation Commands
+The interactive admin shell now includes user moderation helpers in addition to basic CRUD:
+
+| Command | Description |
+|---------|-------------|
+| `create user <username> [<password>]` | Create user (default password `changeme` if omitted) |
+| `list users` | List all users with role and ban status |
+| `delete user <username>` | Delete a user |
+| `reset password <username> <new_password>` / `passwd <username> <new_password>` | Reset password |
+| `set role <username> <admin|mod|user>` | Change role |
+| `ban <username> [reason..]` | Ban user with optional reason (stores timestamp & reason) |
+| `unban <username>` | Lift a ban |
+| `list banned` | Show all banned users |
+| `show user <username>` | Detailed user info (role, email, ban state, notes) |
+| `set email <username> <email|none>` | Set or clear email |
+| `note user <username> <text>` | Append a timestamped moderation note |
+
+Login attempts by banned accounts are blocked with a flash message including the ban reason if present.
 
 ## Environment configuration
 

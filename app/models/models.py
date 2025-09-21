@@ -30,6 +30,11 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), nullable=True)
     # Role for authorization: 'admin' | 'mod' | 'user'
     role = db.Column(db.String(20), nullable=False, default='user')
+    # Moderation fields
+    banned = db.Column(db.Boolean, nullable=False, default=False)
+    ban_reason = db.Column(db.Text, nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    banned_at = db.Column(db.DateTime, nullable=True)
     # Add more fields as needed
 
 class Character(db.Model):
