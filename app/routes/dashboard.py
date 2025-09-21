@@ -1,0 +1,239 @@
+"""
+project: Adventure MUD
+module: dashboard.py
+https://github.com/zebadrabbit/adventure-mud
+License: MIT
+
+Dashboard and character management routes for Adventure MUD.
+
+This module provides the dashboard view, character creation, party selection,
+autofill, and character deletion logic. All routes require authentication.
+"""
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask_login import login_required, current_user
+from app.models.models import Character, User
+from app.models.xp import xp_for_level
+from app import db
+import json
+
+bp_dashboard = Blueprint('dashboard', __name__)
+
+
+@bp_dashboard.route('/dashboard', methods=['GET', 'POST'])
+@login_required
+def dashboard():
+    """
+    Display the user's characters and handle character creation and party selection.
+
+    GET: Show all characters for the current user, with class, stats, and inventory.
+    POST: Handle character creation, party selection, email/password update, and adventure start.
+    """
+    import hashlib
+    import random
+    # POST: handle form submissions
+    if request.method == 'POST':
+        form_type = request.form.get('form')
+        if form_type == 'update_email':
+            new_email = request.form.get('email', '').strip() or None
+            if new_email and ('@' not in new_email or '.' not in new_email):
+                flash('Please enter a valid email address.', 'warning')
+            else:
+                user = db.session.get(User, current_user.id)
+                user.email = new_email
+                db.session.commit()
+                flash('Email updated.' if new_email else 'Email cleared.')
+            return redirect(url_for('dashboard.dashboard'))
+        elif form_type == 'change_password':
+            from werkzeug.security import check_password_hash, generate_password_hash
+            current_pw = request.form.get('current_password', '')
+            new_pw = request.form.get('new_password', '')
+            confirm_pw = request.form.get('confirm_password', '')
+            if not new_pw or len(new_pw) < 6:
+                flash('New password must be at least 6 characters.', 'warning')
+                return redirect(url_for('dashboard.dashboard'))
+            if new_pw != confirm_pw:
+                flash('New password and confirmation do not match.', 'warning')
+                return redirect(url_for('dashboard.dashboard'))
+            user = db.session.get(User, current_user.id)
+            if not check_password_hash(user.password, current_pw):
+                flash('Current password is incorrect.', 'danger')
+                return redirect(url_for('dashboard.dashboard'))
+            user.password = generate_password_hash(new_pw)
+            db.session.commit()
+            flash('Password changed successfully.')
+            return redirect(url_for('dashboard.dashboard'))
+        elif form_type == 'start_adventure':
+            # Preserve existing dungeon seed & instance if already set via /api/dungeon/seed.
+            # Only clear transient non-persistent structures.
+            session.pop('party', None)
+            session.pop('dungeon', None)
+            session.pop('dungeon_pos', None)
+            ids = request.form.getlist('party_ids')
+            try:
+                party_ids = list({int(i) for i in ids})
+            except ValueError:
+                party_ids = []
+            if not (1 <= len(party_ids) <= 4):
+                flash('Select between 1 and 4 characters to begin the adventure.', 'warning')
+                return redirect(url_for('dashboard.dashboard'))
+            chars = Character.query.filter(Character.id.in_(party_ids), Character.user_id == current_user.id).all()
+            if len(chars) != len(party_ids):
+                flash('One or more selected characters are invalid.', 'danger')
+                return redirect(url_for('dashboard.dashboard'))
+            party = []
+            for c in chars:
+                s = json.loads(c.stats)
+                cls = s.get('class') or 'unknown'
+                party.append({
+                    'id': c.id,
+                    'name': c.name,
+                    'class': cls.capitalize(),
+                    'hp': s.get('hp', 0),
+                    'mana': s.get('mana', 0)
+                })
+            session['party'] = party
+            from app.models.dungeon_instance import DungeonInstance
+            seed = session.get('dungeon_seed')
+            dungeon_instance_id = session.get('dungeon_instance_id')
+            instance = None
+            if dungeon_instance_id:
+                instance = db.session.get(DungeonInstance, dungeon_instance_id)
+            if instance is None:
+                # If no existing instance (user never touched seed widget/API), fallback to random seed here.
+                import random
+                seed = seed or random.randint(1, 1_000_000)
+                instance = DungeonInstance(user_id=current_user.id, seed=seed, pos_x=0, pos_y=0, pos_z=0)
+                db.session.add(instance)
+                db.session.commit()
+                session['dungeon_instance_id'] = instance.id
+                session['dungeon_seed'] = instance.seed
+            return redirect(url_for('dungeon.adventure'))
+        # Default: character creation form
+        name = request.form['name']
+        char_class = request.form['char_class']
+        from app.routes.main import BASE_STATS, STARTER_ITEMS
+        stats = BASE_STATS.get(char_class, BASE_STATS['fighter'])
+        coins = {'gold': 5, 'silver': 20, 'copper': 50}
+        items = STARTER_ITEMS.get(char_class, STARTER_ITEMS['fighter'])
+        character = Character(
+            user_id=current_user.id,
+            name=name,
+            stats=json.dumps({**stats, **coins, 'class': char_class}),
+            gear=json.dumps([]),
+            items=json.dumps(items),
+            xp=0,
+            level=1
+        )
+        db.session.add(character)
+        db.session.commit()
+        flash(f'Character {name} the {char_class} created!')
+        return redirect(url_for('dashboard.dashboard'))
+    # GET: show dashboard
+    characters = Character.query.filter_by(user_id=current_user.id).all()
+    class_map = {
+        'fighter': lambda s: s['str'] >= s['dex'] and s['str'] >= s['int'] and s['str'] >= s['wis'],
+        'mage':    lambda s: s['int'] >= s['str'] and s['int'] >= s['dex'] and s['int'] >= s['wis'],
+        'druid':   lambda s: s['wis'] >= s['str'] and s['wis'] >= s['dex'] and s['wis'] >= s['int'],
+        'ranger':  lambda s: s['dex'] >= s['str'] and s['wis'] >= s['int'],
+        'rogue':   lambda s: s['dex'] >= s['str'] and s['dex'] >= s['int'] and s['dex'] >= s['wis'],
+        'cleric':  lambda s: True
+    }
+    char_list = []
+    _backfilled = False
+    for c in characters:
+        stats = json.loads(c.stats)
+        stats_class = stats.pop('class', None)
+        coins = {
+            'gold': stats.pop('gold', 0),
+            'silver': stats.pop('silver', 0),
+            'copper': stats.pop('copper', 0)
+        }
+        try:
+            item_slugs = json.loads(c.items) if c.items else []
+        except Exception:
+            item_slugs = []
+        from app.models.models import Item
+        items = Item.query.filter(Item.slug.in_(item_slugs)).all() if item_slugs else []
+        items_by_slug = {i.slug: i for i in items}
+        inventory = []
+        for slug in item_slugs:
+            it = items_by_slug.get(slug)
+            if it:
+                inventory.append({'slug': it.slug, 'name': it.name, 'type': it.type})
+        if stats_class:
+            class_name = stats_class.capitalize()
+        else:
+            if 'herbal-pouch' in item_slugs:
+                class_name = 'Druid'
+            elif 'hunting-bow' in item_slugs:
+                class_name = 'Ranger'
+            else:
+                if class_map['fighter'](stats):
+                    class_name = 'Fighter'
+                elif class_map['mage'](stats):
+                    class_name = 'Mage'
+                elif class_map['druid'](stats):
+                    class_name = 'Druid'
+                elif class_map['ranger'](stats):
+                    class_name = 'Ranger'
+                elif class_map['rogue'](stats):
+                    class_name = 'Rogue'
+                else:
+                    class_name = 'Cleric'
+            new_stats = dict(stats)
+            new_stats.update(coins)
+            new_stats['class'] = class_name.lower()
+            c.stats = json.dumps(new_stats)
+            _backfilled = True
+        char_list.append({
+            'id': c.id,
+            'name': c.name,
+            'stats': stats,
+            'coins': coins,
+            'inventory': inventory,
+            'class_name': class_name,
+            'xp': getattr(c, 'xp', 0),
+            'level': getattr(c, 'level', 1),
+            'xp_next': xp_for_level(getattr(c, 'level', 1) + 1)
+        })
+    if _backfilled:
+        db.session.commit()
+    user_email = None
+    try:
+        user_obj = db.session.get(User, current_user.id)
+        user_email = getattr(user_obj, 'email', None)
+    except Exception:
+        user_email = None
+    # Pre-fill dungeon seed if present in session
+    dungeon_seed = session.get('dungeon_seed', '')
+    return render_template('dashboard.html', characters=char_list, user_email=user_email, dungeon_seed=dungeon_seed)
+
+@bp_dashboard.route('/delete_character/<int:char_id>', methods=['POST'])
+def delete_character(char_id):
+    """Delete a character by id and redirect to dashboard."""
+    from flask_login import current_user
+    from app.models.models import Character
+    c = Character.query.filter_by(id=char_id, user_id=current_user.id).first()
+    if c:
+        from app import db
+        db.session.delete(c)
+        db.session.commit()
+        from flask import flash
+        flash(f'Character {c.name} deleted.', 'info')
+    else:
+        from flask import flash
+        flash('Character not found or not yours.', 'warning')
+    from flask import redirect, url_for
+    return redirect(url_for('dashboard.dashboard'))
+
+# Route to autofill party with random characters if user has fewer than 4
+# POST /autofill_characters
+# Returns: {"created": <number>}
+
+# Route to delete a character by id (POST)
+# POST /delete_character/<int:char_id>
+# Redirects to dashboard after deletion
+
+# Add other dashboard/character management routes here
+
+# Add other dashboard/character management routes here

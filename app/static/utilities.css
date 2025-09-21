@@ -1,0 +1,145 @@
+/* Utility classes for Adventure MUD (extracted from inline styles)
+   Date: 2025-09-21 */
+
+/* Typography */
+.u-mono { font-family: monospace, monospace; }
+
+/* Layout helpers */
+.u-flex-center { display: inline-flex; align-items: center; justify-content: center; }
+
+/* Icon sizing */
+.icon-28 { width:28px; height:28px; }
+.icon-32 { width:32px; height:32px; }
+.icon-dropshadow { filter: drop-shadow(0 0 2px #000); }
+
+/* Map containers */
+/* Legacy square map (still referenced until updated) */
+.map-box { height:512px; width:512px; border:2px solid #222; border-radius:0.5rem; }
+/* New responsive map: fixed height, fluid width */
+.map-fluid-fixed-height { height:512px; width:100%; max-width:100%; border:2px solid #222; border-radius:0.5rem; }
+
+/* Dungeon output panel */
+.dungeon-output { padding:1rem; min-height:120px; border-radius:0.5rem; white-space:pre-line; }
+
+/* Monospace badge */
+.badge-mono { font-family: monospace, monospace; }
+
+/* Lists */
+.no-list { list-style:none; padding-left:0; margin-bottom:0; }
+
+/* Scrollable (e.g., logs) */
+.scroll-area-200 { max-height:200px; overflow:auto; }
+
+/* Button square fixed */
+.btn-square-32 { height:2rem; width:2rem; display:flex; align-items:center; justify-content:center; }
+
+/* Chat body height presets */
+.chat-body-240 { height:240px; min-height:180px; }
+
+/* Width helpers */
+.mw-240 { max-width:240px; }
+
+/* Chat header */
+.chat-header { background: var(--mud-dark); padding: 0.5rem 0.5rem 0.25rem 0.5rem; }
+
+/* Placeholder for future coin color utility classes (phase 2) */
+/* Coin color utilities */
+.coin-gold { color: gold; filter: drop-shadow(0 0 1px gold); }
+.coin-silver { color:#bfc1c2; filter: drop-shadow(0 0 1px #bfc1c2); }
+.coin-copper { color:#b87333; filter: drop-shadow(0 0 1px #b87333); }
+
+/* List reset */
+.list-reset { list-style-type:none; padding-left:0; }
+
+/* Icon visual enhancement utilities */
+.icon-glow { filter: drop-shadow(0 0 2px #000); }
+
+/* Generic subtle panel outline for inline sections */
+.outline-panel { border:1px solid #333; border-radius:8px; background:rgba(18,18,20,0.55); }
+
+/* Flex utility: allow item to shrink below content's intrinsic minimum width (so long text wraps) */
+.flex-min-0 { min-width:0; }
+
+/* Prevent wrapping of movement pad + output row while allowing graceful overflow */
+#dungeon-controls > .d-flex { flex-wrap: nowrap !important; }
+
+/* Dedicated dungeon output outline if not wrapped */
+#dungeon-output.outlined { border:1px solid #333; border-radius:8px; background:rgba(18,18,20,0.55); }
+
+/* Movement pad layout & styling */
+.movement-pad {
+   display: inline-grid;
+   grid-template-areas:
+      ". up ."
+      "left center right"
+      ". down .";
+   gap: 4px;
+   padding: 4px 6px;
+   background: rgba(20,20,24,0.6);
+   border: 1px solid #333;
+   border-radius: 8px;
+   backdrop-filter: blur(2px);
+}
+.player-marker-wrapper { position: relative; width: 40px; height: 40px; }
+.player-marker-img {
+   position: absolute;
+   left: 50%;
+   top: 50%;
+   width: 40px;
+   height: 40px;
+   transform: translate(-50%, -50%) scale(1);
+   transform-origin: 50% 50%;
+   pointer-events: none;
+   transition: transform 120ms linear;
+   filter: drop-shadow(0 0 2px rgba(0,0,0,0.55)) drop-shadow(0 0 4px rgba(255,255,255,0.15));
+}
+.movement-pad button {
+   --btn-size: 40px;
+   width: var(--btn-size);
+   height: var(--btn-size);
+   line-height: 1;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   font-weight: 600;
+   font-size: 0.9rem;
+   color: #eee;
+   background: linear-gradient(#2c2f36,#1e2024);
+   border: 1px solid #555;
+   border-radius: 6px;
+   cursor: pointer;
+   transition: background .18s ease, transform .12s ease, box-shadow .18s ease;
+   box-shadow: 0 2px 2px rgba(0,0,0,0.4);
+}
+.movement-pad button:hover:not(:disabled),
+.movement-pad button:focus-visible:not(:disabled) {
+   background: linear-gradient(#394049,#282c31);
+   box-shadow: 0 0 0 2px #0f4d63, 0 2px 4px rgba(0,0,0,0.55);
+   outline: none;
+}
+.movement-pad button:active:not(:disabled) {
+   transform: translateY(1px);
+}
+
+/* Enhanced high-contrast focus ring for accessibility (will stack with existing shadow) */
+.movement-pad button:focus-visible:not(:disabled) {
+   box-shadow: 0 0 0 2px #fff, 0 0 0 4px #0f4d63, 0 2px 6px rgba(0,0,0,0.6);
+}
+.movement-pad button:disabled {
+   opacity: .35;
+   cursor: not-allowed;
+   filter: grayscale(.4);
+}
+.movement-pad .move-up { grid-area: up; }
+.movement-pad .move-down { grid-area: down; }
+.movement-pad .move-left { grid-area: left; }
+.movement-pad .move-right { grid-area: right; }
+.movement-pad .move-center { grid-area: center; visibility: hidden; }
+
+@media (max-width: 640px) {
+   .movement-pad { --btn-scale: .85; }
+   .movement-pad button { width: calc(var(--btn-size)*var(--btn-scale)); height: calc(var(--btn-size)*var(--btn-scale)); }
+}
+
+/* Visually hidden utility (for live regions etc.) */
+.visually-hidden { position:absolute !important; width:1px !important; height:1px !important; padding:0 !important; margin:-1px !important; overflow:hidden !important; clip:rect(0 0 0 0) !important; white-space:nowrap !important; border:0 !important; }

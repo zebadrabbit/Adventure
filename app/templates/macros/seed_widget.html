@@ -1,0 +1,9 @@
+{% macro seed_widget(seed_value='') %}
+<div class="seed-widget d-flex flex-column gap-2" id="seed-widget" data-initial-seed="{{ seed_value }}">
+  <div class="input-group input-group-sm seed-input-group seed-input-width">
+    <button class="btn btn-outline-warning" type="button" id="btn-new-seed" title="Random seed (shuffle)"><i class="bi bi-shuffle"></i></button>
+    <input type="text" class="form-control" placeholder="Enter seed (auto-applies)" id="input-custom-seed" aria-label="Custom seed value" value="{{ seed_value }}">
+  </div>
+  <div class="small text-muted" id="seed-status" aria-live="polite"></div>
+</div>
+{% endmacro %}

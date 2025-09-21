@@ -1,8 +1,9 @@
 {% extends 'base.html' %}
 {% block head %}
   {{ super() }}
-  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=20250917">
-  <link rel="stylesheet" href="{{ url_for('static', filename='chat-widget.css') }}">
+  <link rel="stylesheet" href="{{ asset_url('dashboard.css') }}">
+  <link rel="stylesheet" href="{{ asset_url('chat-widget.css') }}">
+  <link rel="stylesheet" href="{{ asset_url('utilities.css') }}">
 {% endblock %}
 
 {% block content %}

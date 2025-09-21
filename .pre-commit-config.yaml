@@ -1,0 +1,26 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+  - repo: local
+    hooks:
+      - id: inline-style-check
+        name: Inline style attribute check
+        entry: python scripts/check_inline_styles.py
+        language: system
+        pass_filenames: false
+        types: [html]
+      - id: inline-script-check
+        name: Inline script block check
+        entry: python scripts/check_inline_scripts.py
+        language: system
+        pass_filenames: false
+        types: [html]
+      - id: manual-version-token-check
+        name: Manual static version token check
+        entry: python scripts/check_static_version_tokens.py
+        language: system
+        pass_filenames: false
+        types: [html]

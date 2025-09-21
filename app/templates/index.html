@@ -2,7 +2,7 @@
 {% block title %}MUD Game{% endblock %}
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="{{ url_for('static', filename='home.css') }}?v=20250917">
+<link rel="stylesheet" href="{{ asset_url('home.css') }}">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap" rel="stylesheet">
 {% endblock %}
 {% block content %}

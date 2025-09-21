@@ -1,0 +1,81 @@
+:root {
+  --adv-ink:#0B0F12; --adv-ink-2:#12171C;
+  --adv-crt:#1DF2A0; --adv-amber:#FFC857; --adv-cyan:#19C1FF;
+  --adv-magenta:#FF3FA4; --adv-gold:#E9B44C; --adv-gray:#8A97A6;
+  --adv-parchment:#F5F3E7; --adv-white:#F8FAFB;
+}
+
+/* Bootstrap theme hooks */
+:root {
+  --bs-body-bg: var(--adv-ink);
+  --bs-body-color: var(--adv-white);
+
+  --bs-primary: var(--adv-crt);
+  --bs-secondary: var(--adv-gold);
+  --bs-success: #28D17C;
+  --bs-info: var(--adv-cyan);
+  --bs-warning: var(--adv-amber);
+  --bs-danger: var(--adv-magenta);
+  --bs-light: var(--adv-parchment);
+  --bs-dark: var(--adv-ink-2);
+
+  --bs-border-color: color-mix(in oklab, var(--adv-gray) 70%, transparent);
+  --bs-link-color: var(--adv-crt);
+  --bs-link-hover-color: color-mix(in oklab, var(--adv-crt) 85%, white);
+}
+
+/* Buttons: give a subtle CRT glow */
+.btn-primary {
+  --bs-btn-bg: var(--adv-crt);
+  --bs-btn-border-color: var(--adv-crt);
+  --bs-btn-hover-bg: color-mix(in oklab, var(--adv-crt) 85%, black);
+  --bs-btn-hover-border-color: color-mix(in oklab, var(--adv-crt) 75%, black);
+  box-shadow: 0 0 .6rem rgba(29,242,160,.35);
+}
+
+.btn-secondary {
+  --bs-btn-bg: var(--adv-gold);
+  --bs-btn-border-color: var(--adv-gold);
+  --bs-btn-hover-bg: color-mix(in oklab, var(--adv-gold) 85%, black);
+}
+
+.btn-outline-primary {
+  --bs-btn-color: var(--adv-crt);
+  --bs-btn-border-color: var(--adv-crt);
+  --bs-btn-hover-bg: var(--adv-crt);
+  --bs-btn-hover-color: #06110B;
+}
+
+/* Cards & navbars: deep ink with scanline hint */
+.card, .dropdown-menu, .offcanvas, .modal-content {
+  background: linear-gradient(180deg, #0B0F12 0%, #0D1216 100%);
+  border: 1px solid color-mix(in oklab, var(--adv-gray) 30%, transparent);
+  box-shadow: 0 6px 24px rgba(0,0,0,.5);
+}
+
+/* Scanline utility for hero areas */
+.scanlines {
+  background-image:
+    repeating-linear-gradient(0deg, rgba(255,255,255,.06), rgba(255,255,255,.06) 1px, transparent 1px, transparent 3px);
+  mix-blend-mode: overlay;
+}
+
+/* Pixel font vibe without extra files: tighten tracking & step edges */
+.pixelish {
+  letter-spacing: .02em;
+  image-rendering: pixelated;
+}
+
+/* Accent text helpers */
+.text-crt { color: var(--adv-crt)!important; }
+.text-amber { color: var(--adv-amber)!important; }
+.text-cyan { color: var(--adv-cyan)!important; }
+
+/* Gradient utilities for headers/buttons */
+.bg-crt-gradient {
+  background: linear-gradient(135deg, #1DF2A0 0%, #00B76B 100%);
+  color: #04110B;
+}
+
+/* Seed widget extracted inline style */
+.seed-input-width { max-width:260px; }

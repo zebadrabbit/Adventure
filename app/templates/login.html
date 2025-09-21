@@ -9,7 +9,7 @@
         </div>
         <form method="POST">
             <div class="mb-3">
-                <label for="username" class="form-label">Email address</label>
+                <label for="username" class="form-label">Username or Email</label>
                 <input type="text" class="form-control form-control-lg bg-dark text-white border-secondary" id="username" name="username" required autocomplete="username">
             </div>
             <div class="mb-3">
@@ -26,5 +26,5 @@
 </div>
 {% endblock %}
 {% block head %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='auth.css') }}?v=20250917">
+    <link rel="stylesheet" href="{{ asset_url('auth.css') }}">
 {% endblock %}

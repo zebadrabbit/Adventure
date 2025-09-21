@@ -1,0 +1,8 @@
+/* Class badge styles extracted from dashboard.html */
+/* Harmonized with CLASS_COLORS in config_api.py & CSS vars in dashboard.css */
+.class-badge.fighter-badge { background:var(--class-fighter-bg); color:var(--class-fighter-fg); border:1px solid var(--class-fighter-border); }
+.class-badge.rogue-badge   { background:var(--class-rogue-bg);   color:var(--class-rogue-fg);   border:1px solid var(--class-rogue-border); }
+.class-badge.mage-badge    { background:var(--class-mage-bg);    color:var(--class-mage-fg);    border:1px solid var(--class-mage-border); }
+.class-badge.cleric-badge  { background:var(--class-cleric-bg);  color:var(--class-cleric-fg);  border:1px solid var(--class-cleric-border); }
+.class-badge.druid-badge   { background:var(--class-druid-bg);   color:var(--class-druid-fg);   border:1px solid var(--class-druid-border); }
+.class-badge.ranger-badge  { background:var(--class-ranger-bg);  color:var(--class-ranger-fg);  border:1px solid var(--class-ranger-border); }

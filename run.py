@@ -13,6 +13,8 @@ import signal
 import argparse
 from textwrap import dedent
 
+__version__ = "0.3.3"
+
 try:
     # Optional: load .env automatically if available
     from dotenv import load_dotenv
@@ -78,7 +80,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--version",
         action="version",
-    version="Adventure MUD Server 0.2.1",
+        version=f"Adventure MUD Server {__version__}",
     )
 
     subparsers = parser.add_subparsers(dest="command")
