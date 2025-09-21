@@ -12,6 +12,7 @@ A modern web-based multiplayer dungeon adventure game built with Python (Flask, 
 - Multiplayer via WebSockets
 - Procedural dungeon generation (deterministic by seed)
 - Persistent dungeon state (database-backed)
+- Fog-of-war with persistent explored tile memory (local + server sync)
 - API-driven config for name pools, starter items, base stats, and class map
 - Dynamic UI: party selection, adventure map, and real-time chat
 - Responsive Bootstrap frontend
@@ -82,6 +83,7 @@ See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for coding conventions, pre-com
 - Added lightweight SVG normalization pre-commit hook (trims/strips non-license comments across ~2.7K icons).
 - CI workflow aligned with badge (job id `build-test`), explicit pre-commit run before tests.
 - README branding & Asset Optimization section added.
+- Persistent explored tiles column migration (lazy + script), compression & admin management.
 - CHANGELOG entry for maintenance release.
 
 ### v0.3.3
@@ -199,6 +201,39 @@ Key variables:
 - `SECRET_KEY` - Flask secret key
 - `DATABASE_URL` - SQLAlchemy database URI (default: SQLite in ./instance/mud.db)
 - `CORS_ALLOWED_ORIGINS` - Allowed origins for Socket.IO (default: *)
+
+## Explored Tiles Persistence (Fog-of-War Memory)
+
+Explored dungeon tiles are stored per user and seed to allow long-term mapping memory across sessions and devices.
+
+Storage layers:
+- Client: `localStorage` (fast immediate recall) keyed by `adventureSeenTiles:<seed>`.
+- Server: `user.explored_tiles` TEXT column (JSON object mapping seed -> compressed or raw tile list).
+
+API contract:
+```
+GET  /api/dungeon/seen        -> { seed:<int>, tiles:"x,y;x,y;..." }
+POST /api/dungeon/seen        -> { stored:<int>, compressed:<bool> }
+POST /api/dungeon/seen/clear  -> Admin-only clear ({ username?, seed? })
+```
+
+Compression:
+- Tile lists may be delta-compressed automatically (prefix `D:`). The server transparently decompresses before returning to clients.
+- If compression doesn't reduce size, raw form is stored.
+
+Admin management:
+- Admins can clear all or a single seed's tiles for a user with `/api/dungeon/seen/clear`.
+- Payload examples:
+	- Clear current user's all seeds: `{}`
+	- Clear current seed for user `alice`: `{ "username": "alice", "seed": 12345 }`
+
+Migration:
+- Column added automatically on startup via lightweight `_run_migrations()`.
+- Manual script available: `python scripts/upgrade_explored_tiles.py` (idempotent).
+
+Fallback safety:
+- If persistence temporarily unavailable, API returns HTTP 202 with a warning instead of failing gameplay.
+
 
 ## VS Code tasks
 

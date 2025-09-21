@@ -417,21 +417,25 @@ def _run_migrations():
             db.session.rollback()
             pass
     # Add 'xp' and 'level' columns to character if missing
-    char_cols = {c['name'] for c in inspector.get_columns('character')}
-    if 'xp' not in char_cols:
-        try:
-            db.session.execute(text('ALTER TABLE character ADD COLUMN xp INTEGER NOT NULL DEFAULT 0'))
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-            pass
-    if 'level' not in char_cols:
-        try:
-            db.session.execute(text('ALTER TABLE character ADD COLUMN level INTEGER NOT NULL DEFAULT 1'))
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-            pass
+    # Character table may not exist yet in some minimal test DBs; guard access
+    inspector = inspect(db.engine)
+    tables = set(inspector.get_table_names())
+    if 'character' in tables:
+        char_cols = {c['name'] for c in inspector.get_columns('character')}
+        if 'xp' not in char_cols:
+            try:
+                db.session.execute(text('ALTER TABLE character ADD COLUMN xp INTEGER NOT NULL DEFAULT 0'))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                pass
+        if 'level' not in char_cols:
+            try:
+                db.session.execute(text('ALTER TABLE character ADD COLUMN level INTEGER NOT NULL DEFAULT 1'))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                pass
     # Add 'explored_tiles' persistence column to user (JSON string) if missing
     inspector = inspect(db.engine)
     user_cols = {c['name'] for c in inspector.get_columns('user')}
@@ -442,3 +446,21 @@ def _run_migrations():
         except Exception:
             db.session.rollback()
             pass
+    # Track schema version (very lightweight)
+    try:
+        inspector = inspect(db.engine)
+        tables = inspector.get_table_names()
+        if 'schema_version' not in tables:
+            db.session.execute(text('CREATE TABLE schema_version (id INTEGER PRIMARY KEY, version INTEGER NOT NULL)'))
+            db.session.execute(text('INSERT INTO schema_version (id, version) VALUES (1, 1)'))
+            db.session.commit()
+        else:
+            row = db.session.execute(text('SELECT version FROM schema_version WHERE id=1')).fetchone()
+            ver = row[0] if row else 0
+            target = 1
+            if ver < target:
+                db.session.execute(text('UPDATE schema_version SET version=:v WHERE id=1'), {'v': target})
+                db.session.commit()
+    except Exception:
+        db.session.rollback()
+        pass

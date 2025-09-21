@@ -15,6 +15,16 @@ from app.dungeon import Dungeon
 from functools import lru_cache
 import threading
 import json
+from app.utils.tile_compress import compress_tiles, decompress_tiles
+from functools import wraps
+
+def admin_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if not current_user.is_authenticated or getattr(current_user, 'role', 'user') != 'admin':
+            return jsonify({'error': 'admin only'}), 403
+        return fn(*args, **kwargs)
+    return wrapper
 
 # Simple in-process cache (seed,size)->Dungeon instance. Thread-safe with a lock because Flask-SocketIO/eventlet may interleave greenlets.
 _dungeon_cache = {}
@@ -261,6 +271,9 @@ def get_seen_tiles():
             tiles_compact = data.get(str(seed), '')
         except Exception:
             tiles_compact = ''
+    # If compressed form stored, decompress
+    if tiles_compact.startswith('D:'):
+        tiles_compact = decompress_tiles(tiles_compact)
     return jsonify({'seed': seed, 'tiles': tiles_compact})
 
 @bp_dungeon.route('/api/dungeon/seen', methods=['POST'])
@@ -298,12 +311,55 @@ def post_seen_tiles():
     # Truncate for safety
     if len(merged) > 50000:
         merged = set(list(merged)[:50000])
-    existing[str(seed)] = ';'.join(sorted(merged))
+    merged_str = ';'.join(sorted(merged))
+    stored_value = compress_tiles(merged_str)
+    existing[str(seed)] = stored_value
     try:
         user.explored_tiles = json.dumps(existing)
-        from app import db
         db.session.commit()
-        return jsonify({'stored': len(merged)})
+        return jsonify({'stored': len(merged), 'compressed': stored_value != merged_str})
     except Exception:
         # Column missing or commit failed; don't break gameplay.
         return jsonify({'stored': 0, 'warning': 'explored_tiles persistence unavailable'}), 202
+
+
+@bp_dungeon.route('/api/dungeon/seen/clear', methods=['POST'])
+@login_required
+@admin_required
+def clear_seen_tiles():
+    """Admin-only: Clear seen tiles for a specified user and/or seed.
+    Request JSON: { username?: str, seed?: int }
+    If username omitted, operates on current user. If seed omitted, removes all seeds.
+    Response: { cleared: bool, scope: 'all'|'seed', user: <username> }
+    """
+    payload = request.get_json(silent=True) or {}
+    username = payload.get('username') or current_user.username
+    seed_filter = payload.get('seed')
+    from app.models.models import User as UserModel
+    target = db.session.query(UserModel).filter_by(username=username).first()
+    if not target:
+        return jsonify({'error': 'user not found'}), 404
+    changed = False
+    try:
+        data = json.loads(target.explored_tiles) if target.explored_tiles else {}
+    except Exception:
+        data = {}
+    if not data:
+        return jsonify({'cleared': False, 'user': username, 'scope': 'none'})
+    if seed_filter is None:
+        target.explored_tiles = None
+        changed = True
+        scope = 'all'
+    else:
+        if str(seed_filter) in data:
+            data.pop(str(seed_filter), None)
+            target.explored_tiles = json.dumps(data) if data else None
+            changed = True
+        scope = 'seed'
+    if changed:
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            return jsonify({'error': 'commit failed'}), 500
+    return jsonify({'cleared': changed, 'user': username, 'scope': scope})
