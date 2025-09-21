@@ -67,4 +67,69 @@ Future movement may shift to a dedicated event (`move`) with payload `{ "dir": "
 - Heartbeat / latency metrics event.
 
 ---
+## Client Examples
+
+### JavaScript (Browser) – Lobby Chat
+```js
+import { io } from 'https://cdn.socket.io/4.7.2/socket.io.esm.min.js';
+
+// Reuses Flask session cookie; no extra auth token yet
+const lobby = io('/lobby', { transports: ['websocket'] });
+
+lobby.on('connect', () => {
+	console.log('Connected to lobby');
+	lobby.emit('lobby_chat_message', { message: 'Hello dungeon!' });
+});
+
+lobby.on('lobby_chat_message', (payload) => {
+	console.log(`${payload.user}: ${payload.message}`);
+});
+
+lobby.on('error', (err) => {
+	console.warn('Lobby error', err);
+});
+```
+
+### JavaScript – Game Namespace
+```js
+const game = io('/game', { transports: ['websocket'] });
+
+game.on('connect', () => {
+	game.emit('join_game', { room: 'seed-42' });
+	game.emit('game_action', { room: 'seed-42', action: 'look' });
+});
+
+game.on('status', (s) => console.log('[status]', s.msg));
+game.on('game_update', (u) => console.log('[update]', u.msg));
+game.on('error', (e) => console.warn('[game error]', e));
+```
+
+### Python (socketio-client)
+```py
+import socketio
+
+sio = socketio.Client()
+
+@sio.event(namespace='/lobby')
+def connect():
+		print('Connected to lobby')
+		sio.emit('lobby_chat_message', {'message': 'Hi from Python'}, namespace='/lobby')
+
+@sio.on('lobby_chat_message', namespace='/lobby')
+def on_chat(data):
+		print('Chat:', data)
+
+@sio.on('error', namespace='/lobby')
+def on_error(err):
+		print('Error:', err)
+
+sio.connect('http://localhost:5000/lobby', transports=['websocket'])
+sio.wait()
+```
+
+Notes:
+- Error events follow `{ message, field?, code? }` shape.
+- The current auth model depends on the Flask session cookie; cross-origin clients may need proper CORS & cookie settings.
+
+---
 _Last updated: 2025-09-21_

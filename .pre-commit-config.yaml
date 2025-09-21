@@ -30,3 +30,9 @@ repos:
         language: system
         files: '\\.(svg)$'
         stages: [commit]
+      - id: deprecated-sqlalchemy-query-get
+        name: Deprecated SQLAlchemy Query.get usage
+        entry: python scripts/check_deprecated_query_get.py
+        language: system
+        pass_filenames: false
+        types: [python]

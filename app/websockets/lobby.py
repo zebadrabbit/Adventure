@@ -10,15 +10,22 @@ from app import socketio
 from flask_socketio import emit, join_room, leave_room
 from flask_login import current_user
 from flask import request
+from .validation import (
+    validate,
+    LOBBY_CHAT_MESSAGE,
+    ADMIN_BROADCAST,
+)
 
 # Track online users by session id
 online = {}
 
 @socketio.on('lobby_chat_message')
 def handle_lobby_chat_message(data):
-    message = (data or {}).get('message', '').strip()
-    if not message:
+    ok, result = validate(data or {}, LOBBY_CHAT_MESSAGE)
+    if not ok:
+        emit('error', {'message': f"Invalid lobby_chat_message: {result['error']}", 'field': result['field'], 'code': result['code']})
         return
+    message = result['message']
     try:
         user = getattr(current_user, 'username', 'Anonymous')
     except Exception:
@@ -74,11 +81,14 @@ def handle_admin_broadcast(data):
     except Exception:
         role = 'user'
     if role != 'admin':
+        # Silently ignore (intentionally) to avoid information leakage
         return
-    target = (data or {}).get('target', 'global')
-    message = (data or {}).get('message', '').strip()
-    if not message:
+    ok, result = validate(data or {}, ADMIN_BROADCAST)
+    if not ok:
+        emit('error', {'message': f"Invalid admin_broadcast: {result['error']}", 'field': result['field'], 'code': result['code']})
         return
+    target = result.get('target', 'global') or 'global'
+    message = result['message']
     try:
         from_user = getattr(current_user, 'username', 'Admin')
     except Exception:

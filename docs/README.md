@@ -2,14 +2,25 @@
 
 Welcome to the Adventure project documentation. This index links all major docs now consolidated under `docs/`.
 
+## Table of Contents
+- [Core Guides](#core-guides)
+- [Development](#development)
+- [Dungeon Generation](#dungeon-generation)
+- [WebSockets](#websockets)
+- [Testing & Coverage](#testing--coverage)
+- [Roadmap Ideas (High-Level)](#roadmap-ideas-high-level)
+- [Conventions Recap](#conventions-recap)
+- [Contributing Quick Link](#contributing-quick-link)
+
 ## Core Guides
 - [Project Overview (Root README)](../README.md)
 - [Changelog](CHANGELOG.md)
 - [Release Notes](RELEASE_NOTES.md)
+- [Releasing](RELEASING.md)
 - [Contributing Guide](CONTRIBUTING.md)
 - [Style Guide](STYLE_GUIDE.md)
 - [Architecture Diagram](architecture.md)
- - [WebSocket Event Contracts](websocket_events.md)
+- [WebSocket Event Contracts](websocket_events.md)
 
 ## Development
 - Version bump script: `scripts/bump_version.py` (auto-inserts UNRELEASED section into `docs/CHANGELOG.md`).
