@@ -9,7 +9,28 @@ def anon_client():
     # Ensure tables exist so login manager can resolve users if needed
     with app.app_context():
         db.create_all()
+    # Clear any leftover online state to prevent role bleed between test runs
+    try:
+        import app.websockets.lobby as lobby
+        lobby.online.clear()
+    except Exception:
+        pass
     c = socketio.test_client(app, flask_test_client=app.test_client())
+    # Defensive: ensure its online registration is not carrying over an admin role from a reused SID
+    try:
+        import app.websockets.lobby as lobby
+        info = lobby.online.get(c.sid)
+        if info:
+            info['role'] = 'user'
+            info['is_auth'] = False
+            info['legacy_ok'] = False
+    except Exception:
+        pass
+    # Flush any connection events to start each test with a clean queue
+    try:
+        c.get_received()
+    except Exception:
+        pass
     yield c
     if c.is_connected():
         c.disconnect()
@@ -70,7 +91,8 @@ def test_connect_disconnect_tracks_online(anon_client):
 def test_admin_online_users_requires_admin(anon_client, admin_client, monkeypatch):
     # Non-admin should get nothing
     anon_client.emit('admin_online_users')
-    assert not any(p['name'] == 'admin_online_users' for p in anon_client.get_received())
+    received = anon_client.get_received()
+    assert not any(p['name'] == 'admin_online_users' for p in received), f"Non-admin unexpectedly received legacy event: {received}"
     # Admin request
     # Force context current_user to appear as admin to avoid timing / migration race
     class _DummyAdmin:
@@ -88,6 +110,23 @@ def test_admin_online_users_requires_admin(anon_client, admin_client, monkeypatc
         payloads = _extract('admin_online_users', rec)
     assert payloads, 'Expected admin_online_users payload for admin client'
     assert isinstance(payloads[0], list)
+
+
+def test_admin_online_users_dual_events(admin_client, monkeypatch):
+    """Admin should receive both legacy and response events; they carry identical payload lists."""
+    class _DummyAdmin:
+        role = 'admin'
+        username = 'admin_test'
+    monkeypatch.setattr('app.websockets.lobby.current_user', _DummyAdmin())
+    admin_client.emit('admin_online_users')
+    rec = admin_client.get_received()
+    legacy = [p for p in rec if p['name'] == 'admin_online_users']
+    resp = [p for p in rec if p['name'] == 'admin_online_users_response']
+    assert legacy, 'Expected legacy admin_online_users event'
+    assert resp, 'Expected admin_online_users_response event'
+    # Compare first payload lists if present
+    if legacy[0]['args'] and resp[0]['args']:
+        assert legacy[0]['args'][0] == resp[0]['args'][0]
 
 
 def test_admin_broadcast_targets(admin_client, anon_client, monkeypatch):

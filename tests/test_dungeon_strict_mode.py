@@ -14,6 +14,9 @@ def strict_app(monkeypatch):
     with app.app_context():
         db.create_all()
         yield app
+        # Cleanup: ensure flags not left enabled for downstream tests
+        app.config['DUNGEON_ALLOW_HIDDEN_AREAS_STRICT'] = False
+        app.config['DUNGEON_ALLOW_HIDDEN_AREAS'] = False
 
 
 def _count_unreachable_rooms(d):

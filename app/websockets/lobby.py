@@ -10,6 +10,7 @@ from app import socketio
 from flask_socketio import emit, join_room, leave_room
 from flask_login import current_user
 from flask import request
+from flask import session as flask_session
 from .validation import (
     validate,
     LOBBY_CHAT_MESSAGE,
@@ -47,15 +48,25 @@ def handle_connect():
     # Always isolate joins to explicit role rooms only after verifying role each connect.
     try:
         username = _username()
-        role = _user_role()
+        # Determine auth strictly via session presence to avoid leaked test monkeypatch state
+        session_uid = flask_session.get('_user_id')
+        is_auth = bool(session_uid)
+        raw_role = _user_role() if is_auth else 'user'
+        role = raw_role if raw_role in ('admin','mod') else 'user'
         sid = request.sid
-        online[sid] = {'username': username, 'role': role}
+        stored_role = role if is_auth else 'user'
+        online[sid] = {
+            'username': username,
+            'role': stored_role,
+            'is_auth': is_auth,
+            'legacy_ok': stored_role == 'admin' and is_auth
+        }
         join_room('global')
         join_room('users')  # baseline room for all authenticated or anonymous users
-        if role == 'admin':
+        if stored_role == 'admin':
             join_room('admins')
             join_room('mods')  # admins implicitly get mod messages
-        elif role == 'mod':
+        elif stored_role == 'mod':
             join_room('mods')
     except Exception:
         # Silently ignore connect bookkeeping errors
@@ -79,16 +90,16 @@ def handle_admin_online_users():
     TODO(deprecate): Remove legacy 'admin_online_users' emission in a future minor release
     (e.g. v0.4.0). Clients should listen to 'admin_online_users_response'.
     """
-    role = _user_role()
-    is_auth = getattr(current_user, 'is_authenticated', True)
     entry = online.get(request.sid)
-    if not (role == 'admin' and is_auth and entry and entry.get('role') == 'admin'):
+    # Only allow if this SID connected as an authenticated admin (legacy_ok set at connect time)
+    if not (entry and entry.get('legacy_ok')):
         return
     sid = request.sid
     payload = list(online.values())
     # Emit new response event; legacy event emitted only for admins (requester) to preserve backward compatibility
     emit('admin_online_users_response', payload, room=sid)
-    emit('admin_online_users', payload, room=sid)
+    if entry.get('legacy_ok'):
+        emit('admin_online_users', payload, room=sid)
 
 
 @socketio.on('admin_broadcast')
