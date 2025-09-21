@@ -35,6 +35,8 @@ class User(UserMixin, db.Model):
     ban_reason = db.Column(db.Text, nullable=True)
     notes = db.Column(db.Text, nullable=True)
     banned_at = db.Column(db.DateTime, nullable=True)
+    # JSON string storing explored dungeon tiles keyed by seed: {"<seed>": "x1,y1;x2,y2;..."}
+    explored_tiles = db.Column(db.Text, nullable=True)
     # Add more fields as needed
 
 class Character(db.Model):

@@ -15,6 +15,8 @@
   const MEMORY_DIM_OPACITY = 0.35;  // opacity for previously seen but currently out-of-range tiles
   const MEMORY_STROKE = false;      // memory tiles get no stroke edge
   const MEMORY_FILL_COLOR = '#060606'; // dim color base for memory tiles
+  // Fog config persistence keys (user tunable in console)
+  const FOG_CFG_KEY = 'adventureFogConfig';
   document.addEventListener('DOMContentLoaded', function() {
     const output = document.getElementById('dungeon-output');
     // ------------------------------------------------------------
@@ -51,6 +53,39 @@
       lastSeenSave = now;
       saveSeenTiles(seenSet);
     }
+
+    // ------------------------------------------------------------
+    // Fog configuration persistence (radius/opacity). Exposed via console commands.
+    // ------------------------------------------------------------
+    function loadFogConfig() {
+      try {
+        const raw = localStorage.getItem(FOG_CFG_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw);
+      } catch(e) { return null; }
+    }
+    function saveFogConfig(cfg) {
+      try { localStorage.setItem(FOG_CFG_KEY, JSON.stringify(cfg)); } catch(e) {}
+    }
+    // Only reading current constants (immutable) – for future dynamic tuning we could reassign globals.
+    function currentFogConfig() {
+      return {
+        innerRadius: INNER_VIS_RADIUS,
+        fullRadius: FOG_FULL_RADIUS,
+        minOpacity: MIN_FOG_OPACITY,
+        maxOpacity: MAX_FOG_OPACITY,
+        noise: FOG_NOISE_AMPLITUDE,
+        memoryOpacity: MEMORY_DIM_OPACITY
+      };
+    }
+    // If persisted config differs in future when we allow dynamic adjusting, we'd apply here.
+    (function initFogConfig(){
+      const cfg = loadFogConfig();
+      if (cfg) {
+        // Placeholder: accepting persisted values later when we allow overrides.
+        // We intentionally do not mutate constants now to keep code simple.
+      }
+    })();
   // Position element removed per design update (compass + log only)
   // Legacy exits button container removed
   const moveNorthBtn = document.getElementById('btn-move-n');
@@ -388,6 +423,87 @@
           if (playerPos) {
             try { updateDungeonVisibility(playerPos[0], playerPos[1]); } catch(e) { /* noop */ }
           }
+
+          // Attempt to merge server-side seen tiles (if any) after local vis applied
+          fetch('/api/dungeon/seen')
+            .then(r => r.ok ? r.json() : null)
+            .then(sdata => {
+              if (!sdata || !sdata.tiles) return;
+              const parts = sdata.tiles.split(';').filter(Boolean);
+              if (!window.dungeonSeenTiles) window.dungeonSeenTiles = new Set();
+              let merged = false;
+              for (const p of parts) {
+                if (!window.dungeonSeenTiles.has(p)) { window.dungeonSeenTiles.add(p); merged = true; }
+              }
+              if (merged && playerPos) {
+                updateDungeonVisibility(playerPos[0], playerPos[1]);
+              }
+            })
+            .catch(()=>{});
+
+          // --------------------------------------------------------
+          // Developer console helpers (namespaced under window.dungeonDev)
+          // --------------------------------------------------------
+          if (!window.dungeonDev) window.dungeonDev = {};
+          window.dungeonDev.coverage = function() {
+            if (!window.dungeonTileLayers || !window.dungeonSeenTiles) return 0;
+            const total = Object.keys(window.dungeonTileLayers).length;
+            const seen = window.dungeonSeenTiles.size;
+            const pct = total ? (seen/total*100) : 0;
+            console.log(`[dungeonDev] Seen tiles: ${seen}/${total} (${pct.toFixed(2)}%)`);
+            return { seen, total, pct };
+          };
+          window.dungeonDev.clearSeen = function() {
+            if (window.dungeonSeenTiles) {
+              window.dungeonSeenTiles.clear();
+              saveSeenTiles(window.dungeonSeenTiles);
+              updateDungeonVisibility(playerPos ? playerPos[0] : 0, playerPos ? playerPos[1] : 0);
+              console.log('[dungeonDev] Cleared seen tiles');
+            }
+          };
+          window.dungeonDev.getFogConfig = function() {
+            const cfg = currentFogConfig();
+            console.log('[dungeonDev] Fog config', cfg);
+            return cfg;
+          };
+          window.dungeonDev.saveFogConfig = function(partial) {
+            if (!partial || typeof partial !== 'object') { console.warn('[dungeonDev] supply an object with fog keys'); return; }
+            const merged = { ...currentFogConfig(), ...partial };
+            saveFogConfig(merged);
+            console.log('[dungeonDev] Persisted fog config (note: runtime constants not hot-applied yet).', merged);
+            return merged;
+          };
+          window.dungeonDev.dump = function() {
+            return {
+              coverage: window.dungeonDev.coverage(),
+              fog: currentFogConfig(),
+              seed: window.currentDungeonSeed
+            };
+          };
+          // Throttled server sync for seen tiles
+          let lastServerSync = 0;
+          const SERVER_SYNC_INTERVAL = 4000; // ms
+          function syncSeenToServer(force=false) {
+            const now = performance.now();
+            if (!force && now - lastServerSync < SERVER_SYNC_INTERVAL) return;
+            if (!window.dungeonSeenTiles || !window.currentDungeonSeed) return;
+            lastServerSync = now;
+            // Compress to semicolon list
+            const tiles = Array.from(window.dungeonSeenTiles).slice(0, 50000).join(';');
+            fetch('/api/dungeon/seen', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tiles })
+            }).catch(()=>{});
+          }
+          window.dungeonDev.forceSync = () => syncSeenToServer(true);
+
+          // Hook into existing throttled local save by wrapping saveSeenTilesThrottled
+          const _oldSaveSeenTilesThrottled = saveSeenTilesThrottled;
+          saveSeenTilesThrottled = function(seenSet) {
+            _oldSaveSeenTilesThrottled(seenSet);
+            syncSeenToServer(false);
+          };
 
           if (playerPos) {
             if (window.dungeonPlayerMarker) {

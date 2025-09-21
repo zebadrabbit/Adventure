@@ -1,0 +1,33 @@
+<div class="modal fade" id="fogAdminModal" tabindex="-1" aria-labelledby="fogAdminModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header">
+        <h5 class="modal-title" id="fogAdminModalLabel">Fog & Visibility Management</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body small">
+        <p class="mb-2">View and manage persisted explored tiles (server + localStorage). Use with caution.</p>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          <button id="fog-admin-dump" class="btn btn-sm btn-outline-info">Dump Coverage (Console)</button>
+          <button id="fog-admin-force-sync" class="btn btn-sm btn-outline-primary">Force Sync to Server</button>
+          <button id="fog-admin-clear-local" class="btn btn-sm btn-outline-warning">Clear Local Seen</button>
+          <button id="fog-admin-clear-server" class="btn btn-sm btn-outline-danger">Clear Server Seen</button>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Server Stored Tile Count</label>
+          <div id="fog-admin-server-count" class="form-text">(loading...)</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Local Seen Tile Count</label>
+          <div id="fog-admin-local-count" class="form-text">(loading...)</div>
+        </div>
+        <hr/>
+        <p class="mb-2">Fog Configuration (read-only for now; console can persist future overrides)</p>
+  <pre class="bg-black p-2 rounded fog-admin-config-pre" id="fog-admin-config"></pre>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>

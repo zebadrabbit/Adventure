@@ -14,6 +14,7 @@ from flask_login import login_required, current_user
 from app.dungeon import Dungeon
 from functools import lru_cache
 import threading
+import json
 
 # Simple in-process cache (seed,size)->Dungeon instance. Thread-safe with a lock because Flask-SocketIO/eventlet may interleave greenlets.
 _dungeon_cache = {}
@@ -233,3 +234,64 @@ def adventure():
     return render_template('adventure.html', party=party, seed=seed, pos=pos)
 
 # Add other dungeon/gameplay routes here
+
+@bp_dungeon.route('/api/dungeon/seen', methods=['GET'])
+@login_required
+def get_seen_tiles():
+    """Return persisted seen tiles for the current user & seed.
+    Response: { seed: <int>, tiles: "x,y;x,y;..." }
+    """
+    dungeon_instance_id = session.get('dungeon_instance_id')
+    if not dungeon_instance_id:
+        return jsonify({'error': 'No dungeon instance'}), 404
+    instance = db.session.get(DungeonInstance, dungeon_instance_id)
+    if not instance:
+        return jsonify({'error': 'Instance not found'}), 404
+    seed = instance.seed
+    tiles_compact = ''
+    user = current_user
+    if user.explored_tiles:
+        try:
+            data = json.loads(user.explored_tiles)
+            tiles_compact = data.get(str(seed), '')
+        except Exception:
+            tiles_compact = ''
+    return jsonify({'seed': seed, 'tiles': tiles_compact})
+
+@bp_dungeon.route('/api/dungeon/seen', methods=['POST'])
+@login_required
+def post_seen_tiles():
+    """Persist seen tiles for current user & seed.
+    Request JSON: { tiles: "x,y;x,y;..." } (semicolon separated list)
+    Merges with existing (union). Returns { stored: <int> } count after merge.
+    Size guard: silently truncate if > 50k tiles.
+    """
+    dungeon_instance_id = session.get('dungeon_instance_id')
+    if not dungeon_instance_id:
+        return jsonify({'error': 'No dungeon instance'}), 404
+    instance = db.session.get(DungeonInstance, dungeon_instance_id)
+    if not instance:
+        return jsonify({'error': 'Instance not found'}), 404
+    seed = instance.seed
+    payload = request.get_json(silent=True) or {}
+    tiles_compact = (payload.get('tiles') or '').strip()
+    if tiles_compact and not all(part.count(',')==1 for part in tiles_compact.split(';') if part):
+        return jsonify({'error': 'Bad tiles format'}), 400
+    new_tiles = set([p for p in tiles_compact.split(';') if p]) if tiles_compact else set()
+    user = current_user
+    existing = {}
+    if user.explored_tiles:
+        try:
+            existing = json.loads(user.explored_tiles) or {}
+        except Exception:
+            existing = {}
+    prior = set(existing.get(str(seed), '').split(';')) if existing.get(str(seed)) else set()
+    merged = prior | new_tiles
+    # Truncate for safety
+    if len(merged) > 50000:
+        merged = set(list(merged)[:50000])
+    existing[str(seed)] = ';'.join(sorted(merged))
+    user.explored_tiles = json.dumps(existing)
+    from app import db
+    db.session.commit()
+    return jsonify({'stored': len(merged)})

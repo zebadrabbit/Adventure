@@ -65,6 +65,7 @@
                   <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#accountModal"><i class="bi bi-person-gear me-2"></i>Account & Settings</a></li>
                   {% if user_role == 'admin' %}
                   <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#serverSettingsModal"><i class="bi bi-gear-wide-connected me-2"></i>Server Settings</a></li>
+                  <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#fogAdminModal"><i class="bi bi-cloud-fog2 me-2"></i>Fog & Visibility</a></li>
                   {% endif %}
                   <li><hr class="dropdown-divider"></li>
                   <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
@@ -105,6 +106,8 @@
   {% set user_role = (current_user.role if current_user.is_authenticated else 'user')|default('user', true) %}
       {% if user_role == 'admin' %}
         {% include 'partials/server_settings_modal.html' %}
+        {% include 'partials/fog_admin_modal.html' %}
+        <script src="{{ url_for('static', filename='js/fog_admin_modal.js') }}" defer></script>
       {% endif %}
     {% endif %}
 </body>
