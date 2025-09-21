@@ -208,6 +208,23 @@ Features:
 
 Re-run safe: existing values become defaults; choose whether to rotate the admin password.
 
+Flags / automation:
+```
+--yes / -y                Accept all defaults (non-interactive)
+--non-interactive         Non-interactive mode (fails if required value missing)
+--json                    Emit machine-readable JSON summary only
+--no-admin                Skip ensuring/creating admin user
+--admin-username NAME     Set admin username in non-interactive runs
+--admin-password PASS     Set admin password (use with care; consider env injection)
+--generate-admin-password Auto-generate a secure password (printed once)
+--alembic                 Run `alembic upgrade head` after DB init if migrations present
+--quiet-routes            Suppress route map printing during setup
+```
+Example CI usage:
+```
+python scripts/setup_adventure.py --yes --no-admin --alembic --quiet-routes --json > setup_summary.json
+```
+
 
 Local development uses a `.env` file (auto-loaded):
 

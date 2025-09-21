@@ -101,8 +101,9 @@ app.register_blueprint(bp_config)
 
 from app.websockets import game, lobby
 
-print("Registered routes:")
-print(app.url_map)
+if not os.getenv('ADVENTURE_SUPPRESS_ROUTE_MAP'):
+    print("Registered routes:")
+    print(app.url_map)
 
 # Cache-busting asset helper: generates a url_for static path with ?v=<mtime>
 from flask import url_for
