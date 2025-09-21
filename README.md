@@ -52,6 +52,35 @@ Late-stage carving uses a probability threshold to prevent the normalization pas
 ### Determinism & Caching
 The pipeline is deterministic for a given (seed, size). Generated `Dungeon` instances are cached in-memory keyed by these parameters allowing instant retrieval for repeat visits or seed replays.
 
+### Hidden Areas Flags
+Two configuration flags influence late-stage connectivity behavior (set in Flask config):
+
+| Flag | Default | Behavior |
+|------|---------|----------|
+| `DUNGEON_ALLOW_HIDDEN_AREAS` | `False` | Skips active connectivity carving repairs; unreachable rooms from the structural phase are tolerated during repair, but a final safety sweep still converts unreachable rooms to tunnels so invariants (tests) retain full reachability. |
+| `DUNGEON_ALLOW_HIDDEN_AREAS_STRICT` | `False` | Superset of the above: also skips the final unreachable-room conversion, allowing persistent unreachable rooms (use only for manual debugging / experimental secret areas; never enabled in tests). |
+
+If both flags are false the generator performs dynamic connectivity repairs and, if some rooms remain unreachable, downgrades those entire rooms to tunnels (incrementing `rooms_dropped`). If only the non-strict flag is true, repairs are skipped but the final downgrade still normalizes the layout. Strict mode leaves unreachable rooms intact (they will appear as isolated room cells not connected to the entrance component).
+
+### Generation Metrics
+When `DUNGEON_ENABLE_GENERATION_METRICS` (default True) is enabled, a metrics dictionary is attached to the dungeon object and exposed via the admin endpoint `/api/dungeon/gen/metrics`.
+
+| Key | Description |
+|-----|-------------|
+| `doors_created` | Reserved for future proactive placements (currently 0). |
+| `doors_downgraded` | Doors converted to wall/tunnel due to invalid adjacency. |
+| `repairs_performed` | Number of connectivity repair attempts executed (skipped when hidden areas flag avoids repair). |
+| `chains_collapsed` | Door tiles removed from linear chains along the same wall. |
+| `orphan_fixes` | Door fixes (either carving an adjacent tunnel or degrading the door). |
+| `rooms_dropped` | Entire rooms converted to tunnels in fallback when still unreachable after repairs. |
+| `runtime_ms` | Generation wall-clock duration (ms). |
+| `debug_allow_hidden` | Echo of `DUNGEON_ALLOW_HIDDEN_AREAS` at generation time. |
+| `debug_allow_hidden_strict` | Echo of `DUNGEON_ALLOW_HIDDEN_AREAS_STRICT`. |
+| `debug_room_count_initial` | Room cell count immediately after structural pipeline. |
+| `debug_room_count_post_safety` | Room cell count after final safety (may shrink if unreachable rooms were downgraded). |
+
+These metrics support regression tests and profiling of the consolidated final pass.
+
 ## Testing & Invariants
 Key automated tests (pytest) protect the generation contract:
 
@@ -60,6 +89,8 @@ Key automated tests (pytest) protect the generation contract:
 | Seed persistence test | Ensures dashboard-selected seed matches the adventure instance seed (deterministic replay). |
 | Multi-door presence sweep | Confirms that across a sampled seed range, rooms can legitimately present multiple door placements where distinct corridors meet. |
 | No orphan doors invariant | Validates every door satisfies adjacency rules (one room neighbor + at least one corridor/door neighbor). |
+| Strict hidden areas mode | Verifies that when `DUNGEON_ALLOW_HIDDEN_AREAS_STRICT` is enabled unreachable rooms may persist (skips if rare fully-connected range). |
+| Performance regression | Guards average generation `runtime_ms` across representative seeds against excessive slowdown. |
 
 Future candidates: cycle length distribution, corridor branching factor bounds, entrance accessibility proofs.
 
@@ -193,6 +224,10 @@ The interactive admin shell now includes user moderation helpers in addition to 
 
 Login attempts by banned accounts are blocked with a flash message including the ban reason if present.
 
+WebSocket admin events:
+- `admin_online_users` (request) -> emits `admin_online_users_response` only to the requesting admin's socket (renamed response event to avoid accidental delivery to non-admin listeners).
+	- NOTE: Legacy event name `admin_online_users` is still emitted (to the requesting admin only) for a transitional period. A TODO deprecation marker is present; clients should migrate to `admin_online_users_response`.
+
 ## Environment configuration
 ### Quick Start Setup Script
 An interactive, colorful bootstrap script is provided:
@@ -239,7 +274,7 @@ Key variables:
 ## Explored Tiles Persistence (Fog-of-War Memory)
 
 ### Door Placement Normalization
-The dungeon generator enforces that door tiles appear as discrete entrance points rather than continuous bands. A refinement (2025-09-21) prevents creation of straight chains of adjacent door cells along a single room wall by distinguishing true entry/junction endpoints from inline corridor segments. Inline segments remain tunnels; only corridor dead‑ends, bends, intersections, or single endpoints adjacent to exactly one room become doors.
+The dungeon generator enforces that door tiles appear as discrete entrance points rather than continuous bands. A refinement (2025-09-21) prevents creation of straight chains of adjacent door cells along a single room wall by distinguishing true entry/junction endpoints from inline corridor segments. Inline segments remain tunnels; only corridor dead‑ends, bends, intersections, or single endpoints adjacent to exactly one room become doors. A later consolidation pass merges multiple late normalization steps (separation enforcement, door guarantee, connectivity repair or downgrade, adjacency purges, and chain collapse) into a single traversal tracked by metrics (`repairs_performed`, `chains_collapsed`, `rooms_dropped`).
 
 Explored dungeon tiles are stored per user and seed to allow long-term mapping memory across sessions and devices.
 
