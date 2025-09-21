@@ -73,7 +73,7 @@ See `docs/architecture.md` for a high-level Mermaid diagram of core components (
 SVG icon assets are automatically normalized on commit (whitespace + non-license comment stripping) via a lightweight pre-commit hook (`optimize_svgs`). For deeper path/precision optimization you can still run external tools (e.g., svgo) before committing.
 
 ## Contributing & Development
-See [CONTRIBUTING.md](CONTRIBUTING.md) for coding conventions, pre-commit policy (no inline styles/scripts), asset guidelines, and test instructions.
+See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for coding conventions, pre-commit policy (no inline styles/scripts), asset guidelines, and test instructions.
 
 
 ## What's New (v0.3.4 latest)
@@ -109,7 +109,7 @@ Highlights across recent patches (0.3.1 → 0.3.3):
 - Socket.IO version alignment & stability improvements.
 - Utility CSS consolidation & favicon addition.
 
-Refer to CHANGELOG.md for full historical details.
+Refer to docs/CHANGELOG.md for full historical details.
 
 ## What's New in v0.3.0
 - **Modular backend:** All major logic split into blueprints/modules (`dashboard.py`, `dungeon_api.py`, `config_api.py`)
@@ -263,7 +263,7 @@ Hooks included:
 - Inline script block check (disallows inline `<script>` code blocks)
 - Manual version token check (enforces `asset_url()` usage)
 
-See `STYLE_GUIDE.md` for the full set of frontend conventions.
+See `docs/STYLE_GUIDE.md` for the full set of frontend conventions.
 
 ## CSS Custom Properties (Theming)
 Class color theming is centralized and available both server-side and via `/api/config/class_colors`. Corresponding CSS variables (custom properties) are injected in the stylesheets so you can reskin without hunting through multiple files.
@@ -350,7 +350,7 @@ Caching:
 
 This project follows Semantic Versioning (SemVer): MAJOR.MINOR.PATCH.
 
-See CHANGELOG.md for a curated list of notable changes per release.
+See docs/CHANGELOG.md for a curated list of notable changes per release.
 
 ### Automated Version Bump
 An automated workflow (`auto-bump.yml`) examines the latest commit message on pushes to `main`. If the commit uses a Conventional Commit type (e.g., `feat:`, `fix:`, `perf:`) and the `VERSION` file was not modified in that commit, it will:

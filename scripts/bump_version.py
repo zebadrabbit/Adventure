@@ -24,7 +24,14 @@ import sys, re, pathlib, subprocess
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 VERSION_FILE = ROOT / 'VERSION'
-CHANGELOG = ROOT / 'CHANGELOG.md'
+def find_changelog() -> pathlib.Path | None:
+    candidates = [ROOT / 'docs' / 'CHANGELOG.md', ROOT / 'CHANGELOG.md']
+    for p in candidates:
+        if p.exists():
+            return p
+    return None
+
+CHANGELOG = find_changelog()
 
 SEMVER_RE = re.compile(r'^(\d+)\.(\d+)\.(\d+)$')
 
@@ -62,7 +69,7 @@ def bump(v: str, kind: str, explicit: str | None) -> str:
     raise ValueError('Unknown bump kind')
 
 def ensure_changelog_stub(new_version: str):
-    if not CHANGELOG.exists():
+    if CHANGELOG is None or not CHANGELOG.exists():
         return
     text = CHANGELOG.read_text(encoding='utf-8')
     header = f'# [{new_version}] - UNRELEASED'

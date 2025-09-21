@@ -1,3 +1,11 @@
+# Changelog
+
+Moved from project root to `docs/` for repository root decluttering.
+
+```note
+Automation: The version bump script now supports the changelog in this location.
+```
+
 # [0.3.8] - UNRELEASED
 ### Added
 ### Changed
@@ -48,7 +56,7 @@
  - Adjacency rule enforcement: tunnels no longer directly touch rooms; separation by wall or door only.
  - Guarantee pass: every room is ensured at least one door (creates a tunnel outward if necessary).
  - Connectivity repair: post-generation BFS ensures every room is reachable; isolated rooms get minimal connecting corridors.
- - Multiple door exception: rooms can now legitimately have multiple doors when distinct corridors/tunnels terminate at different wall tiles.
+ - Multiple door exception: rooms can now legitimately have multiple doors when distinct corridors meet.
  - Orphan door repair pass: ensures every door has exactly one adjacent room and at least one adjacent tunnel/door; invalid doors are downgraded or a tunnel is carved outward to preserve invariants.
  - Refactored door normalization into shared helper with probabilistic outward carve guard (prevents runaway tunnel carving and reduces duplication between early and final passes).
 
@@ -84,9 +92,9 @@
 ### Added
 - Cache-busting helper `asset_url()` for all static assets (mtime-based versioning) eliminating manual `?v=` tokens.
 - Frontend governance scripts & pre-commit checks enforcing:
-  - No inline `style="..."` attributes in templates
-  - No inline `<script>` code blocks (all JS externalized)
-  - No manual static version query strings (must use `asset_url()`)
+	- No inline `style="..."` attributes in templates
+	- No inline `<script>` code blocks (all JS externalized)
+	- No manual static version query strings (must use `asset_url()`)
 - Central `utilities.css` consolidating layout, icon, spacing, and effect helpers.
 - Favicon and `<link rel="icon">` reference to remove 404 noise.
 
@@ -112,9 +120,9 @@
 - **Deterministic dungeon generation:** Improved seed handling (alphanumeric and integer) for reproducible dungeons.
 - **Config API:** Exposed endpoints for name pools, starter items, base stats, and class map. Frontend now fetches these via API.
 - **UI overhaul:**
-  - Removed WASD and regenerate map controls from adventure UI.
-  - Added dynamic exit buttons based on available exits from backend.
-  - Improved dashboard and adventure page comments, docstrings, and formatting.
+	- Removed WASD and regenerate map controls from adventure UI.
+	- Added dynamic exit buttons based on available exits from backend.
+	- Improved dashboard and adventure page comments, docstrings, and formatting.
 - **Project headers:** Added/updated project headers, licensing, and GitHub info in all code files.
 - **Documentation:** Updated and clarified code comments, docstrings, and file/module headers.
 
@@ -152,14 +160,14 @@
 
 ### Added
 - Account & Settings section on the dashboard:
-  - Update email address (for potential offline notifications; optional, can be cleared).
-  - Change password with current/new/confirm validation.
+	- Update email address (for potential offline notifications; optional, can be cleared).
+	- Change password with current/new/confirm validation.
 - Lightweight SQLite migration helper to add `user.email` if missing.
 - Party selection flow on the dashboard:
-  - Select characters (up to 4) via checkboxes or by clicking the entire card.
-  - Distinct glow effect and subtle lift for selected cards.
-  - “Your Party” card with live count and summary.
-  - Begin Adventure action posting selected party, with validation.
+	- Select characters (up to 4) via checkboxes or by clicking the entire card.
+	- Distinct glow effect and subtle lift for selected cards.
+	- “Your Party” card with live count and summary.
+	- Begin Adventure action posting selected party, with validation.
 - Adventure briefing page (`/adventure`) summarizing selected party.
 
 ### Changed
