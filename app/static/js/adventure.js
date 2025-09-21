@@ -1,9 +1,15 @@
 // Adventure page dungeon logic extracted from adventure.html
 (function(){
   const TILE_SIZE = 64;
-  // Visibility (fog-of-war) radius in tiles (Manhattan distance). Tiles beyond
-  // this distance from the player are hidden (no fill, no stroke, not interactive).
-  const VISIBILITY_RADIUS = 3; // Adjust to 2 or 3 depending on desired depth
+  // Fog-of-war configuration:
+  // INNER_VIS_RADIUS: tiles within this Manhattan distance are fully visible (original colors).
+  // FOG_FULL_RADIUS: outer limit where fog reaches maximum darkness. Tiles beyond this still rendered
+  // but nearly opaque black (kept so map shape perception is limited). Increase for larger explored area preview.
+  // Opacity scales from MIN_FOG_OPACITY at inner edge to MAX_FOG_OPACITY at outer edge.
+  const INNER_VIS_RADIUS = 3;      // fully visible core
+  const FOG_FULL_RADIUS = 14;      // distance at which fog becomes fully dark (larger fog extent)
+  const MIN_FOG_OPACITY = 0.15;    // near inner edge (letting some map color hint through)
+  const MAX_FOG_OPACITY = 0.90;    // near outer edge (almost black)
   document.addEventListener('DOMContentLoaded', function() {
     const output = document.getElementById('dungeon-output');
   // Position element removed per design update (compass + log only)
@@ -133,33 +139,62 @@
     function updateDungeonVisibility(px, py) {
       if (!window.dungeonTileLayers) return;
       const layers = window.dungeonTileLayers;
-      const radius = VISIBILITY_RADIUS;
-      const maxManhattan = radius; // manhattan distance threshold
       for (const key in layers) {
         const layer = layers[key];
         if (!layer || !layer._dungeon) continue;
         const dx = Math.abs(layer._dungeon.x - px);
         const dy = Math.abs(layer._dungeon.y - py);
-        const dist = dx + dy; // manhattan distance
-        if (dist <= maxManhattan) {
-          // Reveal tile
-            layer.setStyle({
-              fillOpacity: 0.7,
-              weight: 1,
-              color: '#303030',
-              stroke: true,
-              fillColor: layer._dungeon.color
-            });
-            if (layer._dungeon.tooltip && !layer._dungeon.tooltipBound) {
-              layer.bindTooltip(layer._dungeon.tooltip, {permanent: false, direction: 'top', offset: [0, -8]});
-              layer._dungeon.tooltipBound = true;
-            }
-        } else {
-          // Hide tile (fog)
-          layer.setStyle({ fillOpacity: 0, weight: 0, stroke: false });
-          if (layer._tooltip) { // Leaflet internal handle
-            try { layer.unbindTooltip(); layer._dungeon.tooltipBound = false; } catch(e) {}
+        const dist = dx + dy; // Manhattan distance for diamond-shaped visibility
+
+        if (dist <= INNER_VIS_RADIUS) {
+          // Fully visible original tile
+          layer.setStyle({
+            fillOpacity: 0.7,
+            weight: 1,
+            color: '#303030',
+            stroke: true,
+            fillColor: layer._dungeon.color
+          });
+          if (layer._dungeon.tooltip && !layer._dungeon.tooltipBound) {
+            layer.bindTooltip(layer._dungeon.tooltip, {permanent: false, direction: 'top', offset: [0, -8]});
+            layer._dungeon.tooltipBound = true;
           }
+          continue;
+        }
+
+        // Gradient fog region
+        if (dist <= FOG_FULL_RADIUS) {
+          const span = FOG_FULL_RADIUS - INNER_VIS_RADIUS;
+          const rel = span > 0 ? (dist - INNER_VIS_RADIUS) / span : 1;
+          // Clamp and compute opacity
+            let fogOpacity = MIN_FOG_OPACITY + (MAX_FOG_OPACITY - MIN_FOG_OPACITY) * rel;
+            if (fogOpacity < MIN_FOG_OPACITY) fogOpacity = MIN_FOG_OPACITY;
+            else if (fogOpacity > MAX_FOG_OPACITY) fogOpacity = MAX_FOG_OPACITY;
+          layer.setStyle({
+            fillOpacity: fogOpacity,
+            weight: 0.5,
+            color: '#000000',
+            stroke: true,
+            fillColor: '#000000'
+          });
+          if (layer._dungeon.tooltipBound) {
+            try { layer.unbindTooltip(); } catch(e) {}
+            layer._dungeon.tooltipBound = false;
+          }
+          continue;
+        }
+
+        // Beyond full fog radius: almost fully blacked out
+        layer.setStyle({
+          fillOpacity: 0.95,
+          weight: 0,
+          stroke: false,
+          fillColor: '#000000',
+          color: '#000000'
+        });
+        if (layer._dungeon.tooltipBound) {
+          try { layer.unbindTooltip(); } catch(e) {}
+          layer._dungeon.tooltipBound = false;
         }
       }
     }
