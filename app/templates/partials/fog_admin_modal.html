@@ -21,6 +21,16 @@
           <label class="form-label">Local Seen Tile Count</label>
           <div id="fog-admin-local-count" class="form-text">(loading...)</div>
         </div>
+        <div class="mb-3">
+          <label class="form-label">Per-Seed Metrics</label>
+          <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle" id="fog-admin-metrics-table">
+              <thead><tr><th>Seed</th><th>Tiles</th><th>Saved %</th><th>Raw Size</th><th>Stored</th><th>Updated</th><th></th></tr></thead>
+              <tbody><tr><td colspan="7" class="text-muted">(loading)</td></tr></tbody>
+            </table>
+          </div>
+          <div class="form-text" id="fog-admin-metrics-totals"></div>
+        </div>
         <hr/>
         <p class="mb-2">Fog Configuration (read-only for now; console can persist future overrides)</p>
   <pre class="bg-black p-2 rounded fog-admin-config-pre" id="fog-admin-config"></pre>

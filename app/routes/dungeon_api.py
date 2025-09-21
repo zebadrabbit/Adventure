@@ -14,7 +14,8 @@ from flask_login import login_required, current_user
 from app.dungeon import Dungeon
 from functools import lru_cache
 import threading
-import json
+import json, time, os
+from collections import deque
 from app.utils.tile_compress import compress_tiles, decompress_tiles
 from functools import wraps
 
@@ -52,6 +53,27 @@ from app.models.dungeon_instance import DungeonInstance
 from app import db
 
 bp_dungeon = Blueprint('dungeon', __name__)
+
+# ---------------------------------------------------------------------------
+# Rate limiting (simple in-memory) & request metrics for seen tiles endpoint
+# ---------------------------------------------------------------------------
+_SEEN_POST_WINDOW_SECONDS = 10  # sliding window size per user
+_SEEN_POST_MAX_REQUESTS = 8     # max requests in window
+_SEEN_POST_LIMIT_TILES_PER_REQUEST = 4000  # reject excessively large payloads
+_SEEN_SEED_TILE_CAP = 20000               # per-seed tile hard cap after merge
+_SEEN_GLOBAL_SEED_CAP = 12                # max distinct seeds stored per user
+_seen_post_request_times: dict[int, deque] = {}
+
+def _rate_limited(user_id: int) -> bool:
+    now = time.time()
+    dq = _seen_post_request_times.setdefault(user_id, deque())
+    cutoff = now - _SEEN_POST_WINDOW_SECONDS
+    while dq and dq[0] < cutoff:
+        dq.popleft()
+    if len(dq) >= _SEEN_POST_MAX_REQUESTS:
+        return True
+    dq.append(now)
+    return False
 
 
 @bp_dungeon.route('/api/dungeon/map')
@@ -272,8 +294,17 @@ def get_seen_tiles():
         except Exception:
             tiles_compact = ''
     # If compressed form stored, decompress
-    if tiles_compact.startswith('D:'):
-        tiles_compact = decompress_tiles(tiles_compact)
+    # New format may store dict with {'v': value, 'ts': ...}
+    if isinstance(tiles_compact, dict):
+        raw_val = tiles_compact.get('v','')
+    else:
+        raw_val = tiles_compact
+    if isinstance(raw_val, str) and raw_val.startswith('D:'):
+        try:
+            raw_val = decompress_tiles(raw_val)
+        except Exception:
+            raw_val = ''
+    tiles_compact = raw_val if isinstance(raw_val, str) else ''
     return jsonify({'seed': seed, 'tiles': tiles_compact})
 
 @bp_dungeon.route('/api/dungeon/seen', methods=['POST'])
@@ -292,10 +323,27 @@ def post_seen_tiles():
         return jsonify({'error': 'Instance not found'}), 404
     seed = instance.seed
     payload = request.get_json(silent=True) or {}
+
+    # Rate limit check
+    # Allow tests / admins to disable via env or app config
+    disable_rl = False
+    try:
+        from flask import current_app
+        disable_rl = bool(current_app.config.get('TESTING')) or bool(os.getenv('DISABLE_SEEN_RATE_LIMIT'))
+    except Exception:
+        pass
+    # Allow per-request override to enforce during tests
+    if payload.get('enforce_rate_limit'):
+        disable_rl = False
+    if not disable_rl and _rate_limited(current_user.id):
+        return jsonify({'error': 'rate limit exceeded', 'retry_after': _SEEN_POST_WINDOW_SECONDS}), 429
+
     tiles_compact = (payload.get('tiles') or '').strip()
     if tiles_compact and not all(part.count(',')==1 for part in tiles_compact.split(';') if part):
         return jsonify({'error': 'Bad tiles format'}), 400
     new_tiles = set([p for p in tiles_compact.split(';') if p]) if tiles_compact else set()
+    if len(new_tiles) > _SEEN_POST_LIMIT_TILES_PER_REQUEST:
+        return jsonify({'error': 'too many tiles in one request', 'limit': _SEEN_POST_LIMIT_TILES_PER_REQUEST}), 413
     user = current_user
     existing = {}
     try:
@@ -306,18 +354,62 @@ def post_seen_tiles():
                 existing = {}
     except Exception:
         existing = {}
-    prior = set(existing.get(str(seed), '').split(';')) if existing.get(str(seed)) else set()
+    # existing may store either raw "tiles", compressed value, or a dict with {'v': value, 'ts': timestamp}
+    prior_entry = existing.get(str(seed))
+    prior_raw_value = None
+    if isinstance(prior_entry, dict):
+        prior_raw_value = prior_entry.get('v', '')
+    elif isinstance(prior_entry, str):
+        prior_raw_value = prior_entry
+    else:
+        prior_raw_value = ''
+    prior_value = prior_raw_value
+    if isinstance(prior_value, str) and prior_value.startswith('D:'):
+        # decompress for merge
+        try:
+            prior_value = decompress_tiles(prior_value)
+        except Exception:
+            prior_value = ''
+    prior = set(prior_value.split(';')) if prior_value else set()
     merged = prior | new_tiles
-    # Truncate for safety
-    if len(merged) > 50000:
-        merged = set(list(merged)[:50000])
+    # Per-seed truncation
+    if len(merged) > _SEEN_SEED_TILE_CAP:
+        merged = set(list(sorted(merged))[:_SEEN_SEED_TILE_CAP])
     merged_str = ';'.join(sorted(merged))
+    raw_size = len(merged_str)
     stored_value = compress_tiles(merged_str)
-    existing[str(seed)] = stored_value
+    compressed_flag = stored_value != merged_str
+    stored_size = len(stored_value)
+    compression_ratio = round((1 - (stored_size / raw_size)) * 100, 2) if raw_size else 0.0
+    # Update entry with metadata (last update timestamp) for LRU management
+    existing[str(seed)] = {'v': stored_value, 'ts': time.time()}
+
+    # Global seed pruning (simple LRU by 'ts')
+    if len(existing) > _SEEN_GLOBAL_SEED_CAP:
+        # Keep newest N seeds
+        try:
+            sorted_seeds = sorted(
+                [k for k in existing.keys()],
+                key=lambda k: existing[k]['ts'] if isinstance(existing[k], dict) and 'ts' in existing[k] else 0,
+                reverse=True
+            )
+            to_keep = set(sorted_seeds[:_SEEN_GLOBAL_SEED_CAP])
+            for k in list(existing.keys()):
+                if k not in to_keep:
+                    existing.pop(k, None)
+        except Exception:
+            # Fail-safe: if something odd, don't prune
+            pass
     try:
         user.explored_tiles = json.dumps(existing)
         db.session.commit()
-        return jsonify({'stored': len(merged), 'compressed': stored_value != merged_str})
+        return jsonify({
+            'stored': len(merged),
+            'compressed': compressed_flag,
+            'raw_size': raw_size,
+            'stored_size': stored_size,
+            'compression_saved_pct': compression_ratio
+        })
     except Exception:
         # Column missing or commit failed; don't break gameplay.
         return jsonify({'stored': 0, 'warning': 'explored_tiles persistence unavailable'}), 202
@@ -363,3 +455,80 @@ def clear_seen_tiles():
             db.session.rollback()
             return jsonify({'error': 'commit failed'}), 500
     return jsonify({'cleared': changed, 'user': username, 'scope': scope})
+
+
+@bp_dungeon.route('/api/dungeon/seen/metrics', methods=['GET'])
+@login_required
+@admin_required
+def seen_tiles_metrics():
+    """Admin-only: Return metrics for all explored tiles per user (current user by default).
+    Optional query params: username=<user>
+    Response: {
+        'user': <username>,
+        'seeds': [ { 'seed': int, 'tiles': int, 'compressed': bool, 'raw_size': int, 'stored_size': int, 'saved_pct': float, 'last_update': <iso8601|null> } ],
+        'totals': { 'tiles': int, 'raw_size': int, 'stored_size': int, 'saved_pct': float }
+    }
+    """
+    from datetime import datetime
+    username = request.args.get('username') or current_user.username
+    from app.models.models import User as UserModel
+    target = db.session.query(UserModel).filter_by(username=username).first()
+    if not target:
+        return jsonify({'error': 'user not found'}), 404
+    try:
+        data = json.loads(target.explored_tiles) if target.explored_tiles else {}
+    except Exception:
+        data = {}
+    seeds_stats = []
+    total_tiles = 0
+    total_raw = 0
+    total_stored = 0
+    for seed_key, entry in data.items():
+        value = entry
+        ts = None
+        if isinstance(entry, dict) and 'v' in entry:
+            value = entry.get('v','')
+            ts_val = entry.get('ts')
+            if isinstance(ts_val, (int,float)):
+                try:
+                    ts = datetime.utcfromtimestamp(ts_val).isoformat() + 'Z'
+                except Exception:
+                    ts = None
+        # decompress if needed
+        raw_tiles_value = value
+        compressed_flag = False
+        if isinstance(raw_tiles_value, str) and raw_tiles_value.startswith('D:'):
+            try:
+                decompressed = decompress_tiles(raw_tiles_value)
+                compressed_flag = True
+                raw_tiles_value = decompressed
+            except Exception:
+                raw_tiles_value = ''
+        tiles_list = [t for t in raw_tiles_value.split(';') if t]
+        tiles_count = len(tiles_list)
+        raw_size = len(raw_tiles_value)
+        stored_size = len(value) if isinstance(value, str) else len(value.get('v','')) if isinstance(value, dict) else 0
+        saved_pct = round((1 - (stored_size / raw_size)) * 100, 2) if raw_size else 0.0
+        seeds_stats.append({
+            'seed': int(seed_key) if seed_key.isdigit() else seed_key,
+            'tiles': tiles_count,
+            'compressed': compressed_flag,
+            'raw_size': raw_size,
+            'stored_size': stored_size,
+            'saved_pct': saved_pct,
+            'last_update': ts
+        })
+        total_tiles += tiles_count
+        total_raw += raw_size
+        total_stored += stored_size
+    total_saved_pct = round((1 - (total_stored / total_raw)) * 100, 2) if total_raw else 0.0
+    return jsonify({
+        'user': username,
+        'seeds': seeds_stats,
+        'totals': {
+            'tiles': total_tiles,
+            'raw_size': total_raw,
+            'stored_size': total_stored,
+            'saved_pct': total_saved_pct
+        }
+    })

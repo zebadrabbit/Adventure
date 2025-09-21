@@ -1,0 +1,6 @@
+Alembic migrations directory.
+
+Initial manual scaffold created by automated assistant. To generate a new revision:
+  alembic revision -m "description"
+To apply migrations:
+  alembic upgrade head

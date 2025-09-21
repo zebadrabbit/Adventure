@@ -234,6 +234,53 @@ Migration:
 Fallback safety:
 - If persistence temporarily unavailable, API returns HTTP 202 with a warning instead of failing gameplay.
 
+### Rate Limiting & Payload Guards
+`POST /api/dungeon/seen` is rate limited per user (in-memory, per process) to 8 requests per 10s window. Exceeding the limit returns HTTP 429:
+```
+{ "error": "rate limit exceeded", "retry_after": 10 }
+```
+Additional guards:
+- Single request tile submission hard limit: 4000 tiles (HTTP 413 if exceeded)
+- Per-seed retained tile cap: 20,000 (excess silently truncated, oldest coordinates dropped after sort)
+- Global per-user seed cap: 12 seeds; least-recently updated seeds are evicted (LRU) when exceeded.
+
+### Compression & Metrics Endpoint
+Tiles are delta-compressed automatically if it saves space. The admin metrics endpoint surfaces compression efficiency:
+```
+GET /api/dungeon/seen/metrics  (admin)
+Response:
+{
+	"user": "alice",
+	"seeds": [
+		{ "seed": 12345, "tiles": 812, "compressed": true, "raw_size": 5120, "stored_size": 1480, "saved_pct": 71.09, "last_update": "2024-09-22T11:06:22Z" }
+	],
+	"totals": { "tiles": 812, "raw_size": 5120, "stored_size": 1480, "saved_pct": 71.09 }
+}
+```
+Server responses for POST now include additional metrics:
+```
+{ "stored": <count>, "compressed": <bool>, "raw_size": <int>, "stored_size": <int>, "compression_saved_pct": <float> }
+```
+
+### Pruning Metadata Format
+Each seed entry in `user.explored_tiles` now stores an object:
+```
+{ "<seed>": { "v": "D:<compressed-or-raw>", "ts": <epoch-seconds> }, ... }
+```
+Backward compatibility: legacy string values (raw or `D:`) are still accepted; they are upgraded to the object form upon next write.
+
+### Admin Fog Modal Enhancements
+The Fog & Visibility modal now shows a per-seed metrics table with compression savings, sizes, last update timestamps, and per-seed clear buttons powered by the metrics endpoint.
+
+### Alembic Migration Scaffold
+Alembic has been introduced for future schema evolution:
+- Config: `alembic.ini`
+- Scripts dir: `migrations/` (env.py + versions/)
+- Generate a revision (example): `alembic revision --autogenerate -m "add new table"`
+- Apply: `alembic upgrade head`
+
+Current lightweight runtime migration logic remains; Alembic will take over for new structural changes. Keep both until all environments are validated under Alembic.
+
 
 ## VS Code tasks
 
