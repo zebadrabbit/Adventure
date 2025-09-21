@@ -432,3 +432,13 @@ def _run_migrations():
         except Exception:
             db.session.rollback()
             pass
+    # Add 'explored_tiles' persistence column to user (JSON string) if missing
+    inspector = inspect(db.engine)
+    user_cols = {c['name'] for c in inspector.get_columns('user')}
+    if 'explored_tiles' not in user_cols:
+        try:
+            db.session.execute(text('ALTER TABLE user ADD COLUMN explored_tiles TEXT'))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            pass

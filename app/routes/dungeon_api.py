@@ -250,9 +250,14 @@ def get_seen_tiles():
     seed = instance.seed
     tiles_compact = ''
     user = current_user
-    if user.explored_tiles:
+    # Defensive: if column was just added and old connection/schema cached, guard attribute access
+    try:
+        explored_raw = getattr(user, 'explored_tiles', None)
+    except Exception:
+        explored_raw = None
+    if explored_raw:
         try:
-            data = json.loads(user.explored_tiles)
+            data = json.loads(explored_raw)
             tiles_compact = data.get(str(seed), '')
         except Exception:
             tiles_compact = ''
@@ -280,18 +285,25 @@ def post_seen_tiles():
     new_tiles = set([p for p in tiles_compact.split(';') if p]) if tiles_compact else set()
     user = current_user
     existing = {}
-    if user.explored_tiles:
-        try:
-            existing = json.loads(user.explored_tiles) or {}
-        except Exception:
-            existing = {}
+    try:
+        if getattr(user, 'explored_tiles', None):
+            try:
+                existing = json.loads(user.explored_tiles) or {}
+            except Exception:
+                existing = {}
+    except Exception:
+        existing = {}
     prior = set(existing.get(str(seed), '').split(';')) if existing.get(str(seed)) else set()
     merged = prior | new_tiles
     # Truncate for safety
     if len(merged) > 50000:
         merged = set(list(merged)[:50000])
     existing[str(seed)] = ';'.join(sorted(merged))
-    user.explored_tiles = json.dumps(existing)
-    from app import db
-    db.session.commit()
-    return jsonify({'stored': len(merged)})
+    try:
+        user.explored_tiles = json.dumps(existing)
+        from app import db
+        db.session.commit()
+        return jsonify({'stored': len(merged)})
+    except Exception:
+        # Column missing or commit failed; don't break gameplay.
+        return jsonify({'stored': 0, 'warning': 'explored_tiles persistence unavailable'}), 202
