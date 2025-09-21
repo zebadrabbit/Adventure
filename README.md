@@ -78,6 +78,8 @@ When `DUNGEON_ENABLE_GENERATION_METRICS` (default True) is enabled, a metrics di
 | `debug_allow_hidden_strict` | Echo of `DUNGEON_ALLOW_HIDDEN_AREAS_STRICT`. |
 | `debug_room_count_initial` | Room cell count immediately after structural pipeline. |
 | `debug_room_count_post_safety` | Room cell count after final safety (may shrink if unreachable rooms were downgraded). |
+| `door_clusters_reduced` | Dense (3+ doors in a 2x2) clusters collapsed into a single door. |
+| `tunnels_pruned` | Unreachable tunnel cells (not adjacent to any room) removed when hidden areas disabled. |
 
 These metrics support regression tests and profiling of the consolidated final pass.
 
@@ -108,7 +110,13 @@ SVG icon assets are automatically normalized on commit (whitespace + non-license
 See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for coding conventions, pre-commit policy (no inline styles/scripts), asset guidelines, and test instructions.
 
 
-## What's New (v0.3.4 latest)
+## What's New (v0.4.0 latest)
+### v0.4.0 (Door & Tunnel Clarity)
+- Dense 2x2 door cluster reduction (retain one representative door) with preservation of meaningful door pairs.
+- Orphan tunnel pruning (unreachable, non-room-adjacent) for cleaner maps when hidden areas disabled.
+- New generation metrics: `door_clusters_reduced`, `tunnels_pruned`.
+- New pytest marker: `structure` with regression test for clusters & unreachable tunnels.
+
 ### v0.3.4 (Maintenance & Tooling)
 - Repository renamed to `Adventure` (formerly `adventure-mud`).
 - Added lightweight SVG normalization pre-commit hook (trims/strips non-license comments across ~2.7K icons).
@@ -273,8 +281,15 @@ Key variables:
 
 ## Explored Tiles Persistence (Fog-of-War Memory)
 
-### Door Placement Normalization
-The dungeon generator enforces that door tiles appear as discrete entrance points rather than continuous bands. A refinement (2025-09-21) prevents creation of straight chains of adjacent door cells along a single room wall by distinguishing true entry/junction endpoints from inline corridor segments. Inline segments remain tunnels; only corridor dead‑ends, bends, intersections, or single endpoints adjacent to exactly one room become doors. A later consolidation pass merges multiple late normalization steps (separation enforcement, door guarantee, connectivity repair or downgrade, adjacency purges, and chain collapse) into a single traversal tracked by metrics (`repairs_performed`, `chains_collapsed`, `rooms_dropped`).
+### Door Placement & Pruning (v0.4.0)
+Door tiles are refined to maximize clarity while preserving organic branching:
+
+1. Linear chain collapse removes long straight runs of doors along the same wall (retains boundary door).
+2. Dense cluster pruning detects 2x2 windows containing 3+ doors (all bordering the same room) and collapses them to a single door.
+3. Legitimate adjacent door pairs (e.g., corridor forks/junctions) are preserved to maintain expressive connectivity.
+4. Orphan tunnel pruning removes unreachable tunnel pockets not adjacent to a room (skipped when hidden areas flags are enabled), reducing map clutter.
+
+Metrics `door_clusters_reduced` and `tunnels_pruned` quantify pruning impact for regression tracking.
 
 Explored dungeon tiles are stored per user and seed to allow long-term mapping memory across sessions and devices.
 

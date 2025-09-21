@@ -326,7 +326,10 @@ class Dungeon:
             if entrance_tile: break
         visited=set();
         if entrance_tile:
-            q=deque([entrance_tile]); visited.add(entrance_tile)
+            q=deque([entrance_tile])
+            visited.add(entrance_tile)
+            # Cache final accessibility for later pruning phases (avoids extra BFS)
+            self._final_accessible = visited
             while q:
                 cx,cy=q.popleft()
                 for dx,dy in [(-1,0),(1,0),(0,-1),(0,1)]:
@@ -548,7 +551,10 @@ class Dungeon:
         if self.allow_hidden_areas or self.allow_hidden_areas_strict:
             return
         x,y,_=self.size
-        reachable=self._flood_accessibility(grid)
+        # Reuse cached accessibility if available to avoid redundant BFS
+        reachable = getattr(self, '_final_accessible', None)
+        if reachable is None:
+            reachable = self._flood_accessibility(grid)
         pruned=0
         for ix in range(x):
             for iy in range(y):

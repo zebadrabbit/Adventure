@@ -6,29 +6,42 @@ Moved from project root to `docs/` for repository root decluttering.
 Automation: The version bump script now supports the changelog in this location.
 ```
 
-# [0.3.8] - UNRELEASED
+# [0.4.0] - 2025-09-21
 ### Added
-### Changed
-### Fixed
-### Notes
+- Dense door cluster pruning: 2x2 clusters with 3+ doors bordering the same room are reduced to a single door (improves visual clarity while preserving multi-door variety along distinct corridors).
+- Orphan tunnel pruning: unreachable tunnel components (not adjacent to a room) are removed when hidden area flags are disabled.
+- New generation metrics: `door_clusters_reduced`, `tunnels_pruned`.
+- Structural integrity test suite marker (`@pytest.mark.structure`) with regression test ensuring absence of dense door clusters and unreachable tunnel noise.
 
-# [0.3.7] - UNRELEASED
-### Added
 ### Changed
-### Fixed
-### Notes
+- Relaxed earlier aggressive adjacent-door pruning to permit legitimate fork/junction double-door patterns; only dense clusters are collapsed.
+- Updated README with refined pipeline description, pruning behavior, and new metrics.
 
-# [0.3.6] - UNRELEASED
-### Added
-### Changed
 ### Fixed
-### Notes
+- Eliminated visually noisy door bands and stray disconnected tunnel fragments reported in prior exploratory sessions.
 
-# [0.3.5] - UNRELEASED
-### Added
-### Changed
-### Fixed
 ### Notes
+- Hidden areas strict modes bypass orphan tunnel pruning intentionally to allow secret / experimental layouts.
+- Metrics are optional (controlled by `DUNGEON_ENABLE_GENERATION_METRICS`) and safe for CI performance gate.
+
+# [0.3.8] - 2025-09-21
+### Added
+- Placeholder version to align with internal automation; superseded by 0.4.0 feature release on same date.
+
+### Notes
+- No standalone release artifacts (rolled into 0.4.0).
+
+# [0.3.7] - 2025-09-21
+### Notes
+- Skipped (internal sequencing during rapid iteration).
+
+# [0.3.6] - 2025-09-21
+### Notes
+- Skipped (internal sequencing during rapid iteration).
+
+# [0.3.5] - 2025-09-21
+### Notes
+- Skipped (internal sequencing during rapid iteration).
 
 # [0.3.4] - 2025-09-21
 ### Added
