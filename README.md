@@ -219,6 +219,9 @@ Flags / automation:
 --generate-admin-password Auto-generate a secure password (printed once)
 --alembic                 Run `alembic upgrade head` after DB init if migrations present
 --quiet-routes            Suppress route map printing during setup
+--quiet                   Minimal output (suppresses normal info; errors still shown)
+--verbose                 Extra informational output (sets log-level debug)
+--log-level <level>       Explicit verbosity: debug|info|warn|error|silent
 ```
 Example CI usage:
 ```
@@ -229,7 +232,7 @@ python scripts/setup_adventure.py --yes --no-admin --alembic --quiet-routes --js
 Local development uses a `.env` file (auto-loaded):
 
 Key variables:
-- `SECRET_KEY` - Flask secret key
+- `SECRET_KEY` - Flask secret key. If a placeholder value (dev-secret-change-me, changeme, etc.) is detected, the setup script auto-generates a secure random 32-byte urlsafe token and writes it to `.env` (reported in JSON summary as `secret_key_generated: true`).
 - `DATABASE_URL` - SQLAlchemy database URI (default: SQLite in ./instance/mud.db)
 - `CORS_ALLOWED_ORIGINS` - Allowed origins for Socket.IO (default: *)
 
