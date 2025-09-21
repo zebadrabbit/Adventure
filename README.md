@@ -194,6 +194,20 @@ The interactive admin shell now includes user moderation helpers in addition to 
 Login attempts by banned accounts are blocked with a flash message including the ban reason if present.
 
 ## Environment configuration
+### Quick Start Setup Script
+An interactive, colorful bootstrap script is provided:
+```
+python scripts/setup_adventure.py
+```
+Features:
+- Generates / updates `.env` with sensible defaults (SECRET_KEY, DATABASE_URL, CORS origins)
+- Ensures `instance/` directory exists
+- Runs lightweight runtime migration logic (via importing server module)
+- Creates or updates an admin user (optional) and can rotate password
+- Shows compression & fog features already enabled in the codebase during normal runtime
+
+Re-run safe: existing values become defaults; choose whether to rotate the admin password.
+
 
 Local development uses a `.env` file (auto-loaded):
 
