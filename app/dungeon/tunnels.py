@@ -53,31 +53,19 @@ def _carve_leg(grid, x1:int, y1:int, x2:int, y2:int, config: DungeonConfig):
     prev = None
     for _ in range(steps):
         _carve_tile(grid, x, y, config, prev)
-        # Ensure any newly created DOOR has a tunnel neighbor; if not, convert previous cell to tunnel
-        if grid[x][y] == DOOR and not any(0 <= nx < config.width and 0 <= ny < config.height and grid[nx][ny] == TUNNEL for nx,ny in ((x+1,y),(x-1,y),(x,y+1),(x,y-1))):
-            if prev is not None:
-                px,py = prev
-                if grid[px][py] in (CAVE, WALL):
-                    grid[px][py] = TUNNEL
         prev = (x,y)
         x += dx; y += dy
     _carve_tile(grid, x, y, config, prev)
-    if grid[x][y] == DOOR and not any(0 <= nx < config.width and 0 <= ny < config.height and grid[nx][ny] == TUNNEL for nx,ny in ((x+1,y),(x-1,y),(x,y+1),(x,y-1))):
-        if prev is not None:
-            px,py = prev
-            if grid[px][py] in (CAVE, WALL):
-                grid[px][py] = TUNNEL
 
 
 def _carve_tile(grid, x:int, y:int, config: DungeonConfig, prev):
     tile = grid[x][y]
     if tile == WALL:
-        # Only create a door if adjacent to room AND previous cell already a tunnel (or will become one) to guarantee tunnel adjacency.
+        # New rule: tunnels may NOT overwrite wall tiles. A wall may only become a DOOR when
+        # adjacent to a room interior to connect a corridor; otherwise it remains a wall.
         room_adj = any(0 <= nx < config.width and 0 <= ny < config.height and grid[nx][ny] == ROOM for nx,ny in ((x+1,y),(x-1,y),(x,y+1),(x,y-1)))
-        prev_is_tunnel = prev is not None and grid[prev[0]][prev[1]] == TUNNEL
-        if room_adj and prev_is_tunnel:
+        if room_adj:
             grid[x][y] = DOOR
-        else:
-            grid[x][y] = TUNNEL
+        # else leave wall untouched
     elif tile == CAVE:
         grid[x][y] = TUNNEL
