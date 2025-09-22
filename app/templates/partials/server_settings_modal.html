@@ -8,8 +8,37 @@
       <div class="modal-body">
         <div class="row g-3">
           <div class="col-md-4">
-            <h6 class="text-muted">Online Users</h6>
-            <ul id="online-users" class="list-unstyled small mb-0"></ul>
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <h6 class="text-muted mb-0">Online Users</h6>
+              <button class="btn btn-sm btn-outline-secondary" id="admin-refresh-status" title="Refresh"><i class="bi bi-arrow-clockwise"></i></button>
+            </div>
+            <ul id="online-users" class="list-unstyled small mb-2"></ul>
+            <div class="input-group input-group-sm mb-2">
+              <span class="input-group-text">Auto</span>
+              <select id="admin-refresh-interval" class="form-select form-select-sm">
+                <option value="20000" selected>20s</option>
+                <option value="10000">10s</option>
+                <option value="60000">60s</option>
+              </select>
+            </div>
+            <div class="border rounded p-2 small bg-light">
+              <div class="fw-semibold mb-1">System Stats</div>
+              <ul class="list-unstyled mb-0" id="admin-system-stats">
+                <li><span class="text-muted">Total:</span> <span data-stat="total">-</span></li>
+                <li><span class="text-muted">Authenticated:</span> <span data-stat="authenticated">-</span></li>
+                <li><span class="text-muted">Admins:</span> <span data-stat="admins">-</span></li>
+                <li><span class="text-muted">Mods:</span> <span data-stat="mods">-</span></li>
+                <li><span class="text-muted">Active Games:</span> <span data-stat="rooms_tracked">-</span></li>
+                <li><span class="text-muted">Uptime:</span> <span data-stat="uptime_s">-</span>s</li>
+                <li><span class="text-muted">Avg Gen:</span> <span data-stat="avg_dungeon_runtime_ms">-</span>ms</li>
+                <li><span class="text-muted">Banned:</span> <span data-stat="banned">-</span></li>
+                <li><span class="text-muted">Muted:</span> <span data-stat="muted">-</span></li>
+              </ul>
+            </div>
+            <div class="mt-3 border rounded p-2 small bg-light">
+              <div class="fw-semibold mb-1">Active Games</div>
+              <ul id="admin-active-games" class="list-unstyled mb-0 small"></ul>
+            </div>
           </div>
           <div class="col-md-8">
             <h6 class="text-muted">Admin Broadcast</h6>
@@ -32,6 +61,25 @@
               </div>
             </form>
             <div id="admin-broadcast-log" class="mt-2 small scroll-area-200"></div>
+            <hr class="my-3">
+            <div id="moderation-panel" class="small">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="text-muted mb-0"><i class="bi bi-shield-lock me-1"></i>Moderation Panel</h6>
+                <div class="btn-group btn-group-sm" role="group" aria-label="Moderation filters">
+                  <button type="button" class="btn btn-outline-secondary active" data-mod-filter="all">All</button>
+                  <button type="button" class="btn btn-outline-secondary" data-mod-filter="banned">Banned</button>
+                  <button type="button" class="btn btn-outline-secondary" data-mod-filter="muted">Muted</button>
+                </div>
+              </div>
+              <div class="input-group input-group-sm mb-2">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="text" id="mod-search" class="form-control" placeholder="Search user..." maxlength="40">
+              </div>
+              <div class="border rounded bg-light p-2 scroll-area-200" id="mod-list-wrapper">
+                <ul class="list-unstyled mb-0" id="mod-user-list"></ul>
+              </div>
+              <div class="form-text mt-2">Actions update instantly; persistent flags sync on next connect.</div>
+            </div>
           </div>
         </div>
       </div>

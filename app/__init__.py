@@ -52,6 +52,9 @@ app.config.update(
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     TEMPLATES_AUTO_RELOAD=True,
     SEND_FILE_MAX_AGE_DEFAULT=0,
+    # Dungeon generation feature flags / metrics
+    DUNGEON_ALLOW_HIDDEN_AREAS=bool(os.getenv('DUNGEON_ALLOW_HIDDEN_AREAS','0')=='1'),
+    DUNGEON_ENABLE_GENERATION_METRICS=bool(os.getenv('DUNGEON_ENABLE_GENERATION_METRICS','1')=='1'),
 )
 
 db = SQLAlchemy(app, session_options={'expire_on_commit': False})
@@ -101,7 +104,13 @@ app.register_blueprint(bp_config)
 
 from app.websockets import game, lobby
 
-if not os.getenv('ADVENTURE_SUPPRESS_ROUTE_MAP'):
+# Route map debug output (development aid). Suppress by either:
+#   1. Setting env var ADVENTURE_SUPPRESS_ROUTE_MAP=1
+#   2. Setting app.config['SUPPRESS_ROUTE_MAP']=True (e.g., in tests or after create_app())
+if not (
+    os.getenv('ADVENTURE_SUPPRESS_ROUTE_MAP') in ('1','true','yes') or
+    app.config.get('SUPPRESS_ROUTE_MAP')
+):
     print("Registered routes:")
     print(app.url_map)
 
@@ -125,6 +134,42 @@ def asset_url(filename: str) -> str:
         return url_for('static', filename=filename)
 
 app.jinja_env.globals['asset_url'] = asset_url
+
+# --- Lightweight schema version tracking (pre-Alembic compatibility) ---------
+from sqlalchemy import text
+
+def _ensure_schema_version_table():  # pragma: no cover - simple startup helper
+    try:
+        with app.app_context():
+            db.session.execute(text("CREATE TABLE IF NOT EXISTS schema_version (id INTEGER PRIMARY KEY CHECK (id=1), version INTEGER NOT NULL)"))
+            row = db.session.execute(text("SELECT version FROM schema_version WHERE id=1")).fetchone()
+            if not row:
+                db.session.execute(text("INSERT INTO schema_version (id, version) VALUES (1, 1)"))
+            db.session.commit()
+    except Exception:
+        pass
+
+def _bump_schema_version(new_version: int):  # pragma: no cover
+    try:
+        with app.app_context():
+            db.session.execute(text("UPDATE schema_version SET version=:v WHERE id=1"), { 'v': new_version })
+            db.session.commit()
+    except Exception:
+        pass
+
+def _run_lightweight_migrations():  # pragma: no cover - idempotent guard
+    _ensure_schema_version_table()
+    # Future placeholder: detect columns / add defaults. Muted column now part of model.
+    # Example pattern (kept commented for guidance):
+    # from sqlalchemy import inspect
+    # insp = inspect(db.engine)
+    # if 'user' in insp.get_table_names():
+    #     cols = [c['name'] for c in insp.get_columns('user')]
+    #     if 'muted' not in cols:
+    #         db.session.execute(text('ALTER TABLE user ADD COLUMN muted BOOLEAN NOT NULL DEFAULT 0'))
+    #         db.session.commit()
+
+_run_lightweight_migrations()
 
 def create_app():
     return app

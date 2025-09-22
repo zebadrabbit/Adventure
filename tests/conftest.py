@@ -63,3 +63,15 @@ def auth_client(test_app, client):
     with client.session_transaction() as sess:
         sess['dungeon_instance_id'] = inst_id
     return client
+
+
+# ---------------- Autouse fixtures for state isolation ----------------
+@pytest.fixture(autouse=True)
+def _clear_websocket_state():
+    """Ensure websocket online user state doesn't leak between tests causing role confusion."""
+    try:
+        import app.websockets.lobby as lobby
+        lobby.online.clear()
+    except Exception:
+        pass
+    yield

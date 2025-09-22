@@ -10,6 +10,7 @@ This module provides the dashboard view, character creation, party selection,
 autofill, and character deletion logic. All routes require authentication.
 """
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import jsonify
 from flask_login import login_required, current_user
 from app.models.models import Character, User
 from app.models.xp import xp_for_level
@@ -257,6 +258,101 @@ def delete_character(char_id):
 # Route to autofill party with random characters if user has fewer than 4
 # POST /autofill_characters
 # Returns: {"created": <number>}
+@bp_dashboard.route('/autofill_characters', methods=['POST'])
+@login_required
+def autofill_characters():
+    """Autofill the user's roster up to 4 characters with random class/name.
+
+    Response JSON:
+        { "created": <int>, "total": <int>, "characters": [ {id,name,class,level}, ... ] }
+    Status Codes:
+        201 when one or more characters were created
+        200 when no creation was necessary (already had 4)
+    """
+    # Explicit guard (in addition to @login_required) to defend against any test that toggles LOGIN_DISABLED
+    if not current_user.is_authenticated or not session.get('_user_id'):
+        # If this looks like an AJAX/fetch request prefer JSON 401, else redirect
+        wants_json = request.headers.get('X-Requested-With') == 'fetch' or 'application/json' in (request.headers.get('Accept') or '')
+        if wants_json:
+            return jsonify({'error':'unauthorized'}), 401
+        return redirect(url_for('auth.login'))
+    current_user_id = current_user.id
+
+    from app.routes.main import BASE_STATS, STARTER_ITEMS, NAME_POOLS
+    import random, json as _json
+
+    existing = Character.query.filter_by(user_id=current_user_id).all()
+    needed = max(0, 4 - len(existing))
+    created = []
+    if needed:
+        classes = list(BASE_STATS.keys())
+        for _ in range(needed):
+            cls = random.choice(classes)
+            # Pick a name from pool; if exhausted or missing, synthesize one
+            pool = NAME_POOLS.get(cls, [])
+            base_name = random.choice(pool) if pool else cls.capitalize()
+            # Add a short randomized suffix to avoid accidental duplicates
+            suffix = random.randint(100, 999)
+            name = f"{base_name}{suffix}"
+            # Ensure uniqueness for this user (retry a few times if collision)
+            attempts = 0
+            while attempts < 5 and (any(c.name == name for c in existing) or any(c.name == name for c in created)):
+                suffix = random.randint(100, 999)
+                name = f"{base_name}{suffix}"
+                attempts += 1
+            stats = BASE_STATS.get(cls, BASE_STATS['fighter'])
+            coins = {'gold': 5, 'silver': 20, 'copper': 50}
+            items = STARTER_ITEMS.get(cls, STARTER_ITEMS['fighter'])
+            character = Character(
+                user_id=current_user_id,
+                name=name,
+                stats=_json.dumps({**stats, **coins, 'class': cls}),
+                gear=_json.dumps([]),
+                items=_json.dumps(items),
+                xp=0,
+                level=1
+            )
+            db.session.add(character)
+            created.append(character)
+        db.session.commit()
+        existing.extend(created)
+
+    # Prepare response payload
+    payload_chars = []
+    from app.models.models import Item
+    for c in existing:
+        try:
+            s = json.loads(c.stats)
+        except Exception:
+            s = {}
+        coins = {k: s.get(k, 0) for k in ('gold','silver','copper')}
+        cls_name = (s.get('class') or 'unknown').capitalize()
+        # Inventory expansion
+        try:
+            item_slugs = json.loads(c.items) if c.items else []
+        except Exception:
+            item_slugs = []
+        items = []
+        if item_slugs:
+            db_items = Item.query.filter(Item.slug.in_(item_slugs)).all()
+            by_slug = {i.slug: i for i in db_items}
+            for slug in item_slugs:
+                it = by_slug.get(slug)
+                if it:
+                    items.append({'slug': it.slug, 'name': it.name, 'type': it.type})
+        # Remove coin/class keys from stats copy for clarity
+        stats_copy = {k:v for k,v in s.items() if k not in ('gold','silver','copper','class')}
+        payload_chars.append({
+            'id': c.id,
+            'name': c.name,
+            'class': cls_name,
+            'level': getattr(c, 'level', 1),
+            'coins': coins,
+            'stats': stats_copy,
+            'inventory': items
+        })
+    status = 201 if created else 200
+    return jsonify({'created': len(created), 'total': len(existing), 'characters': payload_chars}), status
 
 # Route to delete a character by id (POST)
 # POST /delete_character/<int:char_id>

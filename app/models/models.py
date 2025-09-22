@@ -14,6 +14,7 @@ Notes:
 
 from app import db
 from flask_login import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
 
 class User(UserMixin, db.Model):
     """Authenticated player account.
@@ -35,9 +36,32 @@ class User(UserMixin, db.Model):
     ban_reason = db.Column(db.Text, nullable=True)
     notes = db.Column(db.Text, nullable=True)
     banned_at = db.Column(db.DateTime, nullable=True)
+    # Persistent mute flag (chat suppression); temporary rate-limit mutes may remain in-memory only
+    muted = db.Column(db.Boolean, nullable=False, default=False)
     # JSON string storing explored dungeon tiles keyed by seed: {"<seed>": "x1,y1;x2,y2;..."}
     explored_tiles = db.Column(db.Text, nullable=True)
     # Add more fields as needed
+
+    # Convenience helpers (tests call set_password). Keeps hashing logic centralized.
+    def set_password(self, raw_password: str):
+        """Hash and store a new password value.
+
+        Provided primarily for tests / admin scripts. Application routes
+        already perform hashing before assignment, but having this avoids
+        duplication and supports legacy test patterns.
+        """
+        self.password = generate_password_hash(raw_password)
+
+    def check_password(self, candidate: str) -> bool:
+        """Return True if candidate matches stored hash (or legacy plaintext)."""
+        stored = self.password or ''
+        # Allow for extremely old legacy plaintext value just in case
+        if not stored.startswith(('pbkdf2:','scrypt:','argon2:')):
+            return stored == candidate
+        try:
+            return check_password_hash(stored, candidate)
+        except Exception:
+            return False
 
 class Character(db.Model):
     """A playable character owned by a user.

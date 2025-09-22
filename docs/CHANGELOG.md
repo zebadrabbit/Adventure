@@ -1,4 +1,45 @@
 # Changelog
+## [Unreleased]
+### Added
+- Frontend Autofill button on Dashboard invoking `/autofill_characters` endpoint.
+- Richer `/autofill_characters` JSON response (stats, coins, inventory) for future SPA enhancements.
+- Corner tunnel nub pruning pass removing single-cell tunnel tiles that only diagonally touch rooms.
+- New generation metric: `corner_nubs_pruned`.
+- Door inference safety pass promoting qualifying tunnel cells to doors where a latent room→corridor interface was missed by structural carving (metric: `doors_inferred`).
+- Final post-pruning invariant enforcement pass (door invariants re-run after corner nub pruning) to guard against late structural changes.
+- Regression tests: `test_door_invariants.py`, `test_no_room_tunnel_adjacency.py` protecting door rules and separation.
+- Modular dungeon package fully exercised via new metrics & invariants (see README Modular Dungeon Package section update).
+
+## [0.5.0] - 2025-09-22
+### Added
+- Dedicated Moderation Panel in Server Settings modal with filtering (All / Banned / Muted), search, and direct Ban / Unban / Mute / Unmute buttons (separate from online user list).
+- Temporary mute durations (admin can supply `duration` seconds on `admin_mute_user`; in-memory auto-expire while persistent DB `muted` flag remains for hard mutes).
+- Phase timing instrumentation in dungeon pipeline (`metrics['phase_ms']`) exposing per-phase milliseconds (generate, pruning, invariants, inference, etc.).
+- Internal `_admin_status_snapshot()` helper for deterministic admin status retrieval in tests (stabilizes ban regression test).
+
+### Changed
+- Dungeon pipeline optimized: conditional second invariant & inference sweep now only runs if final corner nub pruning changed cells (reduces redundant full-grid scans, recovering performance headroom and restoring performance regression test pass).
+- `admin_status` payload now includes `moderation.temporary_mutes` map of username -> expiry epoch for active temporary mutes.
+
+### Fixed
+- Intermittent test failure for persistent ban visibility resolved via deterministic status helper.
+- Performance regression addressed (median runtime back under 70ms threshold) through conditional invariant pass.
+
+### Notes
+- Temporary mutes are ephemeral (in-memory expiry) while DB `muted` flag persists as a hard mute indicator. Future enhancement could distinguish persistent vs temporary in the DB schema.
+- Phase timing metrics intended for diagnostics; avoid asserting strict per-phase bounds in tests to keep CI stable.
+
+### Changed
+- Navbar updated: replaced legal links (Privacy/Terms/Conduct/Licenses) with player-focused anchors (Getting Started, Classes, Items, Rules).
+- Removed legacy monolithic `app/dungeon.py` compatibility shim; all imports now target the `app.dungeon` package.
+- Enhanced door guarantee logic to carve outward minimal tunnels for rooms lacking a viable exit (prioritizes entrance room early).
+
+### Notes
+- Anchor links are placeholders pending dedicated content sections/pages; legal pages remain accessible via direct URLs.
+ - Corner nub pruning is cosmetic; it doesn't alter corridor connectivity, only removes isolated diagonal-only tunnel pixels.
+ - Monolith removal is a breaking internal change only; public import path (`from app.dungeon import Dungeon`) remains stable.
+ - Hidden area flags still interact deterministically with invariant passes; strict mode skips connectivity repairs but invariants still run.
+
 
 Moved from project root to `docs/` for repository root decluttering.
 

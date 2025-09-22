@@ -10,7 +10,8 @@ This module provides endpoints to fetch game configuration data for use by the f
 and dashboard. All routes require authentication.
 """
 from flask import Blueprint, jsonify
-from flask_login import login_required
+from flask_login import login_required, current_user
+from flask import request, redirect, url_for, session
 
 bp_config = Blueprint('config', __name__)
 
@@ -90,6 +91,9 @@ def api_name_pools():
     Return the name pools for all classes.
     Response: { 'fighter': [...], 'rogue': [...], ... }
     """
+    if not current_user.is_authenticated or not session.get('_user_id'):
+        wants_json = 'application/json' in (request.headers.get('Accept') or '')
+        return (jsonify({'error':'unauthorized'}), 401) if wants_json else redirect(url_for('auth.login'))
     return jsonify(NAME_POOLS)
 
 
@@ -100,6 +104,9 @@ def api_starter_items():
     Return the starter items for all classes.
     Response: { 'fighter': [...], 'rogue': [...], ... }
     """
+    if not current_user.is_authenticated or not session.get('_user_id'):
+        wants_json = 'application/json' in (request.headers.get('Accept') or '')
+        return (jsonify({'error':'unauthorized'}), 401) if wants_json else redirect(url_for('auth.login'))
     return jsonify(STARTER_ITEMS)
 
 
@@ -110,6 +117,9 @@ def api_base_stats():
     Return the base stats for all classes.
     Response: { 'fighter': {...}, 'rogue': {...}, ... }
     """
+    if not current_user.is_authenticated or not session.get('_user_id'):
+        wants_json = 'application/json' in (request.headers.get('Accept') or '')
+        return (jsonify({'error':'unauthorized'}), 401) if wants_json else redirect(url_for('auth.login'))
     return jsonify(BASE_STATS)
 
 
@@ -120,6 +130,9 @@ def api_class_map():
     Return the class map (slug to display name).
     Response: { 'fighter': 'Fighter', ... }
     """
+    if not current_user.is_authenticated or not session.get('_user_id'):
+        wants_json = 'application/json' in (request.headers.get('Accept') or '')
+        return (jsonify({'error':'unauthorized'}), 401) if wants_json else redirect(url_for('auth.login'))
     return jsonify(CLASS_MAP)
 
 
@@ -129,4 +142,7 @@ def api_class_colors():
     """Return centralized class color mapping.
     Response: { 'fighter': { 'bg': '#xxxxxx', 'fg': '#yyyyyy', 'border': '#zzzzzz' }, ... }
     """
+    if not current_user.is_authenticated or not session.get('_user_id'):
+        wants_json = 'application/json' in (request.headers.get('Accept') or '')
+        return (jsonify({'error':'unauthorized'}), 401) if wants_json else redirect(url_for('auth.login'))
     return jsonify(CLASS_COLORS)

@@ -9,6 +9,7 @@ A modern web-based multiplayer dungeon adventure game built with Python (Flask, 
 ## Features
 - User authentication (login/register)
 - Character management (stats, gear, items)
+	- Autofill endpoint to instantly create a 4-character party (`POST /autofill_characters`)
 - Multiplayer via WebSockets
 - Procedural dungeon generation (deterministic by seed)
 - Persistent dungeon state (database-backed)
@@ -19,7 +20,7 @@ A modern web-based multiplayer dungeon adventure game built with Python (Flask, 
  - Centralized Seed API for deterministic or random dungeon regeneration
 
 ## Dungeon Generation Pipeline (Overview)
-The procedural dungeon system is deterministic per (seed, size) and built from a multi-phase pipeline. Each phase is pure with respect to the prior phase's grid (aside from controlled mutations) enabling reproducibility and targeted testing.
+The procedural dungeon system is deterministic per (seed, size) and built from a multi-phase pipeline. Each phase is implemented in a dedicated module under `app/dungeon/` to keep responsibilities isolated and testable. The pipeline orchestrator (`app/dungeon/pipeline.py`) wires the phases together; helper modules are intentionally free of Flask/web concerns for ease of profiling and future reuse.
 
 1. Grid Initialization – Allocate empty cell matrix and seed RNG.
 2. BSP Partitioning – Recursively subdivide space into candidate room regions (rejecting undersized leaves).
@@ -69,6 +70,7 @@ When `DUNGEON_ENABLE_GENERATION_METRICS` (default True) is enabled, a metrics di
 |-----|-------------|
 | `doors_created` | Reserved for future proactive placements (currently 0). |
 | `doors_downgraded` | Doors converted to wall/tunnel due to invalid adjacency. |
+| `doors_inferred` | Tunnel cells promoted to doors by final inference safety pass. |
 | `repairs_performed` | Number of connectivity repair attempts executed (skipped when hidden areas flag avoids repair). |
 | `chains_collapsed` | Door tiles removed from linear chains along the same wall. |
 | `orphan_fixes` | Door fixes (either carving an adjacent tunnel or degrading the door). |
@@ -80,8 +82,39 @@ When `DUNGEON_ENABLE_GENERATION_METRICS` (default True) is enabled, a metrics di
 | `debug_room_count_post_safety` | Room cell count after final safety (may shrink if unreachable rooms were downgraded). |
 | `door_clusters_reduced` | Dense (3+ doors in a 2x2) clusters collapsed into a single door. |
 | `tunnels_pruned` | Unreachable tunnel cells (not adjacent to any room) removed when hidden areas disabled. |
+| `corner_nubs_pruned` | Cosmetic corner tunnel 'nub' cells removed (single-cell tunnels only diagonally touching a room). |
+| `phase_ms` | Dict mapping phase name -> duration (ms) when metrics enabled; aids profiling & performance triage. |
 
 These metrics support regression tests and profiling of the consolidated final pass.
+
+### Modular Dungeon Package
+As of v0.4.x the former monolithic `app/dungeon.py` has been decomposed into a package:
+
+```
+app/dungeon/
+	__init__.py        # Re-exports Dungeon, DungeonCell for backwards compatibility
+	pipeline.py        # Dungeon dataclass + end-to-end generation orchestration
+	generator.py       # Structural phases: grid init, BSP, rooms, corridors
+	doors.py           # Door normalization, chain collapse, invariant enforcement
+	pruning.py         # Layout cleanup: door clusters, orphan tunnels, corner nubs
+	connectivity.py    # Flood fills, reachability repair, safety consolidation
+	features.py        # Feature and special-room assignment (entrance, boss, water)
+	cells.py           # DungeonCell class & cell-level utilities
+	metrics.py         # init_metrics() and metric key centralization
+```
+
+Design goals:
+1. Separation of concerns – each file focuses on a narrow generation concern.
+2. Deterministic, side‑effect contained helpers – pure functions given RNG & grid.
+3. Fast iteration – failing invariants can be traced to a specific module.
+4. Backwards compatibility – external imports (`from app.dungeon import Dungeon`) still work.
+
+Adding a new phase? Prefer a new function in an existing module (or a new module) and a single call site added to the ordered list inside `Dungeon._run_pipeline()`. Keep any new metrics registered in `metrics.init_metrics()` so tests gain them automatically.
+
+Legacy note: The former monolithic `app/dungeon.py` compatibility shim has now been fully removed (all imports should use `from app.dungeon import Dungeon`). Any direct references to `app.dungeon.py` should be updated; the package re-export in `app/dungeon/__init__.py` remains the stable public entry point.
+
+### Route Map Suppression
+During development the app prints a route map once at startup. Suppress this by setting `ADVENTURE_SUPPRESS_ROUTE_MAP=1` (or `true/yes`) or programmatically via `app.config['SUPPRESS_ROUTE_MAP']=True` before initialization completes.
 
 ## Testing & Invariants
 Key automated tests (pytest) protect the generation contract:
@@ -110,7 +143,15 @@ SVG icon assets are automatically normalized on commit (whitespace + non-license
 See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for coding conventions, pre-commit policy (no inline styles/scripts), asset guidelines, and test instructions.
 
 
-## What's New (v0.4.0 latest)
+## What's New (v0.5.0 latest)
+### v0.5.0 (Moderation & Performance Insight)
+- Dedicated Moderation Panel UI with filtering (All / Banned / Muted), search, and action buttons.
+- Temporary mute durations (seconds) with automatic expiry; persistent DB mute flag remains authoritative for hard mutes.
+- Dungeon pipeline phase timing metrics (`phase_ms`) for profiling (generate, collapse, consolidation, pruning, safety, invariants, inference, features).
+- Conditional invariant re-run optimization (skip second full sweep if corner nub pruning made no changes) improving median generation time and restoring performance regression headroom.
+- Admin status payload enriched with `temporary_mutes` map (username -> expiry epoch seconds).
+
+### v0.4.0 (Door & Tunnel Clarity)
 ### v0.4.0 (Door & Tunnel Clarity)
 - Dense 2x2 door cluster reduction (retain one representative door) with preservation of meaningful door pairs.
 - Orphan tunnel pruning (unreachable, non-room-adjacent) for cleaner maps when hidden areas disabled.
@@ -281,13 +322,14 @@ Key variables:
 
 ## Explored Tiles Persistence (Fog-of-War Memory)
 
-### Door Placement & Pruning (v0.4.0)
+### Door Placement & Pruning (v0.4.0+)
 Door tiles are refined to maximize clarity while preserving organic branching:
 
 1. Linear chain collapse removes long straight runs of doors along the same wall (retains boundary door).
 2. Dense cluster pruning detects 2x2 windows containing 3+ doors (all bordering the same room) and collapses them to a single door.
 3. Legitimate adjacent door pairs (e.g., corridor forks/junctions) are preserved to maintain expressive connectivity.
 4. Orphan tunnel pruning removes unreachable tunnel pockets not adjacent to a room (skipped when hidden areas flags are enabled), reducing map clutter.
+5. Corner tunnel nub pruning removes single-cell tunnel pixels that only diagonally touch a room creating a visual corner artifact without meaningful traversal value.
 
 Metrics `door_clusters_reduced` and `tunnels_pruned` quantify pruning impact for regression tracking.
 

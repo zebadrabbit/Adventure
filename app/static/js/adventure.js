@@ -344,8 +344,10 @@
           }
           const map = L.map('dungeon-map', {
             crs: L.CRS.Simple,
-            minZoom: -2,
-            maxZoom: 2,
+            // Reduced zoom span: drop extreme most-zoomed-out (-2) and most-zoomed-in (+2) levels.
+            // New allowed discrete zoom levels: -1, 0, 1
+            minZoom: -1,
+            maxZoom: 1,
             zoomSnap: 1,
             zoomDelta: 1,
             zoomControl: true,
@@ -526,7 +528,7 @@
             ], { icon: playerDivIcon, interactive: false }).addTo(map);
 
             function scalePlayerMarker() {
-              const z = map.getZoom(); // expected integer in [-2,2]
+              const z = map.getZoom(); // expected integer in [-1,1]
               // Exponential scaling feels more natural than linear at extremes.
               // scale = 1.2^z, clamped to [0.45, 2.0]
               let scale = Math.pow(1.2, z);

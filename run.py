@@ -13,6 +13,29 @@ import signal
 import argparse
 from textwrap import dedent
 
+try:  # Optional color support
+    from colorama import init as _color_init, Fore, Style
+    _color_init()  # pragma: no cover
+    _COLOR_ENABLED = True
+except Exception:  # pragma: no cover
+    class _Dummy:
+        RESET_ALL = ""
+    class _Fore:
+        RED = GREEN = CYAN = MAGENTA = YELLOW = BLUE = WHITE = ""
+    class _Style:
+        BRIGHT = NORMAL = RESET_ALL = ""
+    Fore = _Fore()
+    Style = _Style()
+    _COLOR_ENABLED = False
+
+# Disable colors if output is not a real terminal (e.g., during pytest capture)
+if '_COLOR_ENABLED' in globals():  # safety
+    try:
+        if _COLOR_ENABLED and not sys.stdout.isatty():  # pragma: no cover - environment dependent
+            _COLOR_ENABLED = False
+    except Exception:  # pragma: no cover
+        _COLOR_ENABLED = False
+
 def _load_version() -> str:
     try:
         with open("VERSION", "r", encoding="utf-8") as f:
@@ -191,33 +214,43 @@ def main(argv: list[str]) -> int:
     from app.server import start_server, start_admin_shell
 
     # Startup banner
-    print(
-        """
-========================================
-   MUD Game Server Bootup
-========================================
-   Mode:        {mode}
-   Host:        {host}
-   Port:        {port}
-   Database:    {db_uri}
-   WebSockets:  enabled
-   Flask-Login: enabled
-   Admin Shell: {admin}
-========================================
-""".format(
-            mode=mode.upper(),
-            host=host,
-            port=port,
-            admin="YES" if mode == "admin" else "NO",
-            db_uri=db_banner,
-        )
-    )
+    # Build colored banner lines
+    title = f"{Fore.CYAN}{Style.BRIGHT}MUD Game Server Bootup{Style.RESET_ALL}" if _COLOR_ENABLED else "MUD Game Server Bootup"
+    label = lambda L: f"{Fore.YELLOW}{L}{Style.RESET_ALL}" if _COLOR_ENABLED else L
+    value = lambda V: f"{Fore.GREEN}{V}{Style.RESET_ALL}" if _COLOR_ENABLED else V
+    divider = (Fore.MAGENTA + '='*40 + Style.RESET_ALL) if _COLOR_ENABLED else '='*40
+    lines = [
+        divider,
+        f"  {title}",
+        divider,
+        f"  {label('Mode:'):12} {value(mode.upper())}",
+        f"  {label('Host:'):12} {value(host)}",
+        f"  {label('Port:'):12} {value(port)}",
+        f"  {label('Database:'):12} {value(db_banner)}",
+        f"  {label('WebSockets:'):12} {value('enabled')}",
+        f"  {label('Flask-Login:'):12} {value('enabled')}",
+        f"  {label('Admin Shell:'):12} {value('YES' if mode == 'admin' else 'NO')}",
+        divider,
+        ""
+    ]
+    print("\n".join(lines))
+    try:
+        from app.logging_utils import log
+        log.info(event="startup", mode=mode, host=host, port=port, db=db_banner)
+    except Exception:
+        pass
 
     if mode == "admin":
         start_admin_shell()
         return 0
     else:
-        print("[INFO] Listening for connections... Press Ctrl+C to stop.")
+        info_prefix = f"{Fore.CYAN}[INFO]{Style.RESET_ALL}" if _COLOR_ENABLED else "[INFO]"
+        print(f"{info_prefix} Listening for connections... Press Ctrl+C to stop.")
+        try:
+            from app.logging_utils import log
+            log.info(event="listen", host=host, port=port, debug=debug)
+        except Exception:
+            pass
         # Note: db_uri is read by the Flask app on import via app config/env
         debug = bool(getattr(args, "debug", False) or os.getenv("FLASK_DEBUG") == "1")
         start_server(host=host, port=port, debug=debug)

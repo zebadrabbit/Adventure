@@ -532,3 +532,33 @@ def seen_tiles_metrics():
             'saved_pct': total_saved_pct
         }
     })
+
+
+@bp_dungeon.route('/api/dungeon/gen/metrics', methods=['GET'])
+@login_required
+@admin_required
+def dungeon_generation_metrics():
+    """Admin-only: Return generation metrics for the active dungeon seed in session.
+
+    Response: { seed: int, size: [w,h,levels], metrics: {...}, flags: { allow_hidden_areas: bool, enable_metrics: bool } }
+    If metrics disabled, returns an empty metrics object.
+    """
+    dungeon_instance_id = session.get('dungeon_instance_id')
+    if not dungeon_instance_id:
+        return jsonify({'error': 'no active dungeon instance'}), 404
+    from app.models.dungeon_instance import DungeonInstance
+    inst = db.session.get(DungeonInstance, dungeon_instance_id)
+    if not inst:
+        return jsonify({'error': 'instance not found'}), 404
+    MAP_SIZE = 75
+    dungeon = get_cached_dungeon(inst.seed, (MAP_SIZE, MAP_SIZE, 1))
+    metrics = dungeon.metrics if getattr(dungeon, 'enable_metrics', True) else {}
+    return jsonify({
+        'seed': dungeon.seed,
+        'size': list(dungeon.size),
+        'metrics': metrics,
+        'flags': {
+            'allow_hidden_areas': getattr(dungeon, 'allow_hidden_areas', False),
+            'enable_metrics': getattr(dungeon, 'enable_metrics', True)
+        }
+    })
