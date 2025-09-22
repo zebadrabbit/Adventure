@@ -1,16 +1,13 @@
-"""Dungeon generation package (modularized from former monolithic dungeon.py).
+"""Lean dungeon generation package.
 
-Public entry point: import Dungeon from app.dungeon (re-export from pipeline).
-"""
-"""Public exports for dungeon generation package.
-
-External code should import Dungeon and DungeonCell from here to remain
-stable while internal implementation is refactored.
+Minimal public surface:
+	from app.dungeon import Dungeon, DungeonConfig, CAVE, ROOM, WALL, TUNNEL, DOOR
 """
 
-from .pipeline import Dungeon
-from .cells import DungeonCell
+from .dungeon import Dungeon, DungeonConfig, CAVE, ROOM, WALL, TUNNEL, DOOR
 
-__all__ = ["Dungeon", "DungeonCell"]
-
-__all__ = ["Dungeon", "DungeonCell"]
+__all__ = [
+	"Dungeon",
+	"DungeonConfig",
+	"CAVE","ROOM","WALL","TUNNEL","DOOR"
+]

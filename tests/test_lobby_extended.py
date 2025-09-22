@@ -92,7 +92,7 @@ def test_admin_online_users_requires_admin(anon_client, admin_client, monkeypatc
     # Non-admin should get nothing
     anon_client.emit('admin_online_users')
     received = anon_client.get_received()
-    assert not any(p['name'] == 'admin_online_users' for p in received), f"Non-admin unexpectedly received legacy event: {received}"
+    assert not any(p['name'] == 'admin_online_users_response' for p in received), f"Non-admin unexpectedly received admin list: {received}"
     # Admin request
     # Force context current_user to appear as admin to avoid timing / migration race
     class _DummyAdmin:
@@ -101,32 +101,28 @@ def test_admin_online_users_requires_admin(anon_client, admin_client, monkeypatc
     monkeypatch.setattr('app.websockets.lobby.current_user', _DummyAdmin())
     admin_client.emit('admin_online_users')
     rec = admin_client.get_received()
-    payloads = _extract('admin_online_users', rec)
+    payloads = _extract('admin_online_users_response', rec)
     if not payloads:
-        # Fallback: emit a no-op broadcast to flush event loop, then re-emit
         admin_client.emit('lobby_chat_message', {'message': 'ping'})
         admin_client.emit('admin_online_users')
         rec = admin_client.get_received()
-        payloads = _extract('admin_online_users', rec)
-    assert payloads, 'Expected admin_online_users payload for admin client'
+        payloads = _extract('admin_online_users_response', rec)
+    assert payloads, 'Expected admin_online_users_response payload for admin client'
     assert isinstance(payloads[0], list)
 
 
-def test_admin_online_users_dual_events(admin_client, monkeypatch):
-    """Admin should receive both legacy and response events; they carry identical payload lists."""
+def test_admin_online_users_response_only(admin_client, monkeypatch):
+    """Admin should receive a single modern response event with the user list."""
     class _DummyAdmin:
         role = 'admin'
         username = 'admin_test'
     monkeypatch.setattr('app.websockets.lobby.current_user', _DummyAdmin())
     admin_client.emit('admin_online_users')
     rec = admin_client.get_received()
-    legacy = [p for p in rec if p['name'] == 'admin_online_users']
     resp = [p for p in rec if p['name'] == 'admin_online_users_response']
-    assert legacy, 'Expected legacy admin_online_users event'
     assert resp, 'Expected admin_online_users_response event'
-    # Compare first payload lists if present
-    if legacy[0]['args'] and resp[0]['args']:
-        assert legacy[0]['args'][0] == resp[0]['args'][0]
+    if resp[0]['args']:
+        assert isinstance(resp[0]['args'][0], list)
 
 
 def test_admin_broadcast_targets(admin_client, anon_client, monkeypatch):

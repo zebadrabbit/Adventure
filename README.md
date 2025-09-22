@@ -20,6 +20,25 @@ A modern web-based multiplayer dungeon adventure game built with Python (Flask, 
  - Centralized Seed API for deterministic or random dungeon regeneration
 
 ## Dungeon Generation Pipeline (Overview)
+> NOTE: A simplified char-grid generator (rooms + wall rings + tunnel connectors) is now the default runtime implementation exposed via `from app.dungeon import Dungeon`. The detailed multi-phase pipeline described below is retained as historical documentation and for potential future reintroduction of advanced features. Current tests assert only the simplified invariants: room connectivity, no orphan doors (each door has one room neighbor and at least one walkable neighbor), and deterministic seed layout.
+
+### Simplified Generator (Current Default)
+The active generator focuses on speed, determinism, and clarity:
+* Places a set of non-overlapping rectangular rooms (seeded RNG).
+* Wraps each room with a single-tile wall ring (no layered thickness logic).
+* Connects rooms using a minimal spanning tree of centers, carving straight (or simple L-shaped) tunnels.
+* Inserts doors at room–tunnel interfaces (single-tile) without chain/cluster reduction heuristics.
+* Produces a 2D char grid using symbols: `R` (room), `W` (wall), `T` (tunnel), `D` (door), `C` (cave/unused).
+
+Intentionally removed (legacy-only) behaviors:
+* Door chain collapsing & dense cluster pruning.
+* Hidden area / unreachable room retention toggles.
+* Multi-phase repair & inference passes (orphan repair now trivial: generation avoids creating them).
+* Detailed metrics (only high-level tile counts + seed, unreachable room count, wall anomalies retained).
+
+Rationale: The simplified model drastically reduces maintenance overhead and aligns with current gameplay needs (movement + fog-of-war) while keeping space for future expansion phases to be reintroduced incrementally.
+
+---
 The procedural dungeon system is deterministic per (seed, size) and built from a multi-phase pipeline. Each phase is implemented in a dedicated module under `app/dungeon/` to keep responsibilities isolated and testable. The pipeline orchestrator (`app/dungeon/pipeline.py`) wires the phases together; helper modules are intentionally free of Flask/web concerns for ease of profiling and future reuse.
 
 1. Grid Initialization – Allocate empty cell matrix and seed RNG.
@@ -111,7 +130,7 @@ Design goals:
 
 Adding a new phase? Prefer a new function in an existing module (or a new module) and a single call site added to the ordered list inside `Dungeon._run_pipeline()`. Keep any new metrics registered in `metrics.init_metrics()` so tests gain them automatically.
 
-Legacy note: The former monolithic `app/dungeon.py` compatibility shim has now been fully removed (all imports should use `from app.dungeon import Dungeon`). Any direct references to `app.dungeon.py` should be updated; the package re-export in `app/dungeon/__init__.py` remains the stable public entry point.
+Legacy note: The former monolithic and advanced multi-phase pipeline documentation below represents the prior implementation. The compatibility shim now points to the simplified generator; external imports (`from app.dungeon import Dungeon`) continue to work. Advanced phases can be reintroduced module-by-module without breaking the current API.
 
 ### Route Map Suppression
 During development the app prints a route map once at startup. Suppress this by setting `ADVENTURE_SUPPRESS_ROUTE_MAP=1` (or `true/yes`) or programmatically via `app.config['SUPPRESS_ROUTE_MAP']=True` before initialization completes.

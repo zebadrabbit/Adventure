@@ -1,18 +1,16 @@
-from app.dungeon import Dungeon, DungeonCell
+import pytest
+from app.dungeon import Dungeon, DungeonConfig, ROOM, DOOR
 
 
-def count_room_adjacent_doors(grid):
-    """Return max number of door cells adjacent to any single room tile."""
-    x = len(grid)
-    y = len(grid[0])
+def _max_room_tile_adjacent_doors(d):
+    w = d.config.width; h = d.config.height
     max_doors = 0
-    for ix in range(x):
-        for iy in range(y):
-            if grid[ix][iy][0].cell_type == 'room':
+    for x in range(w):
+        for y in range(h):
+            if d.grid[x][y] == ROOM:
                 doors = 0
-                for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
-                    nx, ny = ix+dx, iy+dy
-                    if 0 <= nx < x and 0 <= ny < y and grid[nx][ny][0].cell_type == 'door':
+                for nx,ny in ((x+1,y),(x-1,y),(x,y+1),(x,y-1)):
+                    if 0 <= nx < w and 0 <= ny < h and d.grid[nx][ny] == DOOR:
                         doors += 1
                 if doors > max_doors:
                     max_doors = doors
@@ -20,17 +18,13 @@ def count_room_adjacent_doors(grid):
 
 
 def test_multiple_doors_possible():
-    """Regression: generation should allow rooms to have more than one door when distinct corridors connect.
-
-    We generate with several seeds to increase likelihood; at least one should yield a room that ends up
-    with 2+ doors. (If this flakes rarely, consider broadening seed range or relaxing threshold.)
-    """
-    found_multi = False
-    # Try a range of deterministic seeds; break early if condition satisfied
+    """At least one seed in a range should produce a room tile with 2+ adjacent doors.
+    This ensures tunnels can connect to rooms at multiple distinct points."""
+    found = False
     for s in range(50, 120):
-        d = Dungeon(seed=s, size=(45,45,1))  # moderate size for faster test
-        m = count_room_adjacent_doors(d.grid)
-        if m >= 2:
-            found_multi = True
+        cfg = DungeonConfig(width=55, height=55, seed=s, min_rooms=6, max_rooms=12)
+        d = Dungeon(cfg)
+        if _max_room_tile_adjacent_doors(d) >= 2:
+            found = True
             break
-    assert found_multi, "Expected at least one generated dungeon to produce a room with multiple door connections"
+    assert found, "Expected a room with at least two door adjacencies across tested seeds"
