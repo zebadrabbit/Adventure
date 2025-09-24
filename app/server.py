@@ -19,8 +19,11 @@ from app import app, socketio, db
 import logging
 from logging.handlers import RotatingFileHandler
 from app.models.models import User, Item
+from app.models.loot import DungeonLoot  # added
 from werkzeug.security import generate_password_hash
 import os
+import glob
+from sqlalchemy import text as _text
 
 # Global event queue for admin shell. The Flask app reads this to publish
 # events (e.g., auth route emits) to the admin shell printer thread.
@@ -37,6 +40,9 @@ def start_server(host='0.0.0.0', port=5000, debug: bool = False):  # pragma: no 
         db.create_all()
         _run_migrations()
         seed_items()
+        _run_migrations()  # ensure new columns after seeds
+        _load_sql_item_seeds()
+        _run_migrations()  # ensure after bulk load
         _configure_logging()
     try:
         print(f"[INFO] Starting Socket.IO server on {host}:{port} (async_mode={socketio.async_mode})")
@@ -84,34 +90,145 @@ def start_admin_shell():  # pragma: no cover (interactive)
         db.create_all()
         _run_migrations()
         seed_items()
+        _load_sql_item_seeds()
         _configure_logging()
     admin_shell()
 
 def seed_items():
     """Seed initial catalog items if they don't already exist."""
-    existing = {i.slug for i in Item.query.all()}
+    existing = {i.slug: i for i in Item.query.all()}
     seeds = [
-        # Weapons/Armor
-        dict(slug='short-sword', name='Short Sword', type='weapon', description='A simple steel short sword.', value_copper=500),
-        dict(slug='dagger', name='Dagger', type='weapon', description='A lightweight dagger.', value_copper=250),
-        dict(slug='oak-staff', name='Oak Staff', type='weapon', description='A sturdy oak staff for channeling magic.', value_copper=400),
-        dict(slug='wooden-shield', name='Wooden Shield', type='armor', description='A round wooden shield.', value_copper=300),
-        dict(slug='leather-armor', name='Leather Armor', type='armor', description='Basic protective leather armor.', value_copper=600),
-        # Potions/Consumables
-        dict(slug='potion-healing', name='Potion of Healing', type='potion', description='Restores a small amount of HP.', value_copper=150),
-        dict(slug='potion-mana', name='Potion of Mana', type='potion', description='Restores a small amount of mana.', value_copper=150),
-        # Tools
-        dict(slug='lockpicks', name='Lockpicks', type='tool', description='Useful for opening tricky locks.', value_copper=200),
-        dict(slug='hunting-bow', name='Hunting Bow', type='weapon', description='A simple bow for hunting.', value_copper=550),
-        dict(slug='herbal-pouch', name='Herbal Pouch', type='tool', description='Druidic herbs and salves.', value_copper=180),
+        dict(slug='short-sword', name='Short Sword', type='weapon', description='A simple steel short sword.', value_copper=500, level=1, rarity='common'),
+        dict(slug='dagger', name='Dagger', type='weapon', description='A lightweight dagger.', value_copper=250, level=1, rarity='common'),
+        dict(slug='oak-staff', name='Oak Staff', type='weapon', description='A sturdy oak staff for channeling magic.', value_copper=400, level=1, rarity='common'),
+        dict(slug='wooden-shield', name='Wooden Shield', type='armor', description='A round wooden shield.', value_copper=300, level=1, rarity='common'),
+        dict(slug='leather-armor', name='Leather Armor', type='armor', description='Basic protective leather armor.', value_copper=600, level=1, rarity='common'),
+        dict(slug='potion-healing', name='Potion of Healing', type='potion', description='Restores a small amount of HP.', value_copper=150, level=0, rarity='common'),
+        dict(slug='potion-mana', name='Potion of Mana', type='potion', description='Restores a small amount of mana.', value_copper=150, level=0, rarity='common'),
+        dict(slug='lockpicks', name='Lockpicks', type='tool', description='Useful for opening tricky locks.', value_copper=200, level=0, rarity='uncommon'),
+        dict(slug='hunting-bow', name='Hunting Bow', type='weapon', description='A simple bow for hunting.', value_copper=550, level=2, rarity='common'),
+        dict(slug='herbal-pouch', name='Herbal Pouch', type='tool', description='Druidic herbs and salves.', value_copper=180, level=0, rarity='common'),
     ]
     created = 0
     for s in seeds:
         if s['slug'] not in existing:
             db.session.add(Item(**s))
             created += 1
+        else:
+            # Backfill level/rarity if missing (legacy rows)
+            row = existing[s['slug']]
+            changed = False
+            if getattr(row, 'level', 0) == 0 and s['level']:
+                row.level = s['level']; changed = True
+            if getattr(row, 'rarity', 'common') == 'common' and s['rarity'] != 'common':
+                row.rarity = s['rarity']; changed = True
+            if changed:
+                created += 0  # no new row, but we update
     if created:
         db.session.commit()
+
+def _load_sql_item_seeds():
+    """Load bulk item seed data from /sql/*.sql files.
+
+    This is idempotent: for each INSERT it relies on the item slug existing or not.
+    We wrap in a transaction per file; errors are logged and rolled back without
+    aborting startup. If level/rarity columns are not present in the SQL, they
+    will default to 0/common and can be backfilled later by heuristics.
+    """
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    # project root assumed one level up from app/ directory
+    project_root = os.path.abspath(os.path.join(base_dir, '..'))
+    sql_dir = os.path.join(project_root, 'sql')
+    if not os.path.isdir(sql_dir):
+        return
+    pattern = os.path.join(sql_dir, '*.sql')
+    files = sorted(glob.glob(pattern))
+    if not files:
+        return
+    from app.models.models import Item
+    existing = {i.slug for i in Item.query.all()}
+    imported = 0
+    for path in files:
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                sql_text = f.read()
+            # Split on semicolons naive; acceptable for simple INSERT sets
+            statements = [s.strip() for s in sql_text.split(';') if s.strip()]
+            for stmt in statements:
+                # Only process INSERTs into item table; ignore others for safety
+                low = stmt.lower()
+                if 'insert' not in low or 'into' not in low or 'item' not in low:
+                    continue
+                # Quick slug extract heuristic: look for values ('slug', ...)
+                slug_token = None
+                # attempt to find first quoted string after VALUES (
+                parts = stmt.split('VALUES')
+                if len(parts) > 1:
+                    vals_part = parts[1]
+                    # crude parse for first parenthetical group
+                    start = vals_part.find('(')
+                    end = vals_part.find(')')
+                    if start != -1 and end != -1 and end > start:
+                        group = vals_part[start+1:end]
+                        # slug usually first value
+                        first = group.split(',')[0].strip()
+                        if first.startswith("'") and first.endswith("'"):
+                            slug_token = first.strip("'")
+                if slug_token and slug_token in existing:
+                    continue
+                try:
+                    db.session.execute(_text(stmt))
+                    if slug_token:
+                        existing.add(slug_token)
+                        imported += 1
+                except Exception:
+                    db.session.rollback()
+                    continue
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            continue
+    if imported:
+        # Backfill simple heuristics for level/rarity based on name keywords
+        _infer_levels_and_rarity()
+
+def _infer_levels_and_rarity():
+    """Infer level/rarity for items lacking them (level=0) via name heuristics.
+
+    This is a coarse fallback until explicit metadata lives in the SQL files.
+    """
+    from app.models.models import Item
+    items = Item.query.all()
+    updated = 0
+    for it in items:
+        if getattr(it, 'level', 0) and getattr(it, 'rarity', 'common') != 'common':
+            continue
+        name = (it.name or '').lower()
+        lvl = getattr(it, 'level', 0)
+        rar = getattr(it, 'rarity', 'common')
+        if lvl == 0:
+            # Very rough mapping
+            if any(k in name for k in ['mythic','ancient','dragon']):
+                lvl = 18; rar = 'mythic'
+            elif any(k in name for k in ['legendary','phoenix','celestial']):
+                lvl = 16; rar = 'legendary'
+            elif any(k in name for k in ['epic','demon','void','starlight']):
+                lvl = 12; rar = 'epic'
+            elif any(k in name for k in ['rare','arcane','masters','veteran']):
+                lvl = 8; rar = 'rare'
+            elif any(k in name for k in ['uncommon','fine','reinforced','sturdy']):
+                lvl = 4; rar = 'uncommon'
+            else:
+                lvl = 1; rar = 'common'
+        if getattr(it, 'level', 0) != lvl or getattr(it, 'rarity','common') != rar:
+            it.level = lvl
+            it.rarity = rar
+            updated += 1
+    if updated:
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
 def admin_shell():
     """
@@ -448,6 +565,27 @@ def _run_migrations():
             pass
     # Track schema version (very lightweight)
     try:
+        inspector = inspect(db.engine)
+        tables = inspector.get_table_names()
+        # Ensure loot table exists (SQLAlchemy create_all will also handle, but explicit for clarity)
+        if 'dungeon_loot' not in tables:
+            db.create_all()  # rely on model metadata
+        # Add new Item columns if missing
+        if 'item' in tables:
+            item_cols = {c['name'] for c in inspector.get_columns('item')}
+            if 'level' not in item_cols:
+                try:
+                    db.session.execute(text("ALTER TABLE item ADD COLUMN level INTEGER NOT NULL DEFAULT 0"))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+            if 'rarity' not in item_cols:
+                try:
+                    db.session.execute(text("ALTER TABLE item ADD COLUMN rarity VARCHAR(20) NOT NULL DEFAULT 'common'"))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+        # Schema version table creation already handled above
         inspector = inspect(db.engine)
         tables = inspector.get_table_names()
         if 'schema_version' not in tables:

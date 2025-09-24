@@ -6,6 +6,97 @@ _Formerly: Adventure MUD (Multi-User Dungeon)_
 
 A modern web-based multiplayer dungeon adventure game built with Python (Flask, Flask-SocketIO), SQLite, and Bootstrap.
 
+## Experimental Generator Invariants (Current Phase)
+The dungeon generator is in an experimental phase introducing room type semantics and secret/locked door variants. During this phase several legacy guarantees are intentionally relaxed:
+- Full reachability: A small number of rooms may be unreachable; tests track this with xfail markers rather than hard failures.
+- Strict per-seed structural determinism: High-level metrics (seed echo, >0 rooms) remain stable, but exact room counts and layout may fluctuate while augmentation ordering is stabilized.
+- Movement guarantees: Immediate movement in a direction may no-op more often; API focuses on correctness (no error) over forced displacement.
+- Advanced pruning metrics: Legacy metrics (`door_clusters_reduced`, `tunnels_pruned`, etc.) may be absent or zeroed.
+
+Temporary test strategy:
+- Deprecated strict tests converted to `xfail` (non-strict) for visibility without blocking CI.
+- A soft determinism smoke test ensures seeds echo and basic metrics are sensible; mismatch in room count triggers an xfail instead of failure.
+
+Roadmap to re-tighten invariants:
+1. Enforce deterministic ordering for augmentation passes (sort candidate collections before RNG draws).
+2. Introduce a bounded unreachable ratio (< 5%) test to replace full reachability assertion.
+3. Reinstate door cluster pruning with deterministic selection logic.
+4. Replace movement no-op tolerance with directional intent validation once pathing heuristics mature.
+
+---
+
+## Loot System (Experimental)
+The new loot subsystem introduces level-aware, rarity-weighted item placements generated lazily the first time a dungeon map is requested for a given seed. Loot nodes are deterministic per seed (placement coordinates and item selection derive from a PRNG seeded with `seed ^ 0xA5F00D`) yet responsive to party progression via an average party level window (±2 levels). This keeps rewards relevant while preserving replay determinism for a given progression state.
+
+### Item Metadata
+`Item` records now include:
+* `level` (int, 0 = utility/no-scaling items like basic potions or tools)
+* `rarity` (enum string) – one of: `common`, `uncommon`, `rare`, `epic`, `legendary`, `mythic`
+
+Bulk item seeds (weapons, armor, potions, misc) live under `sql/`. Startup loads these `.sql` files idempotently; items without explicit `level`/`rarity` fallback to heuristic inference (name keywords) until the SQL is enriched with explicit columns. You can safely re-run the server; existing slugs are skipped.
+
+### Rarity Weights
+Current default relative spawn weights (higher = more common):
+```
+common: 100
+uncommon: 55
+rare: 25
+epic: 10
+legendary: 3
+mythic: 1
+```
+These weights apply within the candidate item pool after level filtering. Adjusting them changes the expected long-run distribution but individual dungeons remain small samples (streaks possible). Future tuning will surface these in a config table / admin UI.
+
+### Placement Algorithm (Summary)
+1. Determine average party level (simple mean of active characters; placeholder currently – may extend to median or weighted).
+2. Compute level window `(avg-2, avg+2)` clamped to `[1,20]`.
+3. Candidate pool: all items whose `level` is inside the window OR `level==0` (utility) to avoid starving baseline supplies.
+4. Determine target loot node count: baseline (24) + small area scaler (≤ +10) but never more than 15% of walkable tiles.
+5. Shuffle walkable tiles deterministically; keep a `spread_factor` slice (default 0.85) to reduce clustering bias.
+6. Select every Nth tile to reach target count, skipping coordinates already containing loot (idempotence).
+7. Weighted rarity roulette to assign one item per chosen tile.
+8. Persist placements to `dungeon_loot`.
+
+Calling the generator again for the same seed is idempotent: existing `(x,y,z)` rows are detected and not duplicated.
+
+### API Endpoints
+```
+GET  /api/dungeon/loot                -> { loot: [ {id,x,y,z,slug,name,rarity,level}, ... ] }
+POST /api/dungeon/loot/claim/<id>     -> { claimed: true, item: { slug, name } }
+```
+Both require authentication; claiming currently lacks proximity checks (TODO) and simply marks the node claimed. Claimed loot disappears from subsequent list calls.
+
+### Tuning Knobs (Current / Planned)
+| Knob | Status | Effect |
+|------|--------|--------|
+| `desired_chests` | code constant | Baseline loot node target per map before scaling |
+| `spread_factor` | code constant | Fraction of shuffled walkables considered for sampling (lower = more dispersed) |
+| Rarity weights | code constant | Relative frequency among candidate pool |
+| Level window width | fixed (±2) | Determines progression tightness; wider window dilutes relevance |
+| Max tile density (15%) | code constant | Upper bound on loot saturation to avoid clutter |
+| Heuristic inference | startup function | Temporary level/rarity assignment for legacy SQL without metadata |
+
+Planned future surfacing: move these constants into a `game_config` table with admin editing or environment overrides, plus per-depth modifiers (e.g., deeper seeds bias toward higher rarity).
+
+### Extending
+To add new items with explicit metadata, update (or create) an `.sql` file including `level` and `rarity` columns, or insert via an admin management route (future). Re-run the server; migration logic will not duplicate rows.
+
+### Testing Strategy
+Upcoming tests will validate:
+* Idempotence (second generation produces zero new rows).
+* Presence of at least one loot item for typical map sizes.
+* Rarity distribution sanity over a batched seed sample (statistical tolerance, not strict).
+* Level window filtering (no items above `avg+2`).
+
+### Roadmap
+1. Proximity & line-of-sight checks for claiming.
+2. Inventory integration (add claimed item to character stash / equipment slots where relevant).
+3. Config-surfaced rarity weights & dynamic scaling by dungeon depth or seed entropy.
+4. Explicit SQL seed metadata (remove heuristic inference fallback).
+5. Weighted drop tables by item type (e.g., potion bias in early levels).
+
+---
+
 ## Features
 - User authentication (login/register)
 - Character management (stats, gear, items)
@@ -162,7 +253,14 @@ SVG icon assets are automatically normalized on commit (whitespace + non-license
 See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for coding conventions, pre-commit policy (no inline styles/scripts), asset guidelines, and test instructions.
 
 
-## What's New (v0.5.0 latest)
+## What's New (v0.6.0 latest)
+### v0.6.0 (Equipment, Inventory, Search UX)
+- Equipment & Bags modal with drag-and-drop equip, per-slot Unequip, and Use actions for consumables.
+- Equipment/Bags buttons on both Dashboard and Adventure party cards; improved outline-warning styling.
+- New Inventory API: `/api/characters/state`, `/equip`, `/unequip`, `/consume` with computed stats.
+- Dungeon perception/search improvements: persistent notice markers; Search enabled after perception; loot is clickable with tooltips.
+- Backend hardening: normalized legacy gear shapes and robust user ID extraction to resolve 404/500s on `/api/characters/state`.
+
 ### v0.5.0 (Moderation & Performance Insight)
 - Dedicated Moderation Panel UI with filtering (All / Banned / Muted), search, and action buttons.
 - Temporary mute durations (seconds) with automatic expiry; persistent DB mute flag remains authoritative for hard mutes.
@@ -237,6 +335,13 @@ python run.py server
 
 ### 3. Open in browser
 Visit http://localhost:5000
+
+### VS Code tasks (optional)
+If you use VS Code, this repo includes ready-to-use tasks and recommendations:
+- Run task: "Run Adventure (bg)" to start the server in the background using the workspace venv.
+- The workspace is configured to use `.venv/bin/python` automatically.
+
+Recommended extensions are listed in `.vscode/extensions.json` (Python, Pylance, Ruff, Black, Jupyter, Docker).
 
 ## Project Structure
 - `models/` - Database models

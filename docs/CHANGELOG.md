@@ -10,6 +10,33 @@
 - Regression tests: `test_door_invariants.py`, `test_no_room_tunnel_adjacency.py` protecting door rules and separation.
 - Modular dungeon package fully exercised via new metrics & invariants (see README Modular Dungeon Package section update).
 
+## [0.6.0] - 2025-09-24
+### Added
+- Equipment & Bags modal with drag-and-drop equip, per-slot Unequip buttons, and consumable Use actions.
+- Equipment UI added to both Dashboard and Adventure party cards; improved button styling for visibility.
+- Inventory API endpoints:
+	- `GET /api/characters/state` for characters, gear, bag, and computed stats.
+	- `POST /api/characters/<cid>/equip` to equip items with slot validation and swap handling.
+	- `POST /api/characters/<cid>/unequip` to remove equipped items back to the bag.
+	- `POST /api/characters/<cid>/consume` for potions (HP/Mana).
+- Dungeon perception/search flow: persistent notice markers, Search button gating after perception, and tooltipped clickable loot.
+
+### Changed
+- Button handlers in `equipment.js` now bind immediately; state loads lazily on first interaction to avoid dead UI when initial fetch fails.
+- Character creation and autofill initialize `gear` as an empty object `{}` instead of a list for consistency.
+- Buttons on Dashboard and Adventure restyled to outline-warning for clarity.
+
+### Fixed
+- Hardened `/api/characters/state` to avoid 404/500s via:
+	- Robust user ID extraction (supports legacy sessions).
+	- Legacy gear normalization (list → dict) at the API boundary.
+	- Per-character try/catch shielding to keep partial results available.
+- Loot markers are removed after claim and persist correctly across refresh.
+
+### Notes
+- Item slot inference remains heuristic; a future update will add explicit slot metadata to items.
+- One dungeon test remains intermittently xfail; stability work continues alongside the new equipment system.
+
 ## [0.5.0] - 2025-09-22
 ### Added
 - Dedicated Moderation Panel in Server Settings modal with filtering (All / Banned / Muted), search, and direct Ban / Unban / Mute / Unmute buttons (separate from online user list).

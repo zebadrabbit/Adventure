@@ -193,7 +193,10 @@
                 <form action="{{ url_for('dashboard.delete_character', char_id=c.id) }}" method="post" onsubmit="return confirm('Delete {{ c.name }}?');">
                     <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Delete</button>
                 </form>
-                <a href="#" class="btn btn-sm btn-outline-secondary disabled"><i class="bi bi-gear"></i> Manage</a>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-warning btn-equip-panel" data-char-id="{{ c.id }}"><i class="bi bi-shield"></i> Equipment</button>
+                    <button class="btn btn-sm btn-outline-warning btn-bag-panel" data-char-id="{{ c.id }}"><i class="bi bi-bag"></i> Bags</button>
+                </div>
             </div>
         </div>
     </div>
@@ -208,6 +211,7 @@
     <script src="https://cdn.socket.io/5.4.1/socket.io.min.js" integrity="sha384-placeholder" crossorigin="anonymous"></script>
     <script src="{{ asset_url('chat-widget.js') }}"></script>
     <script src="{{ asset_url('dashboard.js') }}"></script>
+    <script src="{{ asset_url('js/equipment.js') }}"></script>
     <script src="{{ asset_url('js/seed-widget.js') }}"></script>
     <script src="{{ asset_url('js/dashboard-autofill.js') }}"></script>
 {% endblock %}

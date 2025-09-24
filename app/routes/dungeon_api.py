@@ -18,6 +18,9 @@ import json, time, os
 from collections import deque
 from app.utils.tile_compress import compress_tiles, decompress_tiles
 from functools import wraps
+from app.loot.generator import generate_loot_for_seed, LootConfig  # added
+from app.models.loot import DungeonLoot
+from app.models.models import Item, Character
 
 def admin_required(fn):
     @wraps(fn)
@@ -101,10 +104,25 @@ def dungeon_map():
     if dungeon_instance_id:
         instance = db.session.get(DungeonInstance, dungeon_instance_id)
         if instance:
-            # Seed is now managed exclusively via POST /api/dungeon/seed
-            # Use Dungeon class to generate the dungeon
             MAP_SIZE = 75  # 75x75 grid
             dungeon = get_cached_dungeon(instance.seed, (MAP_SIZE, MAP_SIZE, 1))
+            # Loot generation (idempotent). Collect walkable tiles.
+            walkable_chars = {ROOM, TUNNEL, DOOR}
+            walkables = [(x,y) for x in range(MAP_SIZE) for y in range(MAP_SIZE) if dungeon.grid[x][y] in walkable_chars]
+            # Derive average party level (simplified: user characters avg or default 1)
+            avg_level = 1
+            try:
+                from app.models.models import Character
+                chars = Character.query.filter_by(user_id=current_user.id).all()
+                if chars:
+                    avg_level = max(1, sum(c.level for c in chars)//len(chars))
+            except Exception:
+                pass
+            cfg = LootConfig(avg_party_level=avg_level, width=MAP_SIZE, height=MAP_SIZE, seed=instance.seed)
+            try:
+                generate_loot_for_seed(cfg, walkables)
+            except Exception:
+                pass
             # Simplified entrance: first room center (if any)
             entrance = None
             if getattr(dungeon, 'rooms', None):
@@ -230,8 +248,13 @@ def dungeon_move():
     exits_words = [cardinal_full[e] for e in exits_map]
     if exits_words:
         desc += " Exits: " + ', '.join(word.capitalize() for word in exits_words) + '.'
+    # Perception check for loot at current tile
+    noticed, extra_msg = _maybe_perceive_and_mark_loot(instance, x, y)
+    if extra_msg:
+        # Append on a new line to make it stand out in the UI log panel
+        desc = (desc + "\n" + extra_msg).strip()
     pos = [x, y, z]
-    return jsonify({'pos': pos, 'desc': desc, 'exits': exits_map})
+    return jsonify({'pos': pos, 'desc': desc, 'exits': exits_map, 'noticed_loot': noticed})
 
 
 @bp_dungeon.route('/api/dungeon/state')
@@ -271,6 +294,208 @@ def _char_to_type(ch: str) -> str:
     if ch == DOOR: return 'door'
     if ch == WALL: return 'wall'
     return 'cave'
+
+
+def _get_party_for_current_user():
+    """Return list of Character rows for the current session party if available; otherwise all user's characters.
+
+    We attempt to match characters by name from session['party'] to DB rows for a more accurate stat pull.
+    """
+    party_meta = session.get('party') or []
+    names = set()
+    for m in party_meta:
+        try:
+            nm = (m.get('name') or '').strip()
+            if nm:
+                names.add(nm)
+        except Exception:
+            continue
+    q = Character.query.filter_by(user_id=current_user.id)
+    if names:
+        rows = q.filter(Character.name.in_(list(names))).all()
+        # Fallback to all if names mismatched
+        if rows:
+            return rows
+    return q.all()
+
+
+def _perception_mod_from_stats(stats_json: str) -> int:
+    """Compute a perception modifier from a stats JSON string.
+
+    Prioritizes explicit 'perception' value; otherwise derives from Wisdom (wis) using (wis-10)//2.
+    """
+    if not stats_json:
+        return 0
+    try:
+        data = json.loads(stats_json)
+        if isinstance(data, dict):
+            if 'perception' in data:
+                val = data.get('perception')
+                if isinstance(val, (int, float)):
+                    return int(val)
+            wis = data.get('wis') or data.get('WIS') or data.get('wisdom')
+            if isinstance(wis, (int, float)):
+                return int((wis - 10) // 2)
+    except Exception:
+        return 0
+    return 0
+
+
+def _roll_perception_for_user() -> int:
+    """Return the best perception check (d20 + mod) among the party characters.
+
+    If no characters found, use a modest default of +1.
+    """
+    import random as _random
+    rows = _get_party_for_current_user()
+    best_mod = 1  # default small bonus if unknown
+    if rows:
+        best_mod = max((_perception_mod_from_stats(c.stats) + max(0, int(c.level)//2)) for c in rows)
+    roll = _random.randint(1, 20)
+    return roll + best_mod
+
+
+def _loot_rows_at(seed: int, x: int, y: int) -> list[DungeonLoot]:
+    return DungeonLoot.query.filter_by(seed=seed, x=x, y=y, z=0, claimed=False).all()
+
+
+def _session_noticed_key(seed: int) -> str:
+    return f"noticed:{seed}"
+
+
+def _coord_key(x: int, y: int) -> str:
+    return f"{x},{y}"
+
+
+def _is_container_item(item: Item) -> bool:
+    t = (item.type or '').lower().strip() if item and getattr(item, 'type', None) else ''
+    return t in ('container', 'chest', 'lockbox')
+
+
+@bp_dungeon.route('/api/dungeon/notices', methods=['GET'])
+@login_required
+def get_noticed_coords():
+    """Return all noticed coordinates for the current dungeon seed where unclaimed loot remains.
+
+    Response: { notices: [[x,y], ...] }
+    """
+    dungeon_instance_id = session.get('dungeon_instance_id')
+    if not dungeon_instance_id:
+        return jsonify({'notices': []})
+    instance = db.session.get(DungeonInstance, dungeon_instance_id)
+    if not instance:
+        return jsonify({'notices': []})
+    key = _session_noticed_key(instance.seed)
+    noticed_map = session.get(key) or {}
+    coords = []
+    for ck, val in noticed_map.items():
+        if not val:
+            continue
+        try:
+            xs, ys = ck.split(',')
+            x = int(xs); y = int(ys)
+        except Exception:
+            continue
+        # Only include if there is still unclaimed loot here
+        rows = _loot_rows_at(instance.seed, x, y)
+        if rows:
+            coords.append([x, y])
+    return jsonify({'notices': coords})
+
+
+def _maybe_perceive_and_mark_loot(instance, x: int, y: int) -> tuple[bool, str]:
+    """If there is unclaimed loot at (x,y), perform a perception check unless already noticed.
+
+    Returns (noticed_now_or_before, message). On failed perception for scattered loot, deletes the loot rows.
+    """
+    seed = instance.seed
+    # Gather unclaimed loot rows and filter for scattered (non-container) vs containers
+    rows = _loot_rows_at(seed, x, y)
+    if not rows:
+        return False, ''
+    # Track noticed coordinates per seed in session (kept small)
+    key = _session_noticed_key(seed)
+    noticed_map = session.get(key) or {}
+    ck = _coord_key(x, y)
+    if noticed_map.get(ck):
+        # Already noticed previously; keep available for Search
+        return True, 'You recall a suspicious spot here.'
+
+    # Not yet noticed: roll perception
+    total = _roll_perception_for_user()
+    DC = 13  # baseline difficulty; can evolve with dungeon depth later
+    if total >= DC:
+        noticed_map[ck] = True
+        session[key] = noticed_map
+        # Flask signed cookie session needs mark as modified when mutating a nested object
+        try:
+            session.modified = True
+        except Exception:
+            pass
+        return True, 'You notice a glint of something hidden. You can Search this area.'
+    else:
+        # Failed perception: remove scattered loot (non-container). Keep chests.
+        removed = 0
+        for r in list(rows):
+            item = db.session.get(Item, r.item_id)
+            if not _is_container_item(item):
+                try:
+                    db.session.delete(r)
+                    removed += 1
+                except Exception:
+                    pass
+        if removed:
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+        return False, 'You find nothing of interest. Whatever was here is lost to the dark.'
+
+
+@bp_dungeon.route('/api/dungeon/search', methods=['POST'])
+@login_required
+def dungeon_search():
+    """Reveal loot at the player's current tile if it was previously noticed.
+
+    Response on success: { found: true, items: [{id, name, slug, rarity, level}], message: str }
+    Otherwise: { found: false, message: str }
+    """
+    dungeon_instance_id = session.get('dungeon_instance_id')
+    if not dungeon_instance_id:
+        return jsonify({'found': False, 'message': 'No dungeon instance found'}), 404
+    instance = db.session.get(DungeonInstance, dungeon_instance_id)
+    if not instance:
+        return jsonify({'found': False, 'message': 'Dungeon instance not found'}), 404
+    x, y, z = instance.pos_x, instance.pos_y, instance.pos_z
+    # Require that this coordinate was noticed to avoid blind searching spam
+    key = _session_noticed_key(instance.seed)
+    noticed_map = session.get(key) or {}
+    ck = _coord_key(x, y)
+    if not noticed_map.get(ck):
+        return jsonify({'found': False, 'message': 'You see nothing here to search.'}), 403
+    rows = _loot_rows_at(instance.seed, x, y)
+    if not rows:
+        return jsonify({'found': False, 'message': 'There is nothing here.'}), 404
+    items = []
+    for r in rows:
+        item = db.session.get(Item, r.item_id)
+        if not item:
+            continue
+        items.append({
+            'id': r.id,
+            'name': item.name,
+            'slug': item.slug,
+            'rarity': getattr(item, 'rarity', 'common'),
+            'level': getattr(item, 'level', 0),
+            'type': getattr(item, 'type', ''),
+            'value_copper': getattr(item, 'value_copper', 0),
+            'description': getattr(item, 'description', '') or ''
+        })
+    if not items:
+        return jsonify({'found': False, 'message': 'There is nothing here.'}), 404
+    names = ', '.join(i['name'] for i in items)
+    msg = f"You search the area and discover: {names}."
+    return jsonify({'found': True, 'items': items, 'message': msg})
 
 
 @bp_dungeon.route('/adventure')

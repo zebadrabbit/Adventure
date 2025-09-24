@@ -92,6 +92,8 @@ from app.routes.dashboard import bp_dashboard
 from app.routes.dungeon_api import bp_dungeon
 from app.routes.seed_api import bp_seed
 from app.routes.config_api import bp_config
+from app.routes.loot_api import bp_loot
+from app.routes.inventory_api import bp_inventory
 
 app.register_blueprint(auth.bp)
 app.register_blueprint(main.bp)
@@ -99,6 +101,8 @@ app.register_blueprint(bp_dashboard)
 app.register_blueprint(bp_dungeon)
 app.register_blueprint(bp_seed)
 app.register_blueprint(bp_config)
+app.register_blueprint(bp_loot)
+app.register_blueprint(bp_inventory)
 
 # Import websocket handlers so their event decorators register with Socket.IO
 

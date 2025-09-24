@@ -1,4 +1,3 @@
-from .old.rooms import *  # compatibility shim
 import random
 from dataclasses import dataclass
 from typing import List, Tuple

@@ -1,4 +1,3 @@
-from .old.config import *  # re-export legacy config for compatibility
 from dataclasses import dataclass
 from typing import Optional
 

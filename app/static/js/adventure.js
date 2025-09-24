@@ -137,6 +137,7 @@
   const moveSouthBtn = document.getElementById('btn-move-s');
   const moveEastBtn = document.getElementById('btn-move-e');
   const moveWestBtn = document.getElementById('btn-move-w');
+  const searchBtn = document.getElementById('btn-search');
     let availableExits = [];
     let keyboardEnabled = true;
     const keyboardToggle = document.getElementById('toggle-keyboard-move');
@@ -170,6 +171,55 @@
       processNextMove();
     }
 
+    // Persistent discovered/notice markers
+    let noticeMarkers = {}; // key: "x,y" -> L.marker
+
+    function keyFor(x,y){ return `${x},${y}`; }
+
+    function addNoticeMarker(x, y) {
+      if (!window.dungeonMap) return;
+      const k = keyFor(x,y);
+      if (noticeMarkers[k]) return; // already present
+      const iconHtml = `<img src="/static/iconography/search-question.svg" alt="Searchable" style="width:28px;height:28px;filter: drop-shadow(0 0 2px #000);">`;
+      const divIcon = L.divIcon({ html: iconHtml, className: 'notice-marker-div', iconSize: [28,28], iconAnchor: [14,14] });
+      const m = L.marker([ (y + 0.5) * TILE_SIZE, (x + 0.5) * TILE_SIZE ], { icon: divIcon, interactive: false });
+      m.addTo(window.dungeonMap);
+      noticeMarkers[k] = m;
+      if (searchBtn && window.currentPos && keyFor(window.currentPos[0], window.currentPos[1]) === k) {
+        searchBtn.disabled = false;
+      }
+    }
+
+    function removeNoticeMarker(x, y) {
+      const k = keyFor(x,y);
+      const m = noticeMarkers[k];
+      if (m && window.dungeonMap) {
+        try { window.dungeonMap.removeLayer(m); } catch(e) {}
+      }
+      delete noticeMarkers[k];
+    }
+
+    async function refreshNoticeMarkers() {
+      try {
+        const r = await fetch(`/api/dungeon/notices?ts=${Date.now()}`, { cache: 'no-store' });
+        if (!r.ok) return;
+        const data = await r.json();
+        const set = new Set((data.notices || []).map(p => keyFor(p[0], p[1])));
+        // remove stale
+        Object.keys(noticeMarkers).forEach(k => { if (!set.has(k)) {
+          const [x,y] = k.split(',').map(n=>parseInt(n,10));
+          removeNoticeMarker(x,y);
+        }});
+        // add present
+        (data.notices || []).forEach(p => addNoticeMarker(p[0], p[1]));
+        // update Search button state for current tile
+        if (searchBtn && window.currentPos) {
+          const k = keyFor(window.currentPos[0], window.currentPos[1]);
+          searchBtn.disabled = !noticeMarkers[k];
+        }
+      } catch(e) { /* ignore */ }
+    }
+
     function executeMove(dir) {
       moveInFlight = true;
       fetch('/api/dungeon/move', {
@@ -180,7 +230,14 @@
       .then(r => { if (!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
       .then(data => {
         if (data && data.desc && output) {
-          output.textContent = data.desc;
+          // Treat newlines as log line breaks
+          output.innerHTML = '';
+          const parts = String(data.desc).split(/\n+/);
+          parts.forEach((p, idx) => {
+            const div = document.createElement('div');
+            div.textContent = p;
+            output.appendChild(div);
+          });
           liveRegion.textContent = data.desc.replace(/Exits:.*$/i,'').trim();
         }
         if (data && data.pos) {
@@ -189,9 +246,19 @@
             if (window.dungeonPlayerMarker && window.dungeonMap && Number.isFinite(pxY) && Number.isFinite(pxX)) {
               window.dungeonPlayerMarker.setLatLng([pxY, pxX]);
               window.dungeonMap.panTo([pxY, pxX], { animate: true });
+              window.currentPos = data.pos;
               // Update fog-of-war visibility after movement
               if (Array.isArray(data.pos)) {
                 try { updateDungeonVisibility(data.pos[0], data.pos[1]); } catch(e) { /* noop */ }
+              }
+              // If newly noticed, add marker persistently
+              if (data.noticed_loot) {
+                addNoticeMarker(data.pos[0], data.pos[1]);
+              }
+              // Enable/disable search button based on whether current tile has notice
+              if (searchBtn) {
+                const k = keyFor(data.pos[0], data.pos[1]);
+                searchBtn.disabled = !noticeMarkers[k];
               }
             }
         }
@@ -229,6 +296,118 @@
   if (moveSouthBtn) { moveSouthBtn.setAttribute('aria-label','Move South'); moveSouthBtn.addEventListener('click', () => !moveSouthBtn.disabled && queueMove('s')); }
   if (moveEastBtn)  { moveEastBtn.setAttribute('aria-label','Move East'); moveEastBtn.addEventListener('click', () => !moveEastBtn.disabled && queueMove('e')); }
   if (moveWestBtn)  { moveWestBtn.setAttribute('aria-label','Move West'); moveWestBtn.addEventListener('click', () => !moveWestBtn.disabled && queueMove('w')); }
+
+    if (searchBtn) {
+      searchBtn.addEventListener('click', () => {
+        if (searchBtn.disabled) return;
+        fetch('/api/dungeon/search', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+          .then(r => r.json())
+          .then(data => {
+            if (!output) return;
+            const foundWithItems = data && data.found && Array.isArray(data.items) && data.items.length;
+            // When items are found, replace the plain message with a header and linked items to avoid duplicates
+              if (foundWithItems) {
+              const hdr = document.createElement('div');
+              hdr.textContent = 'You search the area and discover:';
+              output.appendChild(hdr);
+              const list = document.createElement('div');
+              list.className = 'loot-list mt-1';
+              data.items.forEach(it => {
+                const a = document.createElement('a');
+                a.href = '#';
+                a.className = 'loot-link me-2';
+                a.textContent = it.name || it.slug || 'Unknown Item';
+                const rarity = it.rarity || 'common';
+                a.setAttribute('data-tooltip', `${it.name} (Lv ${it.level || 0}, ${rarity})\n${it.type || ''} — ${it.value_copper || 0}c\n${(it.description || '').trim()}`);
+                a.addEventListener('mouseenter', showTooltip);
+                a.addEventListener('mouseleave', hideTooltip);
+                   a.addEventListener('click', (ev) => {
+                  ev.preventDefault();
+                  hideTooltip();
+                  // Claim this loot id
+                  fetch(`/api/dungeon/loot/claim/${it.id}`, { method: 'POST' })
+                    .then(r => r.json())
+                    .then(res => {
+                      const line = document.createElement('div');
+                      if (res && res.claimed) {
+                        line.textContent = `Added ${res.item?.name || 'item'} to your inventory.`;
+                        // remove link
+                        a.remove();
+                          // after claim, refresh markers and update Search
+                          refreshNoticeMarkers();
+                          if (searchBtn && window.currentPos) {
+                            const k = keyFor(window.currentPos[0], window.currentPos[1]);
+                            searchBtn.disabled = !noticeMarkers[k];
+                          }
+                           // If no more loot links remain in this list, optimistically drop marker
+                           const remaining = list.querySelectorAll('.loot-link');
+                           if (!remaining || remaining.length === 0) {
+                             if (window.currentPos) removeNoticeMarker(window.currentPos[0], window.currentPos[1]);
+                             if (searchBtn) searchBtn.disabled = true;
+                           }
+                      } else {
+                        line.textContent = 'Unable to claim item.';
+                      }
+                      output.appendChild(line);
+                      hideTooltip();
+                    })
+                    .catch(err => console.error('[loot] claim error', err));
+                });
+                list.appendChild(a);
+              });
+              output.appendChild(list);
+              // After reveal, refresh from server to keep only those with unclaimed loot
+              refreshNoticeMarkers();
+            } else if (data && data.message) {
+              // If no items found, or generic response, show the server message
+              const div = document.createElement('div');
+              div.textContent = data.message;
+              output.appendChild(div);
+                // If nothing here, ensure markers/buttons reflect it
+              refreshNoticeMarkers();
+              if (/nothing here|there is nothing here/i.test(data.message) && window.currentPos) {
+                removeNoticeMarker(window.currentPos[0], window.currentPos[1]);
+                if (searchBtn) searchBtn.disabled = true;
+              }
+            }
+          })
+          .catch(err => console.error('[dungeon] search error', err));
+      });
+    }
+
+    // Simple tooltip implementation for loot links
+    let tooltipEl = null;
+    function showTooltip(e) {
+      const text = e.currentTarget.getAttribute('data-tooltip');
+      if (!text) return;
+      if (!tooltipEl) {
+        tooltipEl = document.createElement('div');
+        tooltipEl.className = 'adventure-tooltip';
+        document.body.appendChild(tooltipEl);
+      }
+      tooltipEl.textContent = text;
+      tooltipEl.style.display = 'block';
+      const rect = e.currentTarget.getBoundingClientRect();
+      tooltipEl.style.position = 'fixed';
+      tooltipEl.style.left = `${rect.left}px`;
+      tooltipEl.style.top = `${rect.top - 8 - (tooltipEl.offsetHeight || 0)}px`;
+      tooltipEl.style.background = 'rgba(0,0,0,0.85)';
+      tooltipEl.style.color = '#eee';
+      tooltipEl.style.padding = '6px 8px';
+      tooltipEl.style.border = '1px solid #444';
+      tooltipEl.style.borderRadius = '4px';
+      tooltipEl.style.pointerEvents = 'none';
+      tooltipEl.style.whiteSpace = 'pre';
+      tooltipEl.style.zIndex = 9999;
+      // Adjust top now that size is known
+      const h = tooltipEl.offsetHeight;
+      tooltipEl.style.top = `${rect.top - 8 - h}px`;
+    }
+    function hideTooltip() {
+      if (tooltipEl) tooltipEl.style.display = 'none';
+    }
+    // Dismiss tooltip on any document click to avoid lingering when elements are removed
+    document.addEventListener('click', () => { try { hideTooltip(); } catch(e){} }, true);
 
     // Keyboard movement (arrows + WASD). Ignore when typing in input/textarea.
     document.addEventListener('keydown', (e) => {
@@ -425,6 +604,9 @@
           if (validHeight && validWidth) {
             map.setMaxBounds([[0, 0], [height * TILE_SIZE, width * TILE_SIZE]]);
           }
+
+          // Load persisted notices and render markers
+          refreshNoticeMarkers();
 
           for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {

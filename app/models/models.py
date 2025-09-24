@@ -94,6 +94,8 @@ class Item(db.Model):
         type: Category (e.g., 'weapon', 'armor', 'potion', 'tool')
         description: Short description
         value_copper: Integer value in copper coins
+        level: Recommended minimum level (0 for utility / no-scaling)
+        rarity: Drop frequency tier (common, uncommon, rare, epic, legendary, mythic)
     """
     id = db.Column(db.Integer, primary_key=True)
     slug = db.Column(db.String(80), unique=True, nullable=False)
@@ -101,3 +103,5 @@ class Item(db.Model):
     type = db.Column(db.String(40), nullable=False)
     description = db.Column(db.Text, nullable=True)
     value_copper = db.Column(db.Integer, default=0, nullable=False)
+    level = db.Column(db.Integer, nullable=False, default=0)
+    rarity = db.Column(db.String(20), nullable=False, default='common')

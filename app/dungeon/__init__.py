@@ -1,24 +1,17 @@
 """Public dungeon package interface.
 
-Keeps backward compatibility for imports like:
-    from app.dungeon import Dungeon, DungeonConfig, ROOM, WALL, TUNNEL, DOOR, CAVE
+Backward-compatible import surface plus new door variants & helper constants.
 """
 
-from .dungeon import Dungeon, DungeonConfig, CAVE, ROOM, WALL, TUNNEL, DOOR
-
-__all__ = [
-    'Dungeon','DungeonConfig','CAVE','ROOM','WALL','TUNNEL','DOOR'
-]
-"""Lean dungeon generation package.
-
-Minimal public surface:
-	from app.dungeon import Dungeon, DungeonConfig, CAVE, ROOM, WALL, TUNNEL, DOOR
-"""
-
-from .dungeon import Dungeon, DungeonConfig, CAVE, ROOM, WALL, TUNNEL, DOOR
+from .dungeon import (
+	Dungeon,
+	DungeonConfig,
+	CAVE, ROOM, WALL, TUNNEL, DOOR,
+	SECRET_DOOR, LOCKED_DOOR,
+)
 
 __all__ = [
 	"Dungeon",
 	"DungeonConfig",
-	"CAVE","ROOM","WALL","TUNNEL","DOOR"
+	"CAVE","ROOM","WALL","TUNNEL","DOOR","SECRET_DOOR","LOCKED_DOOR"
 ]

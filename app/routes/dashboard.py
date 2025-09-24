@@ -142,7 +142,7 @@ def dashboard():
             user_id=current_user_id,
             name=name,
             stats=json.dumps({**stats, **coins, 'class': char_class}),
-            gear=json.dumps([]),
+            gear=json.dumps({}),
             items=json.dumps(items),
             xp=0,
             level=1
@@ -307,7 +307,7 @@ def autofill_characters():
                 user_id=current_user_id,
                 name=name,
                 stats=_json.dumps({**stats, **coins, 'class': cls}),
-                gear=_json.dumps([]),
+                gear=_json.dumps({}),
                 items=_json.dumps(items),
                 xp=0,
                 level=1

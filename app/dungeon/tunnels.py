@@ -1,4 +1,3 @@
-from .old.tunnels import *  # compatibility shim
 import random
 from typing import List, Tuple, Deque, Optional
 from collections import deque

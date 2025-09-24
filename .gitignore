@@ -32,3 +32,12 @@ dist/
 
 # Logs
 *.log
+
+# Playwright / Chromium (browsers are large and not required in repo)
+playwright-report/
+test-results/
+.playwright/
+**/playwright/.cache/
+**/ms-playwright/
+**/browsers/
+**/chromium/

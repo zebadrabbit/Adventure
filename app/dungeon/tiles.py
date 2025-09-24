@@ -1,4 +1,3 @@
-from .old.tiles import *  # re-export tile constants for compatibility
 # Tile constants centralized for modular imports
 CAVE = 'C'
 ROOM = 'R'
