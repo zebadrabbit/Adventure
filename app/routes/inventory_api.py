@@ -8,6 +8,7 @@ from flask import Blueprint, jsonify, request, session
 from flask_login import login_required, current_user
 from app import db
 from app.models.models import Character, Item
+from app.inventory.utils import load_inventory, dump_inventory, encumbrance_state, apply_encumbrance_penalty, remove_one
 import json
 
 bp_inventory = Blueprint('inventory', __name__)
@@ -173,27 +174,51 @@ def list_characters_state():
     # Preload all items used by these characters for efficient lookups
     slugs_needed = set()
     for ch in chars:
-        bag = _safe_json_load(ch.items, [])
+        inv_objs = load_inventory(ch.items)
+        # gather slugs with multiplicity irrelevant for prefetch
+        for obj in inv_objs:
+            slugs_needed.add(obj['slug'])
         gear = _normalize_gear(_safe_json_load(ch.gear, {}))
-        slugs_needed.update(bag)
         slugs_needed.update([s for s in gear.values() if s])
     items_map = {it.slug: it for it in Item.query.filter(Item.slug.in_(slugs_needed)).all()} if slugs_needed else {}
     for ch in chars:
         try:
             base_stats = _safe_json_load(ch.stats, {})
             gear = _normalize_gear(_safe_json_load(ch.gear, {}))
-            bag_slugs = _safe_json_load(ch.items, [])
-            computed = _computed_stats(base_stats, gear, items_map)
+            inv_objs = load_inventory(ch.items)
+            # Compute encumbrance BEFORE penalty application (but penalty affects exposed computed base dex)
+            str_score = int(base_stats.get('str', 10)) if isinstance(base_stats, dict) else 10
+            enc_state = encumbrance_state(str_score, inv_objs)
+            penalized_base = apply_encumbrance_penalty(base_stats, enc_state)
+            computed = _computed_stats(penalized_base, gear, items_map)
+            bag_payload = []
+            for obj in inv_objs:
+                slug = obj['slug']
+                it = items_map.get(slug)
+                if not it:
+                    continue
+                ser = _serialize_item(it)
+                ser['qty'] = obj.get('qty', 1)
+                bag_payload.append(ser)
             out.append({
                 'id': ch.id,
                 'name': ch.name,
                 'level': ch.level,
-                'stats': {'base': base_stats, 'computed': computed},
+                'stats': {'base': penalized_base, 'computed': computed},
                 'gear': {slot: (_serialize_item(items_map[slug]) if slug in items_map else None) for slot, slug in (gear or {}).items()},
-                'bag': [ _serialize_item(items_map[s]) for s in bag_slugs if s in items_map ],
+                'bag': bag_payload,
+                'encumbrance': enc_state
             })
+            # Persist migrated format if legacy list was detected (length mismatch between slugs list and objects)
+            try:
+                # Detect if original was legacy by comparing raw JSON parse result type
+                raw = _safe_json_load(ch.items, [])
+                if raw and isinstance(raw, list) and (not raw or isinstance(raw[0], str)):
+                    ch.items = dump_inventory(inv_objs)
+                    db.session.flush()
+            except Exception:
+                pass
         except Exception:
-            # Best-effort fallback for malformed legacy data; prevents 500s breaking UI
             out.append({
                 'id': ch.id,
                 'name': ch.name,
@@ -219,9 +244,10 @@ def equip_item(cid: int):
     item = Item.query.filter_by(slug=slug).first()
     if not item:
         return jsonify({'error': 'item not found'}), 404
-    bag = _safe_json_load(ch.items, [])
+    inv = load_inventory(ch.items)
     gear = _normalize_gear(_safe_json_load(ch.gear, {}))
-    if slug not in bag:
+    # Require at least one instance
+    if not any(o['slug'] == slug for o in inv):
         return jsonify({'error': 'item not in bag'}), 400
     slot = data.get('slot') or _slot_for_item(item, gear)
     if slot not in _SLOTS:
@@ -233,15 +259,16 @@ def equip_item(cid: int):
     if _slot_for_item(item, gear) is None:
         return jsonify({'error': 'item not equippable'}), 400
     # Perform equip: remove from bag, move current slot (if any) back to bag
-    try:
-        bag.remove(slug)
-    except ValueError:
-        pass
+    removed = remove_one(inv, slug)
+    if not removed:
+        return jsonify({'error': 'item not in bag'}), 400
     existing = gear.get(slot)
     if existing:
-        bag.append(existing)
+        # return existing to inventory
+        from app.inventory.utils import add_item
+        add_item(inv, existing, 1)
     gear[slot] = slug
-    ch.items = _safe_json_dump(bag)
+    ch.items = dump_inventory(inv)
     ch.gear = _safe_json_dump(gear)
     db.session.commit()
     return jsonify({'ok': True, 'slot': slot, 'equipped': slug})
@@ -262,9 +289,11 @@ def unequip_item(cid: int):
     slug = gear.get(slot)
     if not slug:
         return jsonify({'error': 'empty slot'}), 400
-    bag.append(slug)
+    inv = load_inventory(ch.items)
+    from app.inventory.utils import add_item
+    add_item(inv, slug, 1)
     gear[slot] = None
-    ch.items = _safe_json_dump(bag)
+    ch.items = dump_inventory(inv)
     ch.gear = _safe_json_dump(gear)
     db.session.commit()
     return jsonify({'ok': True, 'slot': slot, 'unequipped': slug})
@@ -283,8 +312,8 @@ def consume_item(cid: int):
     item = Item.query.filter_by(slug=slug).first()
     if not item:
         return jsonify({'error': 'item not found'}), 404
-    bag = _safe_json_load(ch.items, [])
-    if slug not in bag:
+    inv = load_inventory(ch.items)
+    if not any(o['slug'] == slug for o in inv):
         return jsonify({'error': 'item not in bag'}), 400
     # Only allow potions for now
     if (item.type or '').lower() != 'potion':
@@ -304,8 +333,9 @@ def consume_item(cid: int):
     if mana:
         base_stats['mana'] = int(base_stats.get('mana', 0)) + mana
     # Remove potion from bag
-    bag.remove(slug)
-    ch.items = _safe_json_dump(bag)
+    removed = remove_one(inv, slug)
+    if removed:
+        ch.items = dump_inventory(inv)
     ch.stats = _safe_json_dump(base_stats)
     db.session.commit()
     return jsonify({'ok': True, 'consumed': slug, 'effects': {'hp': heal, 'mana': mana}})

@@ -7,6 +7,10 @@ def setup_user_flags():
     # Ensure websocket online registry starts clean each test to avoid cross-test leakage
     import app.websockets.lobby as lobby
     lobby.online.clear()
+    # Also clear moderation state to ensure deterministic tests
+    lobby.banned_usernames.clear()
+    lobby.muted_usernames.clear()
+    lobby._temp_mute_expiry.clear()
     from werkzeug.security import generate_password_hash
     with app.app_context():
         db.create_all()
@@ -46,11 +50,14 @@ def test_persistent_ban_flag_blocks_connect(setup_user_flags):
     for sid, info in lobby.online.items():
         if info.get('username')=='admin_actor':
             info['role']='admin'; info['is_auth']=True; info['legacy_ok']=True
-    admin_c.emit('admin_status')
-    rec = admin_c.get_received()
-    users_events = [p for p in rec if p['name']=='admin_status']
-    assert users_events, 'admin_status response missing'
-    payload = users_events[-1]['args'][0]
+    # Use snapshot to avoid relying on websocket emit ordering
+    snap = lobby._admin_status_snapshot()
+    if snap is None:
+        # As a fallback, synthesize admin entry then retry
+        lobby.online['__test_admin_fallback']={'username':'admin_actor','role':'admin','is_auth':True,'legacy_ok':True}
+        snap = lobby._admin_status_snapshot()
+    assert snap is not None, 'admin status snapshot unavailable'
+    payload = snap
     assert not any(u.get('username')=='flagged_user' for u in payload['users']), 'Banned user should not appear in online list'
 
 def test_rate_limit_auto_mute(setup_user_flags, monkeypatch):

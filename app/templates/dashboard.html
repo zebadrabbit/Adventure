@@ -4,6 +4,17 @@
 
 {% block dashboard_content %}
 
+{% if validation_error %}
+<div class="alert alert-warning" role="alert">
+    {{ validation_error }}
+    <div class="small text-muted">Select characters by checking the boxes on your cards.</div>
+    <div class="small text-muted">You can choose between 1 and 4 party members.</div>
+    <button type="button" class="btn btn-sm btn-outline-warning mt-2" onclick="document.getElementById('autofill-party-btn').click()">
+        Autofill Party
+    </button>
+</div>
+{% endif %}
+
 <div id="lobby-chat-widget" class="mud-chat-widget">
     <div class="mud-chat-tabs-row d-flex align-items-center justify-content-between chat-header">
         <ul class="nav nav-tabs flex-grow-1 mb-0" id="chatTabNav" role="tablist">
@@ -72,8 +83,8 @@
             </div>
             <div class="card-body">
                                 <div id="party-blurb" class="small text-light fst-italic mb-2">
-                                    Choose your party for the next adventure. Only the bravest will answer the call!
-                                </div>
+                                                    Choose your party for the next adventure. Select between 1 and 4 characters. Only the bravest will answer the call!
+                                                </div>
                 <div id="party-table" class="mt-2"></div>
                 <form method="POST" id="begin-adventure-form" class="mt-3 d-flex flex-column gap-2">
                     <input type="hidden" name="form" value="start_adventure">

@@ -19,6 +19,27 @@ import json
 
 bp_dashboard = Blueprint('dashboard', __name__)
 
+# Ensure authentication is rehydrated from session IDs for this blueprint to avoid
+# intermittent AnonymousUser during test client context switches.
+@bp_dashboard.before_request
+def _rehydrate_login_from_session():
+    try:
+        if not current_user.is_authenticated:
+            uid = session.get('_user_id') or session.get('user_id')
+            if uid is not None:
+                try:
+                    uid_int = int(uid)
+                except (TypeError, ValueError):
+                    uid_int = None
+                if uid_int is not None:
+                    user = db.session.get(User, uid_int)
+                    if user is not None:
+                        from flask_login import login_user
+                        login_user(user, remember=False)
+    except Exception:
+        # Non-fatal; fall through to normal @login_required handling
+        pass
+
 
 @bp_dashboard.route('/dashboard', methods=['GET', 'POST'])
 @login_required
@@ -97,8 +118,49 @@ def dashboard():
             except ValueError:
                 party_ids = []
             if not (1 <= len(party_ids) <= 4):
-                flash('Select between 1 and 4 characters to begin the adventure.', 'warning')
-                return redirect(url_for('dashboard.dashboard'))
+                msg = 'Select between 1 and 4 characters'
+                flash(msg, 'warning')
+                # Inline render the dashboard so the validation text is present in this response
+                characters = Character.query.filter_by(user_id=current_user_id).all()
+                char_list = []
+                for c in characters:
+                    stats = json.loads(c.stats)
+                    coins = {k: stats.get(k,0) for k in ('gold','silver','copper')}
+                    class_name = (stats.get('class') or 'unknown').capitalize()
+                    # Minimal inventory expansion for inline path
+                    try:
+                        raw_items = json.loads(c.items) if c.items else []
+                    except Exception:
+                        raw_items = []
+                    inventory = []
+                    if raw_items and isinstance(raw_items, list):
+                        from app.models.models import Item
+                        if raw_items and isinstance(raw_items[0], dict):
+                            slugs = [o.get('slug') for o in raw_items if isinstance(o, dict)]
+                        else:
+                            slugs = [s for s in raw_items if isinstance(s, str)]
+                        if slugs:
+                            db_items = Item.query.filter(Item.slug.in_(slugs)).all()
+                            by_slug = {i.slug: i for i in db_items}
+                            for slug in slugs:
+                                it = by_slug.get(slug)
+                                if it:
+                                    inventory.append({'slug': it.slug, 'name': it.name, 'type': it.type, 'qty':1})
+                    stats_copy = {k:v for k,v in stats.items() if k not in ('gold','silver','copper','class')}
+                    char_list.append({
+                        'id': c.id,
+                        'name': c.name,
+                        'stats': stats_copy,
+                        'coins': coins,
+                        'inventory': inventory,
+                        'class_name': class_name,
+                        'xp': getattr(c,'xp',0),
+                        'level': getattr(c,'level',1),
+                        'xp_next': xp_for_level(getattr(c,'level',1)+1)
+                    })
+                dungeon_seed = session.get('dungeon_seed','')
+                user_email = db.session.get(User, current_user_id).email if db.session.get(User, current_user_id) else None
+                return render_template('dashboard.html', characters=char_list, user_email=user_email, dungeon_seed=dungeon_seed, validation_error=msg)
             chars = Character.query.filter(Character.id.in_(party_ids), Character.user_id == current_user_id).all()
             if len(chars) != len(party_ids):
                 flash('One or more selected characters are invalid.', 'danger')
@@ -152,9 +214,19 @@ def dashboard():
         flash(f'Character {name} the {char_class} created!')
         return redirect(url_for('dashboard.dashboard'))
     # GET: show dashboard
+    # Robust user id resolution (mirrors POST path) to avoid losing flash messages
+    uid = None
     try:
-        uid = current_user.id
+        uid = getattr(current_user, 'id', None)
     except Exception:
+        uid = None
+    if uid is None:
+        sid = session.get('_user_id') or session.get('user_id')
+        try:
+            uid = int(sid) if sid is not None else None
+        except (TypeError, ValueError):
+            uid = None
+    if uid is None:
         from flask_login import logout_user
         logout_user()
         return redirect(url_for('auth.login'))
@@ -177,24 +249,47 @@ def dashboard():
             'silver': stats.pop('silver', 0),
             'copper': stats.pop('copper', 0)
         }
-        try:
-            item_slugs = json.loads(c.items) if c.items else []
-        except Exception:
-            item_slugs = []
+        # Inventory (supports legacy list-of-slugs & new stacked list-of-objects)
         from app.models.models import Item
-        items = Item.query.filter(Item.slug.in_(item_slugs)).all() if item_slugs else []
-        items_by_slug = {i.slug: i for i in items}
+        try:
+            raw_items = json.loads(c.items) if c.items else []
+        except Exception:
+            raw_items = []
+        # Determine representation
+        stacked = []
+        if raw_items and isinstance(raw_items, list) and raw_items and isinstance(raw_items[0], dict):
+            # Already stacked format
+            stacked = raw_items
+        elif isinstance(raw_items, list):
+            # Legacy list of slugs -> aggregate
+            agg = {}
+            for slug in raw_items:
+                if isinstance(slug, str):
+                    agg[slug] = agg.get(slug, 0) + 1
+            stacked = [{'slug': s, 'qty': q} for s, q in agg.items()]
+            if stacked:
+                try:
+                    c.items = json.dumps(stacked)
+                    _backfilled = True
+                except Exception:
+                    pass
+        slugs_needed = [o['slug'] for o in stacked]
+        db_items = Item.query.filter(Item.slug.in_(slugs_needed)).all() if slugs_needed else []
+        by_slug = {i.slug: i for i in db_items}
         inventory = []
-        for slug in item_slugs:
-            it = items_by_slug.get(slug)
-            if it:
-                inventory.append({'slug': it.slug, 'name': it.name, 'type': it.type})
+        for obj in stacked:
+            it = by_slug.get(obj['slug'])
+            if not it:
+                continue
+            inventory.append({'slug': it.slug, 'name': it.name, 'type': it.type, 'qty': obj.get('qty',1)})
         if stats_class:
             class_name = stats_class.capitalize()
         else:
-            if 'herbal-pouch' in item_slugs:
+            # Use current inventory slugs (from stacked representation) for heuristic class inference
+            inv_slugs = {obj['slug'] for obj in stacked}
+            if 'herbal-pouch' in inv_slugs:
                 class_name = 'Druid'
-            elif 'hunting-bow' in item_slugs:
+            elif 'hunting-bow' in inv_slugs:
                 class_name = 'Ranger'
             else:
                 if class_map['fighter'](stats):

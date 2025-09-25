@@ -41,8 +41,12 @@ except OSError:
 # isn't provided, default to a SQLite file in the instance folder.
 secret_key = os.getenv('SECRET_KEY', 'dev-secret-change-me')
 database_url = os.getenv('DATABASE_URL')
+
+# During pytest runs, isolate to a separate test database to reduce locking
 if not database_url:
-    db_path = Path(app.instance_path) / 'mud.db'
+    is_pytest = bool(os.getenv('PYTEST_CURRENT_TEST'))
+    db_filename = 'mud_test.db' if is_pytest else 'mud.db'
+    db_path = Path(app.instance_path) / db_filename
     # Use POSIX path for SQLAlchemy URI compatibility across OS
     database_url = f"sqlite:///{db_path.as_posix()}"
 
@@ -57,7 +61,15 @@ app.config.update(
     DUNGEON_ENABLE_GENERATION_METRICS=bool(os.getenv('DUNGEON_ENABLE_GENERATION_METRICS','1')=='1'),
 )
 
-db = SQLAlchemy(app, session_options={'expire_on_commit': False})
+engine_opts = {}
+if database_url.startswith('sqlite:///'):
+    # Provide a generous timeout to mitigate transient lock contention in tests
+    engine_opts['connect_args'] = {
+        'timeout': 10,            # busy timeout (seconds) for sqlite
+        'check_same_thread': False  # allow usage across threads like socketio / test harness
+    }
+    # Future: poolclass=StaticPool for in-memory usage; for file DB we keep defaults.
+db = SQLAlchemy(app, session_options={'expire_on_commit': False}, engine_options=engine_opts)
 login_manager = LoginManager(app)
 login_manager.login_view = 'auth.login'
 
@@ -72,18 +84,31 @@ def load_user(user_id):  # pragma: no cover - simple loader
 # Let Flask-SocketIO select best async_mode based on installed deps (eventlet/gevent/threading)
 socketio = SocketIO(
     app,
-    # Explicit async mode (eventlet installed) for clarity; can switch to 'gevent' or 'threading' if needed
-    async_mode=os.getenv('SOCKETIO_ASYNC_MODE') or None,  # None lets it auto-select; override via env
-    # In dev, allow all origins by default; set explicit origins in production
+    async_mode=os.getenv('SOCKETIO_ASYNC_MODE') or None,
     cors_allowed_origins=os.getenv('CORS_ALLOWED_ORIGINS', '*'),
-    # Engine.IO low-level logging to help diagnose 400 handshake / timeout issues (disable in production)
     engineio_logger=bool(os.getenv('ENGINEIO_LOGGER', '1') == '1'),
-    # Mitigate rapid reconnect churn by tuning ping timeouts (defaults: ping_interval=25, ping_timeout=20)
     ping_interval=20,
     ping_timeout=10,
-    # Allow both transports explicitly; client will attempt websocket upgrade
     transports=['websocket', 'polling']
 )
+
+# Apply SQLite pragmatic tuning (WAL + busy timeout) once the engine is created.
+try:  # pragma: no cover - lightweight, defensive
+    from sqlalchemy import event
+    from sqlalchemy.engine import Engine
+
+    @event.listens_for(Engine, "connect")
+    def _set_sqlite_pragma(dbapi_connection, connection_record):  # noqa: D401
+        try:
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA busy_timeout=10000")  # 10 seconds
+            cursor.close()
+        except Exception:
+            pass
+except Exception:
+    pass
 
 
 # Register HTTP blueprints
@@ -174,6 +199,21 @@ def _run_lightweight_migrations():  # pragma: no cover - idempotent guard
     #         db.session.commit()
 
 _run_lightweight_migrations()
+
+# When running under pytest, ensure base item seeds and game config exist early so tests relying
+# on catalog items (e.g., short-sword) do not encounter missing rows before server.start_server().
+if os.getenv('PYTEST_CURRENT_TEST'):
+    try:  # pragma: no cover - defensive init hook
+        # Ensure model metadata is loaded
+        from app.models import models as _models  # noqa: F401
+        from app.server import seed_items, _seed_game_config, _run_migrations
+        with app.app_context():
+            db.create_all()
+            _run_migrations()
+            seed_items()
+            _seed_game_config()
+    except Exception:
+        pass
 
 def create_app():
     return app

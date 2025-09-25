@@ -105,3 +105,39 @@ class Item(db.Model):
     value_copper = db.Column(db.Integer, default=0, nullable=False)
     level = db.Column(db.Integer, nullable=False, default=0)
     rarity = db.Column(db.String(20), nullable=False, default='common')
+    # New: per-item weight used for encumbrance calculations (units = weight points)
+    # Light = 0.1-0.5, Medium ~1-5, Heavy 10+, default conservative 1.0
+    weight = db.Column(db.Float, nullable=False, default=1.0)
+
+
+class GameConfig(db.Model):
+    """Key/value style game configuration storage.
+
+    Stores tunable gameplay constants (encumbrance thresholds, capacity formula
+    parameters, starter item mappings, base stats, etc.) so they can be adjusted
+    without code changes. Values are persisted as JSON-serializable text.
+
+    Example rows:
+        key='encumbrance', value='{"base_capacity":10,"per_str":5,"warn_pct":1.0,"over_pct":1.10,"dex_penalty":2}'
+        key='starter_items', value='{"fighter":[...],"mage":[...]}'
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(80), unique=True, nullable=False)
+    value = db.Column(db.Text, nullable=False)
+
+    @staticmethod
+    def get(key: str):  # pragma: no cover - thin convenience
+        from app import db
+        row = GameConfig.query.filter_by(key=key).first()
+        return row.value if row else None
+
+    @staticmethod
+    def set(key: str, value: str):  # pragma: no cover
+        from app import db
+        row = GameConfig.query.filter_by(key=key).first()
+        if not row:
+            row = GameConfig(key=key, value=value)
+            db.session.add(row)
+        else:
+            row.value = value
+        db.session.commit()

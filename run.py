@@ -167,6 +167,21 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     admin_parser.set_defaults(command="admin")
 
+    # admin-tui subcommand (Textual)
+    tui_parser = subparsers.add_parser(
+        "admin-tui",
+        help="Launch the Textual admin console (VT102-compatible)",
+        formatter_class=argparse.RawTextHelpFormatter,
+        description="Run the terminal UI for admin: users, seeds, chat, and logs.",
+    )
+    tui_parser.add_argument(
+        "--server",
+        dest="server_url",
+        default=None,
+        help="Server URL for Socket.IO chat (default: http://127.0.0.1:5000)",
+    )
+    tui_parser.set_defaults(command="admin-tui")
+
     # If no subcommand provided, default to server
     if len(argv) == 0:
         argv = ["server"]
@@ -212,6 +227,7 @@ def main(argv: list[str]) -> int:
 
     # Import server entrypoints only after environment is ready
     from app.server import start_server, start_admin_shell
+    from app.admin_tui import run_admin_tui
 
     # Startup banner
     # Build colored banner lines
@@ -242,6 +258,9 @@ def main(argv: list[str]) -> int:
 
     if mode == "admin":
         start_admin_shell()
+        return 0
+    elif mode == "admin-tui":
+        run_admin_tui(server_url=getattr(args, "server_url", None))
         return 0
     else:
         info_prefix = f"{Fore.CYAN}[INFO]{Style.RESET_ALL}" if _COLOR_ENABLED else "[INFO]"

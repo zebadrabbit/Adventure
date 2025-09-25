@@ -19,6 +19,18 @@
   const FOG_CFG_KEY = 'adventureFogConfig';
   document.addEventListener('DOMContentLoaded', function() {
     const output = document.getElementById('dungeon-output');
+    // Load party characters from data element injected by template (no inline scripts)
+    (function loadPartyCharacters(){
+      try {
+        const el = document.getElementById('party-characters-data');
+        if (!el) { window.partyCharacters = window.partyCharacters || []; return; }
+        const raw = el.getAttribute('data-json') || '[]';
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          window.partyCharacters = parsed.map(p => ({ id: p.id, name: p.name, class: p.class || p.class_name || '' }));
+        }
+      } catch(e) { window.partyCharacters = window.partyCharacters || []; }
+    })();
     // ------------------------------------------------------------------
     // Dynamic class color theming
     // Fetch centralized class color config from /api/config/class_colors
@@ -137,7 +149,6 @@
   const moveSouthBtn = document.getElementById('btn-move-s');
   const moveEastBtn = document.getElementById('btn-move-e');
   const moveWestBtn = document.getElementById('btn-move-w');
-  const searchBtn = document.getElementById('btn-search');
     let availableExits = [];
     let keyboardEnabled = true;
     const keyboardToggle = document.getElementById('toggle-keyboard-move');
@@ -158,6 +169,13 @@
       liveRegion.className = 'visually-hidden';
       document.body.appendChild(liveRegion);
     }
+
+    // Lightweight tooltip stubs (to avoid errors if not provided elsewhere)
+    // Existing code attaches mouseenter/mouseleave handlers that reference these names.
+    // Implement no-ops here; can be upgraded later to a real tooltip if desired.
+    function showTooltip() { /* no-op */ }
+    function hideTooltip() { /* no-op */ }
+    let tooltipEl = null;
 
     function processNextMove() {
       if (moveInFlight) return;
@@ -185,9 +203,6 @@
       const m = L.marker([ (y + 0.5) * TILE_SIZE, (x + 0.5) * TILE_SIZE ], { icon: divIcon, interactive: false });
       m.addTo(window.dungeonMap);
       noticeMarkers[k] = m;
-      if (searchBtn && window.currentPos && keyFor(window.currentPos[0], window.currentPos[1]) === k) {
-        searchBtn.disabled = false;
-      }
     }
 
     function removeNoticeMarker(x, y) {
@@ -212,12 +227,44 @@
         }});
         // add present
         (data.notices || []).forEach(p => addNoticeMarker(p[0], p[1]));
-        // update Search button state for current tile
-        if (searchBtn && window.currentPos) {
-          const k = keyFor(window.currentPos[0], window.currentPos[1]);
-          searchBtn.disabled = !noticeMarkers[k];
-        }
+        // update inline Search buttons state
+        updateInlineSearchButtons();
       } catch(e) { /* ignore */ }
+    }
+
+    function canSearchHere() {
+      if (!window.currentPos) return false;
+      const k = keyFor(window.currentPos[0], window.currentPos[1]);
+      return !!noticeMarkers[k];
+    }
+
+    function renderInlineSearch(container) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-outline-warning btn-sm ms-1 inline-search-btn';
+      btn.textContent = 'Search';
+      btn.disabled = !canSearchHere();
+      btn.dataset.clicked = '0';
+      btn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        if (btn.disabled) return;
+        // Deactivate this specific Search button immediately after click
+        btn.dataset.clicked = '1';
+        btn.disabled = true;
+        doSearch(btn);
+      });
+      container.appendChild(btn);
+      return btn;
+    }
+
+    function updateInlineSearchButtons() {
+      const nodes = document.querySelectorAll('.dungeon-output .inline-search-btn');
+      nodes.forEach(n => {
+        try {
+          const alreadyClicked = (n.dataset && n.dataset.clicked === '1');
+          n.disabled = alreadyClicked || !canSearchHere();
+        } catch(e) {}
+      });
     }
 
     function executeMove(dir) {
@@ -230,15 +277,10 @@
       .then(r => { if (!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
       .then(data => {
         if (data && data.desc && output) {
-          // Treat newlines as log line breaks
-          output.innerHTML = '';
-          const parts = String(data.desc).split(/\n+/);
-          parts.forEach((p, idx) => {
-            const div = document.createElement('div');
-            div.textContent = p;
-            output.appendChild(div);
-          });
-          liveRegion.textContent = data.desc.replace(/Exits:.*$/i,'').trim();
+          renderLogFromDesc(String(data.desc));
+          if (data.last_roll) {
+            try { updateLastRollUI(data.last_roll); } catch(e) {}
+          }
         }
         if (data && data.pos) {
           const pxY = (data.pos[1] + 0.5) * TILE_SIZE;
@@ -255,11 +297,8 @@
               if (data.noticed_loot) {
                 addNoticeMarker(data.pos[0], data.pos[1]);
               }
-              // Enable/disable search button based on whether current tile has notice
-              if (searchBtn) {
-                const k = keyFor(data.pos[0], data.pos[1]);
-                searchBtn.disabled = !noticeMarkers[k];
-              }
+              // Update inline search buttons based on current tile
+              updateInlineSearchButtons();
             }
         }
         if (data && Array.isArray(data.exits)) {
@@ -292,120 +331,167 @@
     }
 
     // Wire dedicated movement buttons if they exist (add ARIA labels)
-  if (moveNorthBtn) { moveNorthBtn.setAttribute('aria-label','Move North'); moveNorthBtn.addEventListener('click', () => !moveNorthBtn.disabled && queueMove('n')); }
+      if (moveNorthBtn) { moveNorthBtn.setAttribute('aria-label','Move North'); moveNorthBtn.addEventListener('click', () => !moveNorthBtn.disabled && queueMove('n')); }
   if (moveSouthBtn) { moveSouthBtn.setAttribute('aria-label','Move South'); moveSouthBtn.addEventListener('click', () => !moveSouthBtn.disabled && queueMove('s')); }
   if (moveEastBtn)  { moveEastBtn.setAttribute('aria-label','Move East'); moveEastBtn.addEventListener('click', () => !moveEastBtn.disabled && queueMove('e')); }
   if (moveWestBtn)  { moveWestBtn.setAttribute('aria-label','Move West'); moveWestBtn.addEventListener('click', () => !moveWestBtn.disabled && queueMove('w')); }
 
-    if (searchBtn) {
-      searchBtn.addEventListener('click', () => {
-        if (searchBtn.disabled) return;
-        fetch('/api/dungeon/search', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
-          .then(r => r.json())
-          .then(data => {
-            if (!output) return;
-            const foundWithItems = data && data.found && Array.isArray(data.items) && data.items.length;
-            // When items are found, replace the plain message with a header and linked items to avoid duplicates
-              if (foundWithItems) {
-              const hdr = document.createElement('div');
-              hdr.textContent = 'You search the area and discover:';
-              output.appendChild(hdr);
-              const list = document.createElement('div');
-              list.className = 'loot-list mt-1';
-              data.items.forEach(it => {
-                const a = document.createElement('a');
-                a.href = '#';
-                a.className = 'loot-link me-2';
-                a.textContent = it.name || it.slug || 'Unknown Item';
-                const rarity = it.rarity || 'common';
-                a.setAttribute('data-tooltip', `${it.name} (Lv ${it.level || 0}, ${rarity})\n${it.type || ''} — ${it.value_copper || 0}c\n${(it.description || '').trim()}`);
-                a.addEventListener('mouseenter', showTooltip);
-                a.addEventListener('mouseleave', hideTooltip);
-                   a.addEventListener('click', (ev) => {
-                  ev.preventDefault();
-                  hideTooltip();
-                  // Claim this loot id
-                  fetch(`/api/dungeon/loot/claim/${it.id}`, { method: 'POST' })
-                    .then(r => r.json())
-                    .then(res => {
-                      const line = document.createElement('div');
-                      if (res && res.claimed) {
-                        line.textContent = `Added ${res.item?.name || 'item'} to your inventory.`;
-                        // remove link
-                        a.remove();
-                          // after claim, refresh markers and update Search
+    // Unified search action used by inline Search buttons
+    let searchInFlight = false;
+    function doSearch(invokingBtn) {
+      if (searchInFlight) return; // guard against duplicate invocations
+      searchInFlight = true;
+      // Only allow when current tile is noticed (prevents spam)
+      if (!canSearchHere()) return;
+      fetch('/api/dungeon/search', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+        .then(r => r.json())
+        .then(data => {
+          if (!output) return;
+          // Prevent duplicates: remove any existing loot list before appending a new one
+          try {
+            const existingLists = output.querySelectorAll('.loot-list');
+            existingLists.forEach(el => el.remove());
+          } catch(e) {}
+          const foundWithItems = data && data.found && Array.isArray(data.items) && data.items.length;
+          if (foundWithItems) {
+            const hdr = document.createElement('div');
+            hdr.textContent = 'You search the area and discover:';
+            output.appendChild(hdr);
+            const list = document.createElement('div');
+            list.className = 'loot-list mt-1';
+            const partyChars = (window.partyCharacters || []).filter(c => c && c.id && c.name);
+            data.items.forEach(it => {
+              const wrapper = document.createElement('div');
+              wrapper.className = 'loot-entry d-inline-block me-3 mb-2';
+              const label = document.createElement('span');
+              label.className = 'loot-label me-1';
+              label.textContent = (it.name || it.slug || 'Unknown Item') + ':';
+              const rarity = it.rarity || 'common';
+              label.setAttribute('data-tooltip', `${it.name} (Lv ${it.level || 0}, ${rarity})\n${it.type || ''} — ${it.value_copper || 0}c\n${(it.description || '').trim()}`);
+              label.addEventListener('mouseenter', showTooltip);
+              label.addEventListener('mouseleave', hideTooltip);
+              const dropdownDiv = document.createElement('div');
+              dropdownDiv.className = 'dropdown d-inline-block';
+              const btn = document.createElement('button');
+              btn.type = 'button';
+              btn.className = 'btn btn-sm btn-outline-warning dropdown-toggle';
+              btn.setAttribute('data-bs-toggle', 'dropdown');
+              btn.setAttribute('aria-expanded', 'false');
+              btn.textContent = (it.name || it.slug || 'Item');
+              const menu = document.createElement('ul');
+              menu.className = 'dropdown-menu';
+              if (!partyChars.length) {
+                const li = document.createElement('li');
+                li.innerHTML = '<span class="dropdown-item disabled">No party</span>';
+                menu.appendChild(li);
+              } else {
+                partyChars.forEach(pc => {
+                  const li = document.createElement('li');
+                  const a = document.createElement('a');
+                  a.href = '#';
+                  a.className = 'dropdown-item';
+                  a.textContent = pc.name;
+                  a.addEventListener('click', (ev) => {
+                    ev.preventDefault();
+                    hideTooltip();
+                    btn.disabled = true;
+                    fetch(`/api/dungeon/loot/claim/${it.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ character_id: pc.id }) })
+                      .then(r => r.json())
+                      .then(res => {
+                        const line = document.createElement('div');
+                        if (res && res.claimed) {
+                          line.textContent = `Assigned ${res.item?.name || 'item'} to ${pc.name}.`;
+                          wrapper.remove();
                           refreshNoticeMarkers();
-                          if (searchBtn && window.currentPos) {
-                            const k = keyFor(window.currentPos[0], window.currentPos[1]);
-                            searchBtn.disabled = !noticeMarkers[k];
+                          const remaining = list.querySelectorAll('.loot-entry');
+                          if (!remaining || remaining.length === 0) {
+                            if (window.currentPos) removeNoticeMarker(window.currentPos[0], window.currentPos[1]);
+                            updateInlineSearchButtons();
                           }
-                           // If no more loot links remain in this list, optimistically drop marker
-                           const remaining = list.querySelectorAll('.loot-link');
-                           if (!remaining || remaining.length === 0) {
-                             if (window.currentPos) removeNoticeMarker(window.currentPos[0], window.currentPos[1]);
-                             if (searchBtn) searchBtn.disabled = true;
-                           }
-                      } else {
-                        line.textContent = 'Unable to claim item.';
-                      }
-                      output.appendChild(line);
-                      hideTooltip();
-                    })
-                    .catch(err => console.error('[loot] claim error', err));
+                        } else {
+                          line.textContent = (res && res.error) ? `Unable to claim: ${res.error}` : 'Unable to claim item.';
+                          btn.disabled = false;
+                        }
+                        output.appendChild(line);
+                      })
+                      .catch(err => {
+                        console.error('[loot] claim error', err);
+                        btn.disabled = false;
+                      });
+                  });
+                  li.appendChild(a);
+                  menu.appendChild(li);
                 });
-                list.appendChild(a);
-              });
-              output.appendChild(list);
-              // After reveal, refresh from server to keep only those with unclaimed loot
-              refreshNoticeMarkers();
-            } else if (data && data.message) {
-              // If no items found, or generic response, show the server message
-              const div = document.createElement('div');
-              div.textContent = data.message;
-              output.appendChild(div);
-                // If nothing here, ensure markers/buttons reflect it
-              refreshNoticeMarkers();
-              if (/nothing here|there is nothing here/i.test(data.message) && window.currentPos) {
-                removeNoticeMarker(window.currentPos[0], window.currentPos[1]);
-                if (searchBtn) searchBtn.disabled = true;
               }
-            }
-          })
-          .catch(err => console.error('[dungeon] search error', err));
-      });
+              dropdownDiv.appendChild(btn);
+              dropdownDiv.appendChild(menu);
+              wrapper.appendChild(label);
+              wrapper.appendChild(dropdownDiv);
+              list.appendChild(wrapper);
+            });
+            output.appendChild(list);
+          } else {
+            const line = document.createElement('div');
+            line.textContent = data && data.message ? data.message : 'You search the area but find nothing.';
+            output.appendChild(line);
+          }
+        })
+        .catch(err => console.error('[dungeon] search error', err))
+        .finally(() => {
+          searchInFlight = false;
+          // Ensure the invoking button stays disabled after click
+          try { if (invokingBtn) { invokingBtn.dataset.clicked = '1'; invokingBtn.disabled = true; } } catch(e){}
+        });
     }
 
-    // Simple tooltip implementation for loot links
-    let tooltipEl = null;
-    function showTooltip(e) {
-      const text = e.currentTarget.getAttribute('data-tooltip');
-      if (!text) return;
-      if (!tooltipEl) {
-        tooltipEl = document.createElement('div');
-        tooltipEl.className = 'adventure-tooltip';
-        document.body.appendChild(tooltipEl);
+    // No global Search button anymore; inline buttons call doSearch()
+
+    function updateLastRollUI(roll) {
+      if (!roll || typeof roll !== 'object') return;
+      const ch = roll.character || null;
+      const who = ch && (ch.id != null) ? document.querySelector(`.character-card .last-roll-line[data-char-id="${ch.id}"]`) : null;
+      const text = (function(){
+        const parts = [];
+        if (roll.skill) parts.push(String(roll.skill).charAt(0).toUpperCase() + String(roll.skill).slice(1));
+        const detail = `${roll.roll ?? '?'}${roll.die ? '' : ''}${typeof roll.mod === 'number' ? (roll.mod>=0? ' +'+roll.mod : ' '+roll.mod) : ''}`;
+        const total = (typeof roll.total === 'number') ? ` = ${roll.total}` : '';
+        const expr = roll.expr ? ` (${roll.expr})` : '';
+        return `Last roll: ${parts.join(' ')} ${detail}${total}${expr}`.trim();
+      })();
+      if (who) {
+        who.textContent = text;
+      } else {
+        // Fallback: show above the log
+        const line = document.createElement('div');
+        line.className = 'text-warning small';
+        line.textContent = text;
+        if (output) output.appendChild(line);
       }
-      tooltipEl.textContent = text;
-      tooltipEl.style.display = 'block';
-      const rect = e.currentTarget.getBoundingClientRect();
-      tooltipEl.style.position = 'fixed';
-      tooltipEl.style.left = `${rect.left}px`;
-      tooltipEl.style.top = `${rect.top - 8 - (tooltipEl.offsetHeight || 0)}px`;
-      tooltipEl.style.background = 'rgba(0,0,0,0.85)';
-      tooltipEl.style.color = '#eee';
-      tooltipEl.style.padding = '6px 8px';
-      tooltipEl.style.border = '1px solid #444';
-      tooltipEl.style.borderRadius = '4px';
-      tooltipEl.style.pointerEvents = 'none';
-      tooltipEl.style.whiteSpace = 'pre';
-      tooltipEl.style.zIndex = 9999;
-      // Adjust top now that size is known
-      const h = tooltipEl.offsetHeight;
-      tooltipEl.style.top = `${rect.top - 8 - h}px`;
     }
-    function hideTooltip() {
-      if (tooltipEl) tooltipEl.style.display = 'none';
+
+    function renderLogFromDesc(desc) {
+      if (!output) return;
+      output.innerHTML = '';
+      const parts = String(desc).split(/\n+/);
+      parts.forEach((p) => {
+        const div = document.createElement('div');
+        const isRecallMsg = /You recall a suspicious spot here\.?$/.test(p);
+        const isCanSearchMsg = /You can Search this area\.?$/.test(p);
+        if (isRecallMsg || isCanSearchMsg) {
+          const span = document.createElement('span');
+          span.textContent = p.replace(/\.?$/, '.');
+          div.appendChild(span);
+          div.appendChild(document.createTextNode(' '));
+          renderInlineSearch(div);
+        } else {
+          div.textContent = p;
+        }
+        output.appendChild(div);
+      });
+      try { liveRegion.textContent = desc.replace(/Exits:.*$/i,'').trim(); } catch(e) {}
+      updateInlineSearchButtons();
     }
+
     // Dismiss tooltip on any document click to avoid lingering when elements are removed
     document.addEventListener('click', () => { try { hideTooltip(); } catch(e){} }, true);
 
@@ -784,8 +870,10 @@
             .then(r => r.json())
             .then(data => {
               if (data && data.desc && output) {
-                output.textContent = data.desc;
-                liveRegion.textContent = data.desc.replace(/Exits:.*$/i,'').trim();
+                renderLogFromDesc(String(data.desc));
+                if (data.last_roll) {
+                  try { updateLastRollUI(data.last_roll); } catch(e) {}
+                }
               }
               if (data && Array.isArray(data.exits)) {
                 availableExits = data.exits.map(e => e.toLowerCase());

@@ -249,12 +249,15 @@ def dungeon_move():
     if exits_words:
         desc += " Exits: " + ', '.join(word.capitalize() for word in exits_words) + '.'
     # Perception check for loot at current tile
-    noticed, extra_msg = _maybe_perceive_and_mark_loot(instance, x, y)
+    noticed, extra_msg, roll_info = _maybe_perceive_and_mark_loot(instance, x, y)
     if extra_msg:
         # Append on a new line to make it stand out in the UI log panel
         desc = (desc + "\n" + extra_msg).strip()
     pos = [x, y, z]
-    return jsonify({'pos': pos, 'desc': desc, 'exits': exits_map, 'noticed_loot': noticed})
+    resp = {'pos': pos, 'desc': desc, 'exits': exits_map, 'noticed_loot': noticed}
+    if roll_info:
+        resp['last_roll'] = roll_info
+    return jsonify(resp)
 
 
 @bp_dungeon.route('/api/dungeon/state')
@@ -285,7 +288,20 @@ def dungeon_state():
     if exits_map:
         cardinal_full = {'n':'north','s':'south','e':'east','w':'west'}
         desc += " Exits: " + ', '.join(cardinal_full[e].capitalize() for e in exits_map) + '.'
-    return jsonify({'pos': [x,y,z], 'desc': desc, 'exits': exits_map})
+    # Non-destructive check: if this coordinate was already noticed and still has unclaimed loot,
+    # surface the recall message so the client can render inline Search controls after reload.
+    seed = instance.seed
+    key = _session_noticed_key(seed)
+    noticed_map = session.get(key) or {}
+    ck = _coord_key(x, y)
+    noticed_flag = False
+    if noticed_map.get(ck):
+        rows = _loot_rows_at(seed, x, y)
+        if rows:
+            noticed_flag = True
+            desc = (desc + "\n" + 'You recall a suspicious spot here.').strip()
+    resp = {'pos': [x,y,z], 'desc': desc, 'exits': exits_map, 'noticed_loot': noticed_flag}
+    return jsonify(resp)
 
 
 def _char_to_type(ch: str) -> str:
@@ -341,18 +357,50 @@ def _perception_mod_from_stats(stats_json: str) -> int:
     return 0
 
 
-def _roll_perception_for_user() -> int:
-    """Return the best perception check (d20 + mod) among the party characters.
+def _roll_perception_for_user():
+    """Return the best party perception roll details.
 
-    If no characters found, use a modest default of +1.
+    Returns a dict: {
+        'skill': 'perception', 'die': 'd20', 'roll': int, 'mod': int, 'total': int,
+        'expr': '1d20+X', 'character': { 'id': int|None, 'name': str|None }
+    }
+
+    Behavior is unchanged from before: we roll a single d20 and add the best party modifier.
+    We attribute the modifier to the character with the highest effective perception.
+    If no characters, we use a default +1 and leave character as None.
     """
     import random as _random
     rows = _get_party_for_current_user()
-    best_mod = 1  # default small bonus if unknown
+    best = {
+        'char': None,
+        'mod': 1
+    }
     if rows:
-        best_mod = max((_perception_mod_from_stats(c.stats) + max(0, int(c.level)//2)) for c in rows)
-    roll = _random.randint(1, 20)
-    return roll + best_mod
+        # Choose the character with the highest effective modifier
+        top = None
+        top_mod = None
+        for c in rows:
+            try:
+                eff = _perception_mod_from_stats(c.stats) + max(0, int(c.level)//2)
+            except Exception:
+                eff = _perception_mod_from_stats(getattr(c, 'stats', None))
+            if top_mod is None or eff > top_mod:
+                top_mod = int(eff)
+                top = c
+        if top is not None and top_mod is not None:
+            best['char'] = top
+            best['mod'] = int(top_mod)
+    die_roll = _random.randint(1, 20)
+    total = die_roll + int(best['mod'])
+    return {
+        'skill': 'perception',
+        'die': 'd20',
+        'roll': int(die_roll),
+        'mod': int(best['mod']),
+        'total': int(total),
+        'expr': f"1d20+{int(best['mod'])}",
+        'character': ({ 'id': int(best['char'].id), 'name': best['char'].name } if best['char'] is not None else None)
+    }
 
 
 def _loot_rows_at(seed: int, x: int, y: int) -> list[DungeonLoot]:
@@ -403,26 +451,27 @@ def get_noticed_coords():
     return jsonify({'notices': coords})
 
 
-def _maybe_perceive_and_mark_loot(instance, x: int, y: int) -> tuple[bool, str]:
+def _maybe_perceive_and_mark_loot(instance, x: int, y: int) -> tuple[bool, str, dict|None]:
     """If there is unclaimed loot at (x,y), perform a perception check unless already noticed.
 
-    Returns (noticed_now_or_before, message). On failed perception for scattered loot, deletes the loot rows.
+    Returns (noticed_now_or_before, message, roll_info_or_none). On failed perception for scattered loot, deletes the loot rows.
     """
     seed = instance.seed
     # Gather unclaimed loot rows and filter for scattered (non-container) vs containers
     rows = _loot_rows_at(seed, x, y)
     if not rows:
-        return False, ''
+        return False, '', None
     # Track noticed coordinates per seed in session (kept small)
     key = _session_noticed_key(seed)
     noticed_map = session.get(key) or {}
     ck = _coord_key(x, y)
     if noticed_map.get(ck):
         # Already noticed previously; keep available for Search
-        return True, 'You recall a suspicious spot here.'
+        return True, 'You recall a suspicious spot here.', None
 
     # Not yet noticed: roll perception
-    total = _roll_perception_for_user()
+    roll_info = _roll_perception_for_user()
+    total = roll_info['total'] if isinstance(roll_info, dict) else int(roll_info)
     DC = 13  # baseline difficulty; can evolve with dungeon depth later
     if total >= DC:
         noticed_map[ck] = True
@@ -432,7 +481,7 @@ def _maybe_perceive_and_mark_loot(instance, x: int, y: int) -> tuple[bool, str]:
             session.modified = True
         except Exception:
             pass
-        return True, 'You notice a glint of something hidden. You can Search this area.'
+        return True, 'You notice a glint of something hidden. You can Search this area.', roll_info if isinstance(roll_info, dict) else None
     else:
         # Failed perception: remove scattered loot (non-container). Keep chests.
         removed = 0
@@ -449,7 +498,7 @@ def _maybe_perceive_and_mark_loot(instance, x: int, y: int) -> tuple[bool, str]:
                 db.session.commit()
             except Exception:
                 db.session.rollback()
-        return False, 'You find nothing of interest. Whatever was here is lost to the dark.'
+        return False, 'You find nothing of interest. Whatever was here is lost to the dark.', roll_info if isinstance(roll_info, dict) else None
 
 
 @bp_dungeon.route('/api/dungeon/search', methods=['POST'])

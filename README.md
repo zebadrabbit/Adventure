@@ -239,6 +239,72 @@ Key automated tests (pytest) protect the generation contract:
 
 Future candidates: cycle length distribution, corridor branching factor bounds, entrance accessibility proofs.
 
+### Test Infrastructure (Selective DB Isolation & Factories)
+
+Recent test scalability and flakiness work introduced three important utilities:
+
+1. Selective SQLite DB isolation marker: only rebuilds the schema for tests that truly need a pristine database (heavy data mutation / migration cases).
+2. Lightweight object factories: fast creation of users, characters, dungeon instances, and ensuring items without repeating boilerplate.
+3. Deterministic websocket helpers: eliminate timing races in moderation/admin Socket.IO tests by snapshotting state or forcing actions synchronously.
+
+#### 1. `@pytest.mark.db_isolation`
+Placed on a test (or class) to request a fresh database setup before it runs. Non‑isolated tests reuse the shared test database which dramatically cuts suite runtime and avoids excess "database is locked" contention.
+
+Example:
+```python
+import pytest
+
+@pytest.mark.db_isolation
+def test_inventory_encumbrance(factory):
+	user = factory.user()
+	char = factory.character(user, str_val=10)
+	# ... perform heavy write operations safely ...
+```
+
+Implementation summary (in `conftest.py`):
+* Registered marker `db_isolation` (pytest will show it in `--markers`).
+* An autouse session fixture intercepts each test; when the marker is present it drops & recreates tables inside an application context.
+* WAL mode & a `busy_timeout` remain enabled globally to mitigate concurrent access blocking.
+
+Guidelines:
+* Use the marker only for tests that genuinely depend on a pristine schema or predictable autoincrement IDs.
+* Prefer shared DB for pure read tests or those that can tolerate existing rows (factory methods generate unique usernames / slugs).
+
+#### 2. Factories
+Exposed via a single `factory` fixture that returns a namespaced helper with methods:
+* `user(username=None, role='user', banned=False)`
+* `character(user=None, str_val=10, dex_val=10, **overrides)`
+* `instance(user=None, seed=12345)` – ensures a `DungeonInstance` row
+* `ensure_item(slug, **attrs)` – create or fetch an `Item`
+
+Behavior:
+* Commits after each object for simplicity; for very hot paths you can batch by creating inside a transaction block (future optimization if needed).
+* Auto‑generates unique usernames / slugs when not provided to avoid collisions in the shared DB mode.
+
+Usage pattern:
+```python
+def test_party_capacity(factory):
+	u = factory.user(role='user')
+	c1 = factory.character(u, str_val=14)
+	potion = factory.ensure_item('potion-healing', weight=0.5)
+	# ... mutate inventory JSON, assert encumbrance ...
+```
+
+#### 3. Deterministic Websocket Test Helpers
+Race‑prone admin moderation tests (e.g., kicking a user and then validating their absence) previously relied on asynchronous disconnect timing. To stabilize:
+* A private snapshot function (`_admin_status_snapshot`) surfaces the in‑memory lobby/admin presence map synchronously for assertions.
+* A test‑only Socket.IO event (`__test_force_kick`) triggers the same internal removal logic as a real admin kick but executes inline so the test can immediately assert disconnection without sleeps or polling.
+
+These helpers are guarded so they don't expand production capabilities; they are only invoked by tests importing the lobby module directly or emitting the reserved event name. If you add new realtime moderation flows, mirror this pattern to keep tests deterministic.
+
+#### When to Add Another Isolation Layer
+Before adding new global teardown/setup logic ask:
+1. Can a factory object with unique identifiers coexist instead?
+2. Is the flakiness due to timing? (Prefer a deterministic helper/event.)
+3. Does the test really require a clean autoincrement or empty table? (Mark with `db_isolation` if yes.)
+
+This layered approach keeps the majority of tests fast (shared DB) while still offering precise isolation where truly needed.
+
 ### Coverage
 Continuous Integration enforces a minimum line coverage threshold of **80%** (raised from 60% after broadening test focus to admin shell, websocket edge cases, and moderation features). The suite currently meets or exceeds this mark with critical generation logic and XP progression at or near 100%. New contributions must not drop overall coverage below 80%; add focused tests for any new dungeon pipeline branch, seed handling logic, websocket behavior, or admin moderation path.
 
@@ -703,3 +769,47 @@ python scripts/bump_version.py <patch|minor|major>
 git add VERSION docs/CHANGELOG.md && git commit -m "release: v$(cat VERSION)" && git push
 git tag -a v$(cat VERSION) -m "Adventure v$(cat VERSION)" && git push --tags
 ```
+
+## Inventory Stacking & Encumbrance
+
+Inventories use a stacked JSON representation:
+
+```
+[ {"slug": "potion-healing", "qty": 3}, {"slug": "short-sword", "qty": 1} ]
+```
+
+Legacy inventories stored as a flat slug list are migrated lazily on first load.
+
+Each `Item` has a `weight` (default 1.0). Total carried weight = sum(weight * qty).
+
+Encumbrance configuration lives in the `game_config` table (key = `encumbrance`) and defaults to:
+```
+{
+	"base_capacity": 10,
+	"per_str": 5,
+	"warn_pct": 1.0,
+	"hard_cap_pct": 1.10,
+	"dex_penalty": 2
+}
+```
+
+Capacity = `base_capacity + STR * per_str`.
+
+States:
+* normal: weight <= capacity
+* encumbered: capacity < weight <= capacity * hard_cap_pct (DEX reduced by `dex_penalty` for computed stats)
+* blocked: weight > capacity * hard_cap_pct (new loot claims rejected and endpoint returns HTTP 400 with `error: encumbered`)
+
+Loot claim responses now include post-claim encumbrance snapshot:
+```
+{
+	"claimed": true,
+	"item": {"slug": "lockpicks", "name": "Lockpicks"},
+	"character_id": 5,
+	"encumbrance": {"weight": 27.0, "capacity": 25, "status": "encumbered", "dex_penalty": 2, "hard_cap_pct": 1.1}
+}
+```
+
+Character state endpoint (`/api/characters/state`) returns stacked bag entries with `qty` and per-character `encumbrance` object. A DEX penalty is applied to base stats prior to gear-derived adjustments when status is `encumbered` or `blocked`.
+
+Tuning: update the JSON in `game_config` (key `encumbrance`) and restart (or hot-reload) the server. Future admin UI will expose these sliders.

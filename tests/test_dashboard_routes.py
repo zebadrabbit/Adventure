@@ -1,18 +1,41 @@
 import json
 from app import db
 from app.models.models import User, Character
+from app.models.dungeon_instance import DungeonInstance
 from werkzeug.security import generate_password_hash
 import pytest
 
 @pytest.fixture()
 def client_authed(client, test_app):
+    """Authenticated client for dashboard tests.
+
+    Deterministic and robust across DB resets: ensures tables exist, creates/resets
+    the user and a DungeonInstance, logs in with redirects, and injects
+    dungeon_instance_id into the session.
+    """
     with test_app.app_context():
+        try:
+            db.create_all()
+        except Exception:
+            pass
         user = User.query.filter_by(username='dashuser').first()
         if not user:
             user = User(username='dashuser', password=generate_password_hash('pw123456'))
             db.session.add(user)
             db.session.commit()
-    client.post('/login', data={'username': 'dashuser', 'password': 'pw123456'})
+        else:
+            # Reset password to known value in case prior tests changed it
+            user.password = generate_password_hash('pw123456')
+            db.session.commit()
+        inst = DungeonInstance.query.filter_by(user_id=user.id).first()
+        if not inst:
+            inst = DungeonInstance(user_id=user.id, seed=12345, pos_x=0, pos_y=0, pos_z=0)
+            db.session.add(inst)
+            db.session.commit()
+        inst_id = inst.id
+    client.post('/login', data={'username': 'dashuser', 'password': 'pw123456'}, follow_redirects=True)
+    with client.session_transaction() as sess:
+        sess['dungeon_instance_id'] = inst_id
     return client
 
 

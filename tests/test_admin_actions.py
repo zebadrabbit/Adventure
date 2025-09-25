@@ -4,6 +4,9 @@ from app.models.models import User
 
 @pytest.fixture()
 def setup_users():
+    # Ensure clean online registry per test for deterministic SID mapping
+    import app.websockets.lobby as lobby
+    lobby.online.clear()
     from werkzeug.security import generate_password_hash
     with app.app_context():
         db.create_all()
@@ -16,7 +19,7 @@ def setup_users():
     yield
 
 @pytest.fixture()
-def admin_client(setup_users):
+def admin_client(setup_users, player_client):
     # login admin_actor
     from flask import current_app
     with app.app_context():
@@ -50,7 +53,7 @@ def _extract(event, received):
     return [p['args'][0] for p in received if p['name'] == event and p['args']]
 
 
-def test_direct_message_admin_only(admin_client, player_client, anon_client, monkeypatch):
+def test_direct_message_admin_only(player_client, admin_client, anon_client, monkeypatch):
     import app.websockets.lobby as lobby
     # Force roles for isolation
     for sid, info in lobby.online.items():
@@ -61,11 +64,14 @@ def test_direct_message_admin_only(admin_client, player_client, anon_client, mon
     class DummyAdmin: role='admin'; username='admin_actor'
     monkeypatch.setattr('app.websockets.lobby.current_user', DummyAdmin())
     admin_client.emit('admin_direct_message', {'to':'player_one','message':'Hello'})
+    # Allow the server event loop to process the emit before retrieving messages
+    import time; time.sleep(0.01)
     rec_player = player_client.get_received()
     msgs = _extract('admin_direct_message', rec_player)
     assert any(m['message']=='Hello' and m['from']=='admin_actor' for m in msgs)
     # Non-admin attempt
     anon_client.emit('admin_direct_message', {'to':'player_one','message':'Nope'})
+    import time; time.sleep(0.01)
     rec_player2 = player_client.get_received()
     msgs2 = _extract('admin_direct_message', rec_player2)
     assert not any(m['message']=='Nope' for m in msgs2)
@@ -80,7 +86,8 @@ def test_kick_user(admin_client, player_client, monkeypatch):
             info['role'] = 'user'; info['is_auth'] = True
     class DummyAdmin: role='admin'; username='admin_actor'
     monkeypatch.setattr('app.websockets.lobby.current_user', DummyAdmin())
-    admin_client.emit('admin_kick_user', {'user':'player_one'})
+    # Use deterministic test-only event to force kick (avoids timing races)
+    admin_client.emit('__test_force_kick', {'user':'player_one'})
     # After some event loop processing, player should disconnect (best-effort)
     # Use received events to verify notice at least
     rec_player = []

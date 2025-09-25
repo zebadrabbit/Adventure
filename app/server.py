@@ -43,6 +43,7 @@ def start_server(host='0.0.0.0', port=5000, debug: bool = False):  # pragma: no 
         _run_migrations()  # ensure new columns after seeds
         _load_sql_item_seeds()
         _run_migrations()  # ensure after bulk load
+        _seed_game_config()
         _configure_logging()
     try:
         print(f"[INFO] Starting Socket.IO server on {host}:{port} (async_mode={socketio.async_mode})")
@@ -91,11 +92,23 @@ def start_admin_shell():  # pragma: no cover (interactive)
         _run_migrations()
         seed_items()
         _load_sql_item_seeds()
+        _seed_game_config()
         _configure_logging()
     admin_shell()
 
 def seed_items():
     """Seed initial catalog items if they don't already exist."""
+    # Defensive: ensure new columns (like weight) exist before querying
+    try:
+        from sqlalchemy import inspect, text
+        insp = inspect(db.engine)
+        cols = {c['name'] for c in insp.get_columns('item')}
+        if 'weight' not in cols:
+            db.session.execute(text("ALTER TABLE item ADD COLUMN weight FLOAT NOT NULL DEFAULT 1.0"))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+        pass
     existing = {i.slug: i for i in Item.query.all()}
     seeds = [
         dict(slug='short-sword', name='Short Sword', type='weapon', description='A simple steel short sword.', value_copper=500, level=1, rarity='common'),
@@ -225,6 +238,37 @@ def _infer_levels_and_rarity():
             it.rarity = rar
             updated += 1
     if updated:
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+
+def _seed_game_config():
+    """Insert default gameplay configuration rows if they do not exist yet.
+
+    This provides DB-backed tunable values for encumbrance, capacity, and other
+    systems that were previously hard-coded. Safe to call multiple times.
+    """
+    from app.models.models import GameConfig
+    import json as _json
+    existing = {row.key: row for row in GameConfig.query.all()}
+    defaults = {
+        'encumbrance': {
+            'base_capacity': 10,      # Base carry capacity before STR scaling
+            'per_str': 5,             # Additional capacity per point of STR
+            'warn_pct': 1.0,          # At or below this = normal
+            'hard_cap_pct': 1.10,     # Above this percentage of capacity: reject new items
+            'dex_penalty': 2          # DEX penalty applied when between warn_pct and hard_cap_pct
+        }
+    }
+    created = 0
+    for k, v in defaults.items():
+        if k not in existing:
+            row = GameConfig(key=k, value=_json.dumps(v))
+            db.session.add(row)
+            created += 1
+    if created:
         try:
             db.session.commit()
         except Exception:
@@ -585,6 +629,19 @@ def _run_migrations():
                     db.session.commit()
                 except Exception:
                     db.session.rollback()
+            if 'weight' not in item_cols:
+                try:
+                    db.session.execute(text("ALTER TABLE item ADD COLUMN weight FLOAT NOT NULL DEFAULT 1.0"))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+        # Add GameConfig table if missing
+        if 'game_config' not in tables:
+            try:
+                db.session.execute(text('CREATE TABLE game_config (id INTEGER PRIMARY KEY, key VARCHAR(80) UNIQUE NOT NULL, value TEXT NOT NULL)'))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
         # Schema version table creation already handled above
         inspector = inspect(db.engine)
         tables = inspector.get_table_names()
