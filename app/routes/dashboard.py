@@ -270,18 +270,34 @@ def dashboard():
         logout_user()
         return redirect(url_for("auth.login"))
     characters = Character.query.filter_by(user_id=uid).all()
+    # Provide a resilient classification map that tolerates legacy / partial stat dicts.
+    # Missing keys are treated as 0 via .get(). This prevents KeyError after server restarts
+    # when a user directly refreshes /dashboard with characters created under older schemas
+    # or manually modified rows.
     class_map = {
-        "fighter": lambda s: s["str"] >= s["dex"] and s["str"] >= s["int"] and s["str"] >= s["wis"],
-        "mage": lambda s: s["int"] >= s["str"] and s["int"] >= s["dex"] and s["int"] >= s["wis"],
-        "druid": lambda s: s["wis"] >= s["str"] and s["wis"] >= s["dex"] and s["wis"] >= s["int"],
-        "ranger": lambda s: s["dex"] >= s["str"] and s["wis"] >= s["int"],
-        "rogue": lambda s: s["dex"] >= s["str"] and s["dex"] >= s["int"] and s["dex"] >= s["wis"],
+        "fighter": lambda s: s.get("str", 0) >= s.get("dex", 0)
+        and s.get("str", 0) >= s.get("int", 0)
+        and s.get("str", 0) >= s.get("wis", 0),
+        "mage": lambda s: s.get("int", 0) >= s.get("str", 0)
+        and s.get("int", 0) >= s.get("dex", 0)
+        and s.get("int", 0) >= s.get("wis", 0),
+        "druid": lambda s: s.get("wis", 0) >= s.get("str", 0)
+        and s.get("wis", 0) >= s.get("dex", 0)
+        and s.get("wis", 0) >= s.get("int", 0),
+        "ranger": lambda s: s.get("dex", 0) >= s.get("str", 0) and s.get("wis", 0) >= s.get("int", 0),
+        "rogue": lambda s: s.get("dex", 0) >= s.get("str", 0)
+        and s.get("dex", 0) >= s.get("int", 0)
+        and s.get("dex", 0) >= s.get("wis", 0),
         "cleric": lambda s: True,
     }
     char_list = []
     _backfilled = False
     for c in characters:
         stats = json.loads(c.stats)
+        # Normalize missing primary stats to 0 to avoid KeyError during classification.
+        # This does not mutate DB unless we backfill class below; it's purely defensive.
+        for _k in ("str", "dex", "int", "wis", "con", "cha", "hp", "mana"):
+            stats.setdefault(_k, 0)
         stats_class = stats.pop("class", None)
         coins = {
             "gold": stats.pop("gold", 0),
