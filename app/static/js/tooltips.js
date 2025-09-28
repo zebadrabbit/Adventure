@@ -59,7 +59,10 @@
     const html = itemHtml(it);
     // Store original HTML in a custom attribute (base64) to avoid quoting/escaping issues inside data attributes.
     const b64 = btoa(unescape(encodeURIComponent(html)));
-    return `data-mud-tooltip="1" data-mud-tip="${b64}"`;
+    // Provide a plain text fallback (short) for environments where Bootstrap JS failed but our fallback
+    // hasn't yet decoded rich HTML; also helps screen readers immediately.
+    const plain = it && it.name ? `${it.name}` : 'Item';
+    return `data-mud-tooltip="1" data-mud-tip="${b64}" data-bs-title="${plain.replace(/"/g,'&quot;')}" aria-label="${plain.replace(/"/g,'&quot;')}"`;
   }
   // Live region for screen reader announcement
   let liveRegion = null;
@@ -244,7 +247,17 @@
     document.body.appendChild(tooltipEl);
     function showFallback(el){
       if (getMode()==='off') return;
-      const html = el.getAttribute('data-bs-title');
+      // Prefer decoded rich tooltip HTML if available
+      let html = '';
+      try {
+        const raw = el.getAttribute('data-mud-tip');
+        if (raw) html = decodeURIComponent(escape(atob(raw)));
+      } catch(e){ html = ''; }
+      if (!html) {
+        html = el.getAttribute('data-bs-title') || '';
+        // Escape minimal if we are using plain text
+        html = html.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+      }
       if (!html) return; tooltipEl.innerHTML = html; tooltipEl.style.display='block';
       const r = el.getBoundingClientRect();
       const pad = 6;
