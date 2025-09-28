@@ -31,14 +31,14 @@ sqlite3 instance/mud.db < sql/monsters_seed.sql
 (Adjust path if using a different DB URI.)
 
 ## Future Enhancements
-- Add rarity tiers (common/uncommon/rare/epic/legendary) via new column.
+The following ideas extend the now-implemented monster + loot systems:
 - Introduce `stat_mods` JSON column for storing per-item bonuses.
 - Normalize accessories into their own table if complexity grows.
-- Add spawn weight tables to tune dungeon / shop distribution probabilities.
+- Add spawn weight override tables (region/biome specific) referencing `monster_catalog.slug`.
 - Add localization keys for names & descriptions.
-- Link monsters to region/biome spawn tables referencing `monster_catalog.slug`.
-- Add `resistances` and `damage_types` JSON columns to monster schema.
-- Introduce procedural affixes that modify base monster rows at runtime.
+- Procedural affixes that modify monster instances at runtime (prefix/suffix system) producing variant slugs.
+- Elite pack generation & multi-monster formations.
+- XP & drop analytics for balancing.
 
 ## Testing Hooks
 For deterministic test fixtures you can load only a minimal subset (e.g., level 1 and level 10 rows) or create a dedicated `items_test.sql` containing a smaller pool.
@@ -68,3 +68,11 @@ sqlite3 instance/mud.db < sql/monsters_seed.sql
 ```
 
 Re-importing will replace prior rows because the file issues a DELETE on the table first.
+
+## Implemented Monster & Loot Integration (Summary)
+- Runtime encounter spawning hooked into `/api/dungeon/move` with weighted rarity selection and midpoint bias.
+- Monster scaling: HP +15%, Damage +10%, XP +20% per additional party member beyond one.
+- Caching: eligible monster query results are cached in-memory for 30s to reduce DB load.
+- Loot tables: `loot_table` column accepts CSV / JSON list / JSON object (weights); `special_drop_slug` grants a 25% drop chance unless suffixed with `!guaranteed` in the table.
+- Resistance support: optional `resistances` (JSON mapping) and `damage_types` columns added by migration helper; helper `apply_resistances` in `app/services/combat_utils.py` ready for combat integration.
+- Admin endpoints: `/api/admin/monsters` (filtered catalog listing) and `/api/admin/force_spawn` (scaled encounter + loot preview) facilitate balancing.

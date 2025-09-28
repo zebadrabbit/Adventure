@@ -10,8 +10,10 @@ layer on top of these primitives.
 from __future__ import annotations
 
 import random
-from typing import List, Optional
-from app.models import MonsterCatalog
+import time
+from typing import Dict, List, Optional, Tuple
+
+from app.models import MonsterCatalog, GameConfig
 
 RARITY_WEIGHTS = {
     "common": 1.0,
@@ -21,12 +23,67 @@ RARITY_WEIGHTS = {
     "boss": 0.02,
 }
 
+# -------------------------------------------------------------------------------------------------
+# Lightweight in-process cache for eligible monster lists to avoid repetitive DB queries.
+# Keyed by (level, include_boss). We intentionally DO NOT include party size because the
+# eligibility filtering ignores party size; scaling happens after selection. Cache keeps the raw
+# MonsterCatalog ORM objects (safe for read-only usage within request scope). A short TTL keeps
+# data fresh if seeds / dynamic injections happen later.
+# -------------------------------------------------------------------------------------------------
+_ELIGIBLE_CACHE: Dict[Tuple[int, bool], tuple[float, List[MonsterCatalog]]] = {}
+_ELIGIBLE_TTL_SECONDS = 30.0
+
+
+def clear_cache():  # pragma: no cover - utility for tests / admin
+    _ELIGIBLE_CACHE.clear()
+
+
+def _load_rarity_weights() -> dict:
+    """Load rarity weights from GameConfig key 'rarity_weights' if present.
+
+    Stored format: JSON object {"common":1.0, ...}. Missing keys fallback to defaults.
+    """
+    try:
+        raw = GameConfig.get("rarity_weights")
+        if not raw:
+            return dict(RARITY_WEIGHTS)
+        import json
+
+        data = json.loads(raw)
+        if not isinstance(data, dict):
+            return dict(RARITY_WEIGHTS)
+        merged = dict(RARITY_WEIGHTS)
+        for k, v in data.items():
+            try:
+                fv = float(v)
+                if fv > 0:
+                    merged[k] = fv
+            except Exception:
+                continue
+        return merged
+    except Exception:
+        return dict(RARITY_WEIGHTS)
+
 
 def _eligible_monsters(level: int, include_boss: bool = False) -> List[MonsterCatalog]:
+    now = time.time()
+    key = (level, include_boss)
+    cached = _ELIGIBLE_CACHE.get(key)
+    if cached:
+        ts, rows = cached
+        if (now - ts) <= _ELIGIBLE_TTL_SECONDS:
+            return rows
     q = MonsterCatalog.query
     rows = q.filter(MonsterCatalog.level_min <= level, MonsterCatalog.level_max >= level).all()
     if not include_boss:
         rows = [r for r in rows if not r.boss]
+    _ELIGIBLE_CACHE[key] = (now, rows)
+    # Simple cap (avoid unbounded growth if level range large)
+    if len(_ELIGIBLE_CACHE) > 128:
+        # Drop oldest by timestamp
+        oldest_key = min(_ELIGIBLE_CACHE.items(), key=lambda kv: kv[1][0])[0]
+        if oldest_key != key:
+            _ELIGIBLE_CACHE.pop(oldest_key, None)
     return rows
 
 
@@ -44,9 +101,10 @@ def choose_monster(level: int, party_size: int = 1, include_boss: bool = False, 
     pool = _eligible_monsters(level, include_boss=include_boss)
     if not pool:
         raise ValueError(f"No monsters available for level {level}")
+    rarity_weights = _load_rarity_weights()
     weights = []
     for m in pool:
-        w = RARITY_WEIGHTS.get(m.rarity, 0.1)
+        w = rarity_weights.get(m.rarity, 0.1)
         # Slight bonus weight if monster's level band tightly matches the requested level midpoint
         midpoint = (m.level_min + m.level_max) / 2.0
         dist = abs(midpoint - level)

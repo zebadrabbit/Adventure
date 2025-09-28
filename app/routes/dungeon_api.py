@@ -26,8 +26,10 @@ from app.loot.generator import LootConfig, generate_loot_for_seed  # added
 from app.models.dungeon_instance import DungeonInstance
 from app.models.loot import DungeonLoot
 from app.models.models import Character, Item
-from app.utils.tile_compress import compress_tiles, decompress_tiles
+from app.services import spawn_service  # monster spawning
+from app.services.loot_service import roll_loot
 from app.services.time_service import advance_for  # standardized time advancement
+from app.utils.tile_compress import compress_tiles, decompress_tiles
 
 
 def admin_required(fn):
@@ -334,6 +336,77 @@ def dungeon_move():
         desc = (desc + "\n" + extra_msg).strip()
     pos = [x, y, z]
     resp = {"pos": pos, "desc": desc, "exits": exits_map, "noticed_loot": noticed}
+    # ------------------------------------------------------------------
+    # Encounter spawning (simple first pass):
+    #   * Only attempt if a movement occurred.
+    #   * Base chance 18% per move; +4% if player recently found nothing (placeholder for future pacing system).
+    #   * Determine party size (characters owned by current_user) and average level for scaling.
+    #   * Attach monster instance under 'encounter' key if roll succeeds.
+    # Future: integrate zone difficulty, spawn cooldowns, boss gating, multi-monster packs.
+    # ------------------------------------------------------------------
+    if moved:
+        try:
+            import random as _r
+
+            # Basic pacing: read recent flag from session (tracks last 5 moves without encounter)
+            pace_key = "_encounter_cooldown"
+            miss_streak = session.get(pace_key, 0)
+            # Load base chance from config if present (GameConfig key 'encounter_spawn': {"base":0.18,"streak_bonus_max":0.04})
+            from app.models import GameConfig as _GC
+            import json as _json_cfg
+
+            cfg_raw = _GC.get("encounter_spawn")
+            base_cfg = {"base": 0.18, "streak_bonus_max": 0.04, "streak_unit": 2}
+            if cfg_raw:
+                try:
+                    parsed = _json_cfg.loads(cfg_raw)
+                    if isinstance(parsed, dict):
+                        base_cfg.update(
+                            {k: parsed[k] for k in ["base", "streak_bonus_max", "streak_unit"] if k in parsed}
+                        )
+                except Exception:
+                    pass
+            base_chance = base_cfg["base"] + min(
+                base_cfg["streak_bonus_max"], 0.01 * miss_streak * base_cfg.get("streak_unit", 2)
+            )
+            if _r.random() < base_chance:
+                # Determine party size & avg level
+                party_chars = []
+                try:
+                    party_chars = (
+                        Character.query.filter_by(user_id=current_user.id).all()  # type: ignore
+                        if current_user.is_authenticated
+                        else []
+                    )
+                except Exception:
+                    party_chars = []
+                party_size = max(1, len(party_chars) or 1)
+                avg_level = 1
+                if party_chars:
+                    avg_level = max(1, sum(c.level for c in party_chars) // len(party_chars))
+                monster = spawn_service.choose_monster(level=avg_level, party_size=party_size)
+                # Persist combat session
+                try:
+                    import json as _json
+                    from app.models.models import CombatSession
+                    from app import db as _db
+
+                    session_row = CombatSession(
+                        user_id=current_user.id,
+                        monster_json=_json.dumps(monster),
+                        status="active",
+                    )
+                    _db.session.add(session_row)
+                    _db.session.commit()
+                    resp["encounter"] = {"monster": monster, "combat_id": session_row.id}
+                except Exception:
+                    resp["encounter"] = {"monster": monster}
+                session[pace_key] = 0
+            else:
+                session[pace_key] = miss_streak + 1
+        except Exception:
+            # Silently ignore spawn failures so movement isn't blocked.
+            pass
     if roll_info:
         resp["last_roll"] = roll_info
     # Advance time 1 tick only if an actual movement occurred
@@ -343,6 +416,100 @@ def dungeon_move():
         except Exception:
             pass
     return jsonify(resp)
+
+
+# --------------------------- Admin Monster Endpoints ---------------------------
+
+
+@bp_dungeon.route("/api/admin/monsters")
+@login_required
+@admin_required
+def admin_list_monsters():
+    """List monsters filtered optionally by level or family.
+
+    Query params: level (int), family (str), boss (bool)
+    Returns array of slim catalog rows (no scaling) for inspection.
+    """
+    try:
+        level = request.args.get("level", type=int)
+        family = request.args.get("family", type=str)
+        boss_flag = request.args.get("boss")
+        from app.models import MonsterCatalog
+
+        q = MonsterCatalog.query
+        if level is not None:
+            q = q.filter(MonsterCatalog.level_min <= level, MonsterCatalog.level_max >= level)
+        if family:
+            q = q.filter(MonsterCatalog.family == family)
+        if boss_flag is not None:
+            val = boss_flag.lower() in ("1", "true", "t", "yes")
+            q = q.filter(MonsterCatalog.boss == val)
+        rows = q.limit(200).all()
+        out = []
+        for r in rows:
+            out.append(
+                {
+                    "slug": r.slug,
+                    "name": r.name,
+                    "level_min": r.level_min,
+                    "level_max": r.level_max,
+                    "rarity": r.rarity,
+                    "family": r.family,
+                    "boss": bool(r.boss),
+                }
+            )
+        return jsonify({"monsters": out, "count": len(out)})
+    except Exception as e:  # pragma: no cover - defensive
+        return jsonify({"error": str(e)}), 500
+
+
+@bp_dungeon.route("/api/admin/force_spawn", methods=["POST"])
+@login_required
+@admin_required
+def admin_force_spawn():
+    """Force-generate an encounter for testing.
+
+    Body (JSON): {"slug": optional specific monster slug, "level": optional int, "party_size": optional int}
+    If slug is provided, it is looked up directly and scaled; otherwise uses choose_monster.
+    Returns encounter with optional loot preview.
+    """
+    data = request.get_json(silent=True) or {}
+    slug = data.get("slug")
+    level = int(data.get("level") or 1)
+    party_size = int(data.get("party_size") or 1)
+    try:
+        if slug:
+            from app.models import MonsterCatalog
+
+            row = MonsterCatalog.query.filter_by(slug=slug).first()
+            if not row:
+                return jsonify({"error": "slug not found"}), 404
+            monster = row.scaled_instance(level=level, party_size=party_size)
+        else:
+            monster = spawn_service.choose_monster(level=level, party_size=party_size)
+        loot_preview = roll_loot(monster)
+        return jsonify({"encounter": {"monster": monster, "preview_loot": loot_preview}})
+    except Exception as e:  # pragma: no cover - defensive
+        return jsonify({"error": str(e)}), 500
+
+
+@bp_dungeon.route("/api/dungeon/combat/<int:combat_id>")
+@login_required
+def get_combat_session(combat_id: int):
+    """Fetch a combat session by id (only if owned by current user).
+
+    Response: { id, status, monster, archived }
+    404 if not found / not owned.
+    """
+    try:
+        from app.models.models import CombatSession
+
+        row = CombatSession.query.filter_by(id=combat_id, user_id=current_user.id).first()
+        if not row:
+            return jsonify({"error": "not found"}), 404
+        return jsonify(row.to_dict())
+    except Exception:
+        return jsonify({"error": "lookup failed"}), 500
 
 
 @bp_dungeon.route("/api/dungeon/state")

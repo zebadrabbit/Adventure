@@ -25,9 +25,9 @@ from flask import (
 from flask_login import current_user, login_required
 
 from app import db
+from app.models import GameClock
 from app.models.models import Character, User
 from app.models.xp import xp_for_level
-from app.models import GameClock
 
 bp_dashboard = Blueprint("dashboard", __name__)
 

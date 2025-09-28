@@ -695,6 +695,29 @@ def _run_migrations():
         except Exception:
             db.session.rollback()
             pass
+    # CombatSession table (lightweight) - create if missing
+    try:
+        if not inspector.has_table("combat_session"):
+            db.session.execute(
+                text(
+                    """
+                    CREATE TABLE combat_session (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        user_id INTEGER NOT NULL REFERENCES user(id),
+                        monster_json TEXT NOT NULL,
+                        status TEXT NOT NULL DEFAULT 'active',
+                        outcome_json TEXT,
+                        archived BOOLEAN NOT NULL DEFAULT 0
+                    );
+                    CREATE INDEX IF NOT EXISTS ix_combat_session_user_id ON combat_session(user_id);
+                    CREATE INDEX IF NOT EXISTS ix_combat_session_archived ON combat_session(archived);
+                    """
+                )
+            )
+    except Exception:
+        pass
     # Add 'xp' and 'level' columns to character if missing
     # Character table may not exist yet in some minimal test DBs; guard access
     inspector = inspect(db.engine)

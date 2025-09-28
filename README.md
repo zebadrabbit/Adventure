@@ -511,6 +511,10 @@ The interactive admin shell now includes user moderation helpers in addition to 
 | `unban <username>` | Lift a ban |
 | `list banned` | Show all banned users |
 | `show user <username>` | Detailed user info (role, email, ban state, notes) |
+---
+
+## Monster Catalog & Encounters (New)
+
 | `set email <username> <email|none>` | Set or clear email |
 | `note user <username> <text>` | Append a timestamped moderation note |
 
@@ -603,7 +607,6 @@ Migration:
 - Column added automatically on startup via lightweight `_run_migrations()`.
 - Manual script available: `python scripts/upgrade_explored_tiles.py` (idempotent).
 
-Fallback safety:
 - If persistence temporarily unavailable, API returns HTTP 202 with a warning instead of failing gameplay.
 
 ### Rate Limiting & Payload Guards

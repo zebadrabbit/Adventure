@@ -2,6 +2,13 @@ import json
 
 
 def test_movement_advances_ticks(auth_client):
+    # Ensure migrations (combat column etc.) before interacting
+    try:
+        from app.server import _run_migrations
+
+        _run_migrations()
+    except Exception:
+        pass
     # Hit dashboard to ensure GameClock row exists
     auth_client.get("/dashboard")
     # Access /dashboard to ensure GameClock row exists
@@ -21,9 +28,16 @@ def test_movement_advances_ticks(auth_client):
             # We can't easily tell if movement succeeded; rely on difference
             if end_tick != start_tick:
                 assert end_tick - start_tick == 1
+    # No migration call needed here (already applied)
 
 
 def test_search_advances_by_config(auth_client):
+    try:
+        from app.server import _run_migrations
+
+        _run_migrations()
+    except Exception:
+        pass
     from app.models import GameClock, GameConfig
 
     # Override search cost to 3
@@ -39,8 +53,14 @@ def test_search_advances_by_config(auth_client):
 
 
 def test_combat_gating_blocks_ticks(auth_client):
+    try:
+        from app.server import _run_migrations
+
+        _run_migrations()
+    except Exception:
+        pass
     from app.models import GameClock
-    from app.services.time_service import set_combat_state, advance_for
+    from app.services.time_service import advance_for, set_combat_state
 
     clock = GameClock.get()
     base = clock.tick
@@ -55,6 +75,12 @@ def test_combat_gating_blocks_ticks(auth_client):
 
 
 def test_socket_event_emission(auth_client, monkeypatch):
+    try:
+        from app.server import _run_migrations
+
+        _run_migrations()
+    except Exception:
+        pass
     from app.services import time_service
 
     captured = {}
@@ -65,8 +91,8 @@ def test_socket_event_emission(auth_client, monkeypatch):
         captured["namespace"] = namespace
 
     monkeypatch.setattr(time_service.socketio, "emit", fake_emit)
-    from app.services.time_service import advance_for
     from app.models import GameClock
+    from app.services.time_service import advance_for
 
     start = GameClock.get().tick
     advance_for("move")

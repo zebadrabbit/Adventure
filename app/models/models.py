@@ -312,3 +312,42 @@ class MonsterCatalog(db.Model):
             "xp": int(round(self.xp_base * mult_xp)),
             "boss": bool(self.boss),
         }
+
+
+class CombatSession(db.Model):
+    """Represents an active or recently completed combat encounter.
+
+    Stores the monster instance JSON plus basic state flags for future turn order
+    expansion. For now a session is created at encounter spawn and can be fetched
+    by id. When combat resolution lands, we'll update outcome, rewards, etc.
+    """
+
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.now())
+    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.func.now(), onupdate=db.func.now())
+    # Owning user (simplified single-player encounter for now; later can be party table)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    # JSON serialized monster instance (stats at time of spawn)
+    monster_json = db.Column(db.Text, nullable=False)
+    # Combat lifecycle
+    status = db.Column(db.String(20), nullable=False, default="active")  # active|won|lost|fled|expired
+    # Future: turn pointer, initiative order, log buffer, etc.
+    outcome_json = db.Column(db.Text, nullable=True)
+    # Soft delete / archival marker
+    archived = db.Column(db.Boolean, nullable=False, default=False, index=True)
+
+    def monster(self):  # pragma: no cover - thin helper
+        import json
+
+        try:
+            return json.loads(self.monster_json)
+        except Exception:
+            return {}
+
+    def to_dict(self):  # pragma: no cover
+        return {
+            "id": self.id,
+            "status": self.status,
+            "monster": self.monster(),
+            "archived": bool(self.archived),
+        }

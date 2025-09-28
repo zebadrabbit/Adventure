@@ -7,7 +7,7 @@ via an in_combat() predicate.
 
 from __future__ import annotations
 
-from typing import Optional, Dict
+from typing import Dict, Optional
 
 from app import db, socketio
 from app.models import GameClock, GameConfig
