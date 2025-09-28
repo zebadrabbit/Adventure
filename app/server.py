@@ -796,6 +796,54 @@ def _run_migrations():
                     {"v": target},
                 )
                 db.session.commit()
+        # Monster catalog table (created by raw SQL seeding; ensure exists & backfill columns if added in code first)
+        inspector = inspect(db.engine)
+        tables = inspector.get_table_names()
+        if "monster_catalog" in tables:
+            mcols = {c["name"] for c in inspector.get_columns("monster_catalog")}
+            # Backfill optional JSON-ish columns
+            for col, ddl in (
+                ("resistances", "ALTER TABLE monster_catalog ADD COLUMN resistances TEXT"),
+                ("damage_types", "ALTER TABLE monster_catalog ADD COLUMN damage_types TEXT"),
+            ):
+                if col not in mcols:
+                    try:
+                        db.session.execute(text(ddl))
+                        db.session.commit()
+                    except Exception:
+                        db.session.rollback()
+        else:
+            # If seed not yet loaded, create minimal table so ORM queries don't explode (subset of original schema)
+            try:
+                db.session.execute(
+                    text(
+                        """
+CREATE TABLE monster_catalog (
+    id INTEGER PRIMARY KEY,
+    slug TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    level_min INTEGER NOT NULL DEFAULT 1,
+    level_max INTEGER NOT NULL DEFAULT 1,
+    base_hp INTEGER NOT NULL,
+    base_damage INTEGER NOT NULL,
+    armor INTEGER NOT NULL DEFAULT 0,
+    speed INTEGER NOT NULL DEFAULT 10,
+    rarity TEXT NOT NULL DEFAULT 'common',
+    family TEXT NOT NULL,
+    traits TEXT,
+    loot_table TEXT,
+    special_drop_slug TEXT,
+    xp_base INTEGER NOT NULL DEFAULT 0,
+    boss INTEGER NOT NULL DEFAULT 0,
+    resistances TEXT,
+    damage_types TEXT
+)
+"""
+                    )
+                )
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
     except Exception:
         db.session.rollback()
         pass

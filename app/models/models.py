@@ -208,3 +208,107 @@ class GameClock(db.Model):
             except Exception:  # pragma: no cover
                 _db.session.rollback()
         return inst
+
+
+class MonsterCatalog(db.Model):
+    """Catalog of monsters (seeded via sql/monsters_seed.sql).
+
+    Columns mirror the raw SQL schema; JSON-like textual columns (traits, loot_table,
+    special_drop_slug) are stored as plain text for now. Future migrations may normalize.
+    New optional JSON columns: resistances, damage_types (added by migration helper if missing).
+    """
+
+    __tablename__ = "monster_catalog"
+
+    id = db.Column(db.Integer, primary_key=True)
+    slug = db.Column(db.String(120), unique=True, nullable=False, index=True)
+    name = db.Column(db.String(160), nullable=False)
+    level_min = db.Column(db.Integer, nullable=False, default=1)
+    level_max = db.Column(db.Integer, nullable=False, default=1)
+    base_hp = db.Column(db.Integer, nullable=False)
+    base_damage = db.Column(db.Integer, nullable=False)
+    armor = db.Column(db.Integer, nullable=False, default=0)
+    speed = db.Column(db.Integer, nullable=False, default=10)
+    rarity = db.Column(db.String(20), nullable=False, default="common")
+    family = db.Column(db.String(40), nullable=False)
+    traits = db.Column(db.Text, nullable=True)
+    loot_table = db.Column(db.Text, nullable=True)
+    special_drop_slug = db.Column(db.Text, nullable=True)
+    xp_base = db.Column(db.Integer, nullable=False, default=0)
+    boss = db.Column(db.Boolean, nullable=False, default=False)
+    # Optional columns added later
+    resistances = db.Column(db.Text, nullable=True)  # JSON mapping damage_type->multiplier
+    damage_types = db.Column(db.Text, nullable=True)  # JSON array or CSV of outgoing damage types
+
+    # ---- Convenience helpers ----
+    def traits_list(self):  # pragma: no cover - trivial
+        raw = self.traits or ""
+        if not raw:
+            return []
+        # Accept either CSV or JSON list
+        if raw.strip().startswith("["):
+            try:
+                import json
+
+                data = json.loads(raw)
+                return [str(x) for x in data] if isinstance(data, list) else []
+            except Exception:
+                return []
+        return [p.strip() for p in raw.split(",") if p.strip()]
+
+    def resist_map(self):  # pragma: no cover - trivial
+        if not self.resistances:
+            return {}
+        import json
+
+        try:
+            data = json.loads(self.resistances)
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            return {}
+
+    def damage_type_list(self):  # pragma: no cover - trivial
+        if not self.damage_types:
+            return []
+        raw = self.damage_types.strip()
+        import json
+
+        if raw.startswith("["):
+            try:
+                data = json.loads(raw)
+                return [str(x) for x in data] if isinstance(data, list) else []
+            except Exception:
+                return []
+        return [p.strip() for p in raw.split(",") if p.strip()]
+
+    def scaled_instance(self, level: int, party_size: int = 1):
+        """Return a dict representing a scaled monster instance for runtime use.
+
+        Scaling rules (simple first pass):
+          * Clamp requested level within [level_min, level_max].
+          * HP scaling: base_hp * (1 + 0.15*(party_size-1))
+          * Damage scaling: base_damage * (1 + 0.10*max(0,party_size-1))
+          * XP: xp_base * (1 + 0.20*(party_size-1))
+        """
+        lvl = max(self.level_min, min(level, self.level_max))
+        mult_hp = 1 + 0.15 * max(0, party_size - 1)
+        mult_dmg = 1 + 0.10 * max(0, party_size - 1)
+        mult_xp = 1 + 0.20 * max(0, party_size - 1)
+        return {
+            "slug": self.slug,
+            "name": self.name,
+            "level": lvl,
+            "hp": int(round(self.base_hp * mult_hp)),
+            "damage": int(round(self.base_damage * mult_dmg)),
+            "armor": self.armor,
+            "speed": self.speed,
+            "rarity": self.rarity,
+            "family": self.family,
+            "traits": self.traits_list(),
+            "resistances": self.resist_map(),
+            "damage_types": self.damage_type_list(),
+            "loot_table": self.loot_table,
+            "special_drop_slug": self.special_drop_slug,
+            "xp": int(round(self.xp_base * mult_xp)),
+            "boss": bool(self.boss),
+        }
