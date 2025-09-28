@@ -34,9 +34,10 @@
   function slotBox(slot, item){
     const label = slot.replace(/\d+$/, '');
     const icon = iconForType(item?.type);
+      const tooltipAttr = (item && window.MUDTooltips) ? window.MUDTooltips.attrForItem(item) : '';
     const right = item
       ? `<div class="d-flex align-items-center gap-2">
-           <div class="small">${icon} ${esc(item.name)} <span class="text-muted small">(${esc(item.type)})</span></div>
+             <div class="small item-name" tabindex="0" ${tooltipAttr}>${icon} ${esc(item.name)} <span class="text-muted small">(${esc(item.type)})</span></div>
            <button class="btn btn-sm btn-outline-danger btn-unequip" data-slot="${slot}" title="Unequip from ${label}"><i class="bi bi-x-lg"></i></button>
          </div>`
       : `<span class="text-muted">Empty</span>`;
@@ -51,8 +52,9 @@
 
   function bagItem(it){
     const icon = iconForType(it.type);
+      const tooltipAttr = window.MUDTooltips ? window.MUDTooltips.attrForItem(it) : '';
     return `<div class="bag-item list-group-item d-flex justify-content-between align-items-center" draggable="true" data-slug="${esc(it.slug)}">
-      <div>${icon} ${esc(it.name)} <span class="text-muted small">(${esc(it.type)})</span></div>
+        <div class="item-name" tabindex="0" ${tooltipAttr}>${icon} ${esc(it.name)} <span class="text-muted small">(${esc(it.type)})</span></div>
       <div class="btn-group btn-group-sm">
         ${it.type === 'potion' ? `<button class="btn btn-success btn-consume" data-slug="${esc(it.slug)}">Use</button>` : ''}
       </div>
@@ -72,6 +74,10 @@
   }
 
   function esc(s){ return (s||'').replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+
+  function buildTooltip(it){
+  // Removed local buildTooltip in favor of shared module
+  }
 
   function renderCharPanel(ch){
     const gear = ch.gear || {};
@@ -164,6 +170,8 @@
     const body = modalEl.querySelector('#equip-modal-body');
     body.innerHTML = renderCharPanel(target);
     wireDnD(modalEl, charId);
+      // Initialize shared tooltips
+      if (window.MUDTooltips) { window.MUDTooltips.apply(modalEl); }
     const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
     bsModal.show();
   }
@@ -191,4 +199,12 @@
   } else {
     init();
   }
+
+  // Respond to global tooltip mode changes by re-applying to the modal content if open
+  document.addEventListener('mud-tooltips-mode-change', () => {
+    const modalEl = document.getElementById(modalId);
+    if (modalEl && modalEl.classList.contains('show')) {
+      if (window.MUDTooltips) window.MUDTooltips.apply(modalEl, true);
+    }
+  });
 })();

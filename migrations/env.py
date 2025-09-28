@@ -1,13 +1,14 @@
 from __future__ import annotations
+
+import os
+import sys
 from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool
+
 from alembic import context
-import os, sys
+from sqlalchemy import engine_from_config, pool
 
 # Add app to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from app import db  # type: ignore
-from app.models import models as app_models  # noqa: F401
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -24,7 +25,7 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 # target_metadata = None
 # Use SQLAlchemy metadata from Flask db
-from app import db as flask_db  # type: ignore
+from app import db as flask_db  # type: ignore  # noqa: E402 path manipulation required before import
 
 target_metadata = flask_db.Model.metadata
 

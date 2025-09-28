@@ -7,34 +7,41 @@ variables, with optional .env loading.
 Run `python run.py --help` for details.
 """
 
-import os
-import sys
-import signal
 import argparse
+import os
+import signal
+import sys
 from textwrap import dedent
 
 try:  # Optional color support
-    from colorama import init as _color_init, Fore, Style
+    from colorama import Fore, Style
+    from colorama import init as _color_init
+
     _color_init()  # pragma: no cover
     _COLOR_ENABLED = True
 except Exception:  # pragma: no cover
+
     class _Dummy:
         RESET_ALL = ""
+
     class _Fore:
         RED = GREEN = CYAN = MAGENTA = YELLOW = BLUE = WHITE = ""
+
     class _Style:
         BRIGHT = NORMAL = RESET_ALL = ""
+
     Fore = _Fore()
     Style = _Style()
     _COLOR_ENABLED = False
 
 # Disable colors if output is not a real terminal (e.g., during pytest capture)
-if '_COLOR_ENABLED' in globals():  # safety
+if "_COLOR_ENABLED" in globals():  # safety
     try:
         if _COLOR_ENABLED and not sys.stdout.isatty():  # pragma: no cover - environment dependent
             _COLOR_ENABLED = False
     except Exception:  # pragma: no cover
         _COLOR_ENABLED = False
+
 
 def _load_version() -> str:
     try:
@@ -42,6 +49,7 @@ def _load_version() -> str:
             return f.read().strip()
     except Exception:
         return "0.3.4"
+
 
 __version__ = _load_version()
 
@@ -182,6 +190,20 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     tui_parser.set_defaults(command="admin-tui")
 
+    # reseed-items subcommand
+    seed_parser = subparsers.add_parser(
+        "reseed-items",
+        help="Rebuild Item catalog from sql/*.sql files",
+        formatter_class=argparse.RawTextHelpFormatter,
+        description="Clear (optional) and import armor/weapons/potions/misc item SQL seed files.",
+    )
+    seed_parser.add_argument(
+        "--no-clear",
+        action="store_true",
+        help="Do not delete existing categorized rows before import (default deletes).",
+    )
+    seed_parser.set_defaults(command="reseed-items")
+
     # If no subcommand provided, default to server
     if len(argv) == 0:
         argv = ["server"]
@@ -226,15 +248,23 @@ def main(argv: list[str]) -> int:
     mode = (getattr(args, "command", None) or "server").lower()
 
     # Import server entrypoints only after environment is ready
-    from app.server import start_server, start_admin_shell
-    from app.admin_tui import run_admin_tui
+    from app.server import start_admin_shell, start_server
 
     # Startup banner
     # Build colored banner lines
-    title = f"{Fore.CYAN}{Style.BRIGHT}MUD Game Server Bootup{Style.RESET_ALL}" if _COLOR_ENABLED else "MUD Game Server Bootup"
-    label = lambda L: f"{Fore.YELLOW}{L}{Style.RESET_ALL}" if _COLOR_ENABLED else L
-    value = lambda V: f"{Fore.GREEN}{V}{Style.RESET_ALL}" if _COLOR_ENABLED else V
-    divider = (Fore.MAGENTA + '='*40 + Style.RESET_ALL) if _COLOR_ENABLED else '='*40
+    title = (
+        f"{Fore.CYAN}{Style.BRIGHT}MUD Game Server Bootup{Style.RESET_ALL}"
+        if _COLOR_ENABLED
+        else "MUD Game Server Bootup"
+    )
+
+    def label(text: str) -> str:
+        return f"{Fore.YELLOW}{text}{Style.RESET_ALL}" if _COLOR_ENABLED else text
+
+    def value(val: str | int) -> str:
+        return f"{Fore.GREEN}{val}{Style.RESET_ALL}" if _COLOR_ENABLED else str(val)
+
+    divider = (Fore.MAGENTA + "=" * 40 + Style.RESET_ALL) if _COLOR_ENABLED else "=" * 40
     lines = [
         divider,
         f"  {title}",
@@ -247,11 +277,12 @@ def main(argv: list[str]) -> int:
         f"  {label('Flask-Login:'):12} {value('enabled')}",
         f"  {label('Admin Shell:'):12} {value('YES' if mode == 'admin' else 'NO')}",
         divider,
-        ""
+        "",
     ]
     print("\n".join(lines))
     try:
         from app.logging_utils import log
+
         log.info(event="startup", mode=mode, host=host, port=port, db=db_banner)
     except Exception:
         pass
@@ -260,18 +291,34 @@ def main(argv: list[str]) -> int:
         start_admin_shell()
         return 0
     elif mode == "admin-tui":
+        # Lazy import so running the web server doesn't require Textual
+        try:
+            from app.admin_tui import run_admin_tui  # type: ignore
+        except ModuleNotFoundError:
+            print(
+                "[ERROR] The 'textual' package is not installed. Install it with:\n  pip install textual python-socketio\nOr add it via requirements and reinstall your venv."
+            )
+            return 1
         run_admin_tui(server_url=getattr(args, "server_url", None))
+        return 0
+    elif mode == "reseed-items":
+        from app.seed_items import reseed_items
+
+        clear = not getattr(args, "no_clear", False)
+        reseed_items(clear_first=clear, verbose=True)
         return 0
     else:
         info_prefix = f"{Fore.CYAN}[INFO]{Style.RESET_ALL}" if _COLOR_ENABLED else "[INFO]"
         print(f"{info_prefix} Listening for connections... Press Ctrl+C to stop.")
+        # Determine debug flag before logging
+        debug = bool(getattr(args, "debug", False) or os.getenv("FLASK_DEBUG") == "1")
         try:
             from app.logging_utils import log
+
             log.info(event="listen", host=host, port=port, debug=debug)
         except Exception:
             pass
         # Note: db_uri is read by the Flask app on import via app config/env
-        debug = bool(getattr(args, "debug", False) or os.getenv("FLASK_DEBUG") == "1")
         start_server(host=host, port=port, debug=debug)
         return 0
 

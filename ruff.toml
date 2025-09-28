@@ -1,11 +1,2 @@
-# Ruff configuration
-line-length = 100
-exclude = [
-  ".venv",
-  "app/static/iconography",
-  "app/static/*.svg"
-]
-select = ["E", "F", "W", "I"]  # pycodestyle, pyflakes, warnings, isort
-ignore = [
-  # Add rule codes here to ignore specific cases
-]
+# Deprecated: Configuration now lives in pyproject.toml. This file retained for clarity but not used.
+# (Consider deleting in a future cleanup PR.)

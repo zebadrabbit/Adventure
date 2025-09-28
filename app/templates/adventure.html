@@ -5,7 +5,8 @@
 
 {% block dashboard_content %}
 <!-- Leaflet CSS -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <div class="row">
   <div class="col-lg-8">
     <div class="card shadow-sm mb-3">
@@ -15,80 +16,97 @@
       </div>
       <div class="card-body">
         <div id="dungeon-map" class="map-fluid-fixed-height mb-2"></div>
-  <div id="dungeon-controls" class="mb-3">
-  <div class="d-flex flex-nowrap align-items-start gap-3 mb-2 align-items-stretch">
-      <div class="movement-pad me-2">
-        <button id="btn-move-n" class="btn btn-sm movement-btn move-up" disabled title="Move North">N</button>
-        <button id="btn-move-w" class="btn btn-sm movement-btn move-left" disabled title="Move West">W</button>
-        <button class="btn btn-sm move-center" disabled aria-hidden="true" tabindex="-1"></button>
-        <button id="btn-move-e" class="btn btn-sm movement-btn move-right" disabled title="Move East">E</button>
-        <button id="btn-move-s" class="btn btn-sm movement-btn move-down" disabled title="Move South">S</button>
-      </div>
-  <div class="flex-grow-1 flex-min-0">
-  <div id="dungeon-output" class="bg-dark text-light dungeon-output u-mono mb-2 outlined">
-          <em>Begin your adventure! Your party stands at the entrance of the dungeon...</em>
+        <div id="dungeon-controls" class="mb-3">
+          <div class="d-flex flex-nowrap align-items-start gap-3 mb-2 align-items-stretch">
+            <div class="movement-pad me-2">
+              <button id="btn-move-n" class="btn btn-sm movement-btn move-up" disabled title="Move North">N</button>
+              <button id="btn-move-w" class="btn btn-sm movement-btn move-left" disabled title="Move West">W</button>
+              <button class="btn btn-sm move-center" disabled aria-hidden="true" tabindex="-1"></button>
+              <button id="btn-move-e" class="btn btn-sm movement-btn move-right" disabled title="Move East">E</button>
+              <button id="btn-move-s" class="btn btn-sm movement-btn move-down" disabled title="Move South">S</button>
+            </div>
+            <div class="flex-grow-1 flex-min-0">
+              <div id="dungeon-output" class="bg-dark text-light dungeon-output u-mono mb-2 outlined">
+                <em>Begin your adventure! Your party stands at the entrance of the dungeon...</em>
+              </div>
+              <div class="d-flex gap-2"><!-- inline search buttons are injected contextually in the log --></div>
+            </div>
+          </div>
+          <div class="d-flex justify-content-start mt-2 ps-1">
+            <div class="form-check form-switch small" title="Enable or disable keyboard (WASD/Arrow) movement">
+              <input class="form-check-input" type="checkbox" id="toggle-keyboard-move" checked>
+              <label class="form-check-label" for="toggle-keyboard-move">Keyboard Movement</label>
+            </div>
+          </div>
         </div>
-        <div class="d-flex gap-2"><!-- inline search buttons are injected contextually in the log --></div>
-      </div>
-    </div>
-    <div class="d-flex justify-content-start mt-2 ps-1">
-      <div class="form-check form-switch small" title="Enable or disable keyboard (WASD/Arrow) movement">
-        <input class="form-check-input" type="checkbox" id="toggle-keyboard-move" checked>
-        <label class="form-check-label" for="toggle-keyboard-move">Keyboard Movement</label>
-      </div>
-    </div>
-  </div>
         <!-- Dungeon output relocated beside movement pad -->
       </div>
-        <!-- Leaflet JS -->
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="{{ asset_url('js/adventure.js') }}"></script>
-  <script src="{{ asset_url('js/equipment.js') }}"></script>
-  <div id="party-characters-data" data-json='{{ party|tojson }}' hidden></div>
+      <div id="party-characters-data" data-json='{{ party|tojson }}' hidden></div>
     </div>
   </div>
   <div class="col-lg-4">
     {% if party and party|length > 0 %}
-      <div class="d-flex flex-column gap-3 align-items-stretch">
-        {% for m in party %}
-        {% set class_lower = m.class.lower() %}
-        <div class="card character-card border-3 class-{{ class_lower }} border-{{ class_lower if class_lower in ['fighter','rogue','mage','cleric','druid','ranger'] else 'default' }}">
-          <div class="card-body p-3">
-            <div class="d-flex align-items-center mb-2">
-              <span class="me-2 icon-32 u-flex-center">
-                {% if class_lower == 'fighter' %}
-                  <img src="{{ url_for('static', filename='iconography/swords-power.svg') }}" alt="Fighter" class="icon-28 icon-dropshadow">
-                {% elif class_lower == 'mage' %}
-                  <img src="{{ url_for('static', filename='iconography/fire-silhouette.svg') }}" alt="Mage" class="icon-28 icon-dropshadow">
-                {% elif class_lower == 'rogue' %}
-                  <img src="{{ url_for('static', filename='iconography/rogue.svg') }}" alt="Rogue" class="icon-28 icon-dropshadow">
-                {% elif class_lower == 'druid' %}
-                  <img src="{{ url_for('static', filename='iconography/heavy-thorny-triskelion.svg') }}" alt="Druid" class="icon-28 icon-dropshadow">
-                {% elif class_lower == 'cleric' %}
-                  <img src="{{ url_for('static', filename='iconography/aura.svg') }}" alt="Cleric" class="icon-28 icon-dropshadow">
-                {% elif class_lower == 'ranger' %}
-                  <img src="{{ url_for('static', filename='iconography/bowman.svg') }}" alt="Ranger" class="icon-28 icon-dropshadow">
-                {% else %}
-                  <span class="avatar-circle">{{ m.name[0]|upper }}</span>
-                {% endif %}
-              </span>
-              <span class="fw-bold">{{ m.name }}</span>
-              <span class="ms-auto badge bg-secondary">Lv 1</span>
-            </div>
-            <div class="mb-1"><span class="fw-semibold">Class:</span> {{ m.class }}</div>
-            <div class="mb-1"><span class="fw-semibold">HP:</span> {{ m.hp }} <span class="fw-semibold ms-2">Mana:</span> {{ m.mana }}</div>
-            <div class="text-warning small last-roll-line" data-char-id="{{ m.id }}" aria-live="polite"></div>
-            <div class="d-flex justify-content-end mt-2">
-              <div class="btn-group btn-group-sm">
-                <button class="btn btn-outline-warning btn-equip-panel" data-char-id="{{ m.id }}"><i class="bi bi-shield"></i> Equipment</button>
-                <button class="btn btn-outline-warning btn-bag-panel" data-char-id="{{ m.id }}"><i class="bi bi-bag"></i> Bags</button>
-              </div>
+    <div class="d-flex flex-column gap-3 align-items-stretch">
+      {% for m in party %}
+      {% set class_lower = m.class.lower() %}
+      <div
+        class="card character-card border-3 class-{{ class_lower }} border-{{ class_lower if class_lower in ['fighter','rogue','mage','cleric','druid','ranger'] else 'default' }}">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center mb-2">
+            <span class="me-2 icon-32 u-flex-center">
+              {% if class_lower == 'fighter' %}
+              <img src="{{ url_for('static', filename='iconography/swords-power.svg') }}" alt="Fighter"
+                class="icon-28 icon-dropshadow">
+              {% elif class_lower == 'mage' %}
+              <img src="{{ url_for('static', filename='iconography/fire-silhouette.svg') }}" alt="Mage"
+                class="icon-28 icon-dropshadow">
+              {% elif class_lower == 'rogue' %}
+              <img src="{{ url_for('static', filename='iconography/rogue.svg') }}" alt="Rogue"
+                class="icon-28 icon-dropshadow">
+              {% elif class_lower == 'druid' %}
+              <img src="{{ url_for('static', filename='iconography/heavy-thorny-triskelion.svg') }}" alt="Druid"
+                class="icon-28 icon-dropshadow">
+              {% elif class_lower == 'cleric' %}
+              <img src="{{ url_for('static', filename='iconography/aura.svg') }}" alt="Cleric"
+                class="icon-28 icon-dropshadow">
+              {% elif class_lower == 'ranger' %}
+              <img src="{{ url_for('static', filename='iconography/bowman.svg') }}" alt="Ranger"
+                class="icon-28 icon-dropshadow">
+              {% else %}
+              <span class="avatar-circle">{{ m.name[0]|upper }}</span>
+              {% endif %}
+            </span>
+            <span class="fw-bold">{{ m.name }}</span>
+            <span class="ms-auto badge bg-secondary">Lv 1</span>
+          </div>
+          <div class="mb-1"><span class="fw-semibold">Class:</span> {{ m.class }}</div>
+          <div class="mb-1"><span class="fw-semibold">HP:</span> {{ m.hp }} <span class="fw-semibold ms-2">Mana:</span>
+            {{ m.mana }}</div>
+          <div class="text-warning small last-roll-line" data-char-id="{{ m.id }}" aria-live="polite"></div>
+          <div class="d-flex justify-content-end mt-2">
+            <div class="btn-group btn-group-sm">
+              <button class="btn btn-outline-warning btn-equip-panel" data-char-id="{{ m.id }}"><i
+                  class="bi bi-shield"></i> Equipment</button>
+              <button class="btn btn-outline-warning btn-bag-panel" data-char-id="{{ m.id }}"><i class="bi bi-bag"></i>
+                Bags</button>
             </div>
           </div>
         </div>
-        {% endfor %}
       </div>
+      {% endfor %}
+    </div>
     {% endif %}
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<!-- Leaflet & adventure-specific assets (load after Bootstrap bundle from base template) -->
+<link rel="stylesheet" href="{{ asset_url('tooltips.css') }}">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="{{ asset_url('js/tooltips.js') }}"></script>
+<script src="{{ asset_url('js/adventure.js') }}"></script>
+<script src="{{ asset_url('js/equipment.js') }}"></script>
 {% endblock %}

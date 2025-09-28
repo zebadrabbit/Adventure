@@ -6,22 +6,88 @@ _Formerly: Adventure MUD (Multi-User Dungeon)_
 
 A modern web-based multiplayer dungeon adventure game built with Python (Flask, Flask-SocketIO), SQLite, and Bootstrap.
 
-## Experimental Generator Invariants (Current Phase)
-The dungeon generator is in an experimental phase introducing room type semantics and secret/locked door variants. During this phase several legacy guarantees are intentionally relaxed:
-- Full reachability: A small number of rooms may be unreachable; tests track this with xfail markers rather than hard failures.
-- Strict per-seed structural determinism: High-level metrics (seed echo, >0 rooms) remain stable, but exact room counts and layout may fluctuate while augmentation ordering is stabilized.
-- Movement guarantees: Immediate movement in a direction may no-op more often; API focuses on correctness (no error) over forced displacement.
-- Advanced pruning metrics: Legacy metrics (`door_clusters_reduced`, `tunnels_pruned`, etc.) may be absent or zeroed.
+> Quick Links: [Dungeon Generation](docs/DUNGEON_GENERATION.md) · [Teleports](docs/TELEPORTS.md) · [Development Workflow](docs/DEVELOPMENT.md) · [Architecture](docs/architecture.md) · [Contributing](docs/CONTRIBUTING.md)
 
-Temporary test strategy:
-- Deprecated strict tests converted to `xfail` (non-strict) for visibility without blocking CI.
-- A soft determinism smoke test ensures seeds echo and basic metrics are sensible; mismatch in room count triggers an xfail instead of failure.
+## Code Style & Linting
 
-Roadmap to re-tighten invariants:
-1. Enforce deterministic ordering for augmentation passes (sort candidate collections before RNG draws).
-2. Introduce a bounded unreachable ratio (< 5%) test to replace full reachability assertion.
-3. Reinstate door cluster pruning with deterministic selection logic.
-4. Replace movement no-op tolerance with directional intent validation once pathing heuristics mature.
+The project uses Ruff + Black with a unified line length of 120 characters (relaxed from 100) to reduce noisy wrapping in
+tests and data-heavy assertions. Previous per-file ignores for `E501` in `tests/` were removed; instead, we favor clearer
+one-line payload constructions and assertion context. Long, descriptive comments are still welcome; if an exceptional
+line exceeds 120 for readability (rare), it may be annotated with `# noqa: E501` along with a brief rationale.
+
+Enforced rule families (see `pyproject.toml`):
+- E, W (pycodestyle)
+- F (pyflakes)
+- I (import sorting)
+- UP (pyupgrade), B (bugbear), SIM (simplify), C4 (comprehensions)
+
+Rationale for 120:
+1. Reduces churn when adding parameters to test payloads.
+2. Keeps assertion messages (especially with f-string context) readable without artificial fragmentation.
+3. Aligns with common wider-line conventions (PSF tooling supports 120 as an accepted alternative to 79/88/100).
+
+If you prefer a stricter wrap in a particular block (e.g., documentation examples), you can manually format and optionally
+add a `# fmt: off / # fmt: on` pair for Black isolation (use sparingly).
+
+
+## Generation Guarantees (Summary)
+Core invariants (doors, corridor repair, determinism, logical reachability via teleports) are enforced by the test suite. For the full invariant matrix and legacy vs. current generator details see [Dungeon Generation](docs/DUNGEON_GENERATION.md).
+
+### Teleports (Overview)
+Teleport pads (`P`) provide a logical fallback for unreachable rooms without additional corridor carving. An O(1) lookup (`teleport_lookup`) enables instant activation in movement. See the dedicated [Teleports](docs/TELEPORTS.md) document for placement algorithm, data structures, and test strategy.
+
+
+### Updated Tunnel & Door Rules (v0.6.x)
+The tunnel algorithm now enforces a strict "single-door-per-approach" rule:
+
+* Tunnels only carve through `CAVE` tiles.
+* When a carving path encounters the first `WALL` tile adjacent to a `ROOM`, that wall is converted to a single `DOOR` and carving stops.
+* Additional walls are never overwritten in the same approach, preventing multi-door bursts along one wall segment.
+* Post‑carve a localized de-duplication sweep collapses any accidental adjacent door placements, restoring one canonical door.
+
+Rationale:
+1. Preserves clean wall rings and readable silhouettes for rooms.
+2. Eliminates confusing double/triple doorway clusters that added little tactical differentiation.
+3. Simplifies invariant reasoning (tests now assert absence of orthogonally adjacent doors globally).
+
+Door variants (`SECRET_DOOR = 'S'`, `LOCKED_DOOR = 'L'`) are probabilistic and may not appear in small sample sizes or narrow seed ranges. Tests therefore treat their absence as an expected (xfail) condition rather than a hard failure. Secret doors are non-walkable until revealed; locked doors are currently walkable placeholders for future lock/key logic.
+
+#### Secret Door Reveal API
+Players (or future perception / skill systems) can reveal a planted secret door using a lightweight endpoint:
+
+```
+POST /api/dungeon/reveal
+Body: { "x": <int>, "y": <int> }
+```
+
+Rules / Validation:
+1. User must have an active dungeon instance (session keys: `dungeon_instance_id`, `dungeon_seed`).
+2. `(x,y)` must be inside current map bounds (75x75 default).
+3. Tile at `(x,y)` must currently be a secret door (`'S'`).
+4. Player must be within Manhattan distance `<= 2` of the target (placeholder proximity rule; will evolve into perception/search mechanics).
+
+Successful response (HTTP 200):
+```
+{ "revealed": true, "tile": "D" }
+```
+
+Failure responses (HTTP 400/404):
+```
+{ "error": "x and y required" }
+{ "error": "No dungeon instance" }
+{ "error": "Out of bounds" }
+{ "error": "Too far" }
+{ "error": "Not a secret door" }
+{ "error": "Reveal failed" }
+```
+
+Implementation Notes:
+* The endpoint mutates the live cached dungeon grid in-place (revealing updates subsequent map/state fetches immediately).
+* Future extensions may gate success behind a perception check or a required item (e.g., magnifying lens) before promoting `S -> D`.
+* Distance rule kept intentionally small to discourage blind coordinate probing.
+* The current test suite includes positive and negative cases (distance and wrong-tile) ensuring baseline contract stability.
+
+If future design favors richer tactical entry options (multiple doors) this rule can be relaxed by reintroducing controlled multi-door generation and adjusting the xfailed legacy test `test_multiple_doors_possible`.
 
 ---
 
@@ -113,21 +179,8 @@ Upcoming tests will validate:
 ## Dungeon Generation Pipeline (Overview)
 > NOTE: A simplified char-grid generator (rooms + wall rings + tunnel connectors) is now the default runtime implementation exposed via `from app.dungeon import Dungeon`. The detailed multi-phase pipeline described below is retained as historical documentation and for potential future reintroduction of advanced features. Current tests assert only the simplified invariants: room connectivity, no orphan doors (each door has one room neighbor and at least one walkable neighbor), and deterministic seed layout.
 
-### Simplified Generator (Current Default)
-The active generator focuses on speed, determinism, and clarity:
-* Places a set of non-overlapping rectangular rooms (seeded RNG).
-* Wraps each room with a single-tile wall ring (no layered thickness logic).
-* Connects rooms using a minimal spanning tree of centers, carving straight (or simple L-shaped) tunnels.
-* Inserts doors at room–tunnel interfaces (single-tile) without chain/cluster reduction heuristics.
-* Produces a 2D char grid using symbols: `R` (room), `W` (wall), `T` (tunnel), `D` (door), `C` (cave/unused).
-
-Intentionally removed (legacy-only) behaviors:
-* Door chain collapsing & dense cluster pruning.
-* Hidden area / unreachable room retention toggles.
-* Multi-phase repair & inference passes (orphan repair now trivial: generation avoids creating them).
-* Detailed metrics (only high-level tile counts + seed, unreachable room count, wall anomalies retained).
-
-Rationale: The simplified model drastically reduces maintenance overhead and aligns with current gameplay needs (movement + fog-of-war) while keeping space for future expansion phases to be reintroduced incrementally.
+### Simplified Generator (Overview)
+Deterministic room placement + MST corridor carving + door insertion + teleport fallback. Legacy multi-phase normalization has been retired for maintainability. See [Dungeon Generation](docs/DUNGEON_GENERATION.md) for comparison and extension points.
 
 ---
 The procedural dungeon system is deterministic per (seed, size) and built from a multi-phase pipeline. Each phase is implemented in a dedicated module under `app/dungeon/` to keep responsibilities isolated and testable. The pipeline orchestrator (`app/dungeon/pipeline.py`) wires the phases together; helper modules are intentionally free of Flask/web concerns for ease of profiling and future reuse.

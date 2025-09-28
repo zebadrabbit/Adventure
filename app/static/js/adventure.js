@@ -1,5 +1,5 @@
 // Adventure page dungeon logic extracted from adventure.html
-(function(){
+(function () {
   const TILE_SIZE = 64;
   // Fog-of-war configuration:
   // INNER_VIS_RADIUS: tiles within this Manhattan distance are fully visible (original colors).
@@ -17,10 +17,10 @@
   const MEMORY_FILL_COLOR = '#060606'; // dim color base for memory tiles
   // Fog config persistence keys (user tunable in console)
   const FOG_CFG_KEY = 'adventureFogConfig';
-  document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener('DOMContentLoaded', function () {
     const output = document.getElementById('dungeon-output');
     // Load party characters from data element injected by template (no inline scripts)
-    (function loadPartyCharacters(){
+    (function loadPartyCharacters() {
       try {
         const el = document.getElementById('party-characters-data');
         if (!el) { window.partyCharacters = window.partyCharacters || []; return; }
@@ -29,7 +29,7 @@
         if (Array.isArray(parsed)) {
           window.partyCharacters = parsed.map(p => ({ id: p.id, name: p.name, class: p.class || p.class_name || '' }));
         }
-      } catch(e) { window.partyCharacters = window.partyCharacters || []; }
+      } catch (e) { window.partyCharacters = window.partyCharacters || []; }
     })();
     // ------------------------------------------------------------------
     // Dynamic class color theming
@@ -39,14 +39,14 @@
     // slugs are returned that we don't have predefined .class-*/.border-* rules
     // for, we inject them dynamically.
     // ------------------------------------------------------------------
-    (function fetchAndApplyClassColors(){
+    (function fetchAndApplyClassColors() {
       const endpoint = '/api/config/class_colors';
-      fetch(endpoint, { headers: { 'Accept': 'application/json' }})
-        .then(r => { if(!r.ok) throw new Error('status '+r.status); return r.json(); })
+      fetch(endpoint, { headers: { 'Accept': 'application/json' } })
+        .then(r => { if (!r.ok) throw new Error('status ' + r.status); return r.json(); })
         .then(map => {
           if (!map || typeof map !== 'object') return;
           const root = document.documentElement;
-          const predefined = new Set(['fighter','rogue','mage','cleric','druid','ranger']);
+          const predefined = new Set(['fighter', 'rogue', 'mage', 'cleric', 'druid', 'ranger']);
           const dynamicRules = [];
           for (const [slug, cfg] of Object.entries(map)) {
             if (!cfg || typeof cfg !== 'object') continue;
@@ -64,7 +64,7 @@
           }
           if (dynamicRules.length) {
             const styleEl = document.createElement('style');
-            styleEl.setAttribute('data-generated','class-colors');
+            styleEl.setAttribute('data-generated', 'class-colors');
             styleEl.textContent = dynamicRules.join('\n');
             document.head.appendChild(styleEl);
           }
@@ -93,7 +93,7 @@
         if (!raw) return new Set();
         const arr = JSON.parse(raw);
         if (Array.isArray(arr)) return new Set(arr);
-      } catch(e) { /* ignore parse/storage errors */ }
+      } catch (e) { /* ignore parse/storage errors */ }
       return new Set();
     }
 
@@ -101,7 +101,7 @@
       try {
         const arr = Array.from(seenSet);
         localStorage.setItem(seenStorageKey(), JSON.stringify(arr));
-      } catch(e) { /* ignore quota or storage errors */ }
+      } catch (e) { /* ignore quota or storage errors */ }
     }
 
     function saveSeenTilesThrottled(seenSet) {
@@ -119,10 +119,10 @@
         const raw = localStorage.getItem(FOG_CFG_KEY);
         if (!raw) return null;
         return JSON.parse(raw);
-      } catch(e) { return null; }
+      } catch (e) { return null; }
     }
     function saveFogConfig(cfg) {
-      try { localStorage.setItem(FOG_CFG_KEY, JSON.stringify(cfg)); } catch(e) {}
+      try { localStorage.setItem(FOG_CFG_KEY, JSON.stringify(cfg)); } catch (e) { }
     }
     // Only reading current constants (immutable) – for future dynamic tuning we could reassign globals.
     function currentFogConfig() {
@@ -136,19 +136,19 @@
       };
     }
     // If persisted config differs in future when we allow dynamic adjusting, we'd apply here.
-    (function initFogConfig(){
+    (function initFogConfig() {
       const cfg = loadFogConfig();
       if (cfg) {
         // Placeholder: accepting persisted values later when we allow overrides.
         // We intentionally do not mutate constants now to keep code simple.
       }
     })();
-  // Position element removed per design update (compass + log only)
-  // Legacy exits button container removed
-  const moveNorthBtn = document.getElementById('btn-move-n');
-  const moveSouthBtn = document.getElementById('btn-move-s');
-  const moveEastBtn = document.getElementById('btn-move-e');
-  const moveWestBtn = document.getElementById('btn-move-w');
+    // Position element removed per design update (compass + log only)
+    // Legacy exits button container removed
+    const moveNorthBtn = document.getElementById('btn-move-n');
+    const moveSouthBtn = document.getElementById('btn-move-s');
+    const moveEastBtn = document.getElementById('btn-move-e');
+    const moveWestBtn = document.getElementById('btn-move-w');
     let availableExits = [];
     let keyboardEnabled = true;
     const keyboardToggle = document.getElementById('toggle-keyboard-move');
@@ -170,66 +170,70 @@
       document.body.appendChild(liveRegion);
     }
 
-    // Lightweight tooltip stubs (to avoid errors if not provided elsewhere)
-    // Existing code attaches mouseenter/mouseleave handlers that reference these names.
-    // Implement no-ops here; can be upgraded later to a real tooltip if desired.
-    function showTooltip() { /* no-op */ }
-    function hideTooltip() { /* no-op */ }
-    let tooltipEl = null;
+    // Shared tooltip system now provided by tooltips.js (MUDTooltips)
+    function showTooltip() { /* retained for legacy listeners; actual logic handled by Bootstrap */ }
+    function hideTooltip() { /* retained for legacy listeners */ }
 
+    // Movement queue helpers (restored after refactor)
+    function queueMove(dir) {
+      moveQueue.push(dir);
+      if (!moveInFlight) processNextMove();
+    }
     function processNextMove() {
       if (moveInFlight) return;
       const next = moveQueue.shift();
-      if (!next && next !== '') return; // allow empty string init
+      if (!next) return;
       executeMove(next);
     }
 
-    function queueMove(dir) {
-      moveQueue.push(dir);
-      processNextMove();
-    }
-
-    // Persistent discovered/notice markers
-    let noticeMarkers = {}; // key: "x,y" -> L.marker
-
-    function keyFor(x,y){ return `${x},${y}`; }
-
+    // ------------------------------------------------------------
+    // Notice markers (spots with recalled / potential loot/search)
+    // Lightweight recreation after refactor that removed originals.
+    // ------------------------------------------------------------
+    const noticeMarkers = window.noticeMarkers || (window.noticeMarkers = {});
+    function keyFor(x, y) { return x + ',' + y; }
     function addNoticeMarker(x, y) {
-      if (!window.dungeonMap) return;
-      const k = keyFor(x,y);
-      if (noticeMarkers[k]) return; // already present
-      const iconHtml = `<img src="/static/iconography/search-question.svg" alt="Searchable" style="width:28px;height:28px;filter: drop-shadow(0 0 2px #000);">`;
-      const divIcon = L.divIcon({ html: iconHtml, className: 'notice-marker-div', iconSize: [28,28], iconAnchor: [14,14] });
-      const m = L.marker([ (y + 0.5) * TILE_SIZE, (x + 0.5) * TILE_SIZE ], { icon: divIcon, interactive: false });
-      m.addTo(window.dungeonMap);
-      noticeMarkers[k] = m;
-    }
-
-    function removeNoticeMarker(x, y) {
-      const k = keyFor(x,y);
-      const m = noticeMarkers[k];
-      if (m && window.dungeonMap) {
-        try { window.dungeonMap.removeLayer(m); } catch(e) {}
-      }
-      delete noticeMarkers[k];
-    }
-
-    async function refreshNoticeMarkers() {
       try {
-        const r = await fetch(`/api/dungeon/notices?ts=${Date.now()}`, { cache: 'no-store' });
-        if (!r.ok) return;
-        const data = await r.json();
-        const set = new Set((data.notices || []).map(p => keyFor(p[0], p[1])));
-        // remove stale
-        Object.keys(noticeMarkers).forEach(k => { if (!set.has(k)) {
-          const [x,y] = k.split(',').map(n=>parseInt(n,10));
-          removeNoticeMarker(x,y);
-        }});
-        // add present
-        (data.notices || []).forEach(p => addNoticeMarker(p[0], p[1]));
-        // update inline Search buttons state
-        updateInlineSearchButtons();
-      } catch(e) { /* ignore */ }
+        if (!window.dungeonMap) return;
+        const k = keyFor(x, y);
+        if (noticeMarkers[k]) return; // already present
+        const lat = (y + 0.5) * TILE_SIZE;
+        const lng = (x + 0.5) * TILE_SIZE;
+        const marker = L.circleMarker([lat, lng], {
+          radius: 6,
+          color: '#ffc107',
+          weight: 2,
+          fillColor: '#ffc107',
+          fillOpacity: 0.9
+        }).addTo(window.dungeonMap);
+        noticeMarkers[k] = { marker, x, y };
+      } catch (e) { /* noop */ }
+    }
+    function removeNoticeMarker(x, y) {
+      try {
+        const k = keyFor(x, y);
+        const entry = noticeMarkers[k];
+        if (entry) {
+          try { window.dungeonMap && window.dungeonMap.removeLayer(entry.marker); } catch (e) { }
+          delete noticeMarkers[k];
+        }
+      } catch (e) { /* noop */ }
+    }
+    function refreshNoticeMarkers() {
+      // Optional server-driven refresh; if endpoint missing, fails silently.
+      fetch('/api/dungeon/notices')
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!data) return;
+          if (Array.isArray(data.positions)) {
+            data.positions.forEach(p => {
+              if (Array.isArray(p) && p.length >= 2 && Number.isFinite(p[0]) && Number.isFinite(p[1])) {
+                addNoticeMarker(p[0], p[1]);
+              }
+            });
+          }
+        })
+        .catch(() => { });
     }
 
     function canSearchHere() {
@@ -263,7 +267,7 @@
         try {
           const alreadyClicked = (n.dataset && n.dataset.clicked === '1');
           n.disabled = alreadyClicked || !canSearchHere();
-        } catch(e) {}
+        } catch (e) { }
       });
     }
 
@@ -274,24 +278,24 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dir })
       })
-      .then(r => { if (!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
-      .then(data => {
-        if (data && data.desc && output) {
-          renderLogFromDesc(String(data.desc));
-          if (data.last_roll) {
-            try { updateLastRollUI(data.last_roll); } catch(e) {}
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(data => {
+          if (data && data.desc && output) {
+            renderLogFromDesc(String(data.desc));
+            if (data.last_roll) {
+              try { updateLastRollUI(data.last_roll); } catch (e) { }
+            }
           }
-        }
-        if (data && data.pos) {
-          const pxY = (data.pos[1] + 0.5) * TILE_SIZE;
-          const pxX = (data.pos[0] + 0.5) * TILE_SIZE;
+          if (data && data.pos) {
+            const pxY = (data.pos[1] + 0.5) * TILE_SIZE;
+            const pxX = (data.pos[0] + 0.5) * TILE_SIZE;
             if (window.dungeonPlayerMarker && window.dungeonMap && Number.isFinite(pxY) && Number.isFinite(pxX)) {
               window.dungeonPlayerMarker.setLatLng([pxY, pxX]);
               window.dungeonMap.panTo([pxY, pxX], { animate: true });
               window.currentPos = data.pos;
               // Update fog-of-war visibility after movement
               if (Array.isArray(data.pos)) {
-                try { updateDungeonVisibility(data.pos[0], data.pos[1]); } catch(e) { /* noop */ }
+                try { updateDungeonVisibility(data.pos[0], data.pos[1]); } catch (e) { /* noop */ }
               }
               // If newly noticed, add marker persistently
               if (data.noticed_loot) {
@@ -300,58 +304,61 @@
               // Update inline search buttons based on current tile
               updateInlineSearchButtons();
             }
-        }
-        if (data && Array.isArray(data.exits)) {
-          availableExits = data.exits.map(e => e.toLowerCase());
-        } else if (data && data.desc) {
-          const match = data.desc.match(/Exits: ([^.]*)\./);
-          if (match && match[1]) {
-            availableExits = match[1].split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
           }
-        } else {
-          availableExits = [];
-        }
-      })
-      .catch(err => {
-        console.error('[dungeon] move error', err);
-      })
-      .finally(() => {
-        renderExitButtons();
-        moveInFlight = false;
-        setTimeout(processNextMove, 120);
-      });
+          if (data && Array.isArray(data.exits)) {
+            availableExits = data.exits.map(e => e.toLowerCase());
+          } else if (data && data.desc) {
+            const match = data.desc.match(/Exits: ([^.]*)\./);
+            if (match && match[1]) {
+              availableExits = match[1].split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+            }
+          } else {
+            availableExits = [];
+          }
+        })
+        .catch(err => {
+          console.error('[dungeon] move error', err);
+        })
+        .finally(() => {
+          renderExitButtons();
+          moveInFlight = false;
+          setTimeout(processNextMove, 120);
+        });
     }
 
     function renderExitButtons() {
       const normalized = availableExits;
       if (moveNorthBtn) moveNorthBtn.disabled = !normalized.includes('n') && !normalized.includes('north');
       if (moveSouthBtn) moveSouthBtn.disabled = !normalized.includes('s') && !normalized.includes('south');
-      if (moveEastBtn)  moveEastBtn.disabled  = !normalized.includes('e') && !normalized.includes('east');
-      if (moveWestBtn)  moveWestBtn.disabled  = !normalized.includes('w') && !normalized.includes('west');
+      if (moveEastBtn) moveEastBtn.disabled = !normalized.includes('e') && !normalized.includes('east');
+      if (moveWestBtn) moveWestBtn.disabled = !normalized.includes('w') && !normalized.includes('west');
     }
 
     // Wire dedicated movement buttons if they exist (add ARIA labels)
-      if (moveNorthBtn) { moveNorthBtn.setAttribute('aria-label','Move North'); moveNorthBtn.addEventListener('click', () => !moveNorthBtn.disabled && queueMove('n')); }
-  if (moveSouthBtn) { moveSouthBtn.setAttribute('aria-label','Move South'); moveSouthBtn.addEventListener('click', () => !moveSouthBtn.disabled && queueMove('s')); }
-  if (moveEastBtn)  { moveEastBtn.setAttribute('aria-label','Move East'); moveEastBtn.addEventListener('click', () => !moveEastBtn.disabled && queueMove('e')); }
-  if (moveWestBtn)  { moveWestBtn.setAttribute('aria-label','Move West'); moveWestBtn.addEventListener('click', () => !moveWestBtn.disabled && queueMove('w')); }
+    if (moveNorthBtn) { moveNorthBtn.setAttribute('aria-label', 'Move North'); moveNorthBtn.addEventListener('click', () => !moveNorthBtn.disabled && queueMove('n')); }
+    if (moveSouthBtn) { moveSouthBtn.setAttribute('aria-label', 'Move South'); moveSouthBtn.addEventListener('click', () => !moveSouthBtn.disabled && queueMove('s')); }
+    if (moveEastBtn) { moveEastBtn.setAttribute('aria-label', 'Move East'); moveEastBtn.addEventListener('click', () => !moveEastBtn.disabled && queueMove('e')); }
+    if (moveWestBtn) { moveWestBtn.setAttribute('aria-label', 'Move West'); moveWestBtn.addEventListener('click', () => !moveWestBtn.disabled && queueMove('w')); }
 
     // Unified search action used by inline Search buttons
     let searchInFlight = false;
     function doSearch(invokingBtn) {
-      if (searchInFlight) return; // guard against duplicate invocations
+      if (searchInFlight) { console.debug('[search] skipped: already in-flight'); return; }
+      // Only allow when current tile is noticed (prevents spam). Important: check BEFORE setting in-flight flag.
+      const allowed = canSearchHere();
+      if (!allowed) { console.debug('[search] blocked: cannot search here (no notice marker at current pos?)'); return; }
       searchInFlight = true;
-      // Only allow when current tile is noticed (prevents spam)
-      if (!canSearchHere()) return;
+      console.debug('[search] starting search request');
       fetch('/api/dungeon/search', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
         .then(r => r.json())
         .then(data => {
+          console.debug('[search] response payload', data);
           if (!output) return;
           // Prevent duplicates: remove any existing loot list before appending a new one
           try {
             const existingLists = output.querySelectorAll('.loot-list');
             existingLists.forEach(el => el.remove());
-          } catch(e) {}
+          } catch (e) { }
           const foundWithItems = data && data.found && Array.isArray(data.items) && data.items.length;
           if (foundWithItems) {
             const hdr = document.createElement('div');
@@ -361,15 +368,13 @@
             list.className = 'loot-list mt-1';
             const partyChars = (window.partyCharacters || []).filter(c => c && c.id && c.name);
             data.items.forEach(it => {
+              try { console.debug('[search] render loot item', { id: it && it.id, name: it && it.name, rarity: it && it.rarity }); } catch (_e) { }
               const wrapper = document.createElement('div');
               wrapper.className = 'loot-entry d-inline-block me-3 mb-2';
               const label = document.createElement('span');
               label.className = 'loot-label me-1';
               label.textContent = (it.name || it.slug || 'Unknown Item') + ':';
               const rarity = it.rarity || 'common';
-              label.setAttribute('data-tooltip', `${it.name} (Lv ${it.level || 0}, ${rarity})\n${it.type || ''} — ${it.value_copper || 0}c\n${(it.description || '').trim()}`);
-              label.addEventListener('mouseenter', showTooltip);
-              label.addEventListener('mouseleave', hideTooltip);
               const dropdownDiv = document.createElement('div');
               dropdownDiv.className = 'dropdown d-inline-block';
               const btn = document.createElement('button');
@@ -378,8 +383,27 @@
               btn.setAttribute('data-bs-toggle', 'dropdown');
               btn.setAttribute('aria-expanded', 'false');
               btn.textContent = (it.name || it.slug || 'Item');
+              // Debug hook: mark loot id for diagnostics
+              btn.setAttribute('data-loot-id', it.id);
+              // Ensure a Bootstrap dropdown instance is created (some pages might not auto-init)
+              // Fallback manual toggler if Bootstrap dropdown fails to show
+              // (Deferred init added later after DOM insertion)
+              // Move tooltip to the dropdown button so hovering the button (not just the label) shows details
+              if (window.MUDTooltips) {
+                try {
+                  btn.setAttribute('tabindex', '0');
+                  btn.setAttribute('aria-label', `${it.name}`);
+                  btn.setAttribute('role', 'button');
+                  const attrStr = window.MUDTooltips.attrForItem(it);
+                  if (attrStr) {
+                    const regex = /([a-zA-Z-]+)="([^"]*)"/g; let m;
+                    while ((m = regex.exec(attrStr))) { btn.setAttribute(m[1], m[2]); }
+                  }
+                } catch (e) { }
+              }
               const menu = document.createElement('ul');
               menu.className = 'dropdown-menu';
+              menu.setAttribute('data-parent-loot-id', it.id);
               if (!partyChars.length) {
                 const li = document.createElement('li');
                 li.innerHTML = '<span class="dropdown-item disabled">No party</span>';
@@ -396,26 +420,48 @@
                     hideTooltip();
                     btn.disabled = true;
                     fetch(`/api/dungeon/loot/claim/${it.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ character_id: pc.id }) })
-                      .then(r => r.json())
-                      .then(res => {
+                      .then(async r => {
+                        const status = r.status;
+                        let payload = null; let text = null;
+                        try { payload = await r.json(); } catch (e) { try { text = await r.text(); } catch (_) { } }
+                        return { status, ok: r.ok, body: payload, rawText: text };
+                      })
+                      .then(resWrap => {
                         const line = document.createElement('div');
-                        if (res && res.claimed) {
+                        line.className = 'small';
+                        const res = resWrap.body || {};
+                        if (resWrap.ok && res && res.claimed) {
                           line.textContent = `Assigned ${res.item?.name || 'item'} to ${pc.name}.`;
                           wrapper.remove();
-                          refreshNoticeMarkers();
+                          try { refreshNoticeMarkers(); } catch (e) { }
                           const remaining = list.querySelectorAll('.loot-entry');
                           if (!remaining || remaining.length === 0) {
                             if (window.currentPos) removeNoticeMarker(window.currentPos[0], window.currentPos[1]);
                             updateInlineSearchButtons();
                           }
                         } else {
-                          line.textContent = (res && res.error) ? `Unable to claim: ${res.error}` : 'Unable to claim item.';
+                          // Build detailed error message
+                          const errCore = res?.error || resWrap.rawText || 'unknown error';
+                          const detailParts = [];
+                          if (res?.message) detailParts.push(res.message);
+                          if (res?.where) detailParts.push('where=' + res.where);
+                          if (res?.character) detailParts.push('character=' + res.character);
+                          if (res?.party) detailParts.push('party=' + JSON.stringify(res.party));
+                          if (res?.expected_seed) detailParts.push('expected_seed=' + res.expected_seed);
+                          if (res?.row_seed) detailParts.push('row_seed=' + res.row_seed);
+                          line.textContent = `Unable to claim (${resWrap.status}): ${errCore}${detailParts.length ? ' [' + detailParts.join('; ') + ']' : ''}`;
                           btn.disabled = false;
                         }
                         output.appendChild(line);
+                        try { line.scrollIntoView({ block: 'nearest' }); } catch (e) { }
+                        console.debug('[loot] claim response', resWrap);
                       })
                       .catch(err => {
-                        console.error('[loot] claim error', err);
+                        console.error('[loot] claim network/parse error', err);
+                        const line = document.createElement('div');
+                        line.className = 'small text-danger';
+                        line.textContent = 'Unable to claim item (network error)';
+                        output.appendChild(line);
                         btn.disabled = false;
                       });
                   });
@@ -428,19 +474,61 @@
               wrapper.appendChild(label);
               wrapper.appendChild(dropdownDiv);
               list.appendChild(wrapper);
+              // Defer dropdown init until after element & menu are in DOM so Bootstrap can find the menu sibling
+              setTimeout(() => {
+                try {
+                  if (!document.body.contains(btn)) return; // removed meanwhile
+                  if (window.bootstrap && bootstrap.Dropdown) {
+                    if (bootstrap.Dropdown.getOrCreateInstance) {
+                      btn.__mudDropdown = bootstrap.Dropdown.getOrCreateInstance(btn, { autoClose: true, popperConfig: { strategy: 'absolute' } });
+                    } else {
+                      let existing = bootstrap.Dropdown.getInstance(btn);
+                      if (!existing) existing = new bootstrap.Dropdown(btn, { autoClose: true, popperConfig: { strategy: 'absolute' } });
+                      btn.__mudDropdown = existing;
+                    }
+                  } else {
+                    // Fallback manual toggle if Bootstrap not present (shouldn't happen now)
+                    btn.addEventListener('click', () => {
+                      const m = btn.nextElementSibling;
+                      if (!m) return;
+                      const shown = m.classList.contains('show');
+                      m.classList.toggle('show', !shown);
+                      if (!shown) {
+                        m.style.position = 'absolute';
+                        const r = btn.getBoundingClientRect();
+                        m.style.top = (r.bottom + 4) + 'px';
+                        m.style.left = r.left + 'px';
+                      }
+                    }, { once: false });
+                  }
+                } catch (e) { console.debug('[loot] deferred dropdown init failed', e); }
+              }, 0);
             });
             output.appendChild(list);
+            try {
+              const entries = list.querySelectorAll('.loot-entry');
+              console.debug('[search] loot list appended', { count: entries.length });
+              if (!entries.length) {
+                console.warn('[search] expected loot items but none rendered');
+              }
+            } catch (_e) { }
+            // Re-apply tooltips for newly inserted loot buttons
+            // Re-apply tooltips without forced reinit to avoid duplicate bootstrap instance churn
+            try { if (window.MUDTooltips) window.MUDTooltips.apply(list, false); } catch (e) { }
           } else {
             const line = document.createElement('div');
             line.textContent = data && data.message ? data.message : 'You search the area but find nothing.';
             output.appendChild(line);
+            console.debug('[search] no loot found', { found: data && data.found, itemsLength: data && data.items && data.items.length });
           }
         })
         .catch(err => console.error('[dungeon] search error', err))
         .finally(() => {
           searchInFlight = false;
           // Ensure the invoking button stays disabled after click
-          try { if (invokingBtn) { invokingBtn.dataset.clicked = '1'; invokingBtn.disabled = true; } } catch(e){}
+          try { if (invokingBtn) { invokingBtn.dataset.clicked = '1'; invokingBtn.disabled = true; } } catch (e) { }
+          // Failsafe: clear flag after short delay in case of unexpected early return paths
+          setTimeout(() => { if (searchInFlight) { console.warn('[search] failsafe clearing stuck in-flight flag'); searchInFlight = false; } }, 4000);
         });
     }
 
@@ -450,10 +538,10 @@
       if (!roll || typeof roll !== 'object') return;
       const ch = roll.character || null;
       const who = ch && (ch.id != null) ? document.querySelector(`.character-card .last-roll-line[data-char-id="${ch.id}"]`) : null;
-      const text = (function(){
+      const text = (function () {
         const parts = [];
         if (roll.skill) parts.push(String(roll.skill).charAt(0).toUpperCase() + String(roll.skill).slice(1));
-        const detail = `${roll.roll ?? '?'}${roll.die ? '' : ''}${typeof roll.mod === 'number' ? (roll.mod>=0? ' +'+roll.mod : ' '+roll.mod) : ''}`;
+        const detail = `${roll.roll ?? '?'}${roll.die ? '' : ''}${typeof roll.mod === 'number' ? (roll.mod >= 0 ? ' +' + roll.mod : ' ' + roll.mod) : ''}`;
         const total = (typeof roll.total === 'number') ? ` = ${roll.total}` : '';
         const expr = roll.expr ? ` (${roll.expr})` : '';
         return `Last roll: ${parts.join(' ')} ${detail}${total}${expr}`.trim();
@@ -488,33 +576,48 @@
         }
         output.appendChild(div);
       });
-      try { liveRegion.textContent = desc.replace(/Exits:.*$/i,'').trim(); } catch(e) {}
+      try { liveRegion.textContent = desc.replace(/Exits:.*$/i, '').trim(); } catch (e) { }
       updateInlineSearchButtons();
     }
 
     // Dismiss tooltip on any document click to avoid lingering when elements are removed
-    document.addEventListener('click', () => { try { hideTooltip(); } catch(e){} }, true);
+    document.addEventListener('click', () => { try { hideTooltip(); } catch (e) { } }, true);
+    // After dynamic loot list updates, apply Bootstrap tooltips
+    const observer = new MutationObserver(() => { if (window.MUDTooltips) window.MUDTooltips.apply(output || document); });
+    if (output) { observer.observe(output, { childList: true, subtree: true }); }
+    if (window.MUDTooltips) window.MUDTooltips.apply(output || document);
 
     // Keyboard movement (arrows + WASD). Ignore when typing in input/textarea.
     document.addEventListener('keydown', (e) => {
       if (!keyboardEnabled) return;
       const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
-      if (tag === 'input' || tag === 'textarea' || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (tag === 'input' || tag === 'textarea') return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return; // except we allow Shift as a movement override only
       let dir = null;
-      switch(e.key.toLowerCase()) {
+      switch (e.key.toLowerCase()) {
         case 'arrowup': case 'w': dir = 'n'; break;
         case 'arrowdown': case 's': dir = 's'; break;
         case 'arrowleft': case 'a': dir = 'w'; break;
         case 'arrowright': case 'd': dir = 'e'; break;
       }
-      if (dir) {
-        if (dir === 'n' && moveNorthBtn && moveNorthBtn.disabled) return;
-        if (dir === 's' && moveSouthBtn && moveSouthBtn.disabled) return;
-        if (dir === 'e' && moveEastBtn  && moveEastBtn.disabled)  return;
-        if (dir === 'w' && moveWestBtn  && moveWestBtn.disabled)  return;
-        e.preventDefault();
-        queueMove(dir);
+      if (!dir) return;
+      // Allow Shift to bypass disabled button checks (useful if buttons not in DOM or stale)
+      const bypass = e.shiftKey;
+      const blocked = !bypass && (
+        (dir === 'n' && moveNorthBtn && moveNorthBtn.disabled) ||
+        (dir === 's' && moveSouthBtn && moveSouthBtn.disabled) ||
+        (dir === 'e' && moveEastBtn && moveEastBtn.disabled) ||
+        (dir === 'w' && moveWestBtn && moveWestBtn.disabled)
+      );
+      if (blocked) {
+        if (window && window.console && !e._mudLoggedBlock) {
+          e._mudLoggedBlock = true;
+          console.debug('[movement] suppressed key press', { dir, reason: 'button-disabled', hint: 'Hold Shift to force movement if map loaded.' });
+        }
+        return;
       }
+      e.preventDefault();
+      queueMove(dir);
     });
 
     // Initial exits fetched after map load (see loadDungeonMap)
@@ -533,7 +636,7 @@
         if (!layer || !layer._dungeon) continue;
         const dx = layer._dungeon.x - px;
         const dy = layer._dungeon.y - py;
-        const dist = Math.sqrt(dx*dx + dy*dy); // Euclidean for circular falloff
+        const dist = Math.sqrt(dx * dx + dy * dy); // Euclidean for circular falloff
 
         if (dist <= INNER_VIS_RADIUS) {
           // Mark as seen
@@ -550,7 +653,7 @@
             renderState[key] = { mode: 'visible' };
           }
           if (layer._dungeon.tooltip && !layer._dungeon.tooltipBound) {
-            layer.bindTooltip(layer._dungeon.tooltip, {permanent: false, direction: 'top', offset: [0, -8]});
+            layer.bindTooltip(layer._dungeon.tooltip, { permanent: false, direction: 'top', offset: [0, -8] });
             layer._dungeon.tooltipBound = true;
           }
           continue;
@@ -575,20 +678,20 @@
           if (wasSeen) {
             fogOpacity = Math.min(fogOpacity, MEMORY_DIM_OPACITY + 0.15); // memory slightly lighter than fresh fog
           }
-            const roundedOpacity = Math.round(fogOpacity * 100) / 100; // reduce churn from tiny float deltas
-            const prev = renderState[key];
-            if (!prev || prev.mode !== 'fog' || prev.o !== roundedOpacity) {
-              layer.setStyle({
-                fillOpacity: fogOpacity,
-                weight: 0,
-                stroke: false,
-                fillColor: '#000000',
-                color: '#000000'
-              });
-              renderState[key] = { mode: 'fog', o: roundedOpacity };
-            }
+          const roundedOpacity = Math.round(fogOpacity * 100) / 100; // reduce churn from tiny float deltas
+          const prev = renderState[key];
+          if (!prev || prev.mode !== 'fog' || prev.o !== roundedOpacity) {
+            layer.setStyle({
+              fillOpacity: fogOpacity,
+              weight: 0,
+              stroke: false,
+              fillColor: '#000000',
+              color: '#000000'
+            });
+            renderState[key] = { mode: 'fog', o: roundedOpacity };
+          }
           if (layer._dungeon.tooltipBound) {
-            try { layer.unbindTooltip(); } catch(e) {}
+            try { layer.unbindTooltip(); } catch (e) { }
             layer._dungeon.tooltipBound = false;
           }
           // Mark tiles moderately close (inside fog region) as seen so they persist when you move away
@@ -624,10 +727,10 @@
           }
         }
         if (layer._dungeon.tooltipBound) {
-          try { layer.unbindTooltip(); } catch(e) {}
+          try { layer.unbindTooltip(); } catch (e) { }
           layer._dungeon.tooltipBound = false;
+        }
       }
-    }
       if (seenChanged) saveSeenTilesThrottled(seen);
     }
 
@@ -667,25 +770,25 @@
 
           let playerPos = null;
           if (Array.isArray(data.player_pos) && data.player_pos.length >= 2 &&
-              Number.isFinite(data.player_pos[0]) && Number.isFinite(data.player_pos[1])) {
+            Number.isFinite(data.player_pos[0]) && Number.isFinite(data.player_pos[1])) {
             playerPos = data.player_pos;
           }
 
-            if (playerPos) {
-              const centerY = (playerPos[1] + 0.5) * TILE_SIZE; // y first
-              const centerX = (playerPos[0] + 0.5) * TILE_SIZE; // x second
-              if (Number.isFinite(centerY) && Number.isFinite(centerX)) {
-                map.setView([centerY, centerX], 0);
-              } else if (validHeight && validWidth) {
-                map.setView([(height * TILE_SIZE) / 2, (width * TILE_SIZE) / 2], 0);
-              } else {
-                map.setView([0, 0], 0);
-              }
+          if (playerPos) {
+            const centerY = (playerPos[1] + 0.5) * TILE_SIZE; // y first
+            const centerX = (playerPos[0] + 0.5) * TILE_SIZE; // x second
+            if (Number.isFinite(centerY) && Number.isFinite(centerX)) {
+              map.setView([centerY, centerX], 0);
             } else if (validHeight && validWidth) {
               map.setView([(height * TILE_SIZE) / 2, (width * TILE_SIZE) / 2], 0);
             } else {
               map.setView([0, 0], 0);
             }
+          } else if (validHeight && validWidth) {
+            map.setView([(height * TILE_SIZE) / 2, (width * TILE_SIZE) / 2], 0);
+          } else {
+            map.setView([0, 0], 0);
+          }
 
           if (validHeight && validWidth) {
             map.setMaxBounds([[0, 0], [height * TILE_SIZE, width * TILE_SIZE]]);
@@ -697,7 +800,7 @@
           for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
               const cell = grid[y][x]; // y row, x column
-              let tooltip = `(${x+1},${y+1}): `;
+              let tooltip = `(${x + 1},${y + 1}): `;
               if (typeof cell === 'object' && cell !== null && cell.cell_type) {
                 tooltip += cell.cell_type;
                 if (cell.features && cell.features.length > 0) {
@@ -711,15 +814,15 @@
               // Brighter & slightly more saturated palette (v2)
               const color = (typeof cell === 'object' && cell !== null && cell.cell_type) ?
                 (cell.cell_type === 'room' ? '#256535' :          // brighter moss green
-                 cell.cell_type === 'tunnel' ? '#155067' :        // richer teal/blue
-                 cell.cell_type === 'wall' ? '#523727' :          // warmer brown
-                 cell.cell_type === 'door' ? '#551455' :          // more vivid purple
-                 cell.cell_type === 'cave' ? '#121212' : '#232323') :
+                  cell.cell_type === 'tunnel' ? '#155067' :        // richer teal/blue
+                    cell.cell_type === 'wall' ? '#523727' :          // warmer brown
+                      cell.cell_type === 'door' ? '#551455' :          // more vivid purple
+                        cell.cell_type === 'cave' ? '#121212' : '#232323') :
                 (cell === 'room' ? '#256535' :
-                 cell === 'tunnel' ? '#155067' :
-                 cell === 'wall' ? '#523727' :
-                 cell === 'door' ? '#551455' :
-                 cell === 'cave' ? '#121212' : '#232323');
+                  cell === 'tunnel' ? '#155067' :
+                    cell === 'wall' ? '#523727' :
+                      cell === 'door' ? '#551455' :
+                        cell === 'cave' ? '#121212' : '#232323');
               const rect = L.rectangle(
                 [[y * TILE_SIZE, x * TILE_SIZE], [(y + 1) * TILE_SIZE, (x + 1) * TILE_SIZE]],
                 { color: '#303030', weight: 1, fillColor: color, fillOpacity: 0.85, interactive: true }
@@ -736,7 +839,7 @@
 
           // After all tiles added, apply initial visibility based on player position
           if (playerPos) {
-            try { updateDungeonVisibility(playerPos[0], playerPos[1]); } catch(e) { /* noop */ }
+            try { updateDungeonVisibility(playerPos[0], playerPos[1]); } catch (e) { /* noop */ }
           }
 
           // Attempt to merge server-side seen tiles (if any) after local vis applied
@@ -754,21 +857,21 @@
                 updateDungeonVisibility(playerPos[0], playerPos[1]);
               }
             })
-            .catch(()=>{});
+            .catch(() => { });
 
           // --------------------------------------------------------
           // Developer console helpers (namespaced under window.dungeonDev)
           // --------------------------------------------------------
           if (!window.dungeonDev) window.dungeonDev = {};
-          window.dungeonDev.coverage = function() {
+          window.dungeonDev.coverage = function () {
             if (!window.dungeonTileLayers || !window.dungeonSeenTiles) return 0;
             const total = Object.keys(window.dungeonTileLayers).length;
             const seen = window.dungeonSeenTiles.size;
-            const pct = total ? (seen/total*100) : 0;
+            const pct = total ? (seen / total * 100) : 0;
             console.log(`[dungeonDev] Seen tiles: ${seen}/${total} (${pct.toFixed(2)}%)`);
             return { seen, total, pct };
           };
-          window.dungeonDev.clearSeen = function() {
+          window.dungeonDev.clearSeen = function () {
             if (window.dungeonSeenTiles) {
               window.dungeonSeenTiles.clear();
               saveSeenTiles(window.dungeonSeenTiles);
@@ -776,19 +879,19 @@
               console.log('[dungeonDev] Cleared seen tiles');
             }
           };
-          window.dungeonDev.getFogConfig = function() {
+          window.dungeonDev.getFogConfig = function () {
             const cfg = currentFogConfig();
             console.log('[dungeonDev] Fog config', cfg);
             return cfg;
           };
-          window.dungeonDev.saveFogConfig = function(partial) {
+          window.dungeonDev.saveFogConfig = function (partial) {
             if (!partial || typeof partial !== 'object') { console.warn('[dungeonDev] supply an object with fog keys'); return; }
             const merged = { ...currentFogConfig(), ...partial };
             saveFogConfig(merged);
             console.log('[dungeonDev] Persisted fog config (note: runtime constants not hot-applied yet).', merged);
             return merged;
           };
-          window.dungeonDev.dump = function() {
+          window.dungeonDev.dump = function () {
             return {
               coverage: window.dungeonDev.coverage(),
               fog: currentFogConfig(),
@@ -798,7 +901,7 @@
           // Throttled server sync for seen tiles
           let lastServerSync = 0;
           const SERVER_SYNC_INTERVAL = 4000; // ms
-          function syncSeenToServer(force=false) {
+          function syncSeenToServer(force = false) {
             const now = performance.now();
             if (!force && now - lastServerSync < SERVER_SYNC_INTERVAL) return;
             if (!window.dungeonSeenTiles || !window.currentDungeonSeed) return;
@@ -809,13 +912,13 @@
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ tiles })
-            }).catch(()=>{});
+            }).catch(() => { });
           }
           window.dungeonDev.forceSync = () => syncSeenToServer(true);
 
           // Hook into existing throttled local save by wrapping saveSeenTilesThrottled
           const _oldSaveSeenTilesThrottled = saveSeenTilesThrottled;
-          saveSeenTilesThrottled = function(seenSet) {
+          saveSeenTilesThrottled = function (seenSet) {
             _oldSaveSeenTilesThrottled(seenSet);
             syncSeenToServer(false);
           };
@@ -833,7 +936,7 @@
               html: wrapper,
               className: 'player-marker-div', // keep Leaflet from adding default img styles
               iconSize: [baseSize, baseSize],
-              iconAnchor: [baseSize/2, baseSize/2]
+              iconAnchor: [baseSize / 2, baseSize / 2]
             });
             window.dungeonPlayerMarker = L.marker([
               (playerPos[1] + 0.5) * TILE_SIZE, // y
@@ -857,11 +960,11 @@
           }
 
           // Defer invalidateSize to allow layout (fluid width) to settle
-          setTimeout(() => { try { map.invalidateSize(false); } catch(e) {} }, 50);
+          setTimeout(() => { try { map.invalidateSize(false); } catch (e) { } }, 50);
           // Recalculate on window resize for responsive horizontal expansion
           window.addEventListener('resize', () => {
             if (window.dungeonMap) {
-              try { window.dungeonMap.invalidateSize(false); } catch(e) {}
+              try { window.dungeonMap.invalidateSize(false); } catch (e) { }
             }
           }, { passive: true });
 
@@ -872,7 +975,7 @@
               if (data && data.desc && output) {
                 renderLogFromDesc(String(data.desc));
                 if (data.last_roll) {
-                  try { updateLastRollUI(data.last_roll); } catch(e) {}
+                  try { updateLastRollUI(data.last_roll); } catch (e) { }
                 }
               }
               if (data && Array.isArray(data.exits)) {
@@ -881,14 +984,14 @@
               }
               // If position returned differs (e.g., server corrected), update fog
               if (data && Array.isArray(data.pos) && data.pos.length >= 2) {
-                try { updateDungeonVisibility(data.pos[0], data.pos[1]); } catch(e) {}
+                try { updateDungeonVisibility(data.pos[0], data.pos[1]); } catch (e) { }
               }
             })
             .catch(err => console.error('[dungeon] state error', err));
         });
     }
 
-    function requestNewSeed(seedValue, regenerate=false) {
+    function requestNewSeed(seedValue, regenerate = false) {
       const body = {};
       if (seedValue !== undefined && seedValue !== null) body.seed = seedValue;
       if (regenerate) body.regenerate = true;
@@ -896,11 +999,11 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
-      }).then(r => { if(!r.ok) throw new Error('Seed HTTP '+r.status); return r.json(); });
+      }).then(r => { if (!r.ok) throw new Error('Seed HTTP ' + r.status); return r.json(); });
     }
 
     // Example hook: expose to global for a future UI control (not yet wired in templates)
-    window.dungeonNewSeed = function(seedValue) {
+    window.dungeonNewSeed = function (seedValue) {
       return requestNewSeed(seedValue, !seedValue)
         .then(data => {
           // After changing seed, reload map

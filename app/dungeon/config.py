@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
+
 @dataclass
 class DungeonConfig:
     width: int = 75
@@ -12,5 +13,6 @@ class DungeonConfig:
     irregular_chance: float = 0.25
     seed: Optional[int] = None
     extra_connection_chance: float = 0.15
+
 
 __all__ = ["DungeonConfig"]

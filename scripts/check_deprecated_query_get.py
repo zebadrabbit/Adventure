@@ -7,23 +7,25 @@ prevents reintroduction after refactor.
 Exemptions: None (usage should not reappear). If a false positive occurs,
 refactor the line instead of bypassing the hook.
 """
+
 from __future__ import annotations
-import sys
+
 import pathlib
+import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 # Simple scan (avoid importing project modules to stay lightweight & side-effect free)
 violations = []
-target_pattern = '.query.get('
+target_pattern = ".query.get("
 self_path = pathlib.Path(__file__).resolve()
-for path in ROOT.rglob('*.py'):
+for path in ROOT.rglob("*.py"):
     if path.resolve() == self_path:
         continue
-    if any(part in {'.venv', '__pycache__'} for part in path.parts):
+    if any(part in {".venv", "__pycache__"} for part in path.parts):
         continue
     try:
-        text = path.read_text(encoding='utf-8', errors='ignore')
+        text = path.read_text(encoding="utf-8", errors="ignore")
     except Exception:
         continue
     if target_pattern in text:

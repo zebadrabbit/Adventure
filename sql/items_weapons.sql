@@ -8,10 +8,7 @@
 BEGIN TRANSACTION;
 
 -- Swords (balanced damage)
-INSERT INTO item (slug, name, type, description, value_copper) VALUES
--- level 1-20 swords
-"weapon_sword_l1",  "Rusty Shortsword",    'weapon', 'A worn but serviceable blade.', 35;
-
+-- (Removed legacy malformed single-row INSERT for weapon_sword_l1)
 -- Using a compound statement style for readability; each block ends with semicolon.
 
 DELETE FROM item WHERE slug LIKE 'weapon_sword_l%';
@@ -24,7 +21,7 @@ INSERT INTO item (slug, name, type, description, value_copper) VALUES
 ('weapon_sword_l5','Knight Longsword','weapon','Well-balanced knightly steel.',200),
 ('weapon_sword_l6','Fine Longsword','weapon','Expertly honed edge.',280),
 ('weapon_sword_l7','Tempered Longsword','weapon','Resists wear in long battles.',380),
-('weapon_sword_l8','Masterwork Longsword','weapon','A craftsman\'s flawless creation.',510),
+('weapon_sword_l8','Masterwork Longsword','weapon','A craftsman''s flawless creation.',510),
 ('weapon_sword_l9','Runed Longsword','weapon','Etched with faint glowing runes.',670),
 ('weapon_sword_l10','Mythril Longsword','weapon','Light and incredibly sharp.',860),
 ('weapon_sword_l11','Mythril Greatsword','weapon','Two-handed mythril devastation.',1080),

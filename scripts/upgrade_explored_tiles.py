@@ -9,18 +9,20 @@ explicitly (e.g., CI/CD deploy step) without starting the web server.
 
 Idempotent: Safe to run multiple times.
 """
-from app import create_app, db
+
 from sqlalchemy import inspect, text
+
+from app import create_app, db
 
 
 def ensure_explored_tiles_column():
     inspector = inspect(db.engine)
-    user_cols = {c['name'] for c in inspector.get_columns('user')}
-    if 'explored_tiles' in user_cols:
+    user_cols = {c["name"] for c in inspector.get_columns("user")}
+    if "explored_tiles" in user_cols:
         print("[OK] 'explored_tiles' column already present.")
         return False
     try:
-        db.session.execute(text('ALTER TABLE user ADD COLUMN explored_tiles TEXT'))
+        db.session.execute(text("ALTER TABLE user ADD COLUMN explored_tiles TEXT"))
         db.session.commit()
         print("[OK] Added 'explored_tiles' column to user table.")
         return True
@@ -41,5 +43,5 @@ def main():  # pragma: no cover - script entry
             print("[INFO] No changes required.")
 
 
-if __name__ == '__main__':  # pragma: no cover
+if __name__ == "__main__":  # pragma: no cover
     main()

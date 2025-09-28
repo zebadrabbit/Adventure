@@ -4,6 +4,18 @@ repos:
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
+  - repo: https://github.com/psf/black
+    rev: 24.8.0
+    hooks:
+      - id: black
+        args: ["--config=pyproject.toml"]
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.5.7
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+        # NOTE: ruff-format intentionally disabled to avoid oscillating diffs with Black.
+        # Ruff lint (with --fix) handles import sorting; Black is sole formatter.
   - repo: local
     hooks:
       - id: inline-style-check

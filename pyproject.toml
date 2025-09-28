@@ -1,0 +1,45 @@
+[tool.black]
+line-length = 120
+target-version = ["py312"]
+# The previous include pattern had a doubled backslash in a single-quoted TOML string, producing
+# a regex of \\.(py)$ which effectively looked for a literal backslash followed by any character,
+# and never matched Linux paths. This resulted in: "No Python files are present to be formatted.".
+# Use a simpler, correct pattern matching any .py file.
+include = '\.py$'
+## Black's "exclude" is a regular expression applied to the full *normalized* path.
+## Anchor the virtual environment directory so Black never traverses it. The prior pattern
+## relied on a leading and trailing slash wrapper that was fragile and whitespace-sensitive.
+exclude = '''
+(
+  (^|/)(\.venv|build|dist)/
+  | migrations/versions
+  | .*_pb2\.py$
+)
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 120
+multi_line_output = 3
+combine_as_imports = true
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+
+[tool.ruff]
+line-length = 120
+exclude = [".venv","app/static/iconography","app/static/*.svg"]
+
+[tool.ruff.lint]
+select = [
+  "E","F","W", # pycodestyle/pyflakes
+  "I",           # isort
+  "UP",          # pyupgrade
+  "B",           # bugbear
+  "SIM",         # simplify
+  "C4"           # comprehensions
+]
+ignore = ["E203","W503"]
+
+[tool.ruff.lint.per-file-ignores]
+# (No longer ignoring E501 for tests; global line-length relaxed to 120.)

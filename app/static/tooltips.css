@@ -1,0 +1,141 @@
+.mud-item-tip {
+	max-width: 260px;
+}
+
+.mud-item-name {
+	font-size: 0.9rem;
+}
+
+.mud-item-meta {
+	font-size: 0.65rem;
+	letter-spacing: 0.25px;
+}
+
+.mud-item-desc {
+	line-height: 1.15rem;
+}
+
+.mud-item-effects {
+	font-family: monospace;
+	letter-spacing: 0.5px;
+}
+
+.mud-item-tooltip .tooltip-inner {
+	background: #20242a;
+	border: 1px solid #49515c;
+	padding: 6px 8px;
+	max-width: 280px;
+	font-size: 0.75rem;
+	line-height: 1.2;
+	color: #e8eaf0;
+}
+
+/* Ensure loot dropdown menus render above map / log containers */
+.loot-list .dropdown-menu {
+	z-index: 1080;
+	/* above custom tooltip (1055) */
+}
+
+.mud-item-tooltip .tooltip-inner .mud-item-name {
+	font-size: 0.8rem;
+}
+
+.mud-item-tooltip .tooltip-inner .mud-item-meta {
+	opacity: 0.85;
+}
+
+.mud-item-tooltip .tooltip-inner .mud-item-effects {
+	color: #7dc7ff;
+}
+
+.mud-item-tooltip .tooltip-inner .mud-item-desc {
+	color: #d3d6dc;
+}
+
+/* Ensure tooltip arrow inherits dark theme */
+.mud-item-tooltip .tooltip-arrow::before {
+	background: #20242a;
+	border: 1px solid #49515c;
+}
+
+/* Rarity color accents */
+.rarity-common .mud-item-name {
+	color: #ddd;
+}
+
+.rarity-uncommon .mud-item-name {
+	color: #5cb85c;
+}
+
+.rarity-rare .mud-item-name {
+	color: #3fa3ff;
+}
+
+.rarity-epic .mud-item-name {
+	color: #b17bff;
+}
+
+.rarity-legendary .mud-item-name {
+	color: #ffa93f;
+}
+
+.rarity-mythic .mud-item-name {
+	color: #ff5fa3;
+}
+
+/* Outline of tooltip body using rarity color via border-left */
+.rarity-common.mud-item-tip {
+	border-left: 4px solid #888;
+	padding-left: 6px;
+}
+
+.rarity-uncommon.mud-item-tip {
+	border-left: 4px solid #5cb85c;
+	padding-left: 6px;
+}
+
+.rarity-rare.mud-item-tip {
+	border-left: 4px solid #3fa3ff;
+	padding-left: 6px;
+}
+
+.rarity-epic.mud-item-tip {
+	border-left: 4px solid #b17bff;
+	padding-left: 6px;
+}
+
+.rarity-legendary.mud-item-tip {
+	border-left: 4px solid #ffa93f;
+	padding-left: 6px;
+}
+
+.rarity-mythic.mud-item-tip {
+	border-left: 4px solid #ff5fa3;
+	padding-left: 6px;
+}
+
+/* Accessibility helpers */
+.visually-hidden {
+	position: absolute !important;
+	width: 1px !important;
+	height: 1px !important;
+	padding: 0 !important;
+	margin: -1px !important;
+	overflow: hidden !important;
+	clip: rect(0, 0, 0, 0) !important;
+	white-space: nowrap !important;
+	border: 0 !important;
+}
+
+/* Tooltip mode toggle button */
+.mud-tooltips-toggle {
+	font-size: 0.65rem;
+	line-height: 1.1rem;
+	opacity: 0.75;
+	transition: opacity .15s ease-in-out;
+}
+
+.mud-tooltips-toggle:hover,
+.mud-tooltips-toggle:focus {
+	opacity: 1;
+}

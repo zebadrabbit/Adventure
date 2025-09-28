@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 import os
+import subprocess
 import sys
 import time
-import subprocess
 from datetime import datetime
 from urllib.parse import urlencode
 
@@ -14,7 +14,12 @@ PASSWORD = os.environ.get("ADVENTURE_DEMO_PASS", "demo12345")
 
 
 def out_dir():
-    root = os.path.join(os.getcwd(), "instance", "screenshots", f"storyboard-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}")
+    root = os.path.join(
+        os.getcwd(),
+        "instance",
+        "screenshots",
+        f"storyboard-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}",
+    )
     os.makedirs(root, exist_ok=True)
     return root
 
@@ -71,60 +76,66 @@ def upsert_user(page):
         page.fill('input[name="username"]', USERNAME)
         page.fill('input[name="password"]', PASSWORD)
         page.click('button[type="submit"]')
-        page.wait_for_load_state('networkidle')
-        if page.url.endswith('/register'):
-            raise RuntimeError('register failed (likely exists)')
+        page.wait_for_load_state("networkidle")
+        if page.url.endswith("/register"):
+            raise RuntimeError("register failed (likely exists)")
     except Exception:
         page.goto(f"{BASE_URL}/login")
         page.fill('input[name="username"]', USERNAME)
         page.fill('input[name="password"]', PASSWORD)
         page.click('button[type="submit"]')
-        page.wait_for_load_state('networkidle')
+        page.wait_for_load_state("networkidle")
 
 
 def ensure_characters_and_party(page):
     page.goto(f"{BASE_URL}/dashboard")
-    page.wait_for_load_state('networkidle')
+    page.wait_for_load_state("networkidle")
     # Create up to 4 via autofill if none present
     try:
-        cards = page.locator('.character-card')
+        cards = page.locator(".character-card")
         if cards.count() == 0:
             page.request.post(f"{BASE_URL}/autofill_characters")
             page.goto(f"{BASE_URL}/dashboard")
-            page.wait_for_load_state('networkidle')
+            page.wait_for_load_state("networkidle")
     except Exception:
         pass
     # Collect ids and post start adventure
     try:
-        ids = page.evaluate('''() => Array.from(document.querySelectorAll('input.party-select')).slice(0,4).map(el => el.getAttribute('data-id')).filter(Boolean)''')
+        ids = page.evaluate(
+            """() => Array.from(document.querySelectorAll('input.party-select')).slice(0,4).map(el => el.getAttribute('data-id')).filter(Boolean)"""
+        )
     except Exception:
         ids = []
     if ids:
         try:
-            payload = [('form','start_adventure')] + [('party_ids', i) for i in ids]
+            payload = [("form", "start_adventure")] + [("party_ids", i) for i in ids]
             data = urlencode(payload)
-            page.request.post(f"{BASE_URL}/dashboard", data=data, headers={'Content-Type': 'application/x-www-form-urlencoded'})
+            page.request.post(
+                f"{BASE_URL}/dashboard",
+                data=data,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
         except Exception:
             pass
 
 
 def wait_adventure_ready(page):
     page.goto(f"{BASE_URL}/adventure")
-    page.wait_for_load_state('networkidle')
+    page.wait_for_load_state("networkidle")
     # If redirected, re-auth and retry
-    if '/login' in page.url or '/register' in page.url:
+    if "/login" in page.url or "/register" in page.url:
         upsert_user(page)
         ensure_characters_and_party(page)
         page.goto(f"{BASE_URL}/adventure")
-        page.wait_for_load_state('networkidle')
+        page.wait_for_load_state("networkidle")
     try:
-        page.wait_for_selector('#dungeon-map', timeout=20000)
+        page.wait_for_selector("#dungeon-map", timeout=20000)
     except Exception:
-        page.wait_for_selector('#dungeon-controls', timeout=5000)
+        page.wait_for_selector("#dungeon-controls", timeout=5000)
 
 
 def try_find_loot(page, max_steps=36):
-    directions = ['#btn-move-n', '#btn-move-e', '#btn-move-s', '#btn-move-w']
+    directions = ["#btn-move-n", "#btn-move-e", "#btn-move-s", "#btn-move-w"]
     for _ in range(max_steps):
         for sel in directions:
             try:
@@ -133,18 +144,18 @@ def try_find_loot(page, max_steps=36):
                     btn.click()
                     page.wait_for_timeout(150)
                     # Search enabled indicates notice marker exists
-                    if page.locator('#btn-search').is_enabled():
+                    if page.locator("#btn-search").is_enabled():
                         return True
             except Exception:
                 pass
     try:
-        return page.locator('#btn-search').is_enabled()
+        return page.locator("#btn-search").is_enabled()
     except Exception:
         return False
 
 
-def shot(loc, page, selector=None, name='scene', full_page=False):
-    ts = datetime.utcnow().strftime('%H%M%S')
+def shot(loc, page, selector=None, name="scene", full_page=False):
+    ts = datetime.utcnow().strftime("%H%M%S")
     path = os.path.join(loc, f"{name}-{ts}.png")
     try:
         if selector:
@@ -172,75 +183,75 @@ def main():
 
         # 01: Login page
         page.goto(f"{BASE_URL}/login")
-        page.wait_for_load_state('networkidle')
-        shot(out, page, selector='.auth-card', name='01-login')
+        page.wait_for_load_state("networkidle")
+        shot(out, page, selector=".auth-card", name="01-login")
 
         # 02: Register page
         page.goto(f"{BASE_URL}/register")
-        page.wait_for_load_state('networkidle')
-        shot(out, page, selector='.auth-card', name='02-register')
+        page.wait_for_load_state("networkidle")
+        shot(out, page, selector=".auth-card", name="02-register")
 
         # 03: Dashboard (after upsert/login)
         upsert_user(page)
         page.goto(f"{BASE_URL}/dashboard")
-        page.wait_for_load_state('networkidle')
-        shot(out, page, name='03-dashboard', full_page=True)
+        page.wait_for_load_state("networkidle")
+        shot(out, page, name="03-dashboard", full_page=True)
 
         # 04: Dashboard party selection (ensure party and show enabled Begin button)
         ensure_characters_and_party(page)
         page.goto(f"{BASE_URL}/dashboard")
-        page.wait_for_load_state('networkidle')
+        page.wait_for_load_state("networkidle")
         # Try to enable button by selecting a few checkboxes in UI (for visual)
         try:
-            boxes = page.locator('input.party-select')
+            boxes = page.locator("input.party-select")
             count = min(4, boxes.count())
             for i in range(count):
                 boxes.nth(i).check()
                 page.wait_for_timeout(50)
         except Exception:
             pass
-        shot(out, page, selector='#begin-adventure-form', name='04-party-form')
+        shot(out, page, selector="#begin-adventure-form", name="04-party-form")
 
         # 05: Adventure initial
         wait_adventure_ready(page)
-        shot(out, page, name='05-adventure-initial', full_page=True)
+        shot(out, page, name="05-adventure-initial", full_page=True)
 
         # 06: Move until notice (search enabled)
         try_find_loot(page)
-        shot(out, page, selector='#dungeon-controls', name='06-notice-controls')
+        shot(out, page, selector="#dungeon-controls", name="06-notice-controls")
 
         # 07: Search results with loot links
         try:
-            if page.locator('#btn-search').is_enabled():
-                page.click('#btn-search')
+            if page.locator("#btn-search").is_enabled():
+                page.click("#btn-search")
                 page.wait_for_timeout(300)
         except Exception:
             pass
-        shot(out, page, selector='#dungeon-controls', name='07-search-results')
+        shot(out, page, selector="#dungeon-controls", name="07-search-results")
 
         # 08: Tooltip over first loot link
         try:
-            first_link = page.locator('.loot-link').first
+            first_link = page.locator(".loot-link").first
             first_link.hover()
             page.wait_for_timeout(150)
         except Exception:
             pass
-        shot(out, page, selector='#dungeon-controls', name='08-tooltip')
+        shot(out, page, selector="#dungeon-controls", name="08-tooltip")
 
         # 09: Claim first loot link and capture confirmation
         try:
-            page.locator('.loot-link').first.click()
+            page.locator(".loot-link").first.click()
             page.wait_for_timeout(250)
         except Exception:
             pass
-        shot(out, page, selector='#dungeon-controls', name='09-claimed')
+        shot(out, page, selector="#dungeon-controls", name="09-claimed")
 
         # 10: Back to dashboard inventory
         page.goto(f"{BASE_URL}/dashboard")
-        page.wait_for_load_state('networkidle')
+        page.wait_for_load_state("networkidle")
         # Capture first character card including Inventory
         try:
-            card = page.locator('.character-card').first
+            card = page.locator(".character-card").first
             path = os.path.join(out, f"10-inventory-{datetime.utcnow().strftime('%H%M%S')}.png")
             card.screenshot(path=path)
             print(path)
@@ -252,5 +263,5 @@ def main():
         stop_server(proc)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

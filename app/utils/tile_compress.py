@@ -12,21 +12,23 @@ Limitations:
   - Assumes non-negative integer coordinates.
   - Falls back to raw if parsing fails.
 """
+
 from __future__ import annotations
 
+
 def compress_tiles(raw: str) -> str:
-    if not raw or ';' not in raw:
+    if not raw or ";" not in raw:
         return raw
     try:
         coords = []
-        for part in raw.split(';'):
+        for part in raw.split(";"):
             if not part:
                 continue
-            x_s, y_s = part.split(',')
+            x_s, y_s = part.split(",")
             x, y = int(x_s), int(y_s)
             coords.append((x, y))
         if not coords:
-            return ''
+            return ""
         coords.sort()
         pieces = []
         prev_x, prev_y = None, None
@@ -36,21 +38,22 @@ def compress_tiles(raw: str) -> str:
             else:
                 pieces.append(f"{x-prev_x},{y-prev_y}")
             prev_x, prev_y = x, y
-        compressed = 'D:' + '|'.join(pieces)
+        compressed = "D:" + "|".join(pieces)
         return compressed if len(compressed) < len(raw) else raw
     except Exception:
         return raw
 
+
 def decompress_tiles(data: str) -> str:
-    if not data or not data.startswith('D:'):
+    if not data or not data.startswith("D:"):
         return data
     try:
         body = data[2:]
-        parts = body.split('|')
+        parts = body.split("|")
         coords = []
         prev_x, prev_y = None, None
         for idx, token in enumerate(parts):
-            x_s, y_s = token.split(',')
+            x_s, y_s = token.split(",")
             dx, dy = int(x_s), int(y_s)
             if prev_x is None:
                 x, y = dx, dy
@@ -58,8 +61,9 @@ def decompress_tiles(data: str) -> str:
                 x, y = prev_x + dx, prev_y + dy
             coords.append(f"{x},{y}")
             prev_x, prev_y = x, y
-        return ';'.join(coords)
+        return ";".join(coords)
     except Exception:
-        return ''
+        return ""
 
-__all__ = ['compress_tiles', 'decompress_tiles']
+
+__all__ = ["compress_tiles", "decompress_tiles"]

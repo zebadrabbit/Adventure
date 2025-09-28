@@ -4,23 +4,27 @@ Generates level-appropriate loot drops for a dungeon seed using item level
 and rarity weighting. Designed to be idempotent: calling generate_loot_for_seed
 multiple times will not duplicate existing placements at the same coordinates.
 """
+
 from __future__ import annotations
+
+import random
 from dataclasses import dataclass
 from typing import List, Sequence
-import random
+
 from app import db
-from app.models.models import Item
 from app.models.loot import DungeonLoot
+from app.models.models import Item
 
 # Rarity weight configuration (higher = more common)
 RARITY_WEIGHTS = {
-    'common': 100,
-    'uncommon': 55,
-    'rare': 25,
-    'epic': 10,
-    'legendary': 3,
-    'mythic': 1,
+    "common": 100,
+    "uncommon": 55,
+    "rare": 25,
+    "epic": 10,
+    "legendary": 3,
+    "mythic": 1,
 }
+
 
 @dataclass
 class LootConfig:
@@ -51,20 +55,22 @@ def _choose_items(item_pool: Sequence[Item], count: int, rng: random.Random) -> 
     return chosen
 
 
-def _level_window(avg_level: int) -> tuple[int,int]:
+def _level_window(avg_level: int) -> tuple[int, int]:
     lo = max(1, avg_level - 2)
     hi = min(20, avg_level + 2)
     return lo, hi
 
 
-def generate_loot_for_seed(cfg: LootConfig, walkable_tiles: Sequence[tuple[int,int]]):
+def generate_loot_for_seed(cfg: LootConfig, walkable_tiles: Sequence[tuple[int, int]]):
     """Generate loot placements for the given seed if not already present.
 
     walkable_tiles: list of (x,y) coordinates that are valid placement points.
     """
     rng = random.Random(cfg.seed ^ 0xA5F00D)
     # Query existing placements for this seed
-    existing_coords = { (l.x, l.y, l.z) for l in DungeonLoot.query.filter_by(seed=cfg.seed).all() }
+    existing_coords = {
+        (loot_row.x, loot_row.y, loot_row.z) for loot_row in DungeonLoot.query.filter_by(seed=cfg.seed).all()
+    }
 
     lo, hi = _level_window(cfg.avg_party_level)
     # Candidate items: those with level between window or utility (level 0) and not beyond 20
@@ -73,7 +79,15 @@ def generate_loot_for_seed(cfg: LootConfig, walkable_tiles: Sequence[tuple[int,i
     if not candidate_items:
         # Fallback: ensure at least one basic item exists so tests expecting >=1 drop pass.
         # This can occur in a pristine test DB before seed_items() ran.
-        basic = Item(slug='temp-basic-sword', name='Temp Basic Sword', type='weapon', description='Fallback test item', value_copper=100, level=1, rarity='common')
+        basic = Item(
+            slug="temp-basic-sword",
+            name="Temp Basic Sword",
+            type="weapon",
+            description="Fallback test item",
+            value_copper=100,
+            level=1,
+            rarity="common",
+        )
         db.session.add(basic)
         db.session.commit()
         candidate_items = [basic]
@@ -119,7 +133,7 @@ def generate_loot_for_seed(cfg: LootConfig, walkable_tiles: Sequence[tuple[int,i
     chosen_items = _choose_items(candidate_items, len(chosen_tiles), rng)
 
     created = 0
-    for (x,y,z), item in zip(chosen_tiles, chosen_items):
+    for (x, y, z), item in zip(chosen_tiles, chosen_items):
         # Re-check existence (race/idempotence safety)
         if DungeonLoot.query.filter_by(seed=cfg.seed, x=x, y=y, z=z).first():
             continue
