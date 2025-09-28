@@ -2,6 +2,8 @@
 (function(){
   const modalId = 'equipmentModal';
   let state = null; // loaded from /api/characters/state
+  let stateVersion = 0; // increment when invalidated externally
+  let lastLoadedVersion = -1;
 
   function ensureModal(){
     if (document.getElementById(modalId)) return;
@@ -25,11 +27,16 @@
     document.body.insertAdjacentHTML('beforeend', html);
   }
 
-  async function loadState(){
+  async function loadState(force=false){
+    if (!force && state && lastLoadedVersion === stateVersion) return; // cached
     const r = await fetch('/api/characters/state');
     if (!r.ok) throw new Error('failed to load character state');
     state = await r.json();
+    lastLoadedVersion = stateVersion;
   }
+
+  // External cache invalidation (e.g., loot claim elsewhere)
+  document.addEventListener('mud-characters-state-invalidated', () => { stateVersion++; });
 
   function slotBox(slot, item){
     const label = slot.replace(/\d+$/, '');
@@ -125,7 +132,8 @@
           body: JSON.stringify({ slug, slot: targetSlot })
         });
         if (r.ok) {
-          await loadState();
+          stateVersion++; // underlying data changed
+          await loadState(true);
           openForChar(charId); // re-render
         } else {
           console.warn('equip failed', await r.json().catch(()=>({})));
@@ -140,7 +148,8 @@
           body: JSON.stringify({ slug })
         });
         if (r.ok) {
-          await loadState();
+          stateVersion++;
+          await loadState(true);
           openForChar(charId);
         }
       });
@@ -153,7 +162,8 @@
           body: JSON.stringify({ slot })
         });
         if (r.ok) {
-          await loadState();
+          stateVersion++;
+          await loadState(true);
           openForChar(charId);
         } else {
           console.warn('unequip failed', await r.json().catch(()=>({})))
@@ -162,8 +172,10 @@
     });
   }
 
-  function openForChar(charId){
+  async function openForChar(charId){
     ensureModal();
+    // Always refresh state before opening to reflect latest loot assignment from elsewhere
+    try { await loadState(true); } catch(e) { console.warn('equipment: load before open failed', e); }
     const modalEl = document.getElementById(modalId);
     const target = findCharState(charId);
     if (!target) return;
@@ -178,17 +190,11 @@
 
   async function init(){
     ensureModal();
-    // Try to preload state, but don't block wiring if it fails (e.g., transient 401/redirect)
     try { await loadState(); } catch(e) { console.warn('equipment: initial state load failed, will lazy-load on click'); }
-    // Bind click handlers even if state failed to load; we'll lazy load on demand
     document.querySelectorAll('.btn-equip-panel, .btn-bag-panel').forEach(btn => {
-      // Avoid double-binding when navigating between pages with turbolinks-like behavior
       if (btn.__equipWired) return; btn.__equipWired = true;
       btn.addEventListener('click', async ()=>{
         const cid = parseInt(btn.getAttribute('data-char-id'), 10);
-        if (!state) {
-          try { await loadState(); } catch(e) { console.error('equipment: unable to load state', e); return; }
-        }
         openForChar(cid);
       });
     });
@@ -200,7 +206,6 @@
     init();
   }
 
-  // Respond to global tooltip mode changes by re-applying to the modal content if open
   document.addEventListener('mud-tooltips-mode-change', () => {
     const modalEl = document.getElementById(modalId);
     if (modalEl && modalEl.classList.contains('show')) {

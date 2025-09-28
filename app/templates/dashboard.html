@@ -109,8 +109,8 @@
 <div class="row g-4">
     {% for c in characters %}
     <div class="col-12 col-md-6 col-lg-4">
-                <div class="card h-100 shadow-sm border-default character-card" data-id="{{ c.id }}">
-                        <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="card h-100 shadow-sm border-default character-card" data-id="{{ c.id }}">
+            <div class="card-header d-flex justify-content-between align-items-center">
                                 <span class="d-flex align-items-center">
                                     {% set class_lower = c.class_name.lower() %}
                                     <span class="me-2 icon-28 u-flex-center">
@@ -175,6 +175,7 @@
                 <h6 class="text-uppercase text-muted">{{ svg_icon('knapsack', 18, 'me-1 align-text-bottom') }} Inventory</h6>
                 {% if c.inventory and c.inventory|length > 0 %}
                     <ul class="small mb-0 list-reset">
+
                         {% for it in c.inventory %}
                             <li>
                                 {% if it.type == 'weapon' %}
@@ -202,11 +203,11 @@
             </div>
             <div class="card-footer d-flex justify-content-between">
                 <form action="{{ url_for('dashboard.delete_character', char_id=c.id) }}" method="post" onsubmit="return confirm('Delete {{ c.name }}?');">
-                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Delete</button>
+                    <button class="btn btn-sm btn-outline-danger" aria-label="Delete {{ c.name }}" data-bs-title="Delete {{ c.name }}" data-mud-tooltip="1">{{ svg_icon('trash',16) }}</button>
                 </form>
-                <div class="btn-group">
-                    <button class="btn btn-sm btn-outline-warning btn-equip-panel" data-char-id="{{ c.id }}"><i class="bi bi-shield"></i> Equipment</button>
-                    <button class="btn btn-sm btn-outline-warning btn-bag-panel" data-char-id="{{ c.id }}"><i class="bi bi-bag"></i> Bags</button>
+                <div class="btn-group" role="group" aria-label="Character inventory controls">
+                    <button class="btn btn-sm btn-outline-warning btn-equip-panel icon-btn" data-char-id="{{ c.id }}" aria-label="Equipment" data-bs-title="Equipment" data-mud-tooltip="1">{{ svg_icon('anvil',18,'icon-inline') }}</button>
+                    <button class="btn btn-sm btn-outline-warning btn-bag-panel icon-btn" data-char-id="{{ c.id }}" aria-label="Bags" data-bs-title="Bags" data-mud-tooltip="1">{{ svg_icon('knapsack',18,'icon-inline') }}</button>
                 </div>
             </div>
         </div>

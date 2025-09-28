@@ -434,6 +434,8 @@
                           line.textContent = `Assigned ${res.item?.name || 'item'} to ${pc.name}.`;
                           wrapper.remove();
                           try { refreshNoticeMarkers(); } catch (e) { }
+                          // Notify other UI (equipment modal) that character inventories changed
+                          try { document.dispatchEvent(new CustomEvent('mud-characters-state-invalidated', { detail: { character_id: pc.id } })); } catch (e) { }
                           const remaining = list.querySelectorAll('.loot-entry');
                           if (!remaining || remaining.length === 0) {
                             if (window.currentPos) removeNoticeMarker(window.currentPos[0], window.currentPos[1]);

@@ -21,6 +21,19 @@ body {
   min-height: 100vh;
   color: var(--mud-grey);
 }
+/* Icon button adjustments */
+.icon-btn svg, .icon-btn i {
+  pointer-events: none;
+}
+.icon-btn {
+  min-width: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.4rem;
+}
+.icon-btn + .icon-btn { margin-left: 0.25rem; }
+
 .navbar {
   border-radius: 0 0 1rem 1rem;
   margin-bottom: 1.5rem;
