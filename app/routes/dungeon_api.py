@@ -27,6 +27,7 @@ from app.models.dungeon_instance import DungeonInstance
 from app.models.loot import DungeonLoot
 from app.models.models import Character, Item
 from app.utils.tile_compress import compress_tiles, decompress_tiles
+from app.services.time_service import advance_time  # time advancement
 
 
 def admin_required(fn):
@@ -294,6 +295,7 @@ def dungeon_move():
             db.session.rollback()
     # Movement deltas (row-major grid returned to client where visual "north" corresponds to increasing y index)
     deltas = {"n": (0, 1), "s": (0, -1), "e": (1, 0), "w": (-1, 0)}
+    moved = False
     if direction in deltas:
         dx, dy = deltas[direction]
         nx, ny = x + dx, y + dy
@@ -301,6 +303,7 @@ def dungeon_move():
             instance.pos_x, instance.pos_y = nx, ny
             db.session.commit()
             x, y = nx, ny
+            moved = True
             # Teleport activation: if current tile is a teleport pad, jump to its paired pad (if defined)
             if dungeon.grid[x][y] in ("P", getattr(dungeon, "TELEPORT", "P")):
                 tp_lookup = dungeon.metrics.get("teleport_lookup") or {}
@@ -333,6 +336,12 @@ def dungeon_move():
     resp = {"pos": pos, "desc": desc, "exits": exits_map, "noticed_loot": noticed}
     if roll_info:
         resp["last_roll"] = roll_info
+    # Advance time 1 tick only if an actual movement occurred
+    if moved:
+        try:
+            advance_time(1, reason="move", actor_id=None)
+        except Exception:
+            pass
     return jsonify(resp)
 
 
@@ -639,6 +648,10 @@ def dungeon_search():
         return jsonify({"found": False, "message": "There is nothing here."}), 404
     names = ", ".join(i["name"] for i in items)
     msg = f"You search the area and discover: {names}."
+    try:
+        advance_time(1, reason="search", actor_id=None)
+    except Exception:
+        pass
     return jsonify({"found": True, "items": items, "message": msg})
 
 
@@ -658,7 +671,14 @@ def adventure():
         if instance:
             pos = (instance.pos_x, instance.pos_y, instance.pos_z)
             seed = instance.seed
-    return render_template("adventure.html", party=party, seed=seed, pos=pos)
+    from app.models import GameClock
+
+    clock = None
+    try:
+        clock = GameClock.get()
+    except Exception:
+        clock = None
+    return render_template("adventure.html", party=party, seed=seed, pos=pos, game_clock=clock)
 
 
 # Add other dungeon/gameplay routes here

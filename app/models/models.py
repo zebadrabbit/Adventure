@@ -180,3 +180,29 @@ class UserPref(db.Model):
         else:
             row.value = value
         db.session.commit()
+
+
+class GameClock(db.Model):
+    """Global non-combat game clock (simple tick counter).
+
+    Single-row table (id=1) that advances for each non-combat action: movement,
+    searching, using an item, casting a spell, etc. Future combat turns will
+    temporarily pause real-time ticking and instead advance via turn order.
+    """
+
+    id = db.Column(db.Integer, primary_key=True, default=1)
+    tick = db.Column(db.Integer, nullable=False, default=0, index=True)
+
+    @staticmethod
+    def get():  # pragma: no cover - thin convenience
+        from app import db as _db
+
+        inst = _db.session.get(GameClock, 1)
+        if not inst:
+            inst = GameClock(id=1, tick=0)
+            _db.session.add(inst)
+            try:
+                _db.session.commit()
+            except Exception:  # pragma: no cover
+                _db.session.rollback()
+        return inst

@@ -27,6 +27,7 @@ from flask_login import current_user, login_required
 from app import db
 from app.models.models import Character, User
 from app.models.xp import xp_for_level
+from app.models import GameClock
 
 bp_dashboard = Blueprint("dashboard", __name__)
 
@@ -395,11 +396,17 @@ def dashboard():
         user_email = None
     # Pre-fill dungeon seed if present in session
     dungeon_seed = session.get("dungeon_seed", "")
+    # Provide global game clock tick (create row lazily if needed)
+    try:
+        clock = GameClock.get()
+    except Exception:
+        clock = None
     return render_template(
         "dashboard.html",
         characters=char_list,
         user_email=user_email,
         dungeon_seed=dungeon_seed,
+        game_clock=clock,
     )
 
 
