@@ -192,6 +192,8 @@ class GameClock(db.Model):
 
     id = db.Column(db.Integer, primary_key=True, default=1)
     tick = db.Column(db.Integer, nullable=False, default=0, index=True)
+    # When True, non-combat actions should not auto-advance time; turn system controls progression
+    combat = db.Column(db.Boolean, nullable=False, default=False)
 
     @staticmethod
     def get():  # pragma: no cover - thin convenience

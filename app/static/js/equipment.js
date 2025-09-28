@@ -1,11 +1,11 @@
 // equipment.js - Inventory & Equipment UI with drag-and-drop
-(function(){
+(function () {
   const modalId = 'equipmentModal';
   let state = null; // loaded from /api/characters/state
   let stateVersion = 0; // increment when invalidated externally
   let lastLoadedVersion = -1;
 
-  function ensureModal(){
+  function ensureModal() {
     if (document.getElementById(modalId)) return;
     const html = `
 <div class="modal fade" id="${modalId}" tabindex="-1" aria-hidden="true">
@@ -27,7 +27,7 @@
     document.body.insertAdjacentHTML('beforeend', html);
   }
 
-  async function loadState(force=false){
+  async function loadState(force = false) {
     if (!force && state && lastLoadedVersion === stateVersion) return; // cached
     const r = await fetch('/api/characters/state');
     if (!r.ok) throw new Error('failed to load character state');
@@ -38,10 +38,10 @@
   // External cache invalidation (e.g., loot claim elsewhere)
   document.addEventListener('mud-characters-state-invalidated', () => { stateVersion++; });
 
-  function slotBox(slot, item){
+  function slotBox(slot, item) {
     const label = slot.replace(/\d+$/, '');
     const icon = iconForType(item?.type);
-      const tooltipAttr = (item && window.MUDTooltips) ? window.MUDTooltips.attrForItem(item) : '';
+    const tooltipAttr = (item && window.MUDTooltips) ? window.MUDTooltips.attrForItem(item) : '';
     const right = item
       ? `<div class="d-flex align-items-center gap-2">
              <div class="small item-name" tabindex="0" ${tooltipAttr}>${icon} ${esc(item.name)} <span class="text-muted small">(${esc(item.type)})</span></div>
@@ -57,9 +57,9 @@
       </div>`;
   }
 
-  function bagItem(it){
+  function bagItem(it) {
     const icon = iconForType(it.type);
-      const tooltipAttr = window.MUDTooltips ? window.MUDTooltips.attrForItem(it) : '';
+    const tooltipAttr = window.MUDTooltips ? window.MUDTooltips.attrForItem(it) : '';
     return `<div class="bag-item list-group-item d-flex justify-content-between align-items-center" draggable="true" data-slug="${esc(it.slug)}">
         <div class="item-name" tabindex="0" ${tooltipAttr}>${icon} ${esc(it.name)} <span class="text-muted small">(${esc(it.type)})</span></div>
       <div class="btn-group btn-group-sm">
@@ -68,7 +68,7 @@
     </div>`;
   }
 
-  function iconForType(t){
+  function iconForType(t) {
     const m = {
       weapon: '<i class="bi bi-sword"></i>',
       armor: '<i class="bi bi-shield"></i>',
@@ -80,19 +80,19 @@
     return m[t] || '<i class="bi bi-box"></i>';
   }
 
-  function esc(s){ return (s||'').replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+  function esc(s) { return (s || '').replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c])); }
 
-  function buildTooltip(it){
-  // Removed local buildTooltip in favor of shared module
+  function buildTooltip(it) {
+    // Removed local buildTooltip in favor of shared module
   }
 
-  function renderCharPanel(ch){
+  function renderCharPanel(ch) {
     const gear = ch.gear || {};
-    const slots = ['weapon','offhand','head','chest','legs','boots','gloves','ring1','ring2','amulet'];
+    const slots = ['weapon', 'offhand', 'head', 'chest', 'legs', 'boots', 'gloves', 'ring1', 'ring2', 'amulet'];
     let html = `<div class="row g-3" data-char-id="${ch.id}">
       <div class="col-md-6">
         <h6 class="text-muted">Equipment</h6>
-        ${slots.map(s=>slotBox(s, gear[s])).join('')}
+        ${slots.map(s => slotBox(s, gear[s])).join('')}
       </div>
       <div class="col-md-6">
         <h6 class="text-muted">Bags</h6>
@@ -104,26 +104,26 @@
     return html;
   }
 
-  function findCharState(charId){
+  function findCharState(charId) {
     if (!state || !state.characters) return null;
-    return state.characters.find(c=>c.id===charId);
+    return state.characters.find(c => c.id === charId);
   }
 
-  function wireDnD(modalEl, charId){
+  function wireDnD(modalEl, charId) {
     const bag = modalEl.querySelector('#bag-list');
     let dragSlug = null;
-    bag?.addEventListener('dragstart', (e)=>{
+    bag?.addEventListener('dragstart', (e) => {
       const el = e.target.closest('.bag-item');
       if (!el) return;
       dragSlug = el.getAttribute('data-slug');
       e.dataTransfer.setData('text/plain', dragSlug);
     });
     modalEl.querySelectorAll('.equip-slot').forEach(slot => {
-      slot.addEventListener('dragover', e=>{ e.preventDefault(); slot.classList.add('border','border-info'); });
-      slot.addEventListener('dragleave', ()=> slot.classList.remove('border','border-info'));
-      slot.addEventListener('drop', async (e)=>{
+      slot.addEventListener('dragover', e => { e.preventDefault(); slot.classList.add('border', 'border-info'); });
+      slot.addEventListener('dragleave', () => slot.classList.remove('border', 'border-info'));
+      slot.addEventListener('drop', async (e) => {
         e.preventDefault();
-        slot.classList.remove('border','border-info');
+        slot.classList.remove('border', 'border-info');
         const slug = dragSlug || e.dataTransfer.getData('text/plain');
         const targetSlot = slot.getAttribute('data-slot');
         if (!slug || !targetSlot) return;
@@ -136,12 +136,12 @@
           await loadState(true);
           openForChar(charId); // re-render
         } else {
-          console.warn('equip failed', await r.json().catch(()=>({})));
+          console.warn('equip failed', await r.json().catch(() => ({})));
         }
       });
     });
     modalEl.querySelectorAll('.btn-consume').forEach(btn => {
-      btn.addEventListener('click', async ()=>{
+      btn.addEventListener('click', async () => {
         const slug = btn.getAttribute('data-slug');
         const r = await fetch(`/api/characters/${charId}/consume`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -155,7 +155,7 @@
       });
     });
     modalEl.querySelectorAll('.btn-unequip').forEach(btn => {
-      btn.addEventListener('click', async ()=>{
+      btn.addEventListener('click', async () => {
         const slot = btn.getAttribute('data-slot');
         const r = await fetch(`/api/characters/${charId}/unequip`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -166,34 +166,34 @@
           await loadState(true);
           openForChar(charId);
         } else {
-          console.warn('unequip failed', await r.json().catch(()=>({})))
+          console.warn('unequip failed', await r.json().catch(() => ({})))
         }
       });
     });
   }
 
-  async function openForChar(charId){
+  async function openForChar(charId) {
     ensureModal();
     // Always refresh state before opening to reflect latest loot assignment from elsewhere
-    try { await loadState(true); } catch(e) { console.warn('equipment: load before open failed', e); }
+    try { await loadState(true); } catch (e) { console.warn('equipment: load before open failed', e); }
     const modalEl = document.getElementById(modalId);
     const target = findCharState(charId);
     if (!target) return;
     const body = modalEl.querySelector('#equip-modal-body');
     body.innerHTML = renderCharPanel(target);
     wireDnD(modalEl, charId);
-      // Initialize shared tooltips
-      if (window.MUDTooltips) { window.MUDTooltips.apply(modalEl); }
+    // Initialize shared tooltips
+    if (window.MUDTooltips) { window.MUDTooltips.apply(modalEl); }
     const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
     bsModal.show();
   }
 
-  async function init(){
+  async function init() {
     ensureModal();
-    try { await loadState(); } catch(e) { console.warn('equipment: initial state load failed, will lazy-load on click'); }
+    try { await loadState(); } catch (e) { console.warn('equipment: initial state load failed, will lazy-load on click'); }
     document.querySelectorAll('.btn-equip-panel, .btn-bag-panel').forEach(btn => {
       if (btn.__equipWired) return; btn.__equipWired = true;
-      btn.addEventListener('click', async ()=>{
+      btn.addEventListener('click', async () => {
         const cid = parseInt(btn.getAttribute('data-char-id'), 10);
         openForChar(cid);
       });

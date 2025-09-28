@@ -9,22 +9,38 @@
   --mud-bg: #10191a;
   --mud-bg-dark: #153131;
   /* Class color system */
-  --class-fighter-bg: #7a3314; --class-fighter-fg: #f2e2d8; --class-fighter-border: #b44f21;
-  --class-rogue-bg:   #454a1f; --class-rogue-fg:   #e5e5d1; --class-rogue-border:   #6f732f;
-  --class-mage-bg:    #0f4d63; --class-mage-fg:    #d2f2ff; --class-mage-border:    #196e89;
-  --class-cleric-bg:  #6a6f72; --class-cleric-fg:  #f5f5f5; --class-cleric-border:  #9aa1a5;
-  --class-druid-bg:   #213826; --class-druid-fg:   #d8f2dc; --class-druid-border:   #2f5738;
-  --class-ranger-bg:  #1d4a57; --class-ranger-fg:  #d8eef5; --class-ranger-border:  #2c6b7d;
+  --class-fighter-bg: #7a3314;
+  --class-fighter-fg: #f2e2d8;
+  --class-fighter-border: #b44f21;
+  --class-rogue-bg: #454a1f;
+  --class-rogue-fg: #e5e5d1;
+  --class-rogue-border: #6f732f;
+  --class-mage-bg: #0f4d63;
+  --class-mage-fg: #d2f2ff;
+  --class-mage-border: #196e89;
+  --class-cleric-bg: #6a6f72;
+  --class-cleric-fg: #f5f5f5;
+  --class-cleric-border: #9aa1a5;
+  --class-druid-bg: #213826;
+  --class-druid-fg: #d8f2dc;
+  --class-druid-border: #2f5738;
+  --class-ranger-bg: #1d4a57;
+  --class-ranger-fg: #d8eef5;
+  --class-ranger-border: #2c6b7d;
 }
+
 body {
   background: var(--mud-bg-dark);
   min-height: 100vh;
   color: var(--mud-grey);
 }
+
 /* Icon button adjustments */
-.icon-btn svg, .icon-btn i {
+.icon-btn svg,
+.icon-btn i {
   pointer-events: none;
 }
+
 .icon-btn {
   min-width: 34px;
   display: inline-flex;
@@ -32,68 +48,127 @@ body {
   justify-content: center;
   padding: 0.25rem 0.4rem;
 }
-.icon-btn + .icon-btn { margin-left: 0.25rem; }
+
+.icon-btn+.icon-btn {
+  margin-left: 0.25rem;
+}
 
 .navbar {
   border-radius: 0 0 1rem 1rem;
   margin-bottom: 1.5rem;
   background: var(--bs-dark) !important;
 }
+
 .navbar-search {
   background: #0f1518;
   color: var(--mud-grey);
   border-color: #2a343a;
 }
-.navbar-search::placeholder { color: #6c757d; }
+
+.navbar-search::placeholder {
+  color: #6c757d;
+}
+
 .card {
   background: #182124;
   color: var(--mud-grey);
 }
+
 .card-header {
   background: var(--mud-dark);
   color: var(--mud-grey);
 }
+
 /* Accent buttons use theme primary */
-.btn-primary, #lobby-chat-send {
+.btn-primary,
+#lobby-chat-send {
   background: var(--bs-primary);
   border-color: var(--bs-primary);
 }
-.btn-primary:hover, #lobby-chat-send:hover {
+
+.btn-primary:hover,
+#lobby-chat-send:hover {
   background: rgba(var(--bs-primary-rgb), 0.9);
   border-color: rgba(var(--bs-primary-rgb), 0.9);
 }
+
 /* Party selection checkboxes */
 .form-check-input:checked {
   background-color: var(--bs-success);
   border-color: var(--bs-success);
 }
+
 /* Character class color accents */
 /* Revised dark palette for character classes */
 /* Fighter: deep ember, Rogue: muted moss, Mage: twilight cyan, Cleric: soft steel, Druid: forest shadow, Ranger: cold sky */
-.class-fighter { background: var(--class-fighter-bg) !important; color: var(--class-fighter-fg) !important; }
-.class-rogue   { background: var(--class-rogue-bg) !important;   color: var(--class-rogue-fg) !important; }
-.class-mage    { background: var(--class-mage-bg) !important;    color: var(--class-mage-fg) !important; }
-.class-cleric  { background: var(--class-cleric-bg) !important;  color: var(--class-cleric-fg) !important; }
-.class-druid   { background: var(--class-druid-bg) !important;   color: var(--class-druid-fg) !important; }
-.class-ranger  { background: var(--class-ranger-bg) !important;  color: var(--class-ranger-fg) !important; }
+.class-fighter {
+  background: var(--class-fighter-bg) !important;
+  color: var(--class-fighter-fg) !important;
+}
 
-.border-fighter { border: 2px solid var(--class-fighter-border) !important; }
-.border-rogue   { border: 2px solid var(--class-rogue-border) !important; }
-.border-mage    { border: 2px solid var(--class-mage-border) !important; }
-.border-cleric  { border: 2px solid var(--class-cleric-border) !important; }
-.border-druid   { border: 2px solid var(--class-druid-border) !important; }
-.border-ranger  { border: 2px solid var(--class-ranger-border) !important; }
-.border-default { border: 2px solid #333 !important; }
+.class-rogue {
+  background: var(--class-rogue-bg) !important;
+  color: var(--class-rogue-fg) !important;
+}
+
+.class-mage {
+  background: var(--class-mage-bg) !important;
+  color: var(--class-mage-fg) !important;
+}
+
+.class-cleric {
+  background: var(--class-cleric-bg) !important;
+  color: var(--class-cleric-fg) !important;
+}
+
+.class-druid {
+  background: var(--class-druid-bg) !important;
+  color: var(--class-druid-fg) !important;
+}
+
+.class-ranger {
+  background: var(--class-ranger-bg) !important;
+  color: var(--class-ranger-fg) !important;
+}
+
+.border-fighter {
+  border: 2px solid var(--class-fighter-border) !important;
+}
+
+.border-rogue {
+  border: 2px solid var(--class-rogue-border) !important;
+}
+
+.border-mage {
+  border: 2px solid var(--class-mage-border) !important;
+}
+
+.border-cleric {
+  border: 2px solid var(--class-cleric-border) !important;
+}
+
+.border-druid {
+  border: 2px solid var(--class-druid-border) !important;
+}
+
+.border-ranger {
+  border: 2px solid var(--class-ranger-border) !important;
+}
+
+.border-default {
+  border: 2px solid #333 !important;
+}
 
 /* Selected card glow */
 .character-card {
   cursor: pointer;
   transition: box-shadow 0.15s ease, transform 0.1s ease;
 }
+
 .character-card.selected {
   box-shadow: 0 0 0.5rem rgba(255, 255, 255, 0.15),
-              0 0 1rem rgba(255, 215, 0, 0.35),
-              0 0 2rem rgba(255, 165, 0, 0.25);
+    0 0 1rem rgba(255, 215, 0, 0.35),
+    0 0 2rem rgba(255, 165, 0, 0.25);
   border-color: var(--bs-warning) !important;
   transform: translateY(-2px);
 }

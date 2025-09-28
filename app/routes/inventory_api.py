@@ -20,6 +20,7 @@ from app.inventory.utils import (
     remove_one,
 )
 from app.models.models import Character, Item
+from app.services.time_service import advance_for
 
 bp_inventory = Blueprint("inventory", __name__)
 
@@ -310,6 +311,10 @@ def equip_item(cid: int):
     ch.items = dump_inventory(inv)
     ch.gear = _safe_json_dump(gear)
     db.session.commit()
+    try:
+        advance_for("equip")
+    except Exception:
+        pass
     return jsonify({"ok": True, "slot": slot, "equipped": slug})
 
 
@@ -336,6 +341,10 @@ def unequip_item(cid: int):
     ch.items = dump_inventory(inv)
     ch.gear = _safe_json_dump(gear)
     db.session.commit()
+    try:
+        advance_for("unequip")
+    except Exception:
+        pass
     return jsonify({"ok": True, "slot": slot, "unequipped": slug})
 
 
@@ -378,4 +387,8 @@ def consume_item(cid: int):
         ch.items = dump_inventory(inv)
     ch.stats = _safe_json_dump(base_stats)
     db.session.commit()
+    try:
+        advance_for("consume")
+    except Exception:
+        pass
     return jsonify({"ok": True, "consumed": slug, "effects": {"hp": heal, "mana": mana}})

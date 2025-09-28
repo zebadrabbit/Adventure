@@ -359,7 +359,17 @@ def _seed_game_config():
             "warn_pct": 1.0,  # At or below this = normal
             "hard_cap_pct": 1.10,  # Above this percentage of capacity: reject new items
             "dex_penalty": 2,  # DEX penalty applied when between warn_pct and hard_cap_pct
-        }
+        },
+        "tick_costs": {
+            "move": 1,
+            "search": 2,
+            "use_item": 1,
+            "cast_spell": 1,
+            "equip": 0,
+            "unequip": 0,
+            "consume": 1,
+            "loot_claim": 0,
+        },
     }
     created = 0
     for k, v in defaults.items():
@@ -722,6 +732,21 @@ def _run_migrations():
         # Ensure loot table exists (SQLAlchemy create_all will also handle, but explicit for clarity)
         if "dungeon_loot" not in tables:
             db.create_all()  # rely on model metadata
+        # Ensure game_clock table exists (created via SQLAlchemy metadata)
+        if "game_clock" not in tables:
+            try:
+                db.create_all()
+            except Exception:
+                pass
+        else:
+            # Add combat column if missing
+            gc_cols = {c["name"] for c in inspector.get_columns("game_clock")}
+            if "combat" not in gc_cols:
+                try:
+                    db.session.execute(text("ALTER TABLE game_clock ADD COLUMN combat BOOLEAN NOT NULL DEFAULT 0"))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
         # Add new Item columns if missing
         if "item" in tables:
             item_cols = {c["name"] for c in inspector.get_columns("item")}
