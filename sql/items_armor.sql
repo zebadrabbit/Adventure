@@ -245,3 +245,93 @@ INSERT INTO item (slug, name, type, description, value_copper) VALUES
 ('accessory_amulet_l20','Eternal Amulet','armor','Timeless artifact.',970);
 
 COMMIT;
+
+-- Expansion: Additional Accessories & Themed Gear
+-- Separate transaction for additive evolution of catalog.
+BEGIN TRANSACTION;
+
+-- BRACELETS (light stat trinkets placeholder)
+DELETE FROM item WHERE slug LIKE 'accessory_bracelet_l%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('accessory_bracelet_l1','Copper Bracelet','armor','Simple wrist band.',20),
+('accessory_bracelet_l5','Runed Bracelet','armor','Minor etched runes.',110),
+('accessory_bracelet_l10','Mythril Bracelet','armor','Light alloy filigree.',260),
+('accessory_bracelet_l15','Empyreal Bracelet','armor','Radiant inlays.',520),
+('accessory_bracelet_l20','Transcendent Bracelet','armor','Phase-thin loop.',880);
+
+-- EARRINGS
+DELETE FROM item WHERE slug LIKE 'accessory_earring_l%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('accessory_earring_l1','Bronze Earring','armor','Simple bronze stud.',18),
+('accessory_earring_l5','Silver Earring','armor','Polished silver.',100),
+('accessory_earring_l10','Runed Earring','armor','Glyph micro-etch.',240),
+('accessory_earring_l15','Starshard Earring','armor','Star fleck shard.',500),
+('accessory_earring_l20','Transcendent Earring','armor','Ethereal glimmer.',860);
+
+-- BACK VARIANTS (cloaks already exist) add CAPES & MANTLES
+DELETE FROM item WHERE slug LIKE 'armor_cape_l%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('armor_cape_l1','Travel Cape','armor','Simple weather cape.',22),
+('armor_cape_l5','Reinforced Cape','armor','Leather-backed.',90),
+('armor_cape_l10','Runed Cape','armor','Glyph-lined hem.',210),
+('armor_cape_l15','Dragonbone Cape','armor','Bone filament weave.',450),
+('armor_cape_l20','Ascendant Cape','armor','Shifts in light.',820);
+
+DELETE FROM item WHERE slug LIKE 'armor_mantle_l%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('armor_mantle_l1','Padded Mantle','armor','Shoulder drape.',24),
+('armor_mantle_l5','Studded Mantle','armor','Stud reinforcement.',96),
+('armor_mantle_l10','Mythrilthread Mantle','armor','Light alloy thread.',226),
+('armor_mantle_l15','Eclipse Mantle','armor','Shadow gradient.',464),
+('armor_mantle_l20','Paragon Mantle','armor','Peak craftsmanship.',840);
+
+-- SHIELDS extension: light bucklers vs heavy towers already implied; add Kites early sets
+DELETE FROM item WHERE slug LIKE 'armor_buckler_l%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('armor_buckler_l1','Light Buckler','armor','Small round shield.',18),
+('armor_buckler_l5','Runed Buckler','armor','Minor ward glyphs.',96),
+('armor_buckler_l10','Mythril Buckler','armor','Featherweight frame.',220),
+('armor_buckler_l15','Dragonbone Buckler','armor','Bone core disc.',472),
+('armor_buckler_l20','Transcendent Buckler','armor','Phase edge.',820);
+
+DELETE FROM item WHERE slug LIKE 'armor_tower_l%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('armor_tower_l5','Reinforced Tower Shield','armor','Large frontal barrier.',170),
+('armor_tower_l10','Runed Tower Shield','armor','Glyph matrix interior.',390),
+('armor_tower_l15','Adamant Tower Shield','armor','Dense protection wall.',800),
+('armor_tower_l20','Paragon Tower Shield','armor','Ultimate defensive wall.',1360);
+
+-- CLASS THEMED (prefix indicates style; still generic type=armor for schema simplicity)
+-- Warrior: plate emphasis
+DELETE FROM item WHERE slug LIKE 'set_warrior_%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('set_warrior_helm_t3','Warrior Crest Helm','armor','Crested mid-tier helm.',600),
+('set_warrior_chest_t3','Warrior Plate Cuirass','armor','Heavy mid-tier plate.',900),
+('set_warrior_helm_t6','Warrior Vanguard Helm','armor','High-tier elite helm.',1500),
+('set_warrior_chest_t6','Warrior Vanguard Cuirass','armor','Elite defensive plate.',2300);
+
+-- Rogue: leather + agility
+DELETE FROM item WHERE slug LIKE 'set_rogue_%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('set_rogue_hood_t3','Rogue Shadow Hood','armor','Dark flexible hood.',560),
+('set_rogue_jacket_t3','Rogue Shadow Jacket','armor','Silent movement design.',820),
+('set_rogue_hood_t6','Rogue Nightveil Hood','armor','Advanced concealment.',1420),
+('set_rogue_jacket_t6','Rogue Nightveil Jacket','armor','Elite silent weave.',2140);
+
+-- Mage: cloth + focus
+DELETE FROM item WHERE slug LIKE 'set_mage_%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('set_mage_cowl_t3','Mage Focus Cowl','armor','Runic focus lining.',540),
+('set_mage_robe_t3','Mage Focus Robe','armor','Arcane channel threads.',840),
+('set_mage_cowl_t6','Mage Archon Cowl','armor','High-tier resonance.',1460),
+('set_mage_robe_t6','Mage Archon Robe','armor','Elite resonance weave.',2260);
+
+-- Ranger: mixed leather
+DELETE FROM item WHERE slug LIKE 'set_ranger_%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('set_ranger_hood_t3','Ranger Trail Hood','armor','Weather-shielded.',550),
+('set_ranger_jacket_t3','Ranger Trail Jacket','armor','Reinforced joints.',820),
+('set_ranger_hood_t6','Ranger Warden Hood','armor','High-tier field gear.',1440),
+('set_ranger_jacket_t6','Ranger Warden Jacket','armor','Elite environmental ward.',2200);
+
+COMMIT;

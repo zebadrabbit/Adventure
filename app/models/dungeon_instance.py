@@ -4,7 +4,8 @@ from app import db
 
 
 class DungeonInstance(db.Model):
-    __tablename__ = "dungeon_instances"
+    # Use singular table name to align with foreign key references (dungeon_instance.id)
+    __tablename__ = "dungeon_instance"
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     seed = db.Column(db.BigInteger, nullable=False)

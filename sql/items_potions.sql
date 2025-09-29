@@ -137,3 +137,83 @@ INSERT INTO item (slug, name, type, description, value_copper) VALUES
 ('potion_resist_fire_l20','Ultimate Fire Resist Potion','potion','Brief fire immunity.',990);
 
 COMMIT;
+
+-- Expansion: Additional Potion Categories
+BEGIN TRANSACTION;
+
+-- STAMINA / ENERGY (parallel to heal/mana pricing)
+DELETE FROM item WHERE slug LIKE 'potion_stamina_l%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('potion_stamina_l1','Minor Stamina Potion','potion','Restores a small amount of stamina.',18),
+('potion_stamina_l5','Greater Stamina Potion','potion','Restores large stamina.',76),
+('potion_stamina_l10','Mighty Stamina Potion','potion','Mighty stamina restorative.',236),
+('potion_stamina_l15','Transcendent Stamina Elixir','potion','Transcendent stamina regeneration.',496),
+('potion_stamina_l20','Ultimate Stamina Elixir','potion','Maximum stamina restoration.',856);
+
+-- INVISIBILITY (rarer, higher premium value tiers)
+DELETE FROM item WHERE slug LIKE 'potion_invis_l%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('potion_invis_l5','Lesser Invisibility Potion','potion','Short partial invisibility.',180),
+('potion_invis_l10','Invisibility Potion','potion','Full temporary invisibility.',420),
+('potion_invis_l15','Greater Invisibility Potion','potion','Extended invisibility duration.',880),
+('potion_invis_l20','Ultimate Invisibility Elixir','potion','Near-perfect invisibility.',1600);
+
+-- REGENERATION (continuous heal effect)
+DELETE FROM item WHERE slug LIKE 'potion_regen_l%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('potion_regen_l5','Lesser Regeneration Potion','potion','Gradually restores health.',190),
+('potion_regen_l10','Regeneration Potion','potion','Moderate regeneration effect.',440),
+('potion_regen_l15','Greater Regeneration Potion','potion','Strong regeneration.',920),
+('potion_regen_l20','Ultimate Regeneration Elixir','potion','Maximum regeneration potency.',1680);
+
+-- PERCEPTION (improved detection, vision)
+DELETE FROM item WHERE slug LIKE 'potion_perception_l%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('potion_perception_l1','Minor Perception Draught','potion','Slightly heightens senses.',24),
+('potion_perception_l5','Greater Perception Draught','potion','Large perception boost.',90),
+('potion_perception_l10','Superior Perception Elixir','potion','High sensory enhancement.',210),
+('potion_perception_l15','Transcendent Perception Elixir','potion','Near-omniscient awareness.',500),
+('potion_perception_l20','Ultimate Perception Elixir','potion','Peak sensory clarity.',900);
+
+-- LUCK (affects loot RNG - conceptual)
+DELETE FROM item WHERE slug LIKE 'potion_luck_l%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('potion_luck_l5','Lesser Fortune Draught','potion','Slightly increases fortune.',200),
+('potion_luck_l10','Fortune Elixir','potion','Improves luck noticeably.',460),
+('potion_luck_l15','Greater Fortune Elixir','potion','Large fortune increase.',940),
+('potion_luck_l20','Transcendent Fortune Elixir','potion','Peak fortune boost.',1700);
+
+-- ELEMENTAL RESISTS (cold, lightning, poison) mirroring fire pattern
+DELETE FROM item WHERE slug LIKE 'potion_resist_cold_l%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('potion_resist_cold_l1','Minor Cold Resist Potion','potion','Slightly reduces cold damage.',30),
+('potion_resist_cold_l5','Greater Cold Resist Potion','potion','Large cold resistance.',96),
+('potion_resist_cold_l10','Superior Cold Resist Potion','potion','High cold resistance.',270),
+('potion_resist_cold_l15','Transcendent Cold Resist Potion','potion','Near-immune to cold.',580),
+('potion_resist_cold_l20','Ultimate Cold Resist Potion','potion','Brief cold immunity.',990);
+
+DELETE FROM item WHERE slug LIKE 'potion_resist_lightning_l%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('potion_resist_lightning_l1','Minor Lightning Resist Potion','potion','Slightly reduces lightning damage.',34),
+('potion_resist_lightning_l5','Greater Lightning Resist Potion','potion','Large lightning resistance.',104),
+('potion_resist_lightning_l10','Superior Lightning Resist Potion','potion','High lightning resistance.',288),
+('potion_resist_lightning_l15','Transcendent Lightning Resist Potion','potion','Near-immune to lightning.',600),
+('potion_resist_lightning_l20','Ultimate Lightning Resist Potion','potion','Brief lightning immunity.',1020);
+
+DELETE FROM item WHERE slug LIKE 'potion_resist_poison_l%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('potion_resist_poison_l1','Minor Poison Resist Potion','potion','Slightly reduces poison damage.',28),
+('potion_resist_poison_l5','Greater Poison Resist Potion','potion','Large poison resistance.',90),
+('potion_resist_poison_l10','Superior Poison Resist Potion','potion','High poison resistance.',260),
+('potion_resist_poison_l15','Transcendent Poison Resist Potion','potion','Near-immune to poison.',560),
+('potion_resist_poison_l20','Ultimate Poison Resist Potion','potion','Brief poison immunity.',960);
+
+-- GROUP BUFF (party-wide) - premium cost scaling
+DELETE FROM item WHERE slug LIKE 'potion_group_battle_l%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('potion_group_battle_l5','Lesser Battle Elixir','potion','Minor party combat buffs.',300),
+('potion_group_battle_l10','Battle Elixir','potion','Moderate party combat buffs.',660),
+('potion_group_battle_l15','Greater Battle Elixir','potion','Strong party combat buffs.',1240),
+('potion_group_battle_l20','Ultimate Battle Elixir','potion','Peak party combat buffs.',2100);
+
+COMMIT;

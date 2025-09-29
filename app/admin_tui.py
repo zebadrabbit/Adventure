@@ -40,6 +40,20 @@ from app.models.models import User
 
 
 class AdminConsole(App):
+    """Interactive Textual admin console.
+
+    Provides a lightweight operational view into the running game server:
+      * Users panel – lists registered users (future: online state).
+      * Dungeon Seeds – shows active dungeon instances with user positions.
+      * Chat – optional Socket.IO chat relay if the server is reachable.
+      * Event Log – tail of internal application events (login/logout, etc.).
+
+    The console periodically refreshes panels on a 5 second cadence and keeps
+    a background Socket.IO client (if available) to receive real-time chat and
+    event messages. All heavy DB queries run in a thread via ``asyncio.to_thread``
+    to avoid blocking the UI loop.
+    """
+
     CSS = """
     Screen { layout: vertical; }
     .top-row { height: 3fr; }
@@ -58,10 +72,11 @@ class AdminConsole(App):
     def __init__(self, server_url: Optional[str] = None) -> None:
         super().__init__()
         self.server_url = server_url or os.getenv("ADMIN_TUI_SERVER", "http://127.0.0.1:5000")
-        self.sio: Optional["socketio.AsyncClient"] = None
+        # Socket.IO async client (created lazily if library available)
+        self.sio = None  # type: ignore[assignment]
         self._chat_connected = False
 
-    def compose(self) -> ComposeResult:
+    def compose(self) -> ComposeResult:  # type: ignore[override]
         yield Header(show_clock=True)
         with Vertical(classes="top-row"):
             with Horizontal():
@@ -85,22 +100,30 @@ class AdminConsole(App):
             yield self.event_log
         yield Footer()
 
-    async def on_mount(self) -> None:
-        # Kick off periodic refresh tasks
+    async def on_mount(self) -> None:  # type: ignore[override]
+        """Lifecycle hook: schedule periodic refresh & chat connection tasks."""
         self.call_after_refresh(self.refresh_all)
         self._refresh_task = asyncio.create_task(self._periodic_refresh())
         self._chat_task = asyncio.create_task(self._chat_connect())
 
     async def _periodic_refresh(self) -> None:
+        """Loop performing panel refreshes until the app exits."""
         while True:
             await self.refresh_all()
             await asyncio.sleep(5.0)
 
     async def refresh_all(self) -> None:
+        """Refresh all dynamic panels concurrently."""
         await asyncio.gather(self.refresh_users(), self.refresh_seeds())
 
     async def refresh_users(self) -> None:
-        # For now, show registered users and mark those with role=admin; online tracking can be added later.
+        """Update the Users panel with current registered users.
+
+        Notes:
+            Online/offline distinction is not yet implemented; future versions
+            may integrate with websocket presence tracking.
+        """
+
         def _query():
             with flask_app.app_context():
                 rows = User.query.order_by(User.username.asc()).all()
@@ -115,6 +138,8 @@ class AdminConsole(App):
             self.users_body.write_line("(no users)")
 
     async def refresh_seeds(self) -> None:
+        """Update the Dungeon Seeds panel with instance summaries."""
+
         def _query():
             with flask_app.app_context():
                 rows = db.session.query(DungeonInstance).all()
@@ -168,7 +193,7 @@ class AdminConsole(App):
     async def action_refresh(self) -> None:
         await self.refresh_all()
 
-    async def on_input_submitted(self, message: Input.Submitted) -> None:
+    async def on_input_submitted(self, message: Input.Submitted) -> None:  # type: ignore[override]
         if message.input is self.chat_input:
             content = (message.value or "").strip()
             if not content:

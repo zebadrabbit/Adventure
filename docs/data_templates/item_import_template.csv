@@ -1,0 +1,7 @@
+slug,name,type,description,value_copper,extra_json
+weapon_sword_l1,Rusty Shortsword,weapon,A worn but serviceable blade.,35,
+armor_head_l1,Cloth Hood,armor,Simple cloth head covering.,24,
+potion_heal_l1,Minor Healing Potion,potion,Restores a small amount of health.,18,
+material_iron_ore,Iron Ore Chunk,material,Smeltable iron ore.,40,
+scroll_identify,Scroll of Identify,scroll,Reveals properties of an item.,160,
+quest_goblin_totem,Goblin Totem,quest,Totemic carving taken from goblin shaman.,0,{"quest_flag":"goblin_totem"}

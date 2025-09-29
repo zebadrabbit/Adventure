@@ -41,3 +41,6 @@ test-results/
 **/ms-playwright/
 **/browsers/
 **/chromium/
+
+# Ruff linter cache
+.ruff_cache/

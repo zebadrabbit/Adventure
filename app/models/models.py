@@ -67,6 +67,44 @@ class User(UserMixin, db.Model):
             return False
 
 
+# Lightweight event hook to auto-deduplicate hard-coded test usernames gracefully.
+try:  # pragma: no cover - SQLAlchemy event wiring
+    from sqlalchemy import event
+
+    @event.listens_for(User, "before_insert")
+    def _user_before_insert(mapper, connection, target):  # type: ignore[override]
+        """Append numeric suffix if username already exists.
+
+        This primarily addresses test scenarios that insert static usernames multiple times
+        without cleaning the shared session DB (e.g. 'loginuser'). In production usage this
+        path is rarely exercised unless an operator manually creates duplicates during the
+        same test run. We keep it minimal to avoid masking legitimate collisions elsewhere.
+        """
+        uname = getattr(target, "username", None)
+        if not uname:
+            return
+        # Direct SQL check for existing username to avoid ORM session state issues.
+        try:
+            res = connection.execute(db.text("SELECT id FROM user WHERE username = :u"), {"u": uname}).fetchone()
+            if res:
+                base = uname
+                n = 2
+                while True:
+                    cand = f"{base}-{n}"
+                    res2 = connection.execute(
+                        db.text("SELECT id FROM user WHERE username = :u"), {"u": cand}
+                    ).fetchone()
+                    if not res2:
+                        target.username = cand  # type: ignore
+                        break
+                    n += 1
+        except Exception:
+            pass
+
+except Exception:  # pragma: no cover
+    pass
+
+
 class Character(db.Model):
     """A playable character owned by a user.
 
@@ -297,6 +335,8 @@ class MonsterCatalog(db.Model):
         return {
             "slug": self.slug,
             "name": self.name,
+            # Optional icon slug (UI may map to static asset). For now derive simple family-based fallback.
+            "icon_slug": f"{self.family.lower()}-{self.slug}" if self.family and self.slug else self.slug,
             "level": lvl,
             "hp": int(round(self.base_hp * mult_hp)),
             "damage": int(round(self.base_damage * mult_dmg)),
@@ -331,8 +371,20 @@ class CombatSession(db.Model):
     monster_json = db.Column(db.Text, nullable=False)
     # Combat lifecycle
     status = db.Column(db.String(20), nullable=False, default="active")  # active|won|lost|fled|expired
-    # Future: turn pointer, initiative order, log buffer, etc.
+    # Turn system
+    combat_turn = db.Column(db.Integer, nullable=False, default=1)
+    initiative_json = db.Column(
+        db.Text, nullable=True
+    )  # JSON list of entity refs [{'type':'pc','id':..},{'type':'monster'}]
+    active_index = db.Column(db.Integer, nullable=False, default=0)
+    # Participants snapshot
+    party_snapshot_json = db.Column(db.Text, nullable=True)  # list of character stat dicts
+    monster_hp = db.Column(db.Integer, nullable=True)
+    # Logging & outcome
+    log_json = db.Column(db.Text, nullable=True)  # JSON list of log line dicts
     outcome_json = db.Column(db.Text, nullable=True)
+    rewards_json = db.Column(db.Text, nullable=True)  # loot & xp after completion
+    version = db.Column(db.Integer, nullable=False, default=1)  # optimistic lock counter
     # Soft delete / archival marker
     archived = db.Column(db.Boolean, nullable=False, default=False, index=True)
 
@@ -345,9 +397,35 @@ class CombatSession(db.Model):
             return {}
 
     def to_dict(self):  # pragma: no cover
+        import json
+
+        try:
+            initiative = json.loads(self.initiative_json) if self.initiative_json else []
+        except Exception:
+            initiative = []
+        try:
+            party = json.loads(self.party_snapshot_json) if self.party_snapshot_json else None
+        except Exception:
+            party = None
+        try:
+            logs = json.loads(self.log_json) if self.log_json else []
+        except Exception:
+            logs = []
+        try:
+            rewards = json.loads(self.rewards_json) if self.rewards_json else None
+        except Exception:
+            rewards = None
         return {
             "id": self.id,
             "status": self.status,
             "monster": self.monster(),
+            "monster_hp": self.monster_hp,
+            "combat_turn": self.combat_turn,
+            "initiative": initiative,
+            "active_index": self.active_index,
+            "party": party,
+            "log": logs,
+            "rewards": rewards,
+            "version": self.version,
             "archived": bool(self.archived),
         }

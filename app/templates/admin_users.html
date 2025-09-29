@@ -1,0 +1,63 @@
+{% extends 'admin_base.html' %}
+{% block admin_breadcrumb %}<li class="breadcrumb-item active" aria-current="page">Users</li>{% endblock %}
+{% block admin_content %}
+<h2 class="h4 mb-3">Users</h2>
+<div class="table-responsive">
+    <table class="table table-sm table-striped align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>ID</th>
+                <th>Username</th>
+                <th>Role</th>
+                <th>Banned</th>
+                <th>Reason</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in users %}
+            <tr>
+                <td class="text-muted">{{ u.id }}</td>
+                <td>{{ u.username }}</td>
+                <td>
+                    <form method="post" action="{{ url_for('admin.update_user_role', user_id=u.id) }}"
+                        class="d-flex gap-1">
+                        <select name="role" class="form-select form-select-sm" {% if u.id==current_user.id %}disabled{%
+                            endif %}>
+                            {% for r in ['user','mod','admin'] %}
+                            <option value="{{ r }}" {% if u.role==r %}selected{% endif %}>{{ r }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="btn btn-sm btn-outline-primary" {% if u.id==current_user.id %}disabled{% endif
+                            %}>Set</button>
+                    </form>
+                </td>
+                <td>{% if u.banned %}<span class="badge bg-danger">Yes</span>{% else %}<span
+                        class="badge bg-success">No</span>{% endif %}</td>
+                <td class="small">{{ u.ban_reason or '' }}</td>
+                <td>
+                    <form method="post" action="{{ url_for('admin.ban_user', user_id=u.id) }}" class="d-flex gap-1">
+                        {% if not u.banned %}
+                        <input type="hidden" name="action" value="ban" />
+                        <input type="text" name="reason" placeholder="Reason" class="form-control form-control-sm" />
+                        <button class="btn btn-sm btn-outline-danger" {% if u.id==current_user.id %}disabled{% endif
+                            %}>Ban</button>
+                        {% else %}
+                        <input type="hidden" name="action" value="unban" />
+                        <button class="btn btn-sm btn-outline-success" {% if u.id==current_user.id %}disabled{% endif
+                            %}>Unban</button>
+                        {% endif %}
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<div class="d-flex justify-content-between mt-2">
+    <div>{% if page > 1 %}<a class="btn btn-sm btn-outline-secondary" href="?page={{ page-1 }}">&laquo; Prev</a>{% endif
+        %}</div>
+    <div>{% if (page * per_page) < total %}<a class="btn btn-sm btn-outline-secondary" href="?page={{ page+1 }}">Next
+            &raquo;</a>{% endif %}</div>
+</div>
+{% endblock %}

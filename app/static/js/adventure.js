@@ -186,6 +186,50 @@
       executeMove(next);
     }
 
+    // ---------------- Monster Entity Icon Layer -----------------
+    let monsterLayerGroup = null;
+    function ensureMonsterLayer() {
+      if (!window.dungeonMap) return null;
+      if (!monsterLayerGroup) {
+        monsterLayerGroup = L.layerGroup().addTo(window.dungeonMap);
+      }
+      return monsterLayerGroup;
+    }
+
+    function iconForMonster(mon) {
+      const slug = mon.icon_slug || mon.slug || 'generic';
+      // Build URL path: we used family-slug pattern for some; fallback to slug only
+      const fname = slug.replace(/[^a-z0-9\-]/gi, '-').toLowerCase();
+      const known = {
+        'test-ai-mob': 'test-ai-mob',
+        'undead-skeleton': 'undead-skeleton',
+        'slime-green': 'slime-green'
+      };
+      let file = known[fname] || fname;
+      // If missing custom asset, fallback generic
+      return `/static/icons/${file}.svg`;
+    }
+
+    function renderMonsters(monsters) {
+      const layer = ensureMonsterLayer();
+      if (!layer) return;
+      layer.clearLayers();
+      if (!Array.isArray(monsters)) return;
+      monsters.forEach(mon => {
+        const x = mon.x, y = mon.y;
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+        try {
+          const lat = (y + 0.5) * TILE_SIZE;
+          const lng = (x + 0.5) * TILE_SIZE;
+          const iconUrl = iconForMonster(mon);
+          const html = `<div class="monster-icon" title="${mon.name || mon.slug || 'Monster'}"><img src="${iconUrl}" alt="${mon.name || mon.slug || 'Monster'}" style="width:32px;height:32px;filter:drop-shadow(0 0 4px #000);" /></div>`;
+          const divIcon = L.divIcon({ html, className: 'monster-icon-wrapper', iconSize: [32, 32] });
+          const marker = L.marker([lat, lng], { icon: divIcon, interactive: false, keyboard: false });
+          layer.addLayer(marker);
+        } catch (e) { /* ignore per-monster failures */ }
+      });
+    }
+
     // ------------------------------------------------------------
     // Notice markers (spots with recalled / potential loot/search)
     // Lightweight recreation after refactor that removed originals.
@@ -799,6 +843,14 @@
           // Load persisted notices and render markers
           refreshNoticeMarkers();
 
+          // Render monster entities (patrolling / ambient) if provided
+          try {
+            if (Array.isArray(data.entities)) {
+              renderMonsters(data.entities);
+            }
+          } catch (e) { /* non-fatal */ }
+          try { if (Array.isArray(data.entities)) renderMonsters(data.entities); } catch (e) { }
+
           for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
               const cell = grid[y][x]; // y row, x column
@@ -844,22 +896,7 @@
             try { updateDungeonVisibility(playerPos[0], playerPos[1]); } catch (e) { /* noop */ }
           }
 
-          // Attempt to merge server-side seen tiles (if any) after local vis applied
-          fetch('/api/dungeon/seen')
-            .then(r => r.ok ? r.json() : null)
-            .then(sdata => {
-              if (!sdata || !sdata.tiles) return;
-              const parts = sdata.tiles.split(';').filter(Boolean);
-              if (!window.dungeonSeenTiles) window.dungeonSeenTiles = new Set();
-              let merged = false;
-              for (const p of parts) {
-                if (!window.dungeonSeenTiles.has(p)) { window.dungeonSeenTiles.add(p); merged = true; }
-              }
-              if (merged && playerPos) {
-                updateDungeonVisibility(playerPos[0], playerPos[1]);
-              }
-            })
-            .catch(() => { });
+          // Legacy merge of server-side seen tiles removed - fog-of-war now client only.
 
           // --------------------------------------------------------
           // Developer console helpers (namespaced under window.dungeonDev)
@@ -900,30 +937,7 @@
               seed: window.currentDungeonSeed
             };
           };
-          // Throttled server sync for seen tiles
-          let lastServerSync = 0;
-          const SERVER_SYNC_INTERVAL = 4000; // ms
-          function syncSeenToServer(force = false) {
-            const now = performance.now();
-            if (!force && now - lastServerSync < SERVER_SYNC_INTERVAL) return;
-            if (!window.dungeonSeenTiles || !window.currentDungeonSeed) return;
-            lastServerSync = now;
-            // Compress to semicolon list
-            const tiles = Array.from(window.dungeonSeenTiles).slice(0, 50000).join(';');
-            fetch('/api/dungeon/seen', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ tiles })
-            }).catch(() => { });
-          }
-          window.dungeonDev.forceSync = () => syncSeenToServer(true);
-
-          // Hook into existing throttled local save by wrapping saveSeenTilesThrottled
-          const _oldSaveSeenTilesThrottled = saveSeenTilesThrottled;
-          saveSeenTilesThrottled = function (seenSet) {
-            _oldSaveSeenTilesThrottled(seenSet);
-            syncSeenToServer(false);
-          };
+          // Removed server sync of seen tiles (deprecated /api/dungeon/seen endpoints).
 
           if (playerPos) {
             if (window.dungeonPlayerMarker) {

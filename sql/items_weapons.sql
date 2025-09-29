@@ -204,3 +204,122 @@ INSERT INTO item (slug, name, type, description, value_copper) VALUES
 ('weapon_wand_l20','Transcendent Wand','weapon','Perfect mana conduit.',742);
 
 COMMIT;
+
+-- Additional Weapon Categories Expansion (Crossbows, Flails, Throwing, Fist, Scepters, Orbs)
+-- Design Notes:
+--  * Maintain quadratic-ish value growth consistent with earlier sets.
+--  * Slug pattern remains weapon_<category>_l<level>.
+--  * New categories enrich loot diversity and class fantasy breadth.
+--  * All kept in same transaction scope previously committed; if desired these
+--    could be moved above COMMIT and wrapped. For incremental extension we
+--    perform a new transaction here.
+
+BEGIN TRANSACTION;
+
+-- CROSSBOWS (higher base damage, slower implied; value slightly above bows)
+DELETE FROM item WHERE slug LIKE 'weapon_crossbow_l%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('weapon_crossbow_l1','Simple Crossbow','weapon','Basic wooden crossbow.',40),
+('weapon_crossbow_l2','Reinforced Crossbow','weapon','Stronger prod & string.',70),
+('weapon_crossbow_l3','Steel Crossbow','weapon','Steel prod increases power.',108),
+('weapon_crossbow_l4','Heavy Crossbow','weapon','Heavy draw, larger bolt.',160),
+('weapon_crossbow_l5','Refined Heavy Crossbow','weapon','Polished trigger action.',228),
+('weapon_crossbow_l6','Advanced Heavy Crossbow','weapon','Improved spanning design.',312),
+('weapon_crossbow_l7','Masterwork Heavy Crossbow','weapon','Minimal vibration on release.',416),
+('weapon_crossbow_l8','Runed Heavy Crossbow','weapon','Runes stabilize bolt flight.',544),
+('weapon_crossbow_l9','Mythril Heavy Crossbow','weapon','Light frame, high tension.',700),
+('weapon_crossbow_l10','Adamant Heavy Crossbow','weapon','Dense prod stores energy.',888),
+('weapon_crossbow_l11','Adamantine Siege Crossbow','weapon','Massive draw strength.',1112),
+('weapon_crossbow_l12','Celestial Siege Crossbow','weapon','Radiant string shimmer.',1368),
+('weapon_crossbow_l13','Eclipse Siege Crossbow','weapon','Shadow-silenced release.',1660),
+('weapon_crossbow_l14','Dragonbone Siege Crossbow','weapon','Bone lamination core.',1992),
+('weapon_crossbow_l15','Runebound Siege Crossbow','weapon','Rune lattice amplifies force.',2368),
+('weapon_crossbow_l16','Voidglass Siege Crossbow','weapon','Void-lined bolt channel.',2792),
+('weapon_crossbow_l17','Starshard Siege Crossbow','weapon','Star inlays guide trajectory.',3268),
+('weapon_crossbow_l18','Empyreal Siege Crossbow','weapon','Divine resonance hum.',3800),
+('weapon_crossbow_l19','Transcendent Siege Crossbow','weapon','Reality-slipping bolt path.',4392),
+('weapon_crossbow_l20','Paragon Siege Crossbow','weapon','Peak mechanical perfection.',5040);
+
+-- FLAILS (armor bypass flavor, mid-high value)
+DELETE FROM item WHERE slug LIKE 'weapon_flail_l%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('weapon_flail_l1','Rusty Flail','weapon','Loose chained head.',34),
+('weapon_flail_l2','Iron Flail','weapon','Reliable chain links.',58),
+('weapon_flail_l3','Steel Flail','weapon','Balanced striking head.',92),
+('weapon_flail_l4','Spiked Flail','weapon','Added armor penetration.',140),
+('weapon_flail_l5','Heavy Spiked Flail','weapon','Heavier impact core.',200),
+('weapon_flail_l6','Fine Spiked Flail','weapon','Precision forged spikes.',276),
+('weapon_flail_l7','Masterwork Flail','weapon','Optimized chain length.',372),
+('weapon_flail_l8','Runed Flail','weapon','Runes channel momentum.',500),
+('weapon_flail_l9','Mythril Flail','weapon','Light chain, fast recovery.',660),
+('weapon_flail_l10','Adamant Flail','weapon','Dense crushing head.',852),
+('weapon_flail_l11','Adamantine Flail','weapon','Extreme durability.',1076),
+('weapon_flail_l12','Celestial Flail','weapon','Radiant flare on swing.',1332),
+('weapon_flail_l13','Eclipse Flail','weapon','Shadow trail follows.',1618),
+('weapon_flail_l14','Dragonbone Flail','weapon','Bone core resonance.',1938),
+('weapon_flail_l15','Runebound Flail','weapon','Runic mesh chain.',2292),
+('weapon_flail_l16','Voidglass Flail','weapon','Edge of reality tremor.',2684),
+('weapon_flail_l17','Starshard Flail','weapon','Star fleck impacts.',3116),
+('weapon_flail_l18','Empyreal Flail','weapon','Divine harmonic pulse.',3592),
+('weapon_flail_l19','Transcendent Flail','weapon','Space-warp strike.',4116),
+('weapon_flail_l20','Paragon Flail','weapon','Perfect kinetic transfer.',4688);
+
+-- THROWING (knives & axes) small incremental growth; cheaper relative values
+DELETE FROM item WHERE slug LIKE 'weapon_throw_knife_l%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('weapon_throw_knife_l1','Throwing Knife','weapon','Balanced for throwing.',16),
+('weapon_throw_knife_l5','Weighted Throwing Knife','weapon','Added penetration weight.',70),
+('weapon_throw_knife_l10','Fine Throwing Knife','weapon','Precision balance.',160),
+('weapon_throw_knife_l15','Runed Throwing Knife','weapon','Rune-stabilized spin.',320),
+('weapon_throw_knife_l20','Transcendent Throwing Knife','weapon','Space-skimming edge.',640);
+
+DELETE FROM item WHERE slug LIKE 'weapon_throw_axe_l%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('weapon_throw_axe_l1','Light Throwing Axe','weapon','Small balanced axe.',20),
+('weapon_throw_axe_l5','Weighted Throwing Axe','weapon','Reinforced center.',90),
+('weapon_throw_axe_l10','Fine Throwing Axe','weapon','Precision edge.',200),
+('weapon_throw_axe_l15','Runed Throwing Axe','weapon','Runes steady arc.',380),
+('weapon_throw_axe_l20','Transcendent Throwing Axe','weapon','Dimensional cleave.',760);
+
+-- FIST / UNARMED (claws, cestus) supports monk / brawler fantasies
+DELETE FROM item WHERE slug LIKE 'weapon_fist_l%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('weapon_fist_l1','Wrapped Fists','weapon','Cloth wrapped knuckles.',18),
+('weapon_fist_l2','Leather Cestus','weapon','Leather braced fists.',32),
+('weapon_fist_l3','Studded Cestus','weapon','Metal studs embed.',50),
+('weapon_fist_l4','Spiked Cestus','weapon','Short protrusion spikes.',72),
+('weapon_fist_l5','Iron Claw Fist','weapon','Curved claw caps.',98),
+('weapon_fist_l6','Steel Claw Fist','weapon','Sharper steel claws.',128),
+('weapon_fist_l7','Masterwork Claw Fist','weapon','Perfect articulation.',164),
+('weapon_fist_l8','Runed Claw Fist','weapon','Runes reinforce strikes.',206),
+('weapon_fist_l9','Mythril Claw Fist','weapon','Light high-speed slashes.',254),
+('weapon_fist_l10','Adamant Claw Fist','weapon','Crushing hook slashes.',308),
+('weapon_fist_l11','Adamantine Claw Fist','weapon','Superior hardness claws.',368),
+('weapon_fist_l12','Celestial Claw Fist','weapon','Radiant arc swipe.',434),
+('weapon_fist_l13','Eclipse Claw Fist','weapon','Shadow smear motion.',506),
+('weapon_fist_l14','Dragonbone Claw Fist','weapon','Bone core channel.',584),
+('weapon_fist_l15','Runebound Claw Fist','weapon','Dense rune frame.',668),
+('weapon_fist_l16','Voidglass Claw Fist','weapon','Edge refracts light.',758),
+('weapon_fist_l17','Starshard Claw Fist','weapon','Star sparkle trails.',854),
+('weapon_fist_l18','Empyreal Claw Fist','weapon','Divine resonance.',956),
+('weapon_fist_l19','Transcendent Claw Fist','weapon','Phase-rip slash.',1064),
+('weapon_fist_l20','Paragon Claw Fist','weapon','Perfect kinetic output.',1178);
+
+-- SCEPTERS (hybrid caster/melee) and ORBS (pure focus) small set
+DELETE FROM item WHERE slug LIKE 'weapon_scepter_l%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('weapon_scepter_l1','Oak Scepter','weapon','Short focus rod.',42),
+('weapon_scepter_l5','Runed Scepter','weapon','Runes guide channeling.',168),
+('weapon_scepter_l10','Mythril Scepter','weapon','Light alloy core.',376),
+('weapon_scepter_l15','Empyreal Scepter','weapon','Divine aligned conduit.',672),
+('weapon_scepter_l20','Transcendent Scepter','weapon','Perfect hybrid conduit.',1040);
+
+DELETE FROM item WHERE slug LIKE 'weapon_orb_l%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('weapon_orb_l1','Cracked Focus Orb','weapon','Unstable arcane focus.',30),
+('weapon_orb_l5','Polished Focus Orb','weapon','Refined channel sphere.',140),
+('weapon_orb_l10','Runed Focus Orb','weapon','Runic stabilization.',320),
+('weapon_orb_l15','Starshard Focus Orb','weapon','Star fragment suspended.',580),
+('weapon_orb_l20','Transcendent Focus Orb','weapon','Reality lens core.',920);
+
+COMMIT;

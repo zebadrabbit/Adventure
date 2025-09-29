@@ -14,9 +14,9 @@ for SQLite and other runtime data.
 
 import logging
 import os
+import pathlib  # moved up (cache bust helper)  # noqa: E402
 import uuid
 from pathlib import Path
-import pathlib  # moved up (cache bust helper)  # noqa: E402
 
 from dotenv import load_dotenv
 from flask import Flask
@@ -119,6 +119,7 @@ except Exception:
 
 # Register HTTP blueprints (import after app/db created but keep near top for clarity)
 from app.routes import auth, main  # noqa: E402
+from app.routes.admin import bp_admin  # noqa: E402
 from app.routes.config_api import bp_config  # noqa: E402
 from app.routes.dashboard import bp_dashboard  # noqa: E402
 from app.routes.dungeon_api import bp_dungeon  # noqa: E402
@@ -136,6 +137,7 @@ app.register_blueprint(bp_config)
 app.register_blueprint(bp_loot)
 app.register_blueprint(bp_inventory)
 app.register_blueprint(bp_user_prefs)
+app.register_blueprint(bp_admin)
 
 # Import websocket handlers so their event decorators register with Socket.IO (side-effect)
 from app.websockets import game as _ws_game  # noqa: F401,E402
@@ -216,6 +218,104 @@ def _run_lightweight_migrations():  # pragma: no cover - idempotent guard
 
 _run_lightweight_migrations()
 
+# Ensure critical runtime/migration columns (e.g., monster_catalog optional columns) exist even
+# when tests import the app before PYTEST_CURRENT_TEST is set (so the conditional bootstrap
+# below would be skipped). This is idempotent and safe for production startup.
+try:  # pragma: no cover - defensive import-time safeguard
+    from app.server import _run_migrations, _seed_game_config, seed_items
+
+    with app.app_context():
+        db.create_all()
+        _run_migrations()
+        seed_items()
+        _seed_game_config()
+except Exception:
+    pass
+
+# Direct fallback to guarantee monster_catalog optional columns even if the import above
+# failed due to circular imports early in initialization.
+try:  # pragma: no cover - defensive
+    from sqlalchemy import inspect as _insp_mod
+    from sqlalchemy import text as _tddl
+
+    with app.app_context():
+        _insp = _insp_mod(db.engine)
+        tables = set(_insp.get_table_names())
+        if "monster_catalog" not in tables:
+            # Create fresh table with optional columns included so later seed script won't omit them.
+            db.session.execute(
+                _tddl(
+                    """
+CREATE TABLE monster_catalog (
+    id INTEGER PRIMARY KEY,
+    slug TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    level_min INTEGER NOT NULL DEFAULT 1,
+    level_max INTEGER NOT NULL DEFAULT 1,
+    base_hp INTEGER NOT NULL,
+    base_damage INTEGER NOT NULL,
+    armor INTEGER NOT NULL DEFAULT 0,
+    speed INTEGER NOT NULL DEFAULT 10,
+    rarity TEXT NOT NULL DEFAULT 'common',
+    family TEXT NOT NULL,
+    traits TEXT,
+    loot_table TEXT,
+    special_drop_slug TEXT,
+    xp_base INTEGER NOT NULL DEFAULT 0,
+    boss INTEGER NOT NULL DEFAULT 0,
+    resistances TEXT,
+    damage_types TEXT
+)
+"""
+                )
+            )
+            db.session.commit()
+        else:
+            cols = {c["name"] for c in _insp.get_columns("monster_catalog")}
+            if not {"resistances", "damage_types"}.issubset(cols):
+                # Rebuild table (SQLite lacks easy IF NOT EXISTS add for multiple columns)
+                # Preserve existing data.
+                existing_only = "id, slug, name, level_min, level_max, base_hp, base_damage, armor, speed, rarity, family, traits, loot_table, special_drop_slug, xp_base, boss"
+                db.session.execute(_tddl("ALTER TABLE monster_catalog RENAME TO monster_catalog_old"))
+                db.session.execute(
+                    _tddl(
+                        """
+CREATE TABLE monster_catalog (
+    id INTEGER PRIMARY KEY,
+    slug TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    level_min INTEGER NOT NULL DEFAULT 1,
+    level_max INTEGER NOT NULL DEFAULT 1,
+    base_hp INTEGER NOT NULL,
+    base_damage INTEGER NOT NULL,
+    armor INTEGER NOT NULL DEFAULT 0,
+    speed INTEGER NOT NULL DEFAULT 10,
+    rarity TEXT NOT NULL DEFAULT 'common',
+    family TEXT NOT NULL,
+    traits TEXT,
+    loot_table TEXT,
+    special_drop_slug TEXT,
+    xp_base INTEGER NOT NULL DEFAULT 0,
+    boss INTEGER NOT NULL DEFAULT 0,
+    resistances TEXT,
+    damage_types TEXT
+)
+"""
+                    )
+                )
+                db.session.execute(
+                    _tddl(
+                        f"INSERT INTO monster_catalog ({existing_only}, resistances, damage_types) SELECT {existing_only}, NULL, NULL FROM monster_catalog_old"
+                    )
+                )
+                db.session.execute(_tddl("DROP TABLE monster_catalog_old"))
+                db.session.commit()
+except Exception:
+    try:
+        db.session.rollback()
+    except Exception:
+        pass
+
 # When running under pytest, ensure base item seeds and game config exist early so tests relying
 # on catalog items (e.g., short-sword) do not encounter missing rows before server.start_server().
 if os.getenv("PYTEST_CURRENT_TEST"):
@@ -234,6 +334,24 @@ if os.getenv("PYTEST_CURRENT_TEST"):
 
 
 def create_app():
+    """Return the Flask app instance, ensuring schema/migrations are applied.
+
+    Pytest sets PYTEST_CURRENT_TEST late; if the module-level test bootstrap block
+    above didn't run (because the env var wasn't present yet), a fresh test DB may
+    lack newer optional columns (e.g., monster_catalog.resistances). To harden
+    against ordering differences we apply create_all + lightweight migrations
+    here as an idempotent safety net.
+    """
+    try:  # pragma: no cover - defensive
+        with app.app_context():
+            db.create_all()
+            from app.server import _run_migrations, _seed_game_config, seed_items
+
+            _run_migrations()
+            seed_items()
+            _seed_game_config()
+    except Exception:  # swallow; normal startup path will also attempt
+        pass
     return app
 
 

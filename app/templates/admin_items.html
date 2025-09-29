@@ -1,0 +1,121 @@
+{% extends 'admin_base.html' %}
+{% block admin_breadcrumb %}<li class="breadcrumb-item active" aria-current="page">Items</li>{% endblock %}
+{% block admin_content %}
+<h2 class="h4 mb-3">Item Catalog</h2>
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">Import CSV</div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data" class="mb-2">
+                    <div class="mb-3">
+                        <input class="form-control" type="file" name="file" accept=".csv,text/csv" required />
+                        <div class="form-text">Columns: slug,name,type,description,value_copper,level,rarity[,weight]
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-primary">Validate & Import</button>
+                </form>
+                {% if imported is not none %}
+                <div class="alert alert-success py-2 mb-0">Imported {{ imported }} items.</div>
+                {% endif %}
+                {% if errors %}
+                <div class="alert alert-danger mt-3 mb-0">
+                    <strong>Validation errors:</strong>
+                    <ul class="mb-0 small">
+                        {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% if rows %}
+        <div class="card mt-4">
+            <div class="card-header">Parsed Preview ({{ rows|length }} rows)</div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 300px;">
+                    <table class="table table-sm table-striped mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Line</th>
+                                <th>Slug</th>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Lvl</th>
+                                <th>Rarity</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in rows %}
+                            <tr>
+                                <td>{{ r['__line__'] }}</td>
+                                <td>{{ r['slug'] }}</td>
+                                <td>{{ r['name'] }}</td>
+                                <td>{{ r['type'] }}</td>
+                                <td>{{ r['level'] }}</td>
+                                <td>{{ r['rarity'] }}</td>
+                                <td>{{ r['value_copper'] }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Existing Items</span>
+                <span class="small text-muted">Page {{ page }} ({{ total }} total)</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Slug</th>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Lvl</th>
+                            <th>Rarity</th>
+                            <th>Value</th>
+                            <th>Wt</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for it in items %}
+                        <tr>
+                            <td class="text-muted">{{ it.id }}</td>
+                            <td><code>{{ it.slug }}</code></td>
+                            <td>{{ it.name }}</td>
+                            <td>{{ it.type }}</td>
+                            <td>{{ it.level }}</td>
+                            <td>{{ it.rarity }}</td>
+                            <td>{{ it.value_copper }}</td>
+                            <td>{{ '%.1f'|format(it.weight or 0) }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if not items %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted small py-3">No items found.</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer d-flex justify-content-between">
+                <div>
+                    {% if page > 1 %}<a class="btn btn-sm btn-outline-secondary" href="?page={{ page-1 }}">&laquo;
+                        Prev</a>{% endif %}
+                </div>
+                <div>
+                    {% if (page * per_page) < total %}<a class="btn btn-sm btn-outline-secondary"
+                        href="?page={{ page+1 }}">Next &raquo;</a>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

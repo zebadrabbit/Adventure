@@ -56,3 +56,79 @@ INSERT INTO item (slug, name, type, description, value_copper) VALUES
 ('key_dragon','Dragon Key','key','Unlocks a draconic seal.',0);
 
 COMMIT;
+
+-- Expansion: Additional Misc / Crafting / Quest Items
+BEGIN TRANSACTION;
+
+-- Additional TOOLS
+DELETE FROM item WHERE slug LIKE 'tool_alchemy_%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('tool_alchemy_basic','Basic Alchemy Kit','tool','Allows brewing minor potions.',240),
+('tool_alchemy_advanced','Advanced Alchemy Kit','tool','Enables complex potion crafting.',640);
+
+DELETE FROM item WHERE slug LIKE 'tool_cooking_%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('tool_cooking_basic','Camp Cooking Set','tool','Cook simple meals.',160),
+('tool_cooking_gourmet','Gourmet Cooking Set','tool','Prepare high-quality feasts.',520);
+
+DELETE FROM item WHERE slug LIKE 'tool_enchant_%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('tool_enchant_apprentice','Apprentice Enchanting Kit','tool','Apply minor enchantments.',480),
+('tool_enchant_master','Master Enchanting Kit','tool','Apply advanced enchantments.',1400);
+
+-- Additional MATERIAL tiers
+DELETE FROM item WHERE slug LIKE 'material_obsidian_%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('material_obsidian_fragment','Obsidian Fragment','material','Volcanic glass shard.',260),
+('material_obsidian_chunk','Obsidian Chunk','material','Larger glassy shard.',520);
+
+DELETE FROM item WHERE slug LIKE 'material_etheric_%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('material_etheric_residue','Etheric Residue','material','Faintly luminous dust.',640),
+('material_etheric_core','Etheric Core','material','Condensed planar energy.',1320);
+
+DELETE FROM item WHERE slug LIKE 'material_ancient_%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('material_ancient_relic','Ancient Relic Fragment','material','Piece of forgotten device.',980),
+('material_ancient_core','Ancient Power Core','material','Arcane-engine node.',1880);
+
+-- GEM expansion (mid-tier variants)
+DELETE FROM item WHERE slug LIKE 'gem_opal' OR slug LIKE 'gem_amethyst' OR slug LIKE 'gem_topaz';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('gem_opal','Opal Shard','gem','Iridescent shifting hues.',380),
+('gem_amethyst','Amethyst Shard','gem','Purple crystalline fragment.',300),
+('gem_topaz','Topaz Shard','gem','Golden crystalline fragment.',340);
+
+-- SCROLL expansion: teleport & summon & ward
+DELETE FROM item WHERE slug LIKE 'scroll_teleport_%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('scroll_teleport_minor','Minor Teleport Scroll','scroll','Short-range reposition.',520),
+('scroll_teleport_greater','Greater Teleport Scroll','scroll','Longer-range teleport.',1320);
+
+DELETE FROM item WHERE slug LIKE 'scroll_summon_%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('scroll_summon_wolf','Scroll of Summon Wolf','scroll','Summons a wolf ally briefly.',680),
+('scroll_summon_elemental','Scroll of Summon Elemental','scroll','Summons minor elemental.',1800);
+
+DELETE FROM item WHERE slug LIKE 'scroll_ward_%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('scroll_ward_fire','Scroll of Fire Ward','scroll','Applies fire resistance ward.',720),
+('scroll_ward_mind','Scroll of Mind Ward','scroll','Applies mental shielding.',900);
+
+-- QUEST / SPECIAL ITEMS
+DELETE FROM item WHERE slug LIKE 'quest_%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('quest_goblin_totem','Goblin Totem','quest','Totemic carving taken from goblin shaman.',0),
+('quest_skeleton_sigil','Skeleton Sigil','quest','Bone sigil radiating undeath.',0),
+('quest_dragon_scale','Ancient Dragon Scale','quest','Scale from a legendary wyrm.',0),
+('quest_elemental_core','Lesser Elemental Core','quest','Residual elemental essence.',0);
+
+-- KEY expansion (region-coded)
+DELETE FROM item WHERE slug LIKE 'key_region_%';
+INSERT INTO item (slug, name, type, description, value_copper) VALUES
+('key_region_forest','Forest Region Key','key','Opens sealed forest gate.',0),
+('key_region_ruins','Ruins Region Key','key','Opens ancient ruin door.',0),
+('key_region_depths','Depths Region Key','key','Unlocks lower dungeon access.',0),
+('key_region_peak','Peak Region Key','key','Unlocks mountain pass.',0);
+
+COMMIT;

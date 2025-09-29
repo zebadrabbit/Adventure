@@ -46,6 +46,29 @@ def start_server(host="0.0.0.0", port=5000, debug: bool = False):  # pragma: no 
         _run_migrations()  # ensure after bulk load
         _seed_game_config()
         _configure_logging()
+        # Seed default monster_ai config if missing (idempotent) to surface patrol keys
+        try:  # local import to avoid circular during app factory
+            import json as _json
+
+            from app.models import GameConfig
+
+            existing = GameConfig.get("monster_ai")
+            if not existing:
+                default_cfg = {
+                    "ambush_chance": 0.5,
+                    "spell_chance": 0.4,
+                    "flee_threshold": 0.2,
+                    "flee_chance": 0.3,
+                    "help_threshold": 0.5,
+                    "help_chance": 0.2,
+                    "cooldown_turns": 0,
+                    "patrol_enabled": False,
+                    "patrol_step_chance": 0.1,
+                    "patrol_radius": 5,
+                }
+                GameConfig.set("monster_ai", _json.dumps(default_cfg))
+        except Exception:
+            pass
     try:
         print(f"[INFO] Starting Socket.IO server on {host}:{port} (async_mode={socketio.async_mode})")
         # Let Flask-SocketIO choose appropriate server (eventlet/gevent/werkzeug)
@@ -658,7 +681,7 @@ def _run_migrations():
         except Exception:
             db.session.rollback()
             pass
-    # Add moderation columns if missing: banned, ban_reason, notes, banned_at
+    # Add moderation columns if missing: banned, ban_reason, notes, banned_at, muted
     inspector = inspect(db.engine)
     user_cols = {c["name"] for c in inspector.get_columns("user")}
     if "banned" not in user_cols:
@@ -695,6 +718,15 @@ def _run_migrations():
         except Exception:
             db.session.rollback()
             pass
+    inspector = inspect(db.engine)
+    user_cols = {c["name"] for c in inspector.get_columns("user")}
+    if "muted" not in user_cols:
+        try:
+            db.session.execute(text("ALTER TABLE user ADD COLUMN muted BOOLEAN NOT NULL DEFAULT 0"))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            pass
     # CombatSession table (lightweight) - create if missing
     try:
         if not inspector.has_table("combat_session"):
@@ -708,7 +740,15 @@ def _run_migrations():
                         user_id INTEGER NOT NULL REFERENCES user(id),
                         monster_json TEXT NOT NULL,
                         status TEXT NOT NULL DEFAULT 'active',
+                        combat_turn INTEGER NOT NULL DEFAULT 1,
+                        initiative_json TEXT,
+                        active_index INTEGER NOT NULL DEFAULT 0,
+                        party_snapshot_json TEXT,
+                        monster_hp INTEGER,
+                        log_json TEXT,
                         outcome_json TEXT,
+                        rewards_json TEXT,
+                        version INTEGER NOT NULL DEFAULT 1,
                         archived BOOLEAN NOT NULL DEFAULT 0
                     );
                     CREATE INDEX IF NOT EXISTS ix_combat_session_user_id ON combat_session(user_id);
@@ -716,6 +756,36 @@ def _run_migrations():
                     """
                 )
             )
+    except Exception:
+        pass
+    # Add new columns to combat_session if table already existed (older deployments)
+    try:
+        if inspector.has_table("combat_session"):
+            existing = {c["name"] for c in inspector.get_columns("combat_session")}
+
+            def _add(col_def):
+                try:
+                    db.session.execute(text(f"ALTER TABLE combat_session ADD COLUMN {col_def}"))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+
+            if "combat_turn" not in existing:
+                _add("combat_turn INTEGER NOT NULL DEFAULT 1")
+            if "initiative_json" not in existing:
+                _add("initiative_json TEXT")
+            if "active_index" not in existing:
+                _add("active_index INTEGER NOT NULL DEFAULT 0")
+            if "party_snapshot_json" not in existing:
+                _add("party_snapshot_json TEXT")
+            if "monster_hp" not in existing:
+                _add("monster_hp INTEGER")
+            if "log_json" not in existing:
+                _add("log_json TEXT")
+            if "rewards_json" not in existing:
+                _add("rewards_json TEXT")
+            if "version" not in existing:
+                _add("version INTEGER NOT NULL DEFAULT 1")
     except Exception:
         pass
     # Add 'xp' and 'level' columns to character if missing
@@ -748,10 +818,154 @@ def _run_migrations():
         except Exception:
             db.session.rollback()
             pass
+    # Ensure core dungeon persistence tables exist before anything referencing them.
+    try:
+        inspector = inspect(db.engine)
+        tables = set(inspector.get_table_names())
+        # Create dungeon_instance first (referenced by dungeon_entity)
+        if "dungeon_instance" not in tables:
+            db.session.execute(
+                text(
+                    """
+                    CREATE TABLE dungeon_instance (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL REFERENCES user(id),
+                        seed INTEGER NOT NULL,
+                        pos_x INTEGER NOT NULL DEFAULT 0,
+                        pos_y INTEGER NOT NULL DEFAULT 0,
+                        pos_z INTEGER NOT NULL DEFAULT 0,
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE INDEX IF NOT EXISTS ix_dungeon_instance_user_id ON dungeon_instance(user_id);
+                    """
+                )
+            )
+            db.session.commit()
+        inspector = inspect(db.engine)
+        tables = set(inspector.get_table_names())
+        if "dungeon_entity" not in tables:
+            db.session.execute(
+                text(
+                    """
+                    CREATE TABLE dungeon_entity (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        instance_id INTEGER NOT NULL REFERENCES dungeon_instance(id),
+                        type TEXT NOT NULL,
+                        slug TEXT,
+                        name TEXT,
+                        x INTEGER NOT NULL,
+                        y INTEGER NOT NULL,
+                        z INTEGER NOT NULL DEFAULT 0,
+                        hp_current INTEGER,
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE INDEX IF NOT EXISTS ix_dungeon_entity_instance ON dungeon_entity(instance_id);
+                    """
+                )
+            )
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+        pass
+
+    # Final safeguard: ensure monster_catalog table and its optional columns exist even
+    # if an earlier step in the broad try/except aborted before reaching the prior
+    # monster handling logic. This runs outside the large block so a failure earlier
+    # (e.g., during combat_session or dungeon table creation) doesn't permanently
+    # skip adding these newer columns, which tests rely on.
+    try:  # narrow, column-level guarded operations
+        from sqlalchemy import inspect as _inspect
+        from sqlalchemy import text as _t2
+
+        _insp2 = _inspect(db.engine)
+        tables2 = set(_insp2.get_table_names())
+        if "monster_catalog" in tables2:
+            mcols2 = {c["name"] for c in _insp2.get_columns("monster_catalog")}
+            if "resistances" not in mcols2:
+                try:
+                    db.session.execute(_t2("ALTER TABLE monster_catalog ADD COLUMN resistances TEXT"))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+            if "damage_types" not in mcols2:
+                try:
+                    db.session.execute(_t2("ALTER TABLE monster_catalog ADD COLUMN damage_types TEXT"))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+        else:
+            # Create minimal table with the expected optional columns present so ORM queries do not fail.
+            try:
+                db.session.execute(
+                    _t2(
+                        """
+CREATE TABLE monster_catalog (
+    id INTEGER PRIMARY KEY,
+    slug TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    level_min INTEGER NOT NULL DEFAULT 1,
+    level_max INTEGER NOT NULL DEFAULT 1,
+    base_hp INTEGER NOT NULL,
+    base_damage INTEGER NOT NULL,
+    armor INTEGER NOT NULL DEFAULT 0,
+    speed INTEGER NOT NULL DEFAULT 10,
+    rarity TEXT NOT NULL DEFAULT 'common',
+    family TEXT NOT NULL,
+    traits TEXT,
+    loot_table TEXT,
+    special_drop_slug TEXT,
+    xp_base INTEGER NOT NULL DEFAULT 0,
+    boss INTEGER NOT NULL DEFAULT 0,
+    resistances TEXT,
+    damage_types TEXT
+)
+"""
+                    )
+                )
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+    except Exception:
+        # Swallow any inspection/create failures; earlier logic may already have succeeded.
+        pass
+
     # Track schema version (very lightweight)
     try:
         inspector = inspect(db.engine)
         tables = inspector.get_table_names()
+        # Rename legacy plural dungeon_instances to singular dungeon_instance to match ORM + FKs
+        if "dungeon_instances" in tables and "dungeon_instance" not in tables:
+            try:
+                db.session.execute(text("ALTER TABLE dungeon_instances RENAME TO dungeon_instance"))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+        # If neither exists (fresh DB where metadata not yet created), create minimal singular table early
+        inspector = inspect(db.engine)
+        tables = inspector.get_table_names()
+        if "dungeon_instance" not in tables:
+            try:
+                db.session.execute(
+                    text(
+                        """
+CREATE TABLE dungeon_instance (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES user(id),
+    seed BIGINT NOT NULL,
+    pos_x INTEGER NOT NULL DEFAULT 0,
+    pos_y INTEGER NOT NULL DEFAULT 0,
+    pos_z INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    dungeon_metadata TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_dungeon_instance_user_id ON dungeon_instance(user_id);
+"""
+                    )
+                )
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
         # Ensure loot table exists (SQLAlchemy create_all will also handle, but explicit for clarity)
         if "dungeon_loot" not in tables:
             db.create_all()  # rely on model metadata

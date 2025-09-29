@@ -112,6 +112,15 @@
                         <button type="submit" id="begin-adventure-btn" class="btn btn-warning" disabled>
                             {{ svg_icon('dungeon-gate', 20, 'me-1 align-text-bottom') }} Begin Adventure
                         </button>
+                        {% if session.get('dungeon_instance_id') and session.get('last_party_ids') %}
+                        <form method="POST" class="d-inline" id="continue-adventure-form">
+                            <input type="hidden" name="form" value="continue_adventure">
+                            <button type="submit" class="btn btn-outline-info"
+                                title="Resume your previous dungeon instance with the last party">
+                                {{ svg_icon('campfire', 20, 'me-1 align-text-bottom') }} Continue
+                            </button>
+                        </form>
+                        {% endif %}
                         {{ seed_widget(dungeon_seed) }}
                     </div>
                 </form>

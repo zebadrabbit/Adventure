@@ -1,7 +1,8 @@
 import os
-import sys
 import random
 import string
+import sys
+
 import pytest
 
 # Ensure repository root importable early
@@ -10,10 +11,10 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 from app import create_app, db  # noqa: E402
-from app.models.models import User, Character  # noqa: E402
-from app.models.dungeon_instance import DungeonInstance  # noqa: E402
-from app.routes.dungeon_api import get_cached_dungeon  # noqa: E402
 from app.dungeon import SECRET_DOOR  # noqa: E402
+from app.models.dungeon_instance import DungeonInstance  # noqa: E402
+from app.models.models import Character, User  # noqa: E402
+from app.routes.dungeon_api import get_cached_dungeon  # noqa: E402
 
 
 @pytest.fixture(scope="session")
@@ -154,6 +155,17 @@ def auth_client(test_app, client):
             # Always reset password to known value to avoid prior tests altering it
             user.password = generate_password_hash("pass")
             db.session.commit()
+        # Ensure at least one character for combat action tests
+        from app.models.models import Character as _Char
+
+        char_exists = _Char.query.filter_by(user_id=user.id).first()
+        if not char_exists:
+            cstats = '{"str":12, "dex":11, "int":10, "con":10, "mana":30}'
+            new_char = _Char(user_id=user.id, name="Hero", stats=cstats, gear="{}", items="[]")
+            db.session.add(new_char)
+            db.session.commit()
+        else:
+            new_char = char_exists
         inst = DungeonInstance.query.filter_by(user_id=user.id).first()
         if not inst:
             inst = DungeonInstance(user_id=user.id, seed=1234, pos_x=0, pos_y=0, pos_z=0)
@@ -165,6 +177,11 @@ def auth_client(test_app, client):
     # Ensure dungeon instance id in session
     with client.session_transaction() as sess:
         sess["dungeon_instance_id"] = inst_id
+        # Pre-populate last_party_ids with existing character id to ensure Continue flow has seed value
+        try:
+            sess.setdefault("last_party_ids", [new_char.id])  # type: ignore
+        except Exception:
+            pass
     return client
 
 

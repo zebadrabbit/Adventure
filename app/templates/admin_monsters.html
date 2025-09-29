@@ -1,0 +1,126 @@
+{% extends 'admin_base.html' %}
+{% block admin_breadcrumb %}<li class="breadcrumb-item active" aria-current="page">Monsters</li>{% endblock %}
+{% block admin_content %}
+<h2 class="h4 mb-3">Monster Catalog</h2>
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">Import CSV</div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data" class="mb-2">
+                    <div class="mb-3">
+                        <input class="form-control" type="file" name="file" accept=".csv,text/csv" required />
+                        <div class="form-text small">Columns:
+                            slug,name,level_min,level_max,base_hp,base_damage,armor,speed,rarity,family,xp_base[,traits,loot_table,special_drop_slug,boss,resistances,damage_types]
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-primary">Validate & Import</button>
+                </form>
+                {% if imported is not none %}
+                <div class="alert alert-success py-2 mb-0">Imported {{ imported }} monsters.</div>
+                {% endif %}
+                {% if errors %}
+                <div class="alert alert-danger mt-3 mb-0">
+                    <strong>Validation errors:</strong>
+                    <ul class="mb-0 small">
+                        {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% if rows %}
+        <div class="card mt-4">
+            <div class="card-header">Parsed Preview ({{ rows|length }} rows)</div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 300px;">
+                    <table class="table table-sm table-striped mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Line</th>
+                                <th>Slug</th>
+                                <th>Name</th>
+                                <th>Lvl Range</th>
+                                <th>Rarity</th>
+                                <th>Family</th>
+                                <th>HP</th>
+                                <th>Dmg</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in rows %}
+                            <tr>
+                                <td>{{ r['__line__'] }}</td>
+                                <td>{{ r['slug'] }}</td>
+                                <td>{{ r['name'] }}</td>
+                                <td>{{ r['level_min'] }}-{{ r['level_max'] }}</td>
+                                <td>{{ r['rarity'] }}</td>
+                                <td>{{ r['family'] }}</td>
+                                <td>{{ r['base_hp'] }}</td>
+                                <td>{{ r['base_damage'] }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Existing Monsters</span>
+                <span class="small text-muted">Page {{ page }} ({{ total }} total)</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Slug</th>
+                            <th>Name</th>
+                            <th>Lvl</th>
+                            <th>Rarity</th>
+                            <th>Family</th>
+                            <th>HP</th>
+                            <th>Dmg</th>
+                            <th>Boss</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in monsters %}
+                        <tr>
+                            <td class="text-muted">{{ m.id }}</td>
+                            <td><code>{{ m.slug }}</code></td>
+                            <td>{{ m.name }}</td>
+                            <td>{{ m.level_min }}-{{ m.level_max }}</td>
+                            <td>{{ m.rarity }}</td>
+                            <td>{{ m.family }}</td>
+                            <td>{{ m.base_hp }}</td>
+                            <td>{{ m.base_damage }}</td>
+                            <td>{% if m.boss %}<span class="badge bg-danger">Boss</span>{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if not monsters %}
+                        <tr>
+                            <td colspan="9" class="text-center text-muted small py-3">No monsters found.</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer d-flex justify-content-between">
+                <div>
+                    {% if page > 1 %}<a class="btn btn-sm btn-outline-secondary" href="?page={{ page-1 }}">&laquo;
+                        Prev</a>{% endif %}
+                </div>
+                <div>
+                    {% if (page * per_page) < total %}<a class="btn btn-sm btn-outline-secondary"
+                        href="?page={{ page+1 }}">Next &raquo;</a>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

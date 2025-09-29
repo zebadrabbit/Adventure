@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Skeleton">
+  <rect x="2" y="2" width="60" height="60" rx="12" ry="12" fill="#111" stroke="#666" stroke-width="3"/>
+  <circle cx="24" cy="24" r="8" fill="#fafafa"/>
+  <circle cx="40" cy="24" r="8" fill="#fafafa"/>
+  <circle cx="24" cy="24" r="3" fill="#111"/>
+  <circle cx="40" cy="24" r="3" fill="#111"/>
+  <rect x="20" y="36" width="24" height="6" fill="#fafafa" rx="3"/>
+  <path d="M20 44 H44" stroke="#fafafa" stroke-width="4"/>
+  <path d="M20 50 H44" stroke="#fafafa" stroke-width="4"/>
+</svg>

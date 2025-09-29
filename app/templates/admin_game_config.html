@@ -1,0 +1,41 @@
+{% extends 'admin_base.html' %}
+{% block admin_breadcrumb %}<li class="breadcrumb-item active" aria-current="page">Game Config</li>{% endblock %}
+{% block admin_content %}
+<h2 class="h4 mb-3">Game Configuration</h2>
+<form method="post" class="row gy-2 gx-2 align-items-end mb-4">
+    <div class="col-md-3">
+        <label class="form-label small mb-1">Key</label>
+        <input type="text" name="key" class="form-control form-control-sm" required />
+    </div>
+    <div class="col-md-6">
+        <label class="form-label small mb-1">Value (raw string or JSON)</label>
+        <input type="text" name="value" class="form-control form-control-sm" required />
+    </div>
+    <div class="col-md-3">
+        <button class="btn btn-sm btn-primary w-100">Set / Update</button>
+    </div>
+</form>
+<div class="table-responsive">
+    <table class="table table-sm table-striped align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>Key</th>
+                <th>Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in rows %}
+            <tr>
+                <td><code>{{ r.key }}</code></td>
+                <td class="small text-break" style="max-width:600px;">{{ r.value }}</td>
+            </tr>
+            {% endfor %}
+            {% if not rows %}<tr>
+                <td colspan="2" class="text-center small text-muted py-3">No config entries.</td>
+            </tr>{% endif %}
+        </tbody>
+    </table>
+</div>
+<p class="small text-muted mt-3 mb-0">Values are stored exactly as entered. Use valid JSON when game systems expect it
+    (e.g., encounter_spawn).</p>
+{% endblock %}

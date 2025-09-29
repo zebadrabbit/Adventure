@@ -1,0 +1,4 @@
+slug,name,level_min,level_max,base_hp,base_damage,armor,speed,rarity,family,traits,loot_table,special_drop_slug,xp_base,boss
+example_goblin_scout,Goblin Scout,1,2,18,4,0,12,common,humanoid,"nimble,low_light_vision",goblin_basic,,15,0
+example_skeleton_knight,Skeleton Knight,7,9,125,20,6,9,uncommon,undead,"shielded,resist_pierce",undead_elite,,140,0
+example_boss_dragon,Ancient Flame Wyrm,20,20,1800,120,14,12,boss,dragon,"flying,breath_fire,frightful_presence",boss_dragon,weapon_bow_l20,4000,1

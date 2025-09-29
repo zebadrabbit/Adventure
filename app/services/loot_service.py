@@ -69,6 +69,7 @@ def roll_loot(monster: Dict[str, Any], rng: random.Random | None = None) -> Dict
     rng = rng or random
     raw_table = monster.get("loot_table")
     items_ordered, weights = _parse_loot_table(raw_table)
+    # Collect raw drops in a list first then collapse to mapping slug->qty for stable representation.
     drops: List[str] = []
     rolls_meta: Dict[str, Any] = {"base_pool": items_ordered, "weights": weights, "special": None}
 
@@ -114,7 +115,11 @@ def roll_loot(monster: Dict[str, Any], rng: random.Random | None = None) -> Dict
             pool = [p for p in pool if p != chosen]
             total_w = sum(weights.get(slug, 0.0) for slug in pool)
 
-    return {"items": drops, "rolls": rolls_meta}
+    # Collapse to quantity mapping; maintain legacy compatibility by also returning list under items_list.
+    qty_map: Dict[str, int] = {}
+    for slug in drops:
+        qty_map[slug] = qty_map.get(slug, 0) + 1
+    return {"items": qty_map, "items_list": drops, "rolls": rolls_meta}
 
 
 __all__ = ["roll_loot"]

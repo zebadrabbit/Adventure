@@ -40,6 +40,14 @@ def test_search_advances_by_config(auth_client):
         pass
     from app.models import GameClock, GameConfig
 
+    # Ensure not flagged as in combat from prior tests
+    try:
+        from app.services.time_service import set_combat_state as _set_combat
+
+        _set_combat(False)
+    except Exception:
+        pass
+
     # Override search cost to 3
     GameConfig.set("tick_costs", json.dumps({"search": 3}))
     start = GameClock.get().tick

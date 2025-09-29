@@ -106,7 +106,8 @@ STARTER_ITEMS = {
     "mage": ["oak-staff", "potion-mana", "potion-mana"],
     "cleric": ["oak-staff", "potion-healing", "potion-mana"],
     "ranger": ["hunting-bow", "dagger", "potion-healing"],
-    "druid": ["herbal-pouch", "potion-healing", "potion-mana"],
+    # Added 'oak-staff' so druids receive an auto-equip eligible weapon.
+    "druid": ["oak-staff", "herbal-pouch", "potion-healing", "potion-mana"],
 }
 BASE_STATS = {
     "fighter": {

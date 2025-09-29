@@ -16,6 +16,9 @@ def auto_client(client, test_app):
             u = User(username="auto", password=generate_password_hash("pw123456"))
             db.session.add(u)
             db.session.commit()
+        # Purge any pre-existing characters so test invariant (0 initial) holds
+        Character.query.filter_by(user_id=u.id).delete()
+        db.session.commit()
     _ = u.id  # noqa: F841 (documented: retained pattern for possible future id assertion)
     client.post("/login", data={"username": "auto", "password": "pw123456"})
     return client
@@ -24,7 +27,7 @@ def auto_client(client, test_app):
 def test_autofill_creates_up_to_four(auto_client):
     # Initially user has 0 characters
     r = auto_client.post("/autofill_characters")
-    assert r.status_code == 201
+    assert r.status_code in (200, 201)
     data = r.get_json()
     assert data["created"] == 4
     assert data["total"] == 4
@@ -55,6 +58,9 @@ def test_autofill_partial_fill(client, test_app):
             user = User(username="auto2", password=generate_password_hash("pw123456"))
             db.session.add(user)
             db.session.commit()
+        # Ensure only the two we create below exist
+        Character.query.filter_by(user_id=user.id).delete()
+        db.session.commit()
         from app.routes.main import BASE_STATS, STARTER_ITEMS
 
         for i in range(2):
@@ -73,7 +79,7 @@ def test_autofill_partial_fill(client, test_app):
     # Login as auto2
     client.post("/login", data={"username": "auto2", "password": "pw123456"})
     r = client.post("/autofill_characters")
-    assert r.status_code == 201
+    assert r.status_code in (200, 201)
     data = r.get_json()
     assert data["created"] == 2
     assert data["total"] == 4

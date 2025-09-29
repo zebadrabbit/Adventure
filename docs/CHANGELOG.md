@@ -9,6 +9,30 @@
 - Final post-pruning invariant enforcement pass (door invariants re-run after corner nub pruning) to guard against late structural changes.
 - Regression tests: `test_door_invariants.py`, `test_no_room_tunnel_adjacency.py` protecting door rules and separation.
 - Modular dungeon package fully exercised via new metrics & invariants (see README Modular Dungeon Package section update).
+ - Movement API logic extracted to `app/dungeon/api_helpers/movement.py` (normalize position, attempt move, describe cell/exits) reducing `dungeon_api.py` size.
+ - Tile character mapping centralized in `app/dungeon/api_helpers/tiles.py` with backward-compatible `_char_to_type` shim.
+ - Dashboard helper module `dashboard_helpers.py` consolidating party serialization, autofill, and rendering utilities.
+ - Passive monster patrol update & websocket broadcast (best-effort) after player movement.
+ - Inline Search buttons with perception roll attribution (best party member) and persistent notice markers.
+ - Encounter spawning & patrol logic extracted to `app/dungeon/api_helpers/encounters.py` (removes inline duplication in `dungeon_api.py`).
+ - Perception & search logic extracted to `app/dungeon/api_helpers/perception.py` consolidating notice tracking, rolls, and tile search handling.
+ - Treasure claim flow extracted to `app/dungeon/api_helpers/treasure.py` (single responsibility, easier future extension for lockpicking/chest states).
+
+### Changed
+ - `/api/dungeon/move` and `/api/dungeon/state` now share helper-based description & exits logic (less duplication, clearer tests).
+ - Adventure client fog-of-war relies solely on local storage + in-memory sets (server persistence removed).
+ - Admin fog modal simplified to local coverage only (removed server metrics & clear/sync controls).
+ - README pruned deprecated seen tiles endpoint docs and clarifies client-only fog-of-war approach.
+
+### Removed
+ - Legacy seen tiles subsystem (`/api/dungeon/seen*`) including rate limiting, compression, merge, metrics, and admin clear endpoints.
+ - Tests: `test_seen_tiles_persistence.py`, `test_seen_tiles_metrics.py` (feature obsolete).
+ - Server sync & merge logic for seen tiles in `adventure.js` and `fog_admin_modal.js`.
+
+### Notes
+ - Backward compatibility shim `_char_to_type` remains temporarily to avoid immediate test refactors referencing the old symbol.
+ - Future refactor slices planned: extract encounter spawning, loot noticing, treasure claiming into dedicated helpers for further modularity.
+ - Removal of seen tiles endpoints is a breaking change for any external clients; migrate to client-managed fog-of-war.
 
 ## [0.6.0] - 2025-09-24
 ### Added

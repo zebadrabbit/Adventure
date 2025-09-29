@@ -89,14 +89,30 @@ def login():
 def register():
     """Registration form; on POST creates a new user and logs them in."""
     if request.method == "POST":
-        username = request.form["username"]
-        password = generate_password_hash(request.form["password"])
-        if User.query.filter_by(username=username).first():
+        username = request.form["username"].strip()
+        password_raw = request.form["password"]
+        if not username:
+            flash("Username required")
+            return render_template("register.html")
+        # Idempotent fetch-or-create to reduce test flakiness if same username inserted repeatedly.
+        existing = User.query.filter_by(username=username).first()
+        if existing:
             flash("Username already exists")
         else:
+            password = generate_password_hash(password_raw)
             user = User(username=username, password=password)
-            db.session.add(user)
-            db.session.commit()
+            try:
+                db.session.add(user)
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                # Race or duplicate insert after check: fetch existing and treat as duplicate
+                existing = User.query.filter_by(username=username).first()
+                if existing:
+                    flash("Username already exists")
+                else:
+                    flash("Registration failed")
+                return render_template("register.html")
             login_user(user)
             return redirect(url_for("dashboard.dashboard"))
     return render_template("register.html")

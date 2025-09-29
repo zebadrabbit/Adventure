@@ -6,7 +6,28 @@ _Formerly: Adventure MUD (Multi-User Dungeon)_
 
 A modern web-based multiplayer dungeon adventure game built with Python (Flask, Flask-SocketIO), SQLite, and Bootstrap.
 
-> Quick Links: [Dungeon Generation](docs/DUNGEON_GENERATION.md) · [Teleports](docs/TELEPORTS.md) · [Development Workflow](docs/DEVELOPMENT.md) · [Architecture](docs/architecture.md) · [Contributing](docs/CONTRIBUTING.md)
+> Quick Links: [Dungeon Generation](docs/DUNGEON_GENERATION.md) · [Teleports](docs/TELEPORTS.md) · [Development Workflow](docs/DEVELOPMENT.md) · [Architecture](docs/architecture.md) · [Combat System](#combat-system)
+
+## TL;DR Quick Start
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python run.py server  # visit http://localhost:5000
+
+# Run tests / lint / format
+pytest -q
+ruff check .
+black --check .
+```
+
+Want to format and auto-fix imports / simple issues:
+```bash
+ruff check --fix .
+black .
+```
+
+---
 
 ## Code Style & Linting
 
@@ -28,6 +49,59 @@ Rationale for 120:
 
 If you prefer a stricter wrap in a particular block (e.g., documentation examples), you can manually format and optionally
 add a `# fmt: off / # fmt: on` pair for Black isolation (use sparingly).
+
+### Docstring Style
+Docstrings follow a lightweight Google style variant:
+
+```python
+def player_attack(session_id: int, user_id: int, version: int) -> dict:
+	"""Execute a player attack action.
+
+	Args:
+		session_id: Active combat session id.
+		user_id: Acting user's id (authorization verified internally).
+		version: Optimistic concurrency token; must match current session.version.
+
+	Returns:
+		dict: Serialized session delta or version_conflict payload.
+
+	Raises:
+		ValueError: If the session is not found or action not permitted.
+	"""
+	...
+```
+
+Guidelines:
+1. Module-level docstring: 1–3 line summary + (optional) longer paragraph describing invariants or side effects.
+2. Public functions / service entry-points get full Google-style sections (Args / Returns / Raises). Internal helpers may use a single-sentence docstring if obvious.
+3. Keep imperative mood: "Return" vs "Returns" acceptable; be consistent within file.
+4. Avoid restating parameter types already in annotations unless clarifying semantic domain (e.g., "seed: Deterministic dungeon seed (int <= 2^63-1)").
+5. Prefer documenting important invariants (e.g., idempotence, optimistic lock behavior) over trivial echoing of names.
+
+Rationale: Emphasis on operational contracts and invariants supports contributors making balance / pipeline changes without regressions.
+
+### Running Lint & Format Locally
+
+Automation-friendly one-liners:
+```bash
+ruff check . && black --check . && pytest -q
+```
+Or with auto-fix:
+```bash
+ruff check --fix . && black .
+```
+
+Pre-commit integration (optional):
+```bash
+pip install pre-commit
+pre-commit install
+```
+The existing repo hooks (see `.pre-commit-config.yaml`) will then enforce style (including template inline-style bans) before each commit.
+
+### Common Ruff Suppressions
+Use inline `# noqa: <RULE>` only when **necessary** and add a brief reason, e.g. `# noqa: E501 (example payload clarity)`.
+
+---
 
 
 ## Generation Guarantees (Summary)
@@ -164,17 +238,152 @@ Upcoming tests will validate:
 ---
 
 ## Features
-- User authentication (login/register)
-- Character management (stats, gear, items)
 	- Autofill endpoint to instantly create a 4-character party (`POST /autofill_characters`)
-- Multiplayer via WebSockets
-- Procedural dungeon generation (deterministic by seed)
-- Persistent dungeon state (database-backed)
-- Fog-of-war with persistent explored tile memory (local + server sync)
-- API-driven config for name pools, starter items, base stats, and class map
-- Dynamic UI: party selection, adventure map, and real-time chat
-- Responsive Bootstrap frontend
+	- Automatic starter gear auto-equip (weapon + optional armor) on both manual creation and autofill (centralized in `app/services/auto_equip.py` for single‑source preference logic)
  - Centralized Seed API for deterministic or random dungeon regeneration
+ - Persistent dungeon entities (monsters + treasure) seeded deterministically on first `/api/dungeon/map` call per dungeon instance. Entities exposed via `GET /api/dungeon/entities` and included inline in map payload under `entities`.
+ - Continue Adventure dashboard button rehydrates your last party selection and reuses the existing dungeon instance (seed & explored state) without re-seeding the world.
+- Turn-based combat (initial version):
+	- Automatic encounter spawning during movement
+	- Combat session persistence with initiative order, turn tracking, logging
+	- Player actions: attack, flee (optimistic locking via version field)
+	- Monster auto-turn resolution
+	- Loot generation on victory (reuses loot service)
+	- WebSocket events: `combat_update`, `combat_end`, plus global `combat_state` flag
+
+## Combat System
+
+The combat module implements a lightweight, deterministic (with seeded RNG) turn engine with initiative, multiple player actions, logging, and loot/XP payout. Balance guardrails are enforced by tests rather than informal expectations. Multi‑character parties (up to 4 of the user's characters) are now supported: each character appears independently in the initiative order and all player action endpoints accept an optional `actor_id` (character id) so the client can act with the currently active party member.
+
+### Core Concepts
+- Session entity (`CombatSession`) persists monster state, party snapshot, initiative list, active index, version (optimistic lock), log, rewards, and status.
+- Initiative = each participant `speed + d20`; sorted descending; `active_index` advances after every action or monster auto-turn; wrap increments `combat_turn`.
+- Party snapshot synthesizes one row per **character** including derived stats: `attack`, `defense`, `speed`, `hp / max_hp`, `mana / mana_max`, explicit `int_stat`, resistances, temporary flags (e.g., `defending`).
+- Multi-character: up to 4 of the user's characters are loaded; initiative entries look like `{"type":"player","id":<char_id>,"controller_id":<user_id>,"name":...,"roll":<int>}`. The monster appears as `{"type":"monster","id":<slug-or-id>, ...}`.
+- Optimistic concurrency: every player action posts `{action, version, actor_id?}`; mismatch returns `version_conflict` and the client refetches.
+
+### Party & Targeting
+When a combat session starts, a snapshot of the user's first 1–4 characters is taken. Each character rolls initiative independently; only the actor whose entry matches `initiative[active_index]` may perform a player action. The client includes `actor_id` equal to that character's `char_id` for `attack`, `defend`, `use_item`, or `cast_spell`. If `actor_id` is omitted the server assumes the currently active player initiative entry. Authorization is enforced by verifying `controller_id == current_user.id` and `id == actor_id`.
+
+### Player Actions
+| Action | Effect |
+|--------|--------|
+| attack | d20 accuracy, miss/crit rules, variance, damage application (requires active `actor_id`) |
+| flee | 50% chance to immediately end session (no loot) |
+| defend | Sets `defending=True` on actor; next incoming hit halves post‑resistance damage (min 1) then clears the flag |
+| use_item | Supports `potion-healing` (+25 HP, consumes one if in inventory) on the acting character |
+| cast_spell | `firebolt`: costs 5 mana, d20 accuracy & natural 1 fizzle, natural 20 crit (1.5x), damage `2d8 + INT * 0.6` (post‑crit) with elemental type `fire` (resistances applied) |
+
+### Formulas
+- Accuracy Roll: `acc_roll = d20`; `accuracy = attack + acc_roll`; target evasion = `10 + armor` (monster) / `10 + defense` (player).
+- Miss: natural 1 always misses; otherwise must meet or exceed evasion unless natural 20 (which always hits & crits).
+- Critical Hit: natural 20 multiplies post-variance damage by 1.5 (integer truncated).
+- Player Attack Damage: `base = attack`; variance = uniform int in `[-attack//4, +attack//4]`; apply crit; clamp final to `>=1`.
+- Monster Attack Damage: same pattern using monster `damage` value.
+- Spell (Firebolt): d20 accuracy (nat 1 = fizzle, nat 20 = auto‑hit + crit 1.5x) then damage roll `2d8 + int_stat * 0.6` (rounded down). Fire element passes through resistance table (e.g., 50% fire resist halves final pre‑crit damage).
+- Defend: If target had `defending=True`, halve the damage after crit & resistances (`max(1, dmg // 2)`), then clear flag.
+
+### Logging
+Representative lines:
+```
+Encounter starts vs Training Dummy
+Player hits Training Dummy for 14 (CRIT) damage (HP 486)
+Training Dummy hits Balancer for 5 damage (HP 95)
+Player braces for impact (Defend).
+Player misses Training Dummy (roll 3)
+```
+Logs are truncated to the last 250 entries to bound payload size. WebSocket events `combat_update` and `combat_end` push full state snapshots.
+
+### Rewards
+On monster HP reaching 0: session status becomes `complete`, a loot table is rolled, XP is split equally across present characters, and loot items are appended to the first character's inventory (temporary policy). The stored `session.rewards` now includes both the loot diagnostics and an `xp` block summarizing total and per‑member distribution.
+
+Example (abbreviated `GET /api/dungeon/combat/<id>` after victory):
+
+```
+{
+	"id": 42,
+	"status": "complete",
+	"monster": {"slug":"training-dummy","name":"Training Dummy","xp":40,...},
+## Monster AI (Overview)
+
+The monster AI system introduces modular, opt‑in behaviors controlled by per‑monster flags and global probabilities stored in the `GameConfig` row with key `monster_ai`.
+
+Implemented behaviors:
+* Ambush (pre‑combat surprise strike) – gated by `enable_ambush` and `ambush_chance`.
+* Spell casting (currently `firebolt`) – `enable_monster_spells`, uses `spell_chance`; full hit / crit / fizzle and resistance logic.
+* Flee attempts – `enable_monster_flee` with `flee_threshold` & `flee_chance` (HP ratio trigger).
+* Help calls – `enable_monster_help` (log placeholder) with `help_threshold` & `help_chance`.
+* Action cooldown – global `cooldown_turns` (stores `last_turn` in monster JSON to throttle actions).
+* Status effects scaffold (poison DoT, stun veto) processed each monster turn.
+* Resistances & vulnerabilities – `resistances` mapping (multipliers <1 resist, >1 vulnerability).
+* Patrol wandering – governed by `patrol_enabled`, `patrol_step_chance`, `patrol_radius`; excludes DOOR & TELEPORT tiles (see `app/services/monster_patrol.py`).
+* Icon support – `icon_slug` now included in spawned monster dicts (fallback `family-slug`). UI can map to `static/icons/<icon_slug>.svg` (asset pipeline TBD).
+
+Configuration example (`monster_ai` JSON):
+```json
+{
+	"ambush_chance": 0.5,
+	"spell_chance": 0.4,
+	"flee_threshold": 0.2,
+	"flee_chance": 0.3,
+	"help_threshold": 0.5,
+	"help_chance": 0.2,
+	"cooldown_turns": 0,
+	"patrol_enabled": false,
+	"patrol_step_chance": 0.1,
+	"patrol_radius": 5
+}
+```
+
+On server startup a default config is auto‑seeded if missing (idempotent). You can override values at runtime via:
+```python
+from app.models.models import GameConfig, json
+cfg = {"spell_chance": 0.6, "patrol_enabled": True}
+GameConfig.set("monster_ai", json.dumps(cfg))
+```
+
+See `MONSTER_AI.md` for the authoritative, detailed documentation and maintenance notes.
+
+	"monster_hp": 0,
+	"initiative": [
+		{"type":"player","id":12,"controller_id":7,"name":"Aria","roll":23},
+		{"type":"player","id":13,"controller_id":7,"name":"Brom","roll":18},
+		{"type":"monster","id":"training-dummy","name":"Training Dummy","roll":11}
+	],
+	"rewards": {
+		"items": {"potion-healing": 1, "iron-dagger": 1},
+		"items_list": ["potion-healing","iron-dagger"],
+		"rolls": {"base_pool":["potion-healing","iron-dagger"],"weights":{"potion-healing":1,"iron-dagger":1},"special":null},
+		"xp": {"total": 40, "per_member": {"12": 20, "13": 20}}
+	},
+	"log": ["...omitted..."]
+}
+```
+
+Notes:
+1. `items` is now a mapping `{slug: qty}`; `items_list` provides a legacy flat list for backward compatibility.
+2. `xp.per_member` keys are stringified character ids.
+3. `loot` currently always awards to the first character's inventory; multi‑character equitable distribution is a planned enhancement.
+4. Fleeing or party defeat returns `rewards: {}` (no xp, no items).
+
+### Balance Tests
+Located in `tests/test_combat_balance.py` to lock current behavior:
+| Test | Guardrail |
+|------|-----------|
+| variance bounds | Player damage stays within theoretical min/max (allowing crit inflation) |
+| single crit occurrence | Scripted sequence guarantees exactly one crit (verifies crit logging & multiplier) |
+| crit sampling distribution | Empirical sample produces at least one and not an implausibly high number of crits over forced-roll sessions |
+| defend mitigation | Confirms a defended hit halves post-crit monster damage (min 1) |
+
+These serve as regression tripwires; deliberately update them alongside any formula changes.
+
+### Future Extensions
+Planned roadmap items:
+- Expanded spell list (elemental types, AoE, resist interaction)
+- Targeted spells & attacks (choose monster vs. multiple enemies in future multi-enemy encounters)
+- More nuanced flee odds (speed differential)
+- Status effects (poison, stun, bleed) with per-turn resolution
+- Distinct STR/DEX scaling for melee/ranged vs. INT/WIS for magic, plus gear modifiers
 
 ## Dungeon Generation Pipeline (Overview)
 > NOTE: A simplified char-grid generator (rooms + wall rings + tunnel connectors) is now the default runtime implementation exposed via `from app.dungeon import Dungeon`. The detailed multi-phase pipeline described below is retained as historical documentation and for potential future reintroduction of advanced features. Current tests assert only the simplified invariants: room connectivity, no orphan doors (each door has one room neighbor and at least one walkable neighbor), and deterministic seed layout.
@@ -249,6 +458,107 @@ When `DUNGEON_ENABLE_GENERATION_METRICS` (default True) is enabled, a metrics di
 | `phase_ms` | Dict mapping phase name -> duration (ms) when metrics enabled; aids profiling & performance triage. |
 
 These metrics support regression tests and profiling of the consolidated final pass.
+
+### Persistent Entities & Continue Flow
+
+As of v0.7.x the dungeon world gains a light persistence layer:
+
+* When a new `DungeonInstance` is first visualized via `GET /api/dungeon/map`, a deterministic RNG (`seed ^ 0xE7717`) selects a handful of walkable tiles and seeds:
+	* Monster entities (level-scaled to your average character level) persisted as rows in `DungeonEntity`.
+	* Simple treasure cache markers (`type="treasure"`).
+* Subsequent map loads reuse the same set (idempotent) – no duplicate spawns or shifting coordinates.
+* The map JSON now includes an `entities` array of slim dicts: `{id,type,slug,name,x,y,z,hp_current}`.
+* A companion endpoint `GET /api/dungeon/entities` mirrors this for lighter polling.
+* The dashboard stores your last successful party selection in `session['last_party_ids']`; if a dungeon instance exists you'll see a Continue button which restores the party and jumps straight into the adventure using the existing seed/state.
+
+Planned extensions:
+1. Monster patrol positions updating the persisted entity rows (currently patrol operates in-memory only).
+
+## Data Import & Expansion (Items / Monsters)
+
+The project ships with extensible SQL seed files under `sql/` plus CSV templates under `data_templates/` to streamline bulk content creation.
+
+### SQL Seed Files
+Location: `sql/`
+
+| File | Purpose |
+|------|---------|
+| `items_weapons.sql` | Weapon catalog (levels 1–20) plus expanded categories (crossbows, flails, throwing, fist, scepters, orbs). |
+| `items_armor.sql` | Armor slots + accessories + new bracelet/earring/back variants + class-themed set pieces. |
+| `items_potions.sql` | Healing/mana/buff potions + stamina, invisibility, regeneration, perception, luck, elemental resist, group buffs. |
+| `items_misc.sql` | Tools, crafting mats, gems, scrolls (teleport/summon/ward), keys, quest items (expanded). |
+| `monsters_seed.sql` | `monster_catalog` schema + baseline & expanded families (construct, aberration, demon, beasts) + mini-bosses & extra bosses. |
+
+Each file is idempotent via targeted `DELETE` patterns (e.g., `DELETE FROM item WHERE slug LIKE 'weapon_sword_l%'`). Re-running imports updates rows cleanly without duplicating unrelated content.
+
+### Applying Seeds
+From project root (ensure the SQLite file exists at `instance/mud.db`):
+
+```
+sqlite3 instance/mud.db < sql/items_weapons.sql
+sqlite3 instance/mud.db < sql/items_armor.sql
+sqlite3 instance/mud.db < sql/items_potions.sql
+sqlite3 instance/mud.db < sql/items_misc.sql
+sqlite3 instance/mud.db < sql/monsters_seed.sql
+```
+
+You can safely re-run only the file you modified while iterating.
+
+### CSV Import Templates
+Location: `data_templates/`
+
+| File | Description |
+|------|-------------|
+| `item_import_template.csv` | Column headers for bulk item ingest: `slug,name,type,description,value_copper,extra_json` + sample rows. |
+| `monster_catalog_template.csv` | Headers mirroring `monster_catalog` columns; sample goblin, skeleton, and boss entries. |
+
+Use these to stage new content in spreadsheets (Excel / LibreOffice). Export as UTF‑8 CSV, then write a small loader (future admin route) or ad‑hoc Python script (example below) to insert rows:
+
+```python
+import csv, sqlite3, json
+conn = sqlite3.connect('instance/mud.db')
+cur = conn.cursor()
+with open('data_templates/item_import_template.csv') as f:
+	reader = csv.DictReader(f)
+	for row in reader:
+		cur.execute('INSERT OR REPLACE INTO item (slug,name,type,description,value_copper) VALUES (?,?,?,?,?)',
+					(row['slug'], row['name'], row['type'], row['description'], int(row['value_copper'] or 0)))
+conn.commit()
+```
+
+Monsters (assuming table already created):
+```python
+with open('data_templates/monster_catalog_template.csv') as f:
+	reader = csv.DictReader(f)
+	for r in reader:
+		cur.execute('''INSERT OR REPLACE INTO monster_catalog
+			(slug,name,level_min,level_max,base_hp,base_damage,armor,speed,rarity,family,traits,loot_table,special_drop_slug,xp_base,boss)
+			VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''', (
+			r['slug'], r['name'], int(r['level_min']), int(r['level_max']), int(r['base_hp']), int(r['base_damage']),
+			int(r['armor']), int(r['speed']), r['rarity'], r['family'], r['traits'], r['loot_table'],
+			r['special_drop_slug'] or None, int(r['xp_base']), int(r['boss'])
+		))
+conn.commit()
+```
+
+### Designing New Content
+Guidelines:
+1. Keep `slug` stable & lowercase with underscores; use prefixes for grouping (`weapon_`, `armor_`, `potion_`, `scroll_`).
+2. Favor incremental commits: extend a single category per change to ease review and rollback.
+3. For monsters: choose rarity carefully (overuse of `rare`/`elite` erodes excitement). Use `boss=1` exclusively for encounter anchors.
+4. Introduce new loot tables via code when diversifying families (placeholder names in expansion are stubs until implemented in loot logic).
+5. Maintain value growth curves consistent with peers to avoid economic inflation spikes.
+
+### Future Tooling
+Planned enhancements:
+* Admin UI upload for CSV with diff preview.
+* Automatic curve validation (detect abrupt value or stat deviations).
+* Version tagging (content packs) for modular distribution.
+
+Feel free to propose additional categories (e.g., relics, sigils, glyph-inscribed armor) by opening an issue.
+
+2. Treasure interaction / claiming endpoint to convert caches into actual inventory loot.
+3. NPC entity types (merchants / quest givers) leveraging the same persistence scaffold.
 
 ### Modular Dungeon Package
 As of v0.4.x the former monolithic `app/dungeon.py` has been decomposed into a package:
@@ -379,6 +689,7 @@ See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for coding conventions, pre-com
 - New Inventory API: `/api/characters/state`, `/equip`, `/unequip`, `/consume` with computed stats.
 - Dungeon perception/search improvements: persistent notice markers; Search enabled after perception; loot is clickable with tooltips.
 - Backend hardening: normalized legacy gear shapes and robust user ID extraction to resolve 404/500s on `/api/characters/state`.
+ - Auto-equip baseline gear on creation/autofill: characters now begin with a class-appropriate weapon (and armor when available) populated in the `gear` JSON for immediate dungeon readiness.
 
 ### v0.5.0 (Moderation & Performance Insight)
 - Dedicated Moderation Panel UI with filtering (All / Banned / Muted), search, and action buttons.
@@ -588,9 +899,7 @@ Storage layers:
 
 API contract:
 ```
-GET  /api/dungeon/seen        -> { seed:<int>, tiles:"x,y;x,y;..." }
-POST /api/dungeon/seen        -> { stored:<int>, compressed:<bool> }
-POST /api/dungeon/seen/clear  -> Admin-only clear ({ username?, seed? })
+// NOTE: Legacy `/api/dungeon/seen*` endpoints removed. Fog-of-war now handled entirely client-side.
 ```
 
 Compression:
@@ -598,7 +907,7 @@ Compression:
 - If compression doesn't reduce size, raw form is stored.
 
 Admin management:
-- Admins can clear all or a single seed's tiles for a user with `/api/dungeon/seen/clear`.
+// Removal: clearing individual seed's tiles no longer needed; client may clear local cache via console helper.
 - Payload examples:
 	- Clear current user's all seeds: `{}`
 	- Clear current seed for user `alice`: `{ "username": "alice", "seed": 12345 }`
@@ -610,7 +919,7 @@ Migration:
 - If persistence temporarily unavailable, API returns HTTP 202 with a warning instead of failing gameplay.
 
 ### Rate Limiting & Payload Guards
-`POST /api/dungeon/seen` is rate limited per user (in-memory, per process) to 8 requests per 10s window. Exceeding the limit returns HTTP 429:
+Legacy rate limiting for `POST /api/dungeon/seen` removed along with endpoint deprecation.
 ```
 { "error": "rate limit exceeded", "retry_after": 10 }
 ```
@@ -622,7 +931,7 @@ Additional guards:
 ### Compression & Metrics Endpoint
 Tiles are delta-compressed automatically if it saves space. The admin metrics endpoint surfaces compression efficiency:
 ```
-GET /api/dungeon/seen/metrics  (admin)
+// Metrics endpoint for seen tiles removed.
 Response:
 {
 	"user": "alice",
@@ -721,6 +1030,140 @@ Hooks included:
 - Manual version token check (enforces `asset_url()` usage)
 
 See `docs/STYLE_GUIDE.md` for the full set of frontend conventions.
+
+## Admin & Data Management
+
+The project now ships with a lightweight, secure admin surface (web + CLI parity) for managing users, game configuration, and bulk content (items & monsters) via validated CSV uploads.
+
+### Access & Authorization
+Route prefix: `/admin`
+
+All admin views require an authenticated account whose `User.role == 'admin'`:
+* Non‑authenticated users are redirected to the login page (JSON requests receive `401 {"error":"unauthorized"}`).
+* Authenticated non‑admin users receive HTTP 403 (JSON: `{"error":"forbidden"}`).
+
+The base navigation (`base.html`) automatically shows an Admin Panel link for eligible users.
+
+### Admin Dashboard Overview
+Landing page: `/admin/` – provides quick links to:
+* Users list & role / ban management
+* Game Config key/value editor
+* Item catalog (listing + CSV import)
+* Monster catalog (listing + CSV import)
+
+### CSV Imports (Items & Monsters)
+Upload forms are available at:
+* Items: `/admin/items`
+* Monsters: `/admin/monsters`
+
+Process (Items or Monsters):
+1. Upload UTF‑8 CSV (≤500 KB, ≤5000 data rows).
+2. Server parses & normalizes headers (case/whitespace stripped).
+3. Validation pass collects all errors (no partial writes).
+4. If zero errors: atomic upsert transaction by `slug`.
+
+Safety Guards:
+* File size hard limit: 500,000 bytes.
+* Row hard limit: 5,000 (excluding blank lines).
+* All‑or‑nothing: any validation error aborts without DB changes.
+
+#### Item CSV Required Columns
+`slug,name,type,description,value_copper,level,rarity` (+ optional `weight`)
+
+Validation Highlights:
+* `slug` unique within file, no spaces.
+* Integers: `value_copper >= 0`, `level >= 0`.
+* `rarity` ∈ {common, uncommon, rare, epic, legendary, mythic}.
+* Optional `weight` must be numeric if present.
+
+#### Monster CSV Required Columns
+`slug,name,level_min,level_max,base_hp,base_damage,armor,speed,rarity,family,xp_base`
+
+Optional columns honored if present: `traits,loot_table,special_drop_slug,boss,resistances,damage_types`.
+
+Validation Highlights:
+* `slug` unique; `name`, `family` required.
+* All numeric fields ≥ 0; `level_max >= level_min`.
+* `rarity` ∈ {common, uncommon, rare, elite, boss, epic, legendary, mythic}.
+* `boss` must be boolean-ish (0/1/true/false/yes/no) if provided.
+
+Refer to `data_templates/` and `data_templates/README.md` for canonical column explanations and sample rows.
+
+### CLI Parity
+The same validation logic powers mirrored CLI subcommands (implemented in `run.py`):
+
+```
+python run.py import-items-csv path/to/items.csv
+python run.py import-monsters-csv path/to/monsters.csv
+```
+
+On failure, each validation error is printed (`ERROR: ...`) and exit code is non‑zero.
+
+### Quick Examples
+Create or promote an admin user:
+```
+python run.py make-admin alice
+```
+
+Set / get a game config key:
+```
+python run.py config-set encumbrance '{"base_capacity":12,"per_str":6}'
+python run.py config-get encumbrance
+```
+
+Import new item definitions:
+```
+python run.py import-items-csv snippets/new_items.csv
+```
+
+### User Management
+Web UI: `/admin/users`
+
+Capabilities:
+* List users (paged 50 per page)
+* Change role (`user|mod|admin`) – self‑role change blocked
+* Ban / Unban with optional reason (self‑ban blocked)
+
+JSON workflows (supply `Accept: application/json`):
+```
+POST /admin/users/<id>/role {"role":"mod"}
+POST /admin/users/<id>/ban  {"action":"ban","reason":"abuse"}
+POST /admin/users/<id>/ban  {"action":"unban"}
+```
+Responses include status or structured errors for invalid input.
+
+### Game Configuration
+Web UI: `/admin/game-config`
+
+Stores arbitrary key/value pairs in `GameConfig` (raw string). For JSON semantics, provide serialized JSON string; consumers are responsible for parsing. CLI mirrors this via `config-get` / `config-set`.
+
+### Error Patterns
+| Scenario | Result |
+|----------|--------|
+| Missing CSV required column | `Missing required columns: ...` (no write) |
+| Duplicate slug in file | `Line N: duplicate slug '...'` |
+| Invalid rarity | `Line N: rarity '...' not in [...]` |
+| File > size/row limit | Explicit size/row error, abort |
+| Bad integer field | `Line N: <field> must be integer (got '...')` |
+
+### Extension Ideas (Future)
+Planned but not yet implemented – contributions welcome:
+* Dry‑run mode (show diff preview before commit).
+* Import history & audit log (who imported what & when).
+* Structured JSON field editing for complex configs.
+* Bulk user moderation actions & search filters.
+* Download current catalog as CSV.
+
+### Troubleshooting
+| Symptom | Check |
+|---------|-------|
+| 403 on `/admin/...` | Confirm logged in user has role `admin` |
+| CSV import silently reorders rows | Normal (DB commit order not guaranteed); verify counts |
+| Weight not applied | Ensure numeric; invalid values ignored, see validation logs |
+| Boss flag ignored | Ensure value is one of: 1,true,yes,0,false,no (case-insensitive) |
+
+If an import fails, fix all listed errors then re-upload; partial progress is never applied so retries are safe.
+
 
 ## CSS Custom Properties (Theming)
 Class color theming is centralized and available both server-side and via `/api/config/class_colors`. Corresponding CSS variables (custom properties) are injected in the stylesheets so you can reskin without hunting through multiple files.
@@ -851,6 +1294,34 @@ Encumbrance configuration lives in the `game_config` table (key = `encumbrance`)
 
 Capacity = `base_capacity + STR * per_str`.
 
+### Automatic Starter Gear (Creation & Autofill)
+When a character is created (either manually via the dashboard form or through the `POST /autofill_characters` endpoint), the server now performs a lightweight auto-equip pass. It inspects the starter item list for the chosen class and selects the first matching entries from a preference table:
+
+```
+fighter: weapon [short-sword, long-sword, club]; armor [leather-armor, chain-shirt]
+rogue:   weapon [dagger, short-sword];         armor [leather-armor]
+mage:    weapon [oak-staff, wand];             armor []
+cleric:  weapon [mace, club];                  armor [leather-armor]
+ranger:  weapon [hunting-bow, short-sword];    armor [leather-armor]
+druid:   weapon [oak-staff, club];             armor [leather-armor]
+```
+
+Behavior:
+1. Starter inventory is generated first (existing `STARTER_ITEMS` mapping).
+2. The auto-equip routine normalizes the starter item list (supports future dict-shaped entries) and searches for the first available preferred weapon, then armor.
+3. Equipped slots are stored as a simple mapping in `character.gear` (JSON) e.g. `{ "weapon": "short-sword", "armor": "leather-armor" }`.
+4. If a preferred slot cannot be satisfied (e.g., mage armor), the slot is simply omitted – clients should treat missing keys as unequipped.
+
+Backwards Compatibility:
+- Existing characters with empty or list-form `gear` remain supported; normalization logic elsewhere still tolerates older shapes.
+
+Testing:
+- New tests (`tests/test_autofill_gear.py`) assert that autofill characters always have a `weapon` slot populated and optionally an `armor` slot.
+
+Extending:
+- To add or rebalance starter equipment, update `STARTER_ITEMS` and/or expand the preference lists in the auto-equip block inside `app/routes/dashboard.py`.
+- Future roadmap: incorporate gear stats into derived combat attributes and allow rarity-tier starter variations.
+
 States:
 * normal: weight <= capacity
 * encumbered: capacity < weight <= capacity * hard_cap_pct (DEX reduced by `dex_penalty` for computed stats)
@@ -869,3 +1340,38 @@ Loot claim responses now include post-claim encumbrance snapshot:
 Character state endpoint (`/api/characters/state`) returns stacked bag entries with `qty` and per-character `encumbrance` object. A DEX penalty is applied to base stats prior to gear-derived adjustments when status is `encumbered` or `blocked`.
 
 Tuning: update the JSON in `game_config` (key `encumbrance`) and restart (or hot-reload) the server. Future admin UI will expose these sliders.
+
+---
+
+## Quality Gates & CI ✅
+
+The project enforces a small set of "quality gates" both locally and in CI. A change should pass all of them before merge:
+
+| Gate | Tool / Location | Threshold / Expectation |
+|------|------------------|-------------------------|
+| Lint | `ruff check .`  | Zero errors (warnings allowed only if explicitly ignored in `pyproject.toml`) |
+| Format | `black --check .` | No diffs (line length 120) |
+| Imports | Ruff (rule I) | Auto-sorted; no manual isort run needed |
+| Tests | `pytest -q` | 100% passing; flakiness not tolerated (stochastic tests use deterministic seeds) |
+| Coverage | CI report | >= 80% line coverage overall (raise only after major feature sets stabilize) |
+| Security (light) | Basic review | No hard-coded secrets / credentials committed |
+| Docs | README + key module docstrings | New public services & routes documented |
+
+Status (last local run example):
+```
+ruff: PASS (0 findings)
+black: PASS (no changes)
+pytest: 235 passed, 2 skipped
+coverage: >= 80% (see CI badge/report)
+```
+
+### Adding New Gates
+Proposed additions (open an issue before implementing):
+1. Mypy strict type checking for core services.
+2. Bandit or Semgrep security scan.
+3. Performance budget test for dungeon generation (already partially covered by runtime metric assertion).
+
+### Failing a Gate
+Fail fast & fix in the same PR. If a deliberate behavior change breaks a balance or invariant test, update the test with an inline rationale in the diff.
+
+---

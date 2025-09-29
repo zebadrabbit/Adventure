@@ -6,12 +6,18 @@ def test_dashboard_missing_stat_keys(client, test_app):
 
     Uses existing fixture naming (test_app) consistent with other dashboard tests.
     """
-    from app import db
-    from app.models.models import User, Character
     from werkzeug.security import generate_password_hash
 
+    from app import db
+    from app.models.models import Character, User
+
     with test_app.app_context():
-        u = User(username="nostats", password=generate_password_hash("pass"))
+        # Use a randomized suffix to avoid collisions if test reuses DB without isolation
+        import random
+        import string
+
+        uname = "nostats_" + "".join(random.choices(string.ascii_lowercase, k=5))
+        u = User(username=uname, password=generate_password_hash("pass"))
         db.session.add(u)
         db.session.commit()
         # Intentionally omit 'dex' and 'wis'
@@ -27,7 +33,7 @@ def test_dashboard_missing_stat_keys(client, test_app):
         db.session.commit()
 
     # Log in
-    resp = client.post("/login", data={"username": "nostats", "password": "pass"}, follow_redirects=True)
+    resp = client.post("/login", data={"username": u.username, "password": "pass"}, follow_redirects=True)
     assert resp.status_code == 200
     # Directly hit dashboard (simulates reload after server restart)
     resp2 = client.get("/dashboard")

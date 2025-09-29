@@ -109,6 +109,12 @@ def _username():
 
 @socketio.on("lobby_chat_message")
 def handle_lobby_chat_message(data):
+    """Broadcast a validated lobby chat message from the current user.
+
+    Applies per-user rate limiting and auto-mute logic. Muted or banned users
+    are silently ignored. On validation failure emits an 'error' event scoped
+    to the sender only.
+    """
     ok, result = validate(data or {}, LOBBY_CHAT_MESSAGE)
     if not ok:
         emit(
@@ -169,6 +175,12 @@ def handle_lobby_chat_message(data):
 
 @socketio.on("connect")
 def handle_connect():
+    """Connection handshake logic for lobby namespace.
+
+    Derives username & role, synchronizes persistent ban/mute flags, enforces
+    bans (disconnect), assigns rooms, and supports legacy admin upgrade path
+    for tests via ``legacy_ok`` flag.
+    """
     # Always isolate joins to explicit role rooms only after verifying role each connect.
     try:
         username = _username()
@@ -250,6 +262,7 @@ def handle_connect():
 
 @socketio.on("disconnect")
 def handle_disconnect():
+    """Cleanup online tracking on disconnect."""
     sid = request.sid
     online.pop(sid, None)
 

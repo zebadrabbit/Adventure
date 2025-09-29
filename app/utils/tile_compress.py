@@ -17,6 +17,19 @@ from __future__ import annotations
 
 
 def compress_tiles(raw: str) -> str:
+    """Return compressed representation of a semicolon ``x,y`` list.
+
+    The compressor sorts coordinates, delta-encodes successive x and y values
+    independently, and prefixes with ``D:``. If the encoded payload is not
+    shorter than the original, the original string is returned unchanged.
+
+    Args:
+        raw: Semicolon separated list of ``x,y`` integer pairs (e.g. ``"1,2;3,4"``).
+
+    Returns:
+        Compressed string starting with ``D:`` or the original input if no
+        size benefit or any parsing error occurs.
+    """
     if not raw or ";" not in raw:
         return raw
     try:
@@ -45,6 +58,19 @@ def compress_tiles(raw: str) -> str:
 
 
 def decompress_tiles(data: str) -> str:
+    """Inverse of :func:`compress_tiles`.
+
+    Reconstructs the original semicolon separated coordinate list from a
+    ``D:`` delta-encoded string. If the input does not start with ``D:`` the
+    data is returned unchanged. On parsing failure an empty string is returned
+    (caller should treat empty as a failed decode and ignore).
+
+    Args:
+        data: Compressed delta string or already-raw coordinate list.
+
+    Returns:
+        Raw coordinate list string or empty string on decode failure.
+    """
     if not data or not data.startswith("D:"):
         return data
     try:
