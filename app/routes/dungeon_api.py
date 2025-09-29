@@ -19,22 +19,8 @@ from flask_login import current_user, login_required
 
 from app import db  # moved up to satisfy E402
 from app.dungeon import DOOR, ROOM, TUNNEL, Dungeon
-from app.dungeon.api_helpers.encounters import (
-    maybe_spawn_encounter as _maybe_spawn_encounter,
-)
-from app.dungeon.api_helpers.encounters import (
-    run_monster_patrols as _run_monster_patrols,
-)
-from app.dungeon.api_helpers.movement import (
-    attempt_move,
-    describe_cell_and_exits,
-    normalize_position,
-)
 from app.dungeon.api_helpers.perception import (
     get_noticed_coords as _get_noticed_coords_helper,
-)
-from app.dungeon.api_helpers.perception import (
-    maybe_perceive_and_mark_loot as _maybe_perceive_and_mark_loot,
 )
 from app.dungeon.api_helpers.perception import (
     search_current_tile as _search_current_tile_helper,
@@ -49,7 +35,6 @@ from app.models.dungeon_instance import DungeonInstance
 from app.models.models import Character
 from app.services import spawn_service  # monster spawning
 from app.services.loot_service import roll_loot
-from app.services.time_service import advance_for  # standardized time advancement
 
 """NOTE: Legacy seen-tiles subsystem removed.
 
@@ -279,114 +264,6 @@ def dungeon_map():
                 }
             )
     return jsonify({"error": "No dungeon instance found"}), 404
-
-
-@bp_dungeon.route("/api/dungeon/reveal", methods=["POST"])
-@login_required
-def reveal_secret_door():
-    """Reveal a secret door at the given coordinates (if present and adjacent to player).
-
-    Request JSON: {"x": int, "y": int}
-    Rules:
-      * Coordinates must be within bounds of current dungeon instance.
-      * Tile must currently be a secret door ('S').
-      * (Light proximity check) Player must be within Manhattan distance <= 2 (placeholder for future search/perception logic).
-    Response:
-      200 {"revealed": true, "tile": "D"} on success
-      400/404 with {"error": <msg>} otherwise
-    """
-    data = request.get_json(silent=True) or {}
-    x = data.get("x")
-    y = data.get("y")
-    if not isinstance(x, int) or not isinstance(y, int):
-        return jsonify({"error": "x and y required"}), 400
-    dungeon_instance_id = session.get("dungeon_instance_id")
-    if not dungeon_instance_id:
-        return jsonify({"error": "No dungeon instance"}), 404
-    instance = db.session.get(DungeonInstance, dungeon_instance_id)
-    if not instance:
-        return jsonify({"error": "No dungeon instance"}), 404
-    MAP_SIZE = 75
-    dungeon = get_cached_dungeon(instance.seed, (MAP_SIZE, MAP_SIZE, 1))
-    if not (0 <= x < MAP_SIZE and 0 <= y < MAP_SIZE):
-        return jsonify({"error": "Out of bounds"}), 400
-    # Proximity (placeholder simple rule)
-    dist = abs(instance.pos_x - x) + abs(instance.pos_y - y)
-    if dist > 2:
-        return jsonify({"error": "Too far"}), 400
-    if dungeon.grid[x][y] != getattr(dungeon, "SECRET_DOOR", "S") and dungeon.grid[x][y] != "S":
-        return jsonify({"error": "Not a secret door"}), 400
-    changed = dungeon.reveal_secret_door(x, y)
-    if changed:
-        return jsonify({"revealed": True, "tile": "D"})
-    return jsonify({"error": "Reveal failed"}), 400
-
-
-@bp_dungeon.route("/api/dungeon/move", methods=["POST"])
-@login_required
-def dungeon_move():
-    """
-    Move the party in the dungeon in the specified direction (n/s/e/w).
-    Returns new position and cell description, including available exits.
-    Request: { 'dir': 'n'|'s'|'e'|'w' }
-    Response: { 'pos': [x, y, z], 'desc': <str>, 'exits': [<str>] }
-        Notes:
-            - An empty direction ('') is treated as a no-op and simply returns the current
-                cell description & exits. The frontend uses this after the map initially
-                loads to populate the movement pad without moving the player.
-            - Coordinate system: The map is returned row-major (grid[y][x]) for the client.
-                Visual 'north' corresponds to increasing y index, so deltas are adjusted
-                accordingly (north => dy +1, south => dy -1).
-    """
-    dungeon_instance_id = session.get("dungeon_instance_id")
-    if not dungeon_instance_id:
-        return jsonify({"error": "No dungeon instance found"}), 404
-    instance = db.session.get(DungeonInstance, dungeon_instance_id)
-    if not instance:
-        return jsonify({"error": "Dungeon instance not found"}), 404
-    data = request.get_json(silent=True) or {}
-    direction = (data.get("dir") or "").lower()
-    MAP_SIZE = 75
-    dungeon = get_cached_dungeon(instance.seed, (MAP_SIZE, MAP_SIZE, 1))
-    # Normalize and maybe relocate to entrance
-    x, y, z = normalize_position(dungeon, instance, MAP_SIZE)
-    # Attempt movement (includes teleport logic)
-    x, y, moved = attempt_move(dungeon, instance, direction, MAP_SIZE)
-    # Describe cell and exits
-    desc, exits_map = describe_cell_and_exits(dungeon, x, y, MAP_SIZE)
-    # Human readable exits portion for legacy parser in client (Exits: North, ...) pattern
-    cardinal_full = {"n": "north", "s": "south", "e": "east", "w": "west"}
-    exits_words = [cardinal_full[e] for e in exits_map]
-    if exits_words:
-        desc += " Exits: " + ", ".join(word.capitalize() for word in exits_words) + "."
-    # Perception check for loot at current tile
-    noticed, extra_msg, roll_info = _maybe_perceive_and_mark_loot(instance, x, y)
-    if extra_msg:
-        # Append on a new line to make it stand out in the UI log panel
-        desc = (desc + "\n" + extra_msg).strip()
-    pos = [x, y, z]
-    resp = {"pos": pos, "desc": desc, "exits": exits_map, "noticed_loot": noticed}
-    # ------------------------------------------------------------------
-    # Encounter spawning (simple first pass):
-    #   * Only attempt if a movement occurred.
-    #   * Base chance 18% per move; +4% if player recently found nothing (placeholder for future pacing system).
-    #   * Determine party size (characters owned by current_user) and average level for scaling.
-    #   * Attach monster instance under 'encounter' key if roll succeeds.
-    # Future: integrate zone difficulty, spawn cooldowns, boss gating, multi-monster packs.
-    # ------------------------------------------------------------------
-    if moved:
-        if moved:
-            _maybe_spawn_encounter(instance, moved, resp)
-            _run_monster_patrols(dungeon, instance, resp)
-    if roll_info:
-        resp["last_roll"] = roll_info
-    # Advance time 1 tick only if an actual movement occurred
-    if moved:
-        try:
-            advance_for("move", actor_id=None)
-        except Exception:
-            pass
-    return jsonify(resp)
 
 
 # --------------------------- Admin Monster Endpoints ---------------------------

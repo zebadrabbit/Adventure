@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}Combat{% endblock %}
+{% block content %}
+<div class="container mt-3" id="combat-root" data-combat-id="{{ combat_id }}">
+  <div class="row">
+    <div class="col-md-3 order-md-1 order-2">
+      <div class="card mb-3 monster-panel" id="monster-panel">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span id="monster-name">Monster</span>
+          <span class="badge bg-secondary" id="monster-level"></span>
+        </div>
+        <div class="card-body">
+          <div class="progress mb-2" style="height:20px;">
+            <div class="progress-bar bg-danger" id="monster-hp-bar" role="progressbar" style="width:0%">0 / 0</div>
+          </div>
+          <div id="monster-traits" class="small text-muted"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">Combat Log</div>
+        <div class="card-body p-2" id="combat-log" style="height:300px; overflow-y:auto; font-family:monospace; font-size:0.85rem;"></div>
+      </div>
+    </div>
+    <div class="col-md-9 order-md-2 order-1">
+      <div class="row" id="party-panels">
+        <!-- Party member panels injected here -->
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ asset_url('combat.js') }}"></script>
+<script>window.__COMBAT_ID__ = {{ combat_id|int }};</script>
+{% endblock %}

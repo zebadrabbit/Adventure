@@ -330,6 +330,13 @@
               try { updateLastRollUI(data.last_roll); } catch (e) { }
             }
           }
+          // If an encounter spawned, redirect to combat screen
+          if (data && data.encounter && data.encounter.combat_id) {
+            const cid = data.encounter.combat_id;
+            try { sessionStorage.setItem('lastCombatId', String(cid)); } catch (e) { }
+            window.location.href = '/combat/' + cid;
+            return; // abort further movement response handling
+          }
           if (data && data.pos) {
             const pxY = (data.pos[1] + 0.5) * TILE_SIZE;
             const pxX = (data.pos[0] + 0.5) * TILE_SIZE;
