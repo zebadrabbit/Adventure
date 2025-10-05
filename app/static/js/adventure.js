@@ -64,6 +64,30 @@
         });
         // Expose for debugging
         window.gameSocket = gs;
+        // Generic one-shot call helper: emit event, await matching result event, or timeout -> reject.
+        window.dungeonSocketCall = function dungeonSocketCall(eventName, resultEvent, payload, timeoutMs = 1500) {
+          return new Promise((resolve, reject) => {
+            try {
+              if (!window.gameSocket || window.gameSocket.disconnected) {
+                return reject(new Error('socket_unavailable'));
+              }
+              let finished = false;
+              const timer = setTimeout(() => {
+                if (finished) return; finished = true; cleanup();
+                reject(new Error('socket_timeout'));
+              }, timeoutMs);
+              function cleanup() {
+                try { gs.off(resultEvent, onResult); } catch (_) {}
+                clearTimeout(timer);
+              }
+              function onResult(data) {
+                if (finished) return; finished = true; cleanup(); resolve(data);
+              }
+              gs.once(resultEvent, onResult);
+              gs.emit(eventName, payload || {});
+            } catch (err) { reject(err); }
+          });
+        };
       } catch (e) { console.warn('[socket:/game] init failed', e); }
     })();
     // ------------------------------------------------------------------
@@ -407,73 +431,89 @@
 
     function executeMove(dir) {
       moveInFlight = true;
-      fetch('/api/dungeon/move', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dir })
-      })
-        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-        .then(data => {
-          if (data && typeof data.game_tick === 'number' && window.__updateGameTickHUD) {
-            window.__updateGameTickHUD(data.game_tick);
+      // Inner function to apply movement response consistently (shared by socket + REST fallback)
+      function applyMoveResponse(data) {
+        if (data && typeof data.game_tick === 'number' && window.__updateGameTickHUD) {
+          window.__updateGameTickHUD(data.game_tick);
+        }
+        if (data && data.desc && output) {
+          renderLogFromDesc(String(data.desc));
+          if (data.last_roll) {
+            try { updateLastRollUI(data.last_roll); } catch (e) { }
           }
-          if (data && data.desc && output) {
-            renderLogFromDesc(String(data.desc));
-            if (data.last_roll) {
-              try { updateLastRollUI(data.last_roll); } catch (e) { }
+        }
+        let combatId = null;
+        if (data) {
+          if (data.encounter && data.encounter.combat_id) combatId = data.encounter.combat_id;
+          else if (data.combat_started && data.combat_id) combatId = data.combat_id;
+        }
+        if (combatId) {
+          try { sessionStorage.setItem('lastCombatId', String(combatId)); } catch (e) { }
+          window.location.href = '/combat/' + combatId;
+          return true; // indicates early exit
+        }
+        if (data && data.pos) {
+          const pxY = (data.pos[1] + 0.5) * TILE_SIZE;
+          const pxX = (data.pos[0] + 0.5) * TILE_SIZE;
+          if (window.dungeonPlayerMarker && window.dungeonMap && Number.isFinite(pxY) && Number.isFinite(pxX)) {
+            window.dungeonPlayerMarker.setLatLng([pxY, pxX]);
+            window.dungeonMap.panTo([pxY, pxX], { animate: true });
+            window.currentPos = data.pos;
+            if (Array.isArray(data.pos)) {
+              try { updateDungeonVisibility(data.pos[0], data.pos[1]); } catch (e) { }
             }
-          }
-          // If an encounter spawned, redirect to combat screen (support both response formats)
-          let combatId = null;
-          if (data) {
-            if (data.encounter && data.encounter.combat_id) combatId = data.encounter.combat_id;
-            else if (data.combat_started && data.combat_id) combatId = data.combat_id;
-          }
-          if (combatId) {
-            try { sessionStorage.setItem('lastCombatId', String(combatId)); } catch (e) { }
-            window.location.href = '/combat/' + combatId;
-            return; // abort further movement response handling
-          }
-          if (data && data.pos) {
-            const pxY = (data.pos[1] + 0.5) * TILE_SIZE;
-            const pxX = (data.pos[0] + 0.5) * TILE_SIZE;
-            if (window.dungeonPlayerMarker && window.dungeonMap && Number.isFinite(pxY) && Number.isFinite(pxX)) {
-              window.dungeonPlayerMarker.setLatLng([pxY, pxX]);
-              window.dungeonMap.panTo([pxY, pxX], { animate: true });
-              window.currentPos = data.pos;
-              // Update fog-of-war visibility after movement
-              if (Array.isArray(data.pos)) {
-                try { updateDungeonVisibility(data.pos[0], data.pos[1]); } catch (e) { /* noop */ }
-              }
-              // If newly noticed, add marker persistently
-              if (data.noticed_loot) {
-                addNoticeMarker(data.pos[0], data.pos[1]);
-              }
-              // Update inline search buttons based on current tile
-              updateInlineSearchButtons();
-              // Refresh entities (monsters/treasures) after move (event-driven)
-              refreshEntities();
+            if (data.noticed_loot) {
+              addNoticeMarker(data.pos[0], data.pos[1]);
             }
+            updateInlineSearchButtons();
+            refreshEntities();
           }
-          if (data && Array.isArray(data.exits)) {
-            availableExits = data.exits.map(e => e.toLowerCase());
-          } else if (data && data.desc) {
-            const match = data.desc.match(/Exits: ([^.]*)\./);
-            if (match && match[1]) {
-              availableExits = match[1].split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-            }
-          } else {
-            availableExits = [];
+        }
+        if (data && Array.isArray(data.exits)) {
+          availableExits = data.exits.map(e => e.toLowerCase());
+        } else if (data && data.desc) {
+          const match = data.desc.match(/Exits: ([^.]*)\./);
+          if (match && match[1]) {
+            availableExits = match[1].split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
           }
+        } else {
+          availableExits = [];
+        }
+        return false;
+      }
+      function finalize() {
+        renderExitButtons();
+        moveInFlight = false;
+        setTimeout(processNextMove, 120);
+      }
+      // Attempt socket first
+      if (window.dungeonSocketCall) {
+        window.dungeonSocketCall('dungeon_move', 'dungeon_move_result', { dir })
+          .then(data => {
+            const early = applyMoveResponse(data || {});
+            if (!early) finalize();
+          })
+          .catch(err => {
+            console.debug('[movement] socket fallback', err && err.message);
+            // REST fallback
+            fetch('/api/dungeon/move', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dir })
+            })
+              .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+              .then(data => { applyMoveResponse(data); })
+              .catch(e => console.error('[dungeon] move error', e))
+              .finally(finalize);
+          });
+      } else {
+        // Direct REST path (socket not ready)
+        fetch('/api/dungeon/move', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dir })
         })
-        .catch(err => {
-          console.error('[dungeon] move error', err);
-        })
-        .finally(() => {
-          renderExitButtons();
-          moveInFlight = false;
-          setTimeout(processNextMove, 120);
-        });
+          .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+          .then(data => { applyMoveResponse(data); })
+          .catch(e => console.error('[dungeon] move error', e))
+          .finally(finalize);
+      }
     }
 
     function renderExitButtons() {
@@ -499,195 +539,127 @@
       if (!allowed) { console.debug('[search] blocked: cannot search here (no notice marker at current pos?)'); return; }
       searchInFlight = true;
       console.debug('[search] starting search request');
-      fetch('/api/dungeon/search_tile', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
-        .then(r => r.json())
-        .then(data => {
-          if (data && typeof data.game_tick === 'number' && window.__updateGameTickHUD) { window.__updateGameTickHUD(data.game_tick); }
-          console.debug('[search] response payload', data);
-          // After revealing caches, refresh map entities to show newly visible treasure icons
-          if (data && typeof data.revealed_caches === 'number' && data.revealed_caches > 0) {
-            try { refreshEntities(); } catch (e) { }
-          }
-          if (!output) return;
-          // Prevent duplicates: remove any existing loot list before appending a new one
-          try {
-            const existingLists = output.querySelectorAll('.loot-list');
-            existingLists.forEach(el => el.remove());
-          } catch (e) { }
-          const foundWithItems = data && data.found && Array.isArray(data.items) && data.items.length;
-          if (foundWithItems) {
-            const hdr = document.createElement('div');
+      function applySearchPayload(data) {
+        if (data && typeof data.game_tick === 'number' && window.__updateGameTickHUD) { window.__updateGameTickHUD(data.game_tick); }
+        console.debug('[search] response payload', data);
+        if (data && typeof data.revealed_caches === 'number' && data.revealed_caches > 0) {
+          try { refreshEntities(); } catch (e) { }
+        }
+        if (!output) return;
+        try { output.querySelectorAll('.loot-list').forEach(el => el.remove()); } catch (e) { }
+        const foundWithItems = data && data.found && Array.isArray(data.items) && data.items.length;
+        if (foundWithItems) {
+          const hdr = document.createElement('div');
             hdr.textContent = 'You search the area and discover:';
-            output.appendChild(hdr);
-            const list = document.createElement('div');
-            list.className = 'loot-list mt-1';
-            const partyChars = (window.partyCharacters || []).filter(c => c && c.id && c.name);
-            data.items.forEach(it => {
-              try { console.debug('[search] render loot item', { id: it && it.id, name: it && it.name, rarity: it && it.rarity }); } catch (_e) { }
-              const wrapper = document.createElement('div');
-              wrapper.className = 'loot-entry d-inline-block me-3 mb-2';
-              const label = document.createElement('span');
-              label.className = 'loot-label me-1';
-              label.textContent = (it.name || it.slug || 'Unknown Item') + ':';
-              const rarity = it.rarity || 'common';
-              const dropdownDiv = document.createElement('div');
-              dropdownDiv.className = 'dropdown d-inline-block';
-              const btn = document.createElement('button');
-              btn.type = 'button';
-              btn.className = 'btn btn-sm btn-outline-warning dropdown-toggle';
-              btn.setAttribute('data-bs-toggle', 'dropdown');
-              btn.setAttribute('aria-expanded', 'false');
-              btn.textContent = (it.name || it.slug || 'Item');
-              // Debug hook: mark loot id for diagnostics
-              btn.setAttribute('data-loot-id', it.id);
-              // Ensure a Bootstrap dropdown instance is created (some pages might not auto-init)
-              // Fallback manual toggler if Bootstrap dropdown fails to show
-              // (Deferred init added later after DOM insertion)
-              // Move tooltip to the dropdown button so hovering the button (not just the label) shows details
-              if (window.MUDTooltips) {
-                try {
-                  btn.setAttribute('tabindex', '0');
-                  btn.setAttribute('aria-label', `${it.name}`);
-                  btn.setAttribute('role', 'button');
-                  const attrStr = window.MUDTooltips.attrForItem(it);
-                  if (attrStr) {
-                    const regex = /([a-zA-Z-]+)="([^"]*)"/g; let m;
-                    while ((m = regex.exec(attrStr))) { btn.setAttribute(m[1], m[2]); }
-                  }
-                } catch (e) { }
-              }
-              const menu = document.createElement('ul');
-              menu.className = 'dropdown-menu';
-              menu.setAttribute('data-parent-loot-id', it.id);
-              if (!partyChars.length) {
+          output.appendChild(hdr);
+          const list = document.createElement('div');
+          list.className = 'loot-list mt-1';
+          const partyChars = (window.partyCharacters || []).filter(c => c && c.id && c.name);
+          data.items.forEach(it => {
+            try { console.debug('[search] render loot item', { id: it && it.id, name: it && it.name, rarity: it && it.rarity }); } catch (_e) { }
+            const wrapper = document.createElement('div');
+            wrapper.className = 'loot-entry d-inline-block me-3 mb-2';
+            const label = document.createElement('span');
+            label.className = 'loot-label me-1';
+            label.textContent = (it.name || it.slug || 'Unknown Item') + ':';
+            const dropdownDiv = document.createElement('div');
+            dropdownDiv.className = 'dropdown d-inline-block';
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-sm btn-outline-warning dropdown-toggle';
+            btn.setAttribute('data-bs-toggle', 'dropdown');
+            btn.setAttribute('aria-expanded', 'false');
+            btn.textContent = (it.name || it.slug || 'Item');
+            btn.setAttribute('data-loot-id', it.id);
+            if (window.MUDTooltips) {
+              try {
+                btn.setAttribute('tabindex', '0');
+                btn.setAttribute('aria-label', `${it.name}`);
+                btn.setAttribute('role', 'button');
+                const attrStr = window.MUDTooltips.attrForItem(it);
+                if (attrStr) {
+                  const regex = /([a-zA-Z-]+)="([^"]*)"/g; let m; while ((m = regex.exec(attrStr))) { btn.setAttribute(m[1], m[2]); }
+                }
+              } catch (e) { }
+            }
+            const menu = document.createElement('ul');
+            menu.className = 'dropdown-menu';
+            menu.setAttribute('data-parent-loot-id', it.id);
+            // NOTE (socket-migration): Loot claim still uses REST because the current
+            // websocket event 'dungeon_claim_loot' does not accept a character_id for
+            // assignment. It simply rolls generic loot. To migrate fully we need a
+            // socket event that mirrors POST /api/dungeon/loot/claim/<id> and includes
+            // the chosen character. Until implemented, keep REST here for correctness.
+            if (!(window._lootClaimExplained)) {
+              window._lootClaimExplained = true;
+              console.debug('[loot] Claim remains REST for now due to character assignment requirement; socket event returns generic loot only.');
+            }
+            const partyChars2 = (window.partyCharacters || []).filter(c => c && c.id && c.name);
+            if (!partyChars2.length) {
+              const li = document.createElement('li'); li.innerHTML = '<span class="dropdown-item disabled">No party</span>'; menu.appendChild(li);
+            } else {
+              partyChars2.forEach(pc => {
                 const li = document.createElement('li');
-                li.innerHTML = '<span class="dropdown-item disabled">No party</span>';
-                menu.appendChild(li);
-              } else {
-                partyChars.forEach(pc => {
-                  const li = document.createElement('li');
-                  const a = document.createElement('a');
-                  a.href = '#';
-                  a.className = 'dropdown-item';
-                  a.textContent = pc.name;
-                  a.addEventListener('click', (ev) => {
-                    ev.preventDefault();
-                    hideTooltip();
-                    btn.disabled = true;
-                    fetch(`/api/dungeon/loot/claim/${it.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ character_id: pc.id }) })
-                      .then(async r => {
-                        const status = r.status;
-                        let payload = null; let text = null;
-                        try { payload = await r.json(); } catch (e) { try { text = await r.text(); } catch (_) { } }
-                        return { status, ok: r.ok, body: payload, rawText: text };
-                      })
-                      .then(resWrap => {
-                        const line = document.createElement('div');
-                        line.className = 'small';
-                        const res = resWrap.body || {};
-                        if (resWrap.ok && res && res.claimed) {
-                          line.textContent = `Assigned ${res.item?.name || 'item'} to ${pc.name}.`;
-                          wrapper.remove();
-                          if (typeof res.game_tick === 'number' && window.__updateGameTickHUD) { window.__updateGameTickHUD(res.game_tick); }
-                          try { refreshNoticeMarkers(); } catch (e) { }
-                          // Notify other UI (equipment modal) that character inventories changed
-                          try { document.dispatchEvent(new CustomEvent('mud-characters-state-invalidated', { detail: { character_id: pc.id } })); } catch (e) { }
-                          const remaining = list.querySelectorAll('.loot-entry');
-                          if (!remaining || remaining.length === 0) {
-                            if (window.currentPos) removeNoticeMarker(window.currentPos[0], window.currentPos[1]);
-                            updateInlineSearchButtons();
-                          }
-                        } else {
-                          // Build detailed error message
-                          const errCore = res?.error || resWrap.rawText || 'unknown error';
-                          const detailParts = [];
-                          if (res?.message) detailParts.push(res.message);
-                          if (res?.where) detailParts.push('where=' + res.where);
-                          if (res?.character) detailParts.push('character=' + res.character);
-                          if (res?.party) detailParts.push('party=' + JSON.stringify(res.party));
-                          if (res?.expected_seed) detailParts.push('expected_seed=' + res.expected_seed);
-                          if (res?.row_seed) detailParts.push('row_seed=' + res.row_seed);
-                          line.textContent = `Unable to claim (${resWrap.status}): ${errCore}${detailParts.length ? ' [' + detailParts.join('; ') + ']' : ''}`;
-                          btn.disabled = false;
-                        }
-                        output.appendChild(line);
-                        try { line.scrollIntoView({ block: 'nearest' }); } catch (e) { }
-                        console.debug('[loot] claim response', resWrap);
-                      })
-                      .catch(err => {
-                        console.error('[loot] claim network/parse error', err);
-                        const line = document.createElement('div');
-                        line.className = 'small text-danger';
-                        line.textContent = 'Unable to claim item (network error)';
-                        output.appendChild(line);
-                        btn.disabled = false;
-                      });
-                  });
-                  li.appendChild(a);
-                  menu.appendChild(li);
-                });
-              }
-              dropdownDiv.appendChild(btn);
-              dropdownDiv.appendChild(menu);
-              wrapper.appendChild(label);
-              wrapper.appendChild(dropdownDiv);
-              list.appendChild(wrapper);
-              // Defer dropdown init until after element & menu are in DOM so Bootstrap can find the menu sibling
-              setTimeout(() => {
-                try {
-                  if (!document.body.contains(btn)) return; // removed meanwhile
-                  if (window.bootstrap && bootstrap.Dropdown) {
-                    if (bootstrap.Dropdown.getOrCreateInstance) {
-                      btn.__mudDropdown = bootstrap.Dropdown.getOrCreateInstance(btn, { autoClose: true, popperConfig: { strategy: 'absolute' } });
-                    } else {
-                      let existing = bootstrap.Dropdown.getInstance(btn);
-                      if (!existing) existing = new bootstrap.Dropdown(btn, { autoClose: true, popperConfig: { strategy: 'absolute' } });
-                      btn.__mudDropdown = existing;
-                    }
-                  } else {
-                    // Fallback manual toggle if Bootstrap not present (shouldn't happen now)
-                    btn.addEventListener('click', () => {
-                      const m = btn.nextElementSibling;
-                      if (!m) return;
-                      const shown = m.classList.contains('show');
-                      m.classList.toggle('show', !shown);
-                      if (!shown) {
-                        m.style.position = 'absolute';
-                        const r = btn.getBoundingClientRect();
-                        m.style.top = (r.bottom + 4) + 'px';
-                        m.style.left = r.left + 'px';
+                const a = document.createElement('a'); a.href = '#'; a.className = 'dropdown-item'; a.textContent = pc.name;
+                a.addEventListener('click', (ev) => {
+                  ev.preventDefault(); hideTooltip(); btn.disabled = true;
+                  fetch(`/api/dungeon/loot/claim/${it.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ character_id: pc.id }) })
+                    .then(async r => { const status = r.status; let payload = null; let text = null; try { payload = await r.json(); } catch (e) { try { text = await r.text(); } catch (_) { } } return { status, ok: r.ok, body: payload, rawText: text }; })
+                    .then(resWrap => {
+                      const line = document.createElement('div'); line.className = 'small'; const res = resWrap.body || {};
+                      if (resWrap.ok && res && res.claimed) {
+                        line.textContent = `Assigned ${res.item?.name || 'item'} to ${pc.name}.`;
+                        wrapper.remove(); if (typeof res.game_tick === 'number' && window.__updateGameTickHUD) { window.__updateGameTickHUD(res.game_tick); }
+                        try { refreshNoticeMarkers(); } catch (e) { }
+                        try { document.dispatchEvent(new CustomEvent('mud-characters-state-invalidated', { detail: { character_id: pc.id } })); } catch (e) { }
+                        const remaining = list.querySelectorAll('.loot-entry'); if (!remaining || remaining.length === 0) { if (window.currentPos) removeNoticeMarker(window.currentPos[0], window.currentPos[1]); updateInlineSearchButtons(); }
+                      } else {
+                        const errCore = res?.error || resWrap.rawText || 'unknown error'; const detailParts = []; if (res?.message) detailParts.push(res.message); if (res?.where) detailParts.push('where=' + res.where); if (res?.character) detailParts.push('character=' + res.character); if (res?.party) detailParts.push('party=' + JSON.stringify(res.party)); if (res?.expected_seed) detailParts.push('expected_seed=' + res.expected_seed); if (res?.row_seed) detailParts.push('row_seed=' + res.row_seed);
+                        line.textContent = `Unable to claim (${resWrap.status}): ${errCore}${detailParts.length ? ' [' + detailParts.join('; ') + ']' : ''}`; btn.disabled = false;
                       }
-                    }, { once: false });
-                  }
-                } catch (e) { console.debug('[loot] deferred dropdown init failed', e); }
-              }, 0);
-            });
-            output.appendChild(list);
-            try {
-              const entries = list.querySelectorAll('.loot-entry');
-              console.debug('[search] loot list appended', { count: entries.length });
-              if (!entries.length) {
-                console.warn('[search] expected loot items but none rendered');
-              }
-            } catch (_e) { }
-            // Re-apply tooltips for newly inserted loot buttons
-            // Re-apply tooltips without forced reinit to avoid duplicate bootstrap instance churn
-            try { if (window.MUDTooltips) window.MUDTooltips.apply(list, false); } catch (e) { }
-          } else {
-            const line = document.createElement('div');
-            line.textContent = data && data.message ? data.message : 'You search the area but find nothing.';
-            output.appendChild(line);
-            console.debug('[search] no loot found', { found: data && data.found, itemsLength: data && data.items && data.items.length });
-          }
-        })
-        .catch(err => console.error('[dungeon] search error', err))
-        .finally(() => {
-          searchInFlight = false;
-          // Ensure the invoking button stays disabled after click
-          try { if (invokingBtn) { invokingBtn.dataset.clicked = '1'; invokingBtn.disabled = true; } } catch (e) { }
-          // Failsafe: clear flag after short delay in case of unexpected early return paths
-          setTimeout(() => { if (searchInFlight) { console.warn('[search] failsafe clearing stuck in-flight flag'); searchInFlight = false; } }, 4000);
-        });
+                      output.appendChild(line); try { line.scrollIntoView({ block: 'nearest' }); } catch (e) { }
+                      console.debug('[loot] claim response', resWrap);
+                    })
+                    .catch(err2 => { console.error('[loot] claim network/parse error', err2); const line = document.createElement('div'); line.className = 'small text-danger'; line.textContent = 'Unable to claim item (network error)'; output.appendChild(line); btn.disabled = false; });
+                });
+                li.appendChild(a); menu.appendChild(li);
+              });
+            }
+            dropdownDiv.appendChild(btn); dropdownDiv.appendChild(menu);
+            wrapper.appendChild(label); wrapper.appendChild(dropdownDiv); list.appendChild(wrapper);
+            setTimeout(() => { try { if (!document.body.contains(btn)) return; if (window.bootstrap && bootstrap.Dropdown) { if (bootstrap.Dropdown.getOrCreateInstance) { btn.__mudDropdown = bootstrap.Dropdown.getOrCreateInstance(btn, { autoClose: true, popperConfig: { strategy: 'absolute' } }); } else { let existing = bootstrap.Dropdown.getInstance(btn); if (!existing) existing = new bootstrap.Dropdown(btn, { autoClose: true, popperConfig: { strategy: 'absolute' } }); btn.__mudDropdown = existing; } } } catch (e) { console.debug('[loot] deferred dropdown init failed', e); } }, 0);
+          });
+          output.appendChild(list);
+          try { const entries = list.querySelectorAll('.loot-entry'); console.debug('[search] loot list appended', { count: entries.length }); if (!entries.length) { console.warn('[search] expected loot items but none rendered'); } } catch (_e) { }
+          try { if (window.MUDTooltips) window.MUDTooltips.apply(list, false); } catch (e) { }
+        } else {
+          const line = document.createElement('div'); line.textContent = data && data.message ? data.message : 'You search the area but find nothing.'; output.appendChild(line);
+          console.debug('[search] no loot found', { found: data && data.found, itemsLength: data && data.items && data.items.length });
+        }
+      }
+      function finalize() {
+        searchInFlight = false;
+        try { if (invokingBtn) { invokingBtn.dataset.clicked = '1'; invokingBtn.disabled = true; } } catch (e) { }
+        setTimeout(() => { if (searchInFlight) { console.warn('[search] failsafe clearing stuck in-flight flag'); searchInFlight = false; } }, 4000);
+      }
+      if (window.dungeonSocketCall) {
+        window.dungeonSocketCall('dungeon_search_tile', 'dungeon_search_result', {})
+          .then(applySearchPayload)
+          .catch(err => {
+            console.debug('[search] socket fallback', err && err.message);
+            fetch('/api/dungeon/search_tile', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+              .then(r => r.json())
+              .then(applySearchPayload)
+              .catch(e => console.error('[dungeon] search error', e))
+              .finally(finalize);
+          });
+      } else {
+        fetch('/api/dungeon/search_tile', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+          .then(r => r.json())
+          .then(applySearchPayload)
+          .catch(e => console.error('[dungeon] search error', e))
+          .finally(finalize);
+      }
     }
 
     // No global Search button anymore; inline buttons call doSearch()
