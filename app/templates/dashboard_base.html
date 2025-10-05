@@ -1,12 +1,11 @@
 {% extends 'base.html' %}
 {% block head %}
-{{ super() }}
-<link rel="stylesheet" href="{{ asset_url('css/dashboard.css') }}">
-<link rel="stylesheet" href="{{ asset_url('css/chat-widget.css') }}">
-<link rel="stylesheet" href="{{ asset_url('css/utilities.css') }}">
-<link rel="stylesheet" href="{{ asset_url('css/tooltips.css') }}">
+  {{ super() }}
+  <link rel="stylesheet" href="{{ asset_url('dashboard.css') }}">
+  <link rel="stylesheet" href="{{ asset_url('chat-widget.css') }}">
+  <!-- utilities.css merged into app.css -->
 {% endblock %}
 
 {% block content %}
-{% block dashboard_content %}{% endblock %}
+  {% block dashboard_content %}{% endblock %}
 {% endblock %}

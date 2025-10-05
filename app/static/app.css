@@ -1,0 +1,95 @@
+/* Adventure Consolidated Stylesheet
+   ------------------------------------------------------------------
+   This file aggregates the previously separate theme + utility + component
+   styles that were scattered across multiple small CSS assets. The goal is:
+     * Reduce HTTP requests
+     * Ensure consistent variable/override load order
+     * Make missing-color regressions less likely after directory moves
+
+   Source Files Folded In (original order precedence):
+     1. adv-theme.css (root vars + bootstrap theme overrides)
+     2. theme.css (empty placeholder previously)
+     3. utilities.css (generic utilities + movement pad + dungeon output)
+     4. combat.css (combat layout & log)
+     5. dashboard.css (if exists)  -> (deferred; keep for future merge)
+     6. class-badges.css (deferred; might have sprite/class color rules)
+
+   Deferred files (left separate for now due to page-specific weight):
+     - dashboard.css
+     - class-badges.css
+     - chat-widget.css
+     - tooltips.css
+     - auth.css, home.css (landing/auth specific styling)
+
+   Migration Steps:
+     * Templates updated to reference app.css instead of multiple base files.
+     * Old individual files retained temporarily (can be removed after validation).
+     * If a removed style is reported, search original file notes above.
+--------------------------------------------------------------------*/
+
+/* === 1. adv-theme.css =================================================== */
+:root {
+  --adv-ink: #0B0F12;
+  --adv-ink-2: #12171C;
+  --adv-crt: #1DF2A0;
+  --adv-amber: #FFC857;
+  --adv-cyan: #19C1FF;
+  --adv-magenta: #FF3FA4;
+  --adv-gold: #E9B44C;
+  --adv-gray: #8A97A6;
+  --adv-parchment: #F5F3E7;
+  --adv-white: #F8FAFB;
+}
+:root {
+  --bs-body-bg: var(--adv-ink);
+  --bs-body-color: var(--adv-white);
+  --bs-primary: var(--adv-crt);
+  --bs-secondary: var(--adv-gold);
+  --bs-success: #28D17C;
+  --bs-info: var(--adv-cyan);
+  --bs-warning: var(--adv-amber);
+  --bs-danger: var(--adv-magenta);
+  --bs-light: var(--adv-parchment);
+  --bs-dark: var(--adv-ink-2);
+  --bs-border-color: color-mix(in oklab, var(--adv-gray) 70%, transparent);
+  --bs-link-color: var(--adv-crt);
+  --bs-link-hover-color: color-mix(in oklab, var(--adv-crt) 85%, white);
+}
+.btn-primary { --bs-btn-bg: var(--adv-crt); --bs-btn-border-color: var(--adv-crt); --bs-btn-hover-bg: color-mix(in oklab, var(--adv-crt) 85%, black); --bs-btn-hover-border-color: color-mix(in oklab, var(--adv-crt) 75%, black); box-shadow: 0 0 .6rem rgba(29, 242, 160, .35); }
+.btn-secondary { --bs-btn-bg: var(--adv-gold); --bs-btn-border-color: var(--adv-gold); --bs-btn-hover-bg: color-mix(in oklab, var(--adv-gold) 85%, black); }
+.btn-outline-primary { --bs-btn-color: var(--adv-crt); --bs-btn-border-color: var(--adv-crt); --bs-btn-hover-bg: var(--adv-crt); --bs-btn-hover-color: #06110B; }
+.card, .dropdown-menu, .offcanvas, .modal-content { background: linear-gradient(180deg,#0B0F12 0%,#0D1216 100%); border:1px solid color-mix(in oklab, var(--adv-gray) 30%, transparent); box-shadow:0 6px 24px rgba(0,0,0,.5); }
+.scanlines { background-image:repeating-linear-gradient(0deg, rgba(255,255,255,.06), rgba(255,255,255,.06) 1px, transparent 1px, transparent 3px); mix-blend-mode: overlay; }
+.pixelish { letter-spacing:.02em; image-rendering:pixelated; }
+.text-crt { color: var(--adv-crt) !important; } .text-amber{color:var(--adv-amber)!important;} .text-cyan{color:var(--adv-cyan)!important;}
+.dungeon-output { background:#182124; color: var(--mud-grey, var(--adv-white)); border:1px solid color-mix(in oklab, var(--adv-gray) 25%, transparent); border-left:3px solid var(--bs-primary); padding:.55rem .75rem; font-size:.85rem; line-height:1.15rem; font-family: var(--bs-font-monospace, monospace); max-height:260px; overflow-y:auto; scrollbar-width: thin; }
+.dungeon-output em { color: var(--adv-gray); }
+.dungeon-output::-webkit-scrollbar { width:8px; } .dungeon-output::-webkit-scrollbar-track{background:rgba(255,255,255,0.05);} .dungeon-output::-webkit-scrollbar-thumb{background:color-mix(in oklab, var(--adv-crt) 35%, #182124); border-radius:4px; }
+.monster-icon-wrapper, .treasure-icon-wrapper{pointer-events:none;}
+.monster-icon img.monster-img{width:32px; height:32px; filter:drop-shadow(0 0 4px rgba(0,0,0,.75)); image-rendering:auto; }
+.bg-crt-gradient { background: linear-gradient(135deg,#1DF2A0 0%, #00B76B 100%); color:#04110B; }
+.seed-input-width { max-width:260px; }
+
+/* === 2. theme.css (empty previously) ==================================== */
+/* (Reserved for future global theme overrides) */
+
+/* === 3. utilities.css =================================================== */
+.u-mono{font-family:monospace,monospace;} .u-flex-center{display:inline-flex;align-items:center;justify-content:center;}
+.icon-28{width:28px;height:28px;} .icon-32{width:32px;height:32px;} .icon-dropshadow{filter:drop-shadow(0 0 2px #000);} .icon-glow{filter:drop-shadow(0 0 2px #000);} /* merged */
+.map-box{height:512px;width:512px;border:2px solid #222;border-radius:.5rem;} .map-fluid-fixed-height{height:512px;width:100%;max-width:100%;border:2px solid #222;border-radius:.5rem;}
+.badge-mono{font-family:monospace,monospace;} .no-list{list-style:none;padding-left:0;margin-bottom:0;} .list-reset{list-style-type:none;padding-left:0;}
+.scroll-area-200{max-height:200px;overflow:auto;} .btn-square-32{height:2rem;width:2rem;display:flex;align-items:center;justify-content:center;}
+.chat-body-240{height:240px;min-height:180px;} .mw-240{max-width:240px;} .chat-header{background:var(--mud-dark);padding:.5rem .5rem .25rem .5rem;}
+.outline-panel{border:1px solid #333;border-radius:8px;background:rgba(18,18,20,0.55);} .flex-min-0{min-width:0;} #dungeon-controls>.d-flex{flex-wrap:nowrap!important;}
+#dungeon-output.outlined{border:1px solid #333;border-radius:8px;background:rgba(18,18,20,0.55);} .player-marker-wrapper{position:relative;width:40px;height:40px;} .player-marker-img{position:absolute;left:50%;top:50%;width:40px;height:40px;transform:translate(-50%,-50%) scale(1);transform-origin:50% 50%;pointer-events:none;transition:transform 120ms linear;filter:drop-shadow(0 0 2px rgba(0,0,0,0.55)) drop-shadow(0 0 4px rgba(255,255,255,0.15));}
+.movement-pad{display:inline-grid;grid-template-areas:". up ." "left center right" ". down .";gap:4px;padding:4px 6px;background:rgba(20,20,24,0.6);border:1px solid #333;border-radius:8px;backdrop-filter:blur(2px);} .movement-pad button{--btn-size:40px;width:var(--btn-size);height:var(--btn-size);line-height:1;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:.9rem;color:#eee;background:linear-gradient(#2c2f36,#1e2024);border:1px solid #555;border-radius:6px;cursor:pointer;transition:background .18s ease,transform .12s ease,box-shadow .18s ease;box-shadow:0 2px 2px rgba(0,0,0,0.4);} .movement-pad button:hover:not(:disabled),.movement-pad button:focus-visible:not(:disabled){background:linear-gradient(#394049,#282c31);box-shadow:0 0 0 2px #0f4d63,0 2px 4px rgba(0,0,0,0.55);outline:none;} .movement-pad button:active:not(:disabled){transform:translateY(1px);} .movement-pad button:focus-visible:not(:disabled){box-shadow:0 0 0 2px #fff,0 0 0 4px #0f4d63,0 2px 6px rgba(0,0,0,0.6);} .movement-pad button:disabled{opacity:.35;cursor:not-allowed;filter:grayscale(.4);} .movement-pad .move-up{grid-area:up;} .movement-pad .move-down{grid-area:down;} .movement-pad .move-left{grid-area:left;} .movement-pad .move-right{grid-area:right;} .movement-pad .move-center{grid-area:center;visibility:hidden;} @media (max-width:640px){.movement-pad{--btn-scale:.85;} .movement-pad button{width:calc(var(--btn-size)*var(--btn-scale));height:calc(var(--btn-size)*var(--btn-scale));}}
+.visually-hidden{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;white-space:nowrap!important;border:0!important;}
+/* Coin color utilities */ .coin-gold{color:gold;filter:drop-shadow(0 0 1px gold);} .coin-silver{color:#bfc1c2;filter:drop-shadow(0 0 1px #bfc1c2);} .coin-copper{color:#b87333;filter:drop-shadow(0 0 1px #b87333);} 
+
+/* === 4. combat.css ====================================================== */
+.combat-container{max-width:1400px;} .combat-layout{align-items:stretch;} #combat-left .monster-panel{min-height:300px;} #combat-right .combat-log-wrapper{height:100%;} #combat-log{overflow-y:auto;font-family:var(--bs-font-monospace, monospace);font-size:.8rem;line-height:1.1rem;} @media (max-width:991.98px){#combat-right{order:3;margin-top:1rem;}} .party-member.border-warning{box-shadow:0 0 .5rem rgba(255,193,7,0.5);} .combat-log .log-duplicate{opacity:.6;} .combat-log .log-damage{color:#dc3545;} .combat-log .log-heal{color:#20c997;} .combat-log .log-turn{color:#ffc107;font-weight:600;} .combat-log .log-system{color:#6c757d;font-style:italic;} .combat-log .log-loot{color:#0d6efd;}
+
+/* === 5. Placeholder components ========================================= */
+/* Additional component/style merges (dashboard, badges, chat, tooltips) intentionally deferred */
+
+/* End Consolidated */
