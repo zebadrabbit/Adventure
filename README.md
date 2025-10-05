@@ -239,17 +239,101 @@ Upcoming tests will validate:
 
 ## Features
 	- Autofill endpoint to instantly create a 4-character party (`POST /autofill_characters`)
+
+### Action-Driven Time & Encounter Model (New)
+
+The world now advances only when the player performs an action (no passive 1s polling loop). Each qualifying action
+consumes one or more global non‑combat ticks recorded in `GameClock.tick`.
+
+Tick costs (current defaults):
+* Movement: 1
+* Search / Search Tile: 2
+* Treasure Claim / Cache Open: 2
+* Loot Claim (ground loot): 1
+
+You receive the current `game_tick` in JSON responses for these actions (when no immediate combat started). This enables
+UI features such as day/night cycles or buff duration displays without requiring a separate time endpoint.
+
+#### Random Encounter Pacing
+Encounters roll on any ticked action (movement or non‑movement). Pacing uses a miss streak derived from elapsed ticks:
+
+1. Base chance (`encounter_spawn.base`, default 0.10) is augmented by a streak bonus.
+2. Each tick with no encounter increments a miss streak; gaps larger than 1 tick (e.g., multi‑tick actions) add virtual misses.
+3. Effective chance = base + min(streak_bonus_max, 0.01 * miss_streak * streak_unit).
+4. On success the streak resets; on failure streak += 1.
+
+Set these tuning parameters live via `GameConfig` key `encounter_spawn`:
+```json
+{"base": 0.10, "streak_bonus_max": 0.035, "streak_unit": 2}
+```
+Enable debug output (`encounter_chance`, `encounter_roll`) by setting `debug_encounters` to `true` in `GameConfig`.
+
+#### Monster Patrol Scaling
+Monster patrol attempts scale with the tick amount for the triggering action (linear, capped at 5 attempts per monster per action).
+Multi‑tick actions (searching, opening caches) therefore give the dungeon a larger opportunity to subtly reshuffle patrol positions.
+Patrol updates are broadcast via a single `entities_update` websocket event containing the full monster list, eliminating extra
+follow‑up polling on the client.
+
+#### Design Rationale
+* Removes noisy entity/map polling (previously caused 429 spam under rate limits).
+* Provides deterministic, player‑driven temporal progression (no missed turns while idle).
+* Streak pacing smooths RNG variance—extended dry spells naturally increase odds while preserving unpredictability.
+* Full monster payload pushes reduce client complexity and network chatter.
+
+#### Extending
+* Add new action types: assign an appropriate `tick_amount` and call `advance_non_combat_time` after confirming no combat.
+* To temporarily opt an action out of encounter rolls, pass `action_triggered=False` when invoking `maybe_spawn_encounter`.
+* Future: integrate environmental state (lighting, weather) keyed off `game_tick // segment_length`.
+
+#### Testing
+New tests (`tests/test_time_and_encounters.py`) cover:
+* Tick advancement presence in movement responses.
+* Streak accumulation & non‑decreasing encounter probability under debug mode.
+* Patrol multi‑attempt cap (tick_amount > 5 caps at 5 attempts).
+
+All additions are backward compatible: legacy clients ignoring `game_tick` continue functioning, and the movement route
+still returns familiar keys (`moved`, `pos`, `combat_started`).
 	- Automatic starter gear auto-equip (weapon + optional armor) on both manual creation and autofill (centralized in `app/services/auto_equip.py` for single‑source preference logic)
  - Centralized Seed API for deterministic or random dungeon regeneration
  - Persistent dungeon entities (monsters + treasure) seeded deterministically on first `/api/dungeon/map` call per dungeon instance. Entities exposed via `GET /api/dungeon/entities` and included inline in map payload under `entities`.
  - Continue Adventure dashboard button rehydrates your last party selection and reuses the existing dungeon instance (seed & explored state) without re-seeding the world.
-- Turn-based combat (initial version):
-	- Automatic encounter spawning during movement
-	- Combat session persistence with initiative order, turn tracking, logging
-	- Player actions: attack, flee (optimistic locking via version field)
-	- Monster auto-turn resolution
-	- Loot generation on victory (reuses loot service)
+- Turn-based combat (initial version w/ phase scaffold):
+	- Automatic encounter spawning during movement and redirect to dedicated combat UI
+	- Combat session persistence with initiative order, phases (`start`, `action`, `end`), turn tracking, logging
+	- Player actions: attack, defend, flee, cast_spell (firebolt), use_item (healing potion) – optimistic locking via `version`
+	- Monster auto-turn resolution (basic AI + optional ambush, spell, flee, help, cooldown behaviors)
+	- Loot + XP distribution on victory (split among party), party defeat / flee outcomes
 	- WebSocket events: `combat_update`, `combat_end`, plus global `combat_state` flag
+
+### Rate Limiting & Entity Overlay
+
+All `/api/` routes are protected by a lightweight in-memory rate limiter (fixed window) to mitigate spam.
+
+Defaults:
+- General endpoints: 120 requests per 60 seconds (per user id, falling back to IP) per endpoint.
+- Movement (`POST /api/dungeon/move`): 300 requests per 60 seconds (~5/sec) – tuned to feel responsive while preventing macro flood.
+
+Exceeding a limit returns HTTP 429 with JSON:
+```json
+{ "error": "rate_limited", "retry_after": 12, "limit": 300, "window": 60 }
+```
+`Retry-After` header mirrors `retry_after`.
+
+Dungeon map payloads now include an `entity_overlay` field: a 2D array (same dimensions as `grid`) whose entries are:
+- `M` monster
+- `T` treasure
+- `E` other / future entity types
+- `null` (no entity on that tile)
+
+Example (abridged):
+```json
+{
+  "grid": [["room","room"],["tunnel","door"]],
+  "entity_overlay": [[null,"M"],["T",null]],
+  "player_pos": [12,34,0]
+}
+```
+Clients can safely ignore `entity_overlay` if they prefer to resolve icons purely from the `entities` array.
 
 ## Combat System
 

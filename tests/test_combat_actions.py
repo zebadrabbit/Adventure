@@ -74,6 +74,36 @@ def _start(user_id, monkeypatch, seq=None, rand_vals=None):
     if rand_vals is not None:
         r_it = iter(rand_vals)
         monkeypatch.setattr(random, "random", lambda: next(r_it, 0.5))
+    # Reset character mana to baseline each start to avoid cross-test depletion from persistence.
+    try:
+        import json as _json
+
+        from app import db as _db
+        from app.models.models import Character as _Char
+
+        chars = _Char.query.filter_by(user_id=user_id).all()
+        for c in chars:
+            try:
+                raw = _json.loads(c.stats) if c.stats else {}
+            except Exception:
+                raw = {}
+            # If base mana specified, restore current_mana to at least that value and not above computed max.
+            base_mana = raw.get("mana")
+            # Remove depleted current_mana so _derive_stats recalculates from base mana for isolation.
+            if "current_mana" in raw:
+                # Only reset if depleted below cost threshold (5) or below base mana.
+                try:
+                    if int(raw.get("current_mana", 0)) < 5 or (
+                        base_mana is not None and int(raw.get("current_mana", 0)) < int(base_mana)
+                    ):
+                        raw.pop("current_mana", None)
+                except Exception:
+                    raw.pop("current_mana", None)
+            c.stats = _json.dumps(raw)
+            _db.session.add(c)
+        _db.session.commit()
+    except Exception:
+        pass
     session = combat_service.start_session(user_id, _make_monster())
     return session
 

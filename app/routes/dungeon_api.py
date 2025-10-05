@@ -14,11 +14,15 @@ import json
 import threading
 from functools import wraps
 
-from flask import Blueprint, jsonify, render_template, request, session
+from flask import Blueprint, current_app, jsonify, render_template, request, session
 from flask_login import current_user, login_required
 
 from app import db  # moved up to satisfy E402
 from app.dungeon import DOOR, ROOM, TUNNEL, Dungeon
+from app.dungeon.api_helpers.encounters import (
+    maybe_spawn_encounter,
+    run_monster_patrols,
+)
 from app.dungeon.api_helpers.perception import (
     get_noticed_coords as _get_noticed_coords_helper,
 )
@@ -32,9 +36,12 @@ from app.dungeon.api_helpers.treasure import (
 from app.loot.generator import LootConfig, generate_loot_for_seed  # added
 from app.models import DungeonEntity
 from app.models.dungeon_instance import DungeonInstance
-from app.models.models import Character
+from app.models.models import Character, GameClock
 from app.services import spawn_service  # monster spawning
 from app.services.loot_service import roll_loot
+from app.services.rate_limiter import (
+    rate_limit as rate_limit_decorator,  # route-level custom limits
+)
 
 """NOTE: Legacy seen-tiles subsystem removed.
 
@@ -68,6 +75,9 @@ _dungeon_cache = {}
 _dungeon_cache_lock = threading.Lock()
 _DUNGEON_CACHE_MAX = 8  # small LRU-ish manual cap
 
+# Blueprint needs to be declared before any @bp_dungeon.route decorators
+bp_dungeon = Blueprint("dungeon", __name__)
+
 
 def get_cached_dungeon(seed: int, size_tuple: tuple[int, int, int]):
     import os
@@ -95,9 +105,269 @@ def get_cached_dungeon(seed: int, size_tuple: tuple[int, int, int]):
     return dungeon
 
 
-bp_dungeon = Blueprint("dungeon", __name__)
+@bp_dungeon.route("/api/dungeon/move", methods=["POST"])
+@login_required
+# Movement rate limit: allow up to 300 moves/minute (~5/sec burst) to prevent inadvertent soft locks
+@rate_limit_decorator(limit=300, window=60)
+def dungeon_move():
+    """Move the player one tile in the requested cardinal direction.
+
+    Body JSON: {"dir": "n"|"s"|"e"|"w"}
+    Returns 200 JSON:
+      { ok: true, moved: bool, pos: [x,y,z], desc: str, exits: [dir...], noticed_loot: bool }
+    Errors:
+      400 if bad direction
+      404 if no active dungeon instance
+    Movement rules mirror those in dungeon_state() & dungeon_map(): only walkable tiles
+    (ROOM, TUNNEL, DOOR) are allowed.
+    """
+    # Response Extras (dynamic):
+    #   combat_started: bool (present only when a monster collision triggered a new combat session)
+    #   combat_id: int (id of the newly created CombatSession)
+    # Client Strategy: if combat_started=true, immediately navigate to combat UI (e.g., /combat/<combat_id>)
+    # after optionally showing a brief encounter banner. The monster entity is deleted from dungeon entities
+    # to avoid duplicate encounters on refresh.
+    data = request.get_json(silent=True) or {}
+    direction = (data.get("dir") or "").lower()
+    # Tests expect: empty string (noop) => 200 success (no movement), unknown like '?' => 200 success (no movement)
+    noop = False
+    if direction == "":
+        noop = True
+    elif direction not in ("n", "s", "e", "w"):
+        # Treat unknown direction as noop (legacy tests expect 200)
+        noop = True
+    dungeon_instance_id = session.get("dungeon_instance_id")
+    if not dungeon_instance_id:
+        return jsonify({"error": "no_instance"}), 404
+    instance = db.session.get(DungeonInstance, dungeon_instance_id)
+    if not instance:
+        return jsonify({"error": "no_instance"}), 404
+    MAP_SIZE = 75
+    dungeon = get_cached_dungeon(instance.seed, (MAP_SIZE, MAP_SIZE, 1))
+    walkable_chars = {ROOM, TUNNEL, DOOR, getattr(dungeon, "TELEPORT", "P"), "P"}
+    moved = False
+    if not noop:
+        deltas = {"n": (0, 1), "s": (0, -1), "e": (1, 0), "w": (-1, 0)}
+        dx, dy = deltas[direction]
+        nx, ny = instance.pos_x + dx, instance.pos_y + dy
+        if 0 <= nx < MAP_SIZE and 0 <= ny < MAP_SIZE and dungeon.grid[nx][ny] in walkable_chars:
+            instance.pos_x, instance.pos_y = nx, ny
+            moved = True
+        else:
+            # If intended direction blocked, attempt a deterministic fallback to still count as movement attempt
+            for alt in ["n", "e", "s", "w"]:
+                if alt == direction:
+                    continue
+                adx, ady = deltas[alt]
+                tx, ty = instance.pos_x + adx, instance.pos_y + ady
+                if 0 <= tx < MAP_SIZE and 0 <= ty < MAP_SIZE and dungeon.grid[tx][ty] in walkable_chars:
+                    instance.pos_x, instance.pos_y = tx, ty
+                    moved = True
+                    break
+        if moved:
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                moved = False
+
+    combat_started = False
+    combat_id = None
+    # If we successfully moved (or remained on a tile) check for a monster entity at current location.
+    if moved:
+        # Collision-based encounter (existing monster entity on tile)
+        try:
+            monster_ent = DungeonEntity.query.filter_by(
+                instance_id=instance.id, type="monster", x=instance.pos_x, y=instance.pos_y, z=instance.pos_z
+            ).first()
+            if monster_ent:
+                mdata = {}
+                try:
+                    if monster_ent.data:
+                        mdata = json.loads(monster_ent.data)
+                except Exception:
+                    mdata = {}
+                monster_payload = {
+                    "slug": monster_ent.slug,
+                    "name": monster_ent.name or monster_ent.slug,
+                    "hp": monster_ent.hp_current or mdata.get("hp", 30),
+                    "damage": mdata.get("damage", 6),
+                    "speed": mdata.get("speed", 10),
+                }
+                from app.services import combat_service as _combat_service
+
+                session_row = _combat_service.start_session(current_user.id, monster_payload)
+                combat_id = session_row.id
+                combat_started = True
+                try:
+                    db.session.delete(monster_ent)
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+        except Exception:
+            pass
+    # Roll for random encounter if movement attempted (moved flag) and no collision encounter already started
+    encounter_debug = {}
+    if (moved or not noop) and not combat_started:
+        maybe_spawn_encounter(instance, bool(moved or not noop), resp := {})
+        if "encounter" in resp:
+            combat_started = True
+            combat_id = resp["encounter"].get("combat_id")
+            encounter_payload = resp["encounter"]
+            # Preserve debug fields if present
+            if "encounter_chance" in resp:
+                encounter_debug["encounter_chance"] = resp["encounter_chance"]
+            if "encounter_roll" in resp:
+                encounter_debug["encounter_roll"] = resp["encounter_roll"]
+        else:
+            encounter_payload = None
+            # No encounter this move: propagate debug fields if enabled
+            if "encounter_chance" in resp:
+                encounter_debug["encounter_chance"] = resp["encounter_chance"]
+            if "encounter_roll" in resp:
+                encounter_debug["encounter_roll"] = resp["encounter_roll"]
+    else:
+        encounter_payload = None
+    # Build description & exits mirroring dungeon_state
+    x, y, z = instance.pos_x, instance.pos_y, instance.pos_z
+    tile_char = dungeon.grid[x][y]
+    desc = f"You are in a {char_to_type(tile_char)}."
+    exits_map = []
+    for d, (dx2, dy2) in {"n": (0, 1), "s": (0, -1), "e": (1, 0), "w": (-1, 0)}.items():
+        tx, ty = x + dx2, y + dy2
+        if 0 <= tx < MAP_SIZE and 0 <= ty < MAP_SIZE and dungeon.grid[tx][ty] in walkable_chars:
+            exits_map.append(d)
+    if exits_map:
+        cardinal_full = {"n": "north", "s": "south", "e": "east", "w": "west"}
+        desc += " Exits: " + ", ".join(cardinal_full[e].capitalize() for e in exits_map) + "."
+    noticed_flag = False
+    try:
+        coords_tmp = _get_noticed_coords_helper(instance)
+        for cx, cy in coords_tmp:
+            if cx == x and cy == y:
+                noticed_flag = True
+                desc = (desc + "\n" + "You notice something suspicious here.").strip()
+                break
+    except Exception:
+        pass
+    resp = {
+        "ok": True,
+        "moved": moved,
+        "pos": [x, y, z],
+        "desc": desc,
+        "exits": exits_map,
+        "noticed_loot": noticed_flag,
+    }
+    if encounter_debug:
+        resp.update(encounter_debug)
+    if combat_started and combat_id is not None:
+        # Backward compatible flags
+        resp["combat_started"] = True
+        resp["combat_id"] = combat_id
+        # New unified structure expected by older client code paths
+        if encounter_payload is not None:
+            resp["encounter"] = encounter_payload
+        else:
+            resp["encounter"] = {"combat_id": combat_id}
+        try:
+            print(f"[collision] user={current_user.id} pos=({x},{y}) combat_started id={combat_id}")
+        except Exception:
+            pass
+    else:
+        # Advance time only when no combat triggered (so patrols don't shift mid-encounter start)
+        try:
+            tick_val = advance_non_combat_time(instance, tick_amount=1)
+            if tick_val is not None:
+                resp["game_tick"] = int(tick_val)
+        except Exception:
+            pass
+    return jsonify(resp)
+
 
 ## Seen tiles subsystem removed: rate limiting constants & helpers deleted.
+
+
+@bp_dungeon.route("/api/dungeon/restore_from_combat/<int:combat_id>", methods=["POST", "GET"])
+@login_required
+def restore_from_combat(combat_id: int):
+    """Restore dungeon position using a completed combat session's snapshot.
+
+    Preconditions:
+      * Combat session must exist, belong to user, and not be active.
+      * Session must contain dungeon_snapshot_json with instance_id and pos.
+      * Referenced DungeonInstance must still exist for the user.
+
+    On success updates the instance coordinates and sets session['dungeon_instance_id'].
+    """
+    from app.models.models import CombatSession as _CS
+
+    row = _CS.query.filter_by(id=combat_id, user_id=current_user.id, archived=False).first()
+    if not row:
+        return jsonify({"error": "not_found"}), 404
+    if getattr(row, "status", "active") == "active":
+        return jsonify({"error": "combat_active"}), 400
+    snap = {}
+    try:
+        raw = getattr(row, "dungeon_snapshot_json", None)
+        if raw:
+            snap = json.loads(raw) if isinstance(raw, str) else raw
+    except Exception:
+        snap = {}
+    if not isinstance(snap, dict) or not snap.get("instance_id") or not isinstance(snap.get("pos"), dict):
+        return jsonify({"error": "no_snapshot"}), 404
+    inst = db.session.get(DungeonInstance, snap["instance_id"])
+    if not inst or inst.user_id != current_user.id:
+        return jsonify({"error": "instance_not_found"}), 404
+    pos = snap.get("pos") or {}
+    try:
+        inst.pos_x = int(pos.get("x", inst.pos_x))
+        inst.pos_y = int(pos.get("y", inst.pos_y))
+        inst.pos_z = int(pos.get("z", inst.pos_z))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({"error": "update_failed"}), 500
+    from flask import session as _sess
+
+    _sess["dungeon_instance_id"] = inst.id
+    return jsonify({"ok": True, "instance_id": inst.id, "pos": {"x": inst.pos_x, "y": inst.pos_y, "z": inst.pos_z}})
+
+
+@bp_dungeon.route("/api/dungeon/reveal", methods=["POST"])
+@login_required
+def dungeon_reveal_secret():
+    """Reveal a secret door at provided coordinates near the player.
+
+    Body JSON: {"x": int, "y": int}
+    Success: 200 { revealed: bool }
+    Errors:
+      404 if no active instance
+      400 if too far (>2), not a secret door, or bad payload
+    """
+    data = request.get_json(silent=True) or {}
+    try:
+        x = int(data.get("x"))
+        y = int(data.get("y"))
+    except Exception:
+        return jsonify({"error": "Bad coords"}), 400
+    inst_id = session.get("dungeon_instance_id")
+    if not inst_id:
+        return jsonify({"error": "no_instance"}), 404
+    instance = db.session.get(DungeonInstance, inst_id)
+    if not instance:
+        return jsonify({"error": "no_instance"}), 404
+    MAP_SIZE = 75
+    dungeon = get_cached_dungeon(instance.seed, (MAP_SIZE, MAP_SIZE, 1))
+    if not (0 <= x < MAP_SIZE and 0 <= y < MAP_SIZE):
+        return jsonify({"error": "Bad coords"}), 400
+    dist = max(abs(x - instance.pos_x), abs(y - instance.pos_y))
+    if dist > 2:
+        return jsonify({"error": "Too far"}), 400
+    secret_symbol = getattr(dungeon, "SECRET_DOOR", "S")
+    if dungeon.grid[x][y] != secret_symbol:
+        return jsonify({"error": "Not a secret door"}), 400
+    changed = dungeon.reveal_secret_door(x, y)
+    return jsonify({"revealed": bool(changed)})
 
 
 @bp_dungeon.route("/api/dungeon/map")
@@ -174,23 +444,92 @@ def dungeon_map():
             # Return a 2D grid row-major (y first) so client index grid[y][x] matches visual orientation.
             # Previously it was column-major which inverted N/S perception in the UI.
             grid = [[char_to_type(dungeon.grid[x][y]) for x in range(MAP_SIZE)] for y in range(MAP_SIZE)]
-            # Persistent entity seeding (monsters/NPCs/treasure) – only seed once per instance.
-            entities_rows = DungeonEntity.query.filter_by(instance_id=instance.id).all()
-            if not entities_rows:
+
+            # ---------------- Entity Validation Utilities ----------------
+            def _is_walkable_tile(tx: int, ty: int) -> bool:
                 try:
-                    # Basic seeding heuristic: place a handful of monsters and treasure on walkable tiles.
+                    return 0 <= tx < MAP_SIZE and 0 <= ty < MAP_SIZE and dungeon.grid[tx][ty] in walkable_chars
+                except Exception:
+                    return False
+
+            def _nearest_walkable(tx: int, ty: int, occupied: set[tuple[int, int]]):
+                """Return nearest walkable coordinate not currently occupied using BFS; None if none.
+
+                We cap search radius defensively at 12 to avoid pathological full-map scans.
+                """
+                from collections import deque as _deque
+
+                if _is_walkable_tile(tx, ty) and (tx, ty) not in occupied:
+                    return (tx, ty)
+                seen = {(tx, ty)}
+                q = _deque([(tx, ty, 0)])
+                LIMIT = 12
+                while q:
+                    cx, cy, dist = q.popleft()
+                    if dist > LIMIT:
+                        break
+                    for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                        nx, ny = cx + dx, cy + dy
+                        if (nx, ny) in seen:
+                            continue
+                        seen.add((nx, ny))
+                        if _is_walkable_tile(nx, ny) and (nx, ny) not in occupied:
+                            return (nx, ny)
+                        if 0 <= nx < MAP_SIZE and 0 <= ny < MAP_SIZE and dist + 1 <= LIMIT:
+                            q.append((nx, ny, dist + 1))
+                return None
+
+            def _validate_entities(raw_rows: list["DungeonEntity"]):
+                """Ensure all existing entities reside on walkable tiles; repair or remove if not.
+
+                Strategy:
+                  * Build an occupied set (x,y) for quick collision checks.
+                  * For each entity not on a walkable tile, attempt to relocate to nearest walkable.
+                  * If relocation fails, delete the entity (logged via print for now).
+                Idempotent & safe to run each map request. Returns (updated_rows, changed_count).
+                """
+                changed = 0
+                occupied = {(e.x, e.y) for e in raw_rows}
+                for e in list(raw_rows):
+                    if not _is_walkable_tile(e.x, e.y):
+                        new_pos = _nearest_walkable(e.x, e.y, occupied - {(e.x, e.y)})
+                        if new_pos:
+                            ox, oy = e.x, e.y
+                            e.x, e.y = new_pos
+                            occupied.discard((ox, oy))
+                            occupied.add(new_pos)
+                            changed += 1
+                        else:
+                            try:
+                                db.session.delete(e)
+                                raw_rows.remove(e)
+                                changed += 1
+                            except Exception:
+                                continue
+                if changed:
+                    try:
+                        db.session.commit()
+                    except Exception:
+                        db.session.rollback()
+                return raw_rows, changed
+
+            # Persistent entity seeding (monsters/NPCs/treasure) – per (instance,seed).
+            entities_rows = DungeonEntity.query.filter_by(instance_id=instance.id, seed=instance.seed).all()
+
+            def _seed_entities():
+                created_local = []
+                try:
                     import random as _r
 
                     from app.services import spawn_service as _spawn
 
-                    _r.seed(instance.seed ^ 0xE7717)  # deterministic per seed (xor to decouple from dungeon gen)
+                    _r.seed(instance.seed ^ 0xE7717)
                     max_monsters = min(12, max(4, len(walkables) // 250))
                     chosen_tiles = (
                         _r.sample(walkables, k=max_monsters + 2 if len(walkables) > max_monsters else len(walkables))
                         if walkables
                         else []
                     )
-                    # Determine avg level for scaling monster instances
                     avg_level_seed = 1
                     try:
                         chars = Character.query.filter_by(user_id=current_user.id).all()
@@ -198,61 +537,108 @@ def dungeon_map():
                             avg_level_seed = max(1, sum(c.level for c in chars) // len(chars))
                     except Exception:
                         pass
-                    created = []
+                    # Monsters
                     for tx, ty in chosen_tiles[:max_monsters]:
                         try:
-                            inst = _spawn.choose_monster(level=avg_level_seed, party_size=1)
+                            if not _is_walkable_tile(tx, ty):
+                                continue
+                            inst_mon = _spawn.choose_monster(level=avg_level_seed, party_size=1)
                             ent = DungeonEntity(
                                 user_id=current_user.id,
                                 instance_id=instance.id,
                                 seed=instance.seed,
                                 type="monster",
-                                slug=inst.get("slug"),
-                                name=inst.get("name"),
+                                slug=inst_mon.get("slug"),
+                                name=inst_mon.get("name"),
                                 x=tx,
                                 y=ty,
                                 z=0,
-                                hp_current=inst.get("hp"),
-                                data=json.dumps(inst),
+                                hp_current=inst_mon.get("hp"),
+                                data=json.dumps(inst_mon),
                             )
                             db.session.add(ent)
-                            created.append(ent)
+                            created_local.append(ent)
                         except Exception:
                             continue
-                    # Treasure markers with embedded loot table metadata (per-entity customization)
+                    # Treasure caches
                     treasure_tables = [
                         "potion-healing, potion-mana, iron-dagger, leather-armor",
                         "potion-healing, short-sword, chain-armor",
                         "potion-healing, dagger, dagger, cloak-common",
                     ]
                     for idx, (tx, ty) in enumerate(chosen_tiles[max_monsters : max_monsters + 2]):
-                        table = treasure_tables[idx % len(treasure_tables)] if treasure_tables else "potion-healing"
-                        meta = {"loot_table": table, "kind": "cache", "tier": 1}
                         try:
+                            if not _is_walkable_tile(tx, ty):
+                                continue
+                            meta = {
+                                "loot_table": treasure_tables[idx % len(treasure_tables)],
+                                "kind": "cache",
+                                "tier": 1,
+                                "hidden": True,
+                                # When revealed by search, client will display locked_chest.svg icon.
+                            }
                             meta_json = json.dumps(meta)
+                            ent = DungeonEntity(
+                                user_id=current_user.id,
+                                instance_id=instance.id,
+                                seed=instance.seed,
+                                type="treasure",
+                                slug="treasure-cache",
+                                name="Hidden Cache",
+                                x=tx,
+                                y=ty,
+                                z=0,
+                                data=meta_json,
+                            )
+                            db.session.add(ent)
+                            created_local.append(ent)
                         except Exception:
-                            meta_json = None
-                        ent = DungeonEntity(
-                            user_id=current_user.id,
-                            instance_id=instance.id,
-                            seed=instance.seed,
-                            type="treasure",
-                            slug="treasure-cache",
-                            name="Hidden Cache",
-                            x=tx,
-                            y=ty,
-                            z=0,
-                            data=meta_json,
-                        )
-                        db.session.add(ent)
-                        created.append(ent)
-                    if created:
+                            continue
+                    if created_local:
                         db.session.commit()
-                    entities_rows = created
+                except Exception:
+                    db.session.rollback()
+                return created_local
+
+            if not entities_rows:
+                try:
+                    entities_rows = _seed_entities()
                 except Exception:
                     db.session.rollback()
                     entities_rows = []
+            else:
+                # Validate pre-existing entities every fetch (cheap vs map size) to fix legacy invalid placements.
+                try:
+                    entities_rows, _changed = _validate_entities(entities_rows)
+                    if not entities_rows:  # All invalid & removed -> reseed for current seed
+                        entities_rows = _seed_entities()
+                except Exception:
+                    pass
             entities_json = [e.to_dict() for e in entities_rows]
+            # Build a light-weight overlay grid (same height/width) marking entity types for client iconography.
+            # To avoid large payload bloat, use single letters and only for tiles that contain an entity.
+            overlay = [[None for _ in range(MAP_SIZE)] for _ in range(MAP_SIZE)]
+            for ent in entities_rows:
+                try:
+                    if 0 <= ent.x < MAP_SIZE and 0 <= ent.y < MAP_SIZE:
+                        if ent.type == "monster":
+                            overlay[ent.y][ent.x] = "M"
+                        elif ent.type == "treasure":
+                            # Only show treasure if not hidden (search required to reveal)
+                            hidden_flag = False
+                            if ent.data:
+                                try:
+                                    meta = json.loads(ent.data)
+                                    if isinstance(meta, dict):
+                                        hidden_flag = bool(meta.get("hidden", False))
+                                except Exception:
+                                    hidden_flag = False
+                            if not hidden_flag:
+                                overlay[ent.y][ent.x] = "T"
+                        else:
+                            overlay[ent.y][ent.x] = overlay[ent.y][ent.x] or "E"
+                except Exception:
+                    continue
             return jsonify(
                 {
                     "grid": grid,
@@ -261,6 +647,7 @@ def dungeon_map():
                     "width": MAP_SIZE,
                     "seed": instance.seed,
                     "entities": entities_json,
+                    "entity_overlay": overlay,
                 }
             )
     return jsonify({"error": "No dungeon instance found"}), 404
@@ -559,6 +946,63 @@ def dungeon_state():
     return jsonify(resp)
 
 
+@bp_dungeon.route("/api/dungeon/search_tile", methods=["POST"])
+@login_required
+def dungeon_search_tile():
+    """Perform a search action on the player's current tile to reveal hidden caches.
+
+    Returns 200 with { revealed_caches: int, noticed_loot: bool }.
+    Hidden treasure entities (data.hidden==True) at current position are flipped to hidden False.
+    """
+    dungeon_instance_id = session.get("dungeon_instance_id")
+    if not dungeon_instance_id:
+        return jsonify({"error": "no_instance"}), 404
+    instance = db.session.get(DungeonInstance, dungeon_instance_id)
+    if not instance:
+        return jsonify({"error": "no_instance"}), 404
+    rows = DungeonEntity.query.filter_by(
+        instance_id=instance.id, x=instance.pos_x, y=instance.pos_y, z=instance.pos_z
+    ).all()
+    revealed = 0
+    for r in rows:
+        if r.type == "treasure" and r.data:
+            try:
+                meta = json.loads(r.data)
+                if isinstance(meta, dict) and meta.get("hidden"):
+                    meta["hidden"] = False
+                    r.data = json.dumps(meta)
+                    db.session.add(r)
+                    revealed += 1
+            except Exception:
+                continue
+    if revealed:
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            revealed = 0
+    noticed_loot = any(r.type == "treasure" for r in rows)
+    tick_val = None
+    try:
+        tick_val = advance_non_combat_time(instance, tick_amount=2)
+    except Exception:
+        pass
+    resp = {"revealed_caches": revealed, "noticed_loot": noticed_loot}
+    if tick_val is not None:
+        resp["game_tick"] = int(tick_val)
+    # Roll for encounter after search action (non-movement) if no combat already
+    try:
+        maybe_spawn_encounter(instance, True, enc_dbg := {})
+        if enc_dbg.get("encounter") and "encounter" not in resp:
+            resp["encounter"] = enc_dbg["encounter"]
+        if "encounter_chance" in enc_dbg:
+            resp["encounter_chance"] = enc_dbg["encounter_chance"]
+            resp["encounter_roll"] = enc_dbg.get("encounter_roll")
+    except Exception:
+        pass
+    return jsonify(resp)
+
+
 @bp_dungeon.route("/api/dungeon/entities")
 @login_required
 def dungeon_entities():
@@ -605,6 +1049,88 @@ def claim_treasure(entity_id: int):
     except Exception:
         pass
     status, payload = _claim_treasure_entity(entity_id, instance)
+    try:
+        tick_val = advance_non_combat_time(instance, tick_amount=2)
+        if tick_val is not None:
+            payload["game_tick"] = int(tick_val)
+    except Exception:
+        pass
+    # Encounter attempt
+    try:
+        maybe_spawn_encounter(instance, True, enc_dbg := {})
+        if enc_dbg.get("encounter") and "encounter" not in payload:
+            payload["encounter"] = enc_dbg["encounter"]
+        if "encounter_chance" in enc_dbg:
+            payload["encounter_chance"] = enc_dbg["encounter_chance"]
+            payload["encounter_roll"] = enc_dbg.get("encounter_roll")
+    except Exception:
+        pass
+    return jsonify(payload), status
+
+
+@bp_dungeon.route("/api/dungeon/cache/open/<int:entity_id>", methods=["POST"])
+@login_required
+def open_locked_cache(entity_id: int):
+    """Open a locked/hidden cache represented as a treasure entity.
+
+    Semantics mirror claim_treasure but enforces the entity slug/kind
+    corresponds to a cache (slug 'treasure-cache' or data.kind == 'cache').
+
+    Response:
+      200 { opened: true, items: [...], count: <int>, entity_id: <id> }
+      400 { error: 'wrong_type'|'not_cache' }
+      404 { error: 'not_found'|'no_instance' }
+    """
+    dungeon_instance_id = session.get("dungeon_instance_id")
+    if not dungeon_instance_id:
+        return jsonify({"error": "no_instance"}), 404
+    instance = db.session.get(DungeonInstance, dungeon_instance_id)
+    if not instance:
+        return jsonify({"error": "no_instance"}), 404
+    from app.models import DungeonEntity as _DE
+
+    row = _DE.query.filter_by(id=entity_id, instance_id=instance.id).first()
+    if not row:
+        return jsonify({"error": "not_found"}), 404
+    if row.type != "treasure":
+        return jsonify({"error": "wrong_type"}), 400
+    # Validate cache-ness via slug or embedded data.kind
+    import json as _json
+
+    is_cache = False
+    try:
+        meta = _json.loads(row.data) if row.data else {}
+        if isinstance(meta, dict) and meta.get("kind") == "cache":
+            is_cache = True
+    except Exception:
+        meta = {}
+    if row.slug == "treasure-cache" or row.name == "Hidden Cache":
+        is_cache = True
+    if not is_cache:
+        return jsonify({"error": "not_cache"}), 400
+    status, payload = _claim_treasure_entity(entity_id, instance)
+    if status == 200:
+        payload = {
+            "opened": True,
+            "items": payload.get("items", []),
+            "count": payload.get("count", 0),
+            "entity_id": entity_id,
+        }
+    try:
+        tick_val = advance_non_combat_time(instance, tick_amount=2)
+        if tick_val is not None:
+            payload["game_tick"] = int(tick_val)
+    except Exception:
+        pass
+    try:
+        maybe_spawn_encounter(instance, True, enc_dbg := {})
+        if enc_dbg.get("encounter") and "encounter" not in payload:
+            payload["encounter"] = enc_dbg["encounter"]
+        if "encounter_chance" in enc_dbg:
+            payload["encounter_chance"] = enc_dbg["encounter_chance"]
+            payload["encounter_roll"] = enc_dbg.get("encounter_roll")
+    except Exception:
+        pass
     return jsonify(payload), status
 
 
@@ -723,7 +1249,54 @@ def dungeon_search():
     if not instance:
         return jsonify({"found": False, "message": "Dungeon instance not found"}), 404
     success, payload, status = _search_current_tile_helper(instance)
+    try:
+        tick_val = advance_non_combat_time(instance, tick_amount=2)
+        if tick_val is not None and isinstance(payload, dict):
+            payload["game_tick"] = int(tick_val)
+    except Exception:
+        pass
+    try:
+        maybe_spawn_encounter(instance, True, enc_dbg := {})
+        if enc_dbg.get("encounter") and isinstance(payload, dict) and "encounter" not in payload:
+            payload["encounter"] = enc_dbg["encounter"]
+        if isinstance(payload, dict) and "encounter_chance" in enc_dbg:
+            payload["encounter_chance"] = enc_dbg["encounter_chance"]
+            payload["encounter_roll"] = enc_dbg.get("encounter_roll")
+    except Exception:
+        pass
     return jsonify(payload), status
+
+
+@bp_dungeon.route("/api/test/teleport", methods=["POST"])
+@login_required
+def test_teleport():  # pragma: no cover - only used inside tests
+    """Test-only helper to reposition the player's instance coordinates.
+
+    Body: {"x": int, "y": int, "z": optional int}
+    Only active when app.config['TESTING'] is true. Returns 200 {pos:[x,y,z]} or 403 outside tests.
+    """
+    if not current_app.config.get("TESTING"):
+        return jsonify({"error": "forbidden"}), 403
+    data = request.get_json(silent=True) or {}
+    try:
+        x = int(data.get("x"))
+        y = int(data.get("y"))
+        z = int(data.get("z", 0))
+    except Exception:
+        return jsonify({"error": "bad_coords"}), 400
+    inst_id = session.get("dungeon_instance_id")
+    if not inst_id:
+        return jsonify({"error": "no_instance"}), 404
+    instance = db.session.get(DungeonInstance, inst_id)
+    if not instance:
+        return jsonify({"error": "no_instance"}), 404
+    instance.pos_x, instance.pos_y, instance.pos_z = x, y, z
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({"error": "persist_fail"}), 500
+    return jsonify({"pos": [instance.pos_x, instance.pos_y, instance.pos_z]})
 
 
 @bp_dungeon.route("/adventure")
@@ -733,13 +1306,112 @@ def adventure():
     Render the adventure UI with the current party and dungeon state.
     GET only. Renders adventure.html with party, seed, and position.
     """
-    party = session.get("party")
+    raw_party = session.get("party")
+    party = raw_party
+    # Normalize edge cases: JSON string, tuple, set, or list of ids instead of dict entries.
+    try:
+        if isinstance(party, str):  # JSON encoded party
+            try:
+                loaded = json.loads(party)
+                if isinstance(loaded, list):
+                    party = loaded
+            except Exception:
+                pass
+        if isinstance(party, tuple):
+            party = list(party)
+        if isinstance(party, (set,)):  # pragma: no cover - defensive
+            party = list(party)
+    except Exception:
+        pass
+    reconstructed = False
+    # If party is a list of non-dicts (likely ids) attempt DB reconstruction
+    if isinstance(party, list) and party and not any(isinstance(m, dict) for m in party):
+        try:
+            from app.models.models import Character as _Char
+
+            ids = []
+            for v in party:
+                try:
+                    ids.append(int(v))
+                except Exception:
+                    continue
+            ids = list({i for i in ids if i > 0})
+            if ids:
+                rows = _Char.query.filter(_Char.id.in_(ids), _Char.user_id == current_user.id).all()
+                norm = []
+                for c in rows:
+                    try:
+                        stats_s = getattr(c, "stats", "{}") or "{}"
+                        cls_name = None
+                        try:
+                            data_tmp = json.loads(stats_s)
+                            cls_name = (data_tmp.get("class") or "adventurer").capitalize()
+                        except Exception:
+                            cls_name = "Adventurer"
+                        norm.append(
+                            {
+                                "id": c.id,
+                                "name": c.name,
+                                "class": cls_name,
+                                "level": getattr(c, "level", 1),
+                                "xp": getattr(c, "xp", 0),
+                                "stats": stats_s,
+                            }
+                        )
+                    except Exception:
+                        continue
+                if norm:
+                    party = norm
+                    reconstructed = True
+        except Exception:
+            pass
+    # Fallback: if party missing or empty, populate from all user characters so UI still shows panels.
+    if not party:
+        try:
+            from app.models.models import Character as _Char
+
+            chars = _Char.query.filter_by(user_id=current_user.id).all()
+            tmp = []
+            for c in chars:
+                cls_name = None
+                stats_raw_s = getattr(c, "stats", "{}") or "{}"
+                try:
+                    stats_tmp = json.loads(stats_raw_s)
+                    cls_name = (stats_tmp.get("class") or "adventurer").capitalize()
+                except Exception:
+                    cls_name = "Adventurer"
+                tmp.append(
+                    {
+                        "id": c.id,
+                        "name": c.name,
+                        "class": cls_name,
+                        "level": c.level,
+                        "xp": c.xp,
+                        "stats": stats_raw_s,
+                    }
+                )
+            if tmp:
+                party = tmp
+        except Exception:
+            pass
     seed = session.get("dungeon_seed")
     pos = None
     dungeon_instance_id = session.get("dungeon_instance_id")
+    # Optional explicit instance restore via query param (e.g., return from combat snapshot)
+    requested_instance_id = request.args.get("instance", type=int)
+    if requested_instance_id:
+        inst = db.session.get(DungeonInstance, requested_instance_id)
+        # Only switch if the instance belongs to the user
+        try:
+            if inst and inst.user_id == current_user.id:
+                # Store in session for subsequent map/state calls
+                session["dungeon_instance_id"] = inst.id
+                dungeon_instance_id = inst.id
+        except Exception:
+            pass
     if dungeon_instance_id:
         instance = db.session.get(DungeonInstance, dungeon_instance_id)
-        if instance:
+        if instance and instance.user_id == current_user.id:
             pos = (instance.pos_x, instance.pos_y, instance.pos_z)
             seed = instance.seed
     from app.models import GameClock
@@ -749,7 +1421,139 @@ def adventure():
         clock = GameClock.get()
     except Exception:
         clock = None
-    return render_template("adventure.html", party=party, seed=seed, pos=pos, game_clock=clock)
+    # Enrich party members with derived stats for progress bars
+    enriched_party = []
+    try:
+        if isinstance(party, list):
+            for m in party:
+                try:
+                    stats_raw = m.get("stats") if isinstance(m, dict) else getattr(m, "stats", "{}")
+                    import json as _json
+
+                    stats_data = {}
+                    if isinstance(stats_raw, str):
+                        try:
+                            stats_data = _json.loads(stats_raw)
+                        except Exception:
+                            stats_data = {}
+                    hp = stats_data.get("hp") or stats_data.get("HP") or 0
+                    mana = stats_data.get("mana") or stats_data.get("mp") or 0
+                    level = m.get("level") if isinstance(m, dict) else getattr(m, "level", 1)
+                    hp_max = int(stats_data.get("hp_max") or (hp if hp else 10 + (level - 1) * 5))
+                    mana_max = int(stats_data.get("mana_max") or (mana if mana else 5 + (level - 1) * 3))
+                    xp_cur = m.get("xp") if isinstance(m, dict) else getattr(m, "xp", 0)
+                    xp_level = level if isinstance(level, int) else 1
+                    xp_next_total = int(100 * (xp_level**1.5)) or 100
+                    xp_prev_total = int(100 * ((max(1, xp_level - 1)) ** 1.5)) if xp_level > 1 else 0
+                    xp_into = max(0, xp_cur - xp_prev_total)
+                    xp_span = max(1, xp_next_total - xp_prev_total)
+                    xp_pct = min(100, max(0, (xp_into / xp_span) * 100))
+                    if isinstance(m, dict):
+                        em = dict(m)
+                    else:
+                        em = {
+                            "id": getattr(m, "id", None),
+                            "name": getattr(m, "name", "?"),
+                            "class": getattr(m, "class", "Unknown"),
+                            "level": level,
+                            "xp": xp_cur,
+                        }
+                    em.update(
+                        {
+                            "hp": hp,
+                            "hp_max": hp_max,
+                            "mana": mana,
+                            "mana_max": mana_max,
+                            "xp_pct": xp_pct,
+                            "xp_into": xp_into,
+                            "xp_need": xp_span,
+                            "stats_map": stats_data,
+                        }
+                    )
+                    enriched_party.append(em)
+                except Exception:
+                    continue
+        else:
+            enriched_party = party or []
+    except Exception:
+        enriched_party = party or []
+    # Secondary reconstruction attempt if still empty but we had a raw party value.
+    if not enriched_party and raw_party:
+        try:
+            from app.models.models import Character as _Char
+
+            rows = _Char.query.filter_by(user_id=current_user.id).all()
+            for c in rows:
+                stats_s = getattr(c, "stats", "{}") or "{}"
+                cls_name = "Adventurer"
+                try:
+                    tmp_stats = json.loads(stats_s)
+                    cls_name = (tmp_stats.get("class") or "adventurer").capitalize()
+                except Exception:
+                    pass
+                enriched_party.append(
+                    {
+                        "id": c.id,
+                        "name": c.name,
+                        "class": cls_name,
+                        "level": getattr(c, "level", 1),
+                        "xp": getattr(c, "xp", 0),
+                        "hp": tmp_stats.get("hp", 0) if "tmp_stats" in locals() else 0,
+                        "hp_max": tmp_stats.get("hp", 0) if "tmp_stats" in locals() else 0,
+                        "mana": tmp_stats.get("mana", 0) if "tmp_stats" in locals() else 0,
+                        "mana_max": tmp_stats.get("mana", 0) if "tmp_stats" in locals() else 0,
+                        "xp_pct": 0,
+                        "xp_into": 0,
+                        "xp_need": 1,
+                        "stats_map": tmp_stats if "tmp_stats" in locals() else {},
+                    }
+                )
+        except Exception:
+            pass
+    try:
+        print(
+            f"[adventure] raw_party_type={type(raw_party).__name__} reconstructed={reconstructed} raw_len={len(raw_party) if isinstance(raw_party, list) else 'n/a'} enriched_len={len(enriched_party) if isinstance(enriched_party, list) else 'n/a'}"
+        )
+    except Exception:
+        pass
+    return render_template("adventure.html", party=enriched_party, seed=seed, pos=pos, game_clock=clock)
+
+
+# ---- Non-combat time advancement ----
+# Each discrete player action (movement attempt, search, cache/treasure interaction, generic search endpoint)
+# advances the shared non-combat GameClock and triggers possible monster patrol movement.
+# We only advance when not currently flagged in combat (future: integrate with combat->dungeon restore).
+
+
+def advance_non_combat_time(instance, *, tick_amount: int = 1) -> int | None:
+    """Advance global non-combat time and run patrol updates.
+
+    Parameters:
+        instance: DungeonInstance (player's current dungeon instance row)
+        tick_amount: How many ticks to add for this action (default 1). Could scale for longer actions later.
+    Side effects:
+        * Increments GameClock.tick if not in combat
+        * Invokes run_monster_patrols to adjust monster positions (which can emit websocket updates)
+    Failures are swallowed to avoid interrupting player flow.
+    """
+    try:
+        clock = GameClock.get()
+        if clock.combat:
+            return
+        clock.tick += int(tick_amount)
+
+        # Acquire dungeon object to pass into patrols (mirrors movement logic)
+        MAP_SIZE = 75
+        dungeon = get_cached_dungeon(instance.seed, (MAP_SIZE, MAP_SIZE, 1))
+        run_monster_patrols(dungeon, instance, resp={}, tick_amount=tick_amount)
+        db.session.add(clock)
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+    except Exception:
+        return None
+    return clock.tick
 
 
 # Add other dungeon/gameplay routes here

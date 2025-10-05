@@ -377,6 +377,9 @@ class CombatSession(db.Model):
         db.Text, nullable=True
     )  # JSON list of entity refs [{'type':'pc','id':..},{'type':'monster'}]
     active_index = db.Column(db.Integer, nullable=False, default=0)
+    # Turn phase handling (simple linear phases for now: start, action, end). More can be added.
+    phase = db.Column(db.String(20), nullable=False, default="start")  # current phase key
+    phase_step = db.Column(db.Integer, nullable=False, default=0)  # numeric progress inside phase if needed
     # Participants snapshot
     party_snapshot_json = db.Column(db.Text, nullable=True)  # list of character stat dicts
     monster_hp = db.Column(db.Integer, nullable=True)
@@ -415,6 +418,10 @@ class CombatSession(db.Model):
             rewards = json.loads(self.rewards_json) if self.rewards_json else None
         except Exception:
             rewards = None
+        try:
+            dungeon_snapshot = json.loads(getattr(self, "dungeon_snapshot_json", None) or "null")
+        except Exception:
+            dungeon_snapshot = None
         return {
             "id": self.id,
             "status": self.status,
@@ -423,9 +430,12 @@ class CombatSession(db.Model):
             "combat_turn": self.combat_turn,
             "initiative": initiative,
             "active_index": self.active_index,
+            "phase": self.phase,
+            "phases": ["start", "action", "end"],
             "party": party,
             "log": logs,
             "rewards": rewards,
             "version": self.version,
             "archived": bool(self.archived),
+            "dungeon_snapshot": dungeon_snapshot,
         }

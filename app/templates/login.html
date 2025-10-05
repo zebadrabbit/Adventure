@@ -10,21 +10,23 @@
         <form method="POST">
             <div class="mb-3">
                 <label for="username" class="form-label">Username or Email</label>
-                <input type="text" class="form-control form-control-lg bg-dark text-white border-secondary" id="username" name="username" required autocomplete="username">
+                <input type="text" class="form-control form-control-lg bg-dark text-white border-secondary"
+                    id="username" name="username" required autocomplete="username">
             </div>
             <div class="mb-3">
                 <label for="password" class="form-label">Password</label>
-                <input type="password" class="form-control form-control-lg bg-dark text-white border-secondary" id="password" name="password" required autocomplete="current-password">
+                <input type="password" class="form-control form-control-lg bg-dark text-white border-secondary"
+                    id="password" name="password" required autocomplete="current-password">
             </div>
             <button type="submit" class="btn btn-primary btn-lg w-100">Sign in</button>
         </form>
         <div class="text-center mt-3">
             <small>Don't have an account? <a href="/register" class="text-info">Register here</a>.</small>
         </div>
-            <!-- Third-party sign-in options removed -->
+        <!-- Third-party sign-in options removed -->
     </div>
 </div>
 {% endblock %}
 {% block head %}
-    <link rel="stylesheet" href="{{ asset_url('auth.css') }}">
+<link rel="stylesheet" href="{{ asset_url('css/auth.css') }}">
 {% endblock %}

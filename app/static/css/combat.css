@@ -1,0 +1,61 @@
+/* Combat layout enhancements */
+.combat-container {
+    max-width: 1400px;
+}
+
+.combat-layout {
+    align-items: stretch;
+}
+
+#combat-left .monster-panel {
+    min-height: 300px;
+}
+
+#combat-right .combat-log-wrapper {
+    height: 100%;
+}
+
+#combat-log {
+    overflow-y: auto;
+    font-family: var(--bs-font-monospace, monospace);
+    font-size: 0.8rem;
+    line-height: 1.1rem;
+}
+
+@media (max-width: 991.98px) {
+
+    /* Stack right column below on smaller screens */
+    #combat-right {
+        order: 3;
+        margin-top: 1rem;
+    }
+
+}
+
+/* Active party member highlight (mirrors card border) */
+.party-member.border-warning {
+    box-shadow: 0 0 0.5rem rgba(255, 193, 7, 0.5);
+}
+
+/* Trim duplicate timestamp groups visually */
+.combat-log .log-duplicate {
+    opacity: 0.6;
+}
+
+.combat-log .log-damage {
+    color: #dc3545;
+}
+
+.combat-log .log-heal {
+    color: #20c997;
+}
+
+.combat-log .log-turn {
+    color: #ffc107;
+    font-weight: 600;
+}
+
+.combat-log .log-system {
+    color: #6c757d;
+    font-style: italic;
+}

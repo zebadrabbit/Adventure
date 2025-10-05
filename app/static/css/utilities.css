@@ -1,0 +1,220 @@
+/* Utility classes for Adventure MUD (extracted from inline styles)
+   Date: 2025-09-21 */
+
+/* Typography */
+.u-mono {
+    font-family: monospace, monospace;
+}
+
+/* Layout helpers */
+.u-flex-center {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Icon sizing */
+.icon-28 {
+    width: 28px;
+    height: 28px;
+}
+
+.icon-32 {
+    width: 32px;
+    height: 32px;
+}
+
+.icon-dropshadow {
+    filter: drop-shadow(0 0 2px #000);
+}
+
+/* Map containers */
+/* Legacy square map (still referenced until updated) */
+.map-box {
+    height: 512px;
+    width: 512px;
+    border: 2px solid #222;
+    border-radius: 0.5rem;
+}
+
+/* New responsive map: fixed height, fluid width */
+.map-fluid-fixed-height {
+    height: 512px;
+    width: 100%;
+    max-width: 100%;
+    border: 2px solid #222;
+    border-radius: 0.5rem;
+}
+
+/* Dungeon output panel */
+.dungeon-output {
+    padding: 1rem;
+    min-height: 120px;
+    border-radius: 0.5rem;
+    white-space: pre-line;
+}
+
+/* Monospace badge */
+.badge-mono {
+    font-family: monospace, monospace;
+}
+
+/* Lists */
+.no-list {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 0;
+}
+
+/* Scrollable (e.g., logs) */
+.scroll-area-200 {
+    max-height: 200px;
+    overflow: auto;
+}
+
+/* Button square fixed */
+.btn-square-32 {
+    height: 2rem;
+    width: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Chat body height presets */
+.chat-body-240 {
+    height: 240px;
+    min-height: 180px;
+}
+
+/* Width helpers */
+.mw-240 {
+    max-width: 240px;
+}
+
+/* Chat header */
+.chat-header {
+    background: var(--mud-dark);
+    padding: 0.5rem 0.5rem 0.25rem 0.5rem;
+}
+
+/* Placeholder for future coin color utility classes (phase 2) */
+/* Coin color utilities */
+.coin-gold {
+    color: gold;
+    filter: drop-shadow(0 0 1px gold);
+}
+
+.coin-silver {
+    color: #bfc1c2;
+    filter: drop-shadow(0 0 1px #bfc1c2);
+}
+
+.coin-copper {
+    color: #b87333;
+    filter: drop-shadow(0 0 1px #b87333);
+}
+
+/* List reset */
+.list-reset {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+/* Icon visual enhancement utilities */
+.icon-glow {
+    filter: drop-shadow(0 0 2px #000);
+}
+
+/* Generic subtle panel outline for inline sections */
+.outline-panel {
+    border: 1px solid #333;
+    border-radius: 8px;
+    background: rgba(18, 18, 20, 0.55);
+}
+
+/* Flex utility: allow item to shrink below content's intrinsic minimum width (so long text wraps) */
+.flex-min-0 {
+    min-width: 0;
+}
+
+/* =============================================
+   Map Marker Icons (Player + Monsters)
+   Ensures consistent sizing & perfect centering
+   across zoom levels (player scales via JS).
+   ============================================= */
+.player-marker-wrapper {
+    position: relative;
+    width: 40px;
+    /* logical base size (matches adventure.js baseSize) */
+    height: 40px;
+    pointer-events: none;
+}
+
+.player-marker-img {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 40px;
+    height: 40px;
+    transform: translate(-50%, -50%) scale(1);
+    /* JS updates scale() */
+    transform-origin: 50% 50%;
+    image-rendering: auto;
+    pointer-events: none;
+    filter: drop-shadow(0 0 2px #000) drop-shadow(0 0 4px rgba(0, 0, 0, .55));
+}
+
+.player-marker-div {
+    /* Leaflet divIcon wrapper */
+    width: 40px !important;
+    height: 40px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+}
+
+/* Monster markers */
+.monster-icon-wrapper {
+    width: 32px !important;
+    height: 32px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    position: relative;
+    pointer-events: none;
+    /* non-interactive markers */
+}
+
+.monster-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 32px;
+    height: 32px;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.monster-icon .monster-img {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    display: block;
+    pointer-events: none;
+    filter: drop-shadow(0 0 2px #000) drop-shadow(0 0 4px rgba(0, 0, 0, .4));
+}
+
+/* High-DPI crispness: allow browsers to interpolate smoothly */
+@media (min-resolution: 2dppx) {
+
+    .monster-icon .monster-img,
+    .player-marker-img {
+        image-rendering: auto;
+    }
+}

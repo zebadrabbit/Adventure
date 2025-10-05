@@ -1,0 +1,46 @@
+# keep-icons.txt
+# Newline-delimited list of SVG icon filenames to ALWAYS keep (case-sensitive).
+# Lines beginning with '#' are comments and ignored.
+# You can list names with or without the .svg suffix (the pruning script normalizes).
+# Rationale categories:
+#   CORE_UI     : Required for base layout / favicon / marketing
+#   CLASS_ICON  : Player class selection / depiction
+#   PLAYER_ICON : Player marker / fallback icon on map
+#   TREASURE    : Treasure / cache representation
+#   DYNAMIC     : Referenced indirectly (e.g., constructed in JS/template macro) – future-proof
+#   RESERVED    : Placeholder you plan to use soon
+#
+# When adding dynamic families (e.g., weapon-*.svg) you can instead prefer the --pattern option
+# during pruning runs, but explicitly listing here makes intent auditable in version control.
+#
+# Current referenced & essential icons (auto-seeded on 2025-10-01):
+
+# --- CORE UI / FAVICON ---
+treasure-map.svg           # CORE_UI  site favicon + header icon
+
+# --- PLAYER CLASS SELECTION (adventure.html template) ---
+swords-power.svg           # CLASS_ICON Fighter
+fire-silhouette.svg        # CLASS_ICON Mage
+rogue.svg                  # CLASS_ICON Rogue
+heavy-thorny-triskelion.svg# CLASS_ICON Druid
+Aura.svg                   # NOTE: template uses 'aura.svg' in lowercase; ensure actual file naming
+bowman.svg                 # CLASS_ICON Ranger
+
+# --- MAP / PLAYER / MONSTERS ---
+axe-sword.svg              # PLAYER_ICON player fallback marker (adventure.js)
+# iconForMonster builds dynamic paths like `/static/iconography/${fname}.svg`.
+# If monster definitions rely on filenames not otherwise referenced in code,
+# list them below or maintain a pattern when running prune.
+
+# --- TREASURE / CACHES ---
+locked-chest.svg           # TREASURE hidden cache (revealed & lootable)
+
+# --- DYNAMIC / MACROS ---
+# The macro `templates/macros/svg_icon.html` references `iconography/<name>.svg` dynamically.
+# Add any macro-only names you rely on here to prevent pruning.
+# (none yet)
+
+# --- RESERVED FUTURE ICONS ---
+# Add here before using them in code so they survive a prune.
+# reserved-example.svg      # RESERVED placeholder example
+

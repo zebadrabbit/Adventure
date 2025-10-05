@@ -1,0 +1,48 @@
+/* chat-widget.css: Styles for the floating chat widget */
+
+#lobby-chat-widget {
+    position: fixed;
+    bottom: 1.2rem;
+    left: 1.2rem;
+    width: 400px;
+    max-width: 90vw;
+    z-index: 1050;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, .15);
+    border-radius: 1rem 1rem 0 0;
+    background: #182124;
+    color: var(--mud-grey);
+    display: flex;
+    flex-direction: column;
+    height: 56px;
+    border: 1px solid var(--mud-purple);
+    transition: height 0.2s cubic-bezier(.4, 0, .2, 1);
+    overflow: hidden;
+}
+
+#lobby-chat-widget.open {
+    height: 320px;
+    min-height: 200px;
+}
+
+#lobby-chat-header {
+    background: var(--mud-purple);
+    color: #fff;
+    padding: 0.5rem 0.9rem;
+    border-radius: 1rem 1rem 0 0;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+    min-height: 40px;
+}
+
+#lobby-chat-header .chat-title {
+    font-size: 1rem;
+}
+
+#lobby-chat-header .chat-toggle {
+    margin-left: auto;
+    font-size: 1.1rem;
+}

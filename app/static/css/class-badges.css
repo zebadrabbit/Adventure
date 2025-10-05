@@ -1,0 +1,164 @@
+/* Class badge styles extracted from dashboard.html */
+/* Harmonized with CLASS_COLORS in config_api.py & CSS vars in dashboard.css */
+.class-badge.fighter-badge {
+    background: var(--class-fighter-bg);
+    color: var(--class-fighter-fg);
+    border: 1px solid var(--class-fighter-border);
+}
+
+.class-badge.rogue-badge {
+    background: var(--class-rogue-bg);
+    color: var(--class-rogue-fg);
+    border: 1px solid var(--class-rogue-border);
+}
+
+.class-badge.mage-badge {
+    background: var(--class-mage-bg);
+    color: var(--class-mage-fg);
+    border: 1px solid var(--class-mage-border);
+}
+
+.class-badge.cleric-badge {
+    background: var(--class-cleric-bg);
+    color: var(--class-cleric-fg);
+    border: 1px solid var(--class-cleric-border);
+}
+
+.class-badge.druid-badge {
+    background: var(--class-druid-bg);
+    color: var(--class-druid-fg);
+    border: 1px solid var(--class-druid-border);
+}
+
+.class-badge.ranger-badge {
+    background: var(--class-ranger-bg);
+    color: var(--class-ranger-fg);
+    border: 1px solid var(--class-ranger-border);
+}
+
+/* ---------------------------------------------
+   Card headers & borders for class color theming
+   Used on adventure character cards (class-header-* + border-*)
+---------------------------------------------- */
+.class-header-fighter {
+    background: var(--class-fighter-bg);
+    color: var(--class-fighter-fg);
+    border-bottom: 2px solid var(--class-fighter-border);
+}
+
+.class-header-rogue {
+    background: var(--class-rogue-bg);
+    color: var(--class-rogue-fg);
+    border-bottom: 2px solid var(--class-rogue-border);
+}
+
+.class-header-mage {
+    background: var(--class-mage-bg);
+    color: var(--class-mage-fg);
+    border-bottom: 2px solid var(--class-mage-border);
+}
+
+.class-header-cleric {
+    background: var(--class-cleric-bg);
+    color: var(--class-cleric-fg);
+    border-bottom: 2px solid var(--class-cleric-border);
+}
+
+.class-header-druid {
+    background: var(--class-druid-bg);
+    color: var(--class-druid-fg);
+    border-bottom: 2px solid var(--class-druid-border);
+}
+
+.class-header-ranger {
+    background: var(--class-ranger-bg);
+    color: var(--class-ranger-fg);
+    border-bottom: 2px solid var(--class-ranger-border);
+}
+
+/* Card border rings */
+.card.border-fighter {
+    border-color: var(--class-fighter-border) !important;
+}
+
+.card.border-rogue {
+    border-color: var(--class-rogue-border) !important;
+}
+
+.card.border-mage {
+    border-color: var(--class-mage-border) !important;
+}
+
+.card.border-cleric {
+    border-color: var(--class-cleric-border) !important;
+}
+
+.card.border-druid {
+    border-color: var(--class-druid-border) !important;
+}
+
+.card.border-ranger {
+    border-color: var(--class-ranger-border) !important;
+}
+
+/* Fallbacks (in case :root variables fail to load, keep badges distinguishable) */
+.class-badge.fighter-badge:not([style]) {
+    background: #7a3314;
+    color: #f2e2d8;
+}
+
+.class-badge.rogue-badge:not([style]) {
+    background: #454a1f;
+    color: #e5e5d1;
+}
+
+.class-badge.mage-badge:not([style]) {
+    background: #0f4d63;
+    color: #d2f2ff;
+}
+
+.class-badge.cleric-badge:not([style]) {
+    background: #6a6f72;
+    color: #f5f5f5;
+}
+
+.class-badge.druid-badge:not([style]) {
+    background: #213826;
+    color: #d8f2dc;
+}
+
+.class-badge.ranger-badge:not([style]) {
+    background: #1d4a57;
+    color: #d8eef5;
+}
+
+/* Fallbacks for headers (if vars fail) */
+.class-header-fighter:not([style]) {
+    background: #7a3314;
+    color: #f2e2d8;
+}
+
+.class-header-rogue:not([style]) {
+    background: #454a1f;
+    color: #e5e5d1;
+}
+
+.class-header-mage:not([style]) {
+    background: #0f4d63;
+    color: #d2f2ff;
+}
+
+.class-header-cleric:not([style]) {
+    background: #6a6f72;
+    color: #f5f5f5;
+}
+
+.class-header-druid:not([style]) {
+    background: #213826;
+    color: #d8f2dc;
+}
+
+.class-header-ranger:not([style]) {
+    background: #1d4a57;
+    color: #d8eef5;
+}

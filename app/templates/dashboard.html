@@ -161,9 +161,15 @@
                     <span class="badge class-badge {{ c.class_name|lower }}-badge">{{ c.class_name }}</span>
                     <span class="badge bg-info">Lvl {{ c.level }}</span>
                     <div class="form-check m-0">
+                        {% set in_party = false %}
+                        {% if session.get('party') %}
+                        {% for p in session.get('party') %}
+                        {% if p.id == c.id %}{% set in_party = true %}{% endif %}
+                        {% endfor %}
+                        {% endif %}
                         <input class="form-check-input party-select" type="checkbox" value="{{ c.id }}"
                             id="party-{{ c.id }}" data-id="{{ c.id }}" data-name="{{ c.name }}"
-                            data-class="{{ c.class_name }}">
+                            data-class="{{ c.class_name }}" {% if in_party %}checked{% endif %}>
                         <label class="form-check-label small" for="party-{{ c.id }}">Select</label>
                     </div>
                 </div>
@@ -231,7 +237,7 @@
                 <form action="{{ url_for('dashboard.delete_character', char_id=c.id) }}" method="post"
                     onsubmit="return confirm('Delete {{ c.name }}?');">
                     <button class="btn btn-sm btn-outline-danger" aria-label="Delete {{ c.name }}"
-                        data-bs-title="Delete {{ c.name }}" data-mud-tooltip="1">{{ svg_icon('trash',16) }}</button>
+                        data-bs-title="Delete {{ c.name }}" data-mud-tooltip="1">{{ svg_icon('trash-can',16) }}</button>
                 </form>
                 <div class="btn-group" role="group" aria-label="Character inventory controls">
                     <button class="btn btn-sm btn-outline-warning btn-equip-panel icon-btn" data-char-id="{{ c.id }}"
@@ -249,16 +255,11 @@
 {% endblock %}
 
 {% block scripts %}
-<link rel="stylesheet" href="{{ asset_url('dashboard.css') }}">
-<link rel="stylesheet" href="{{ asset_url('class-badges.css') }}">
-<!-- Socket.IO client 5.x to match python-socketio 5 (Flask-SocketIO 5.3.7) -->
-<script src="https://cdn.socket.io/5.4.1/socket.io.min.js" integrity="sha384-placeholder"
-    crossorigin="anonymous"></script>
-<script src="{{ asset_url('chat-widget.js') }}"></script>
-<script src="{{ asset_url('dashboard.js') }}"></script>
-<link rel="stylesheet" href="{{ asset_url('tooltips.css') }}">
+<script src="{{ asset_url('js/chat-widget.js') }}"></script>
+<script src="{{ asset_url('js/dashboard.js') }}"></script>
 <script src="{{ asset_url('js/tooltips.js') }}"></script>
 <script src="{{ asset_url('js/equipment.js') }}"></script>
 <script src="{{ asset_url('js/seed-widget.js') }}"></script>
 <script src="{{ asset_url('js/dashboard-autofill.js') }}"></script>
+<script src="{{ asset_url('js/character.js') }}"></script>
 {% endblock %}

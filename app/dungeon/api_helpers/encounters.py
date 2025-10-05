@@ -23,18 +23,28 @@ from flask import session
 from flask_login import current_user
 
 from app import db
-from app.models.models import Character
+from app.models.models import Character, GameClock
 from app.services import spawn_service
 
 __all__ = ["maybe_spawn_encounter", "run_monster_patrols"]
 
 
 def _load_spawn_config():
+    """Load encounter spawn pacing config.
+
+    Structure (stored in GameConfig under 'encounter_spawn'):
+      {
+        "base": float   # base per-move spawn probability (default 0.10)
+        "streak_bonus_max": float  # cap for streak-based bonus added progressively
+        "streak_unit": int  # multiplier for miss streak -> bonus scaling
+      }
+    Missing / invalid keys use defaults. Allows live tuning via admin panel.
+    """
     import json as _json_cfg
 
     from app.models import GameConfig as _GC
 
-    base_cfg = {"base": 0.18, "streak_bonus_max": 0.04, "streak_unit": 2}
+    base_cfg = {"base": 0.10, "streak_bonus_max": 0.035, "streak_unit": 2}
     raw = _GC.get("encounter_spawn")
     if not raw:
         return base_cfg
@@ -69,12 +79,30 @@ def _debug_flag() -> bool:
         return False
 
 
-def maybe_spawn_encounter(instance, moved: bool, resp: dict):
-    if not moved:
+def maybe_spawn_encounter(instance, action_triggered: bool, resp: dict):
+    """Attempt to spawn an encounter for any world-advancing player action.
+
+    The previous implementation gated on actual movement; we now allow searches,
+    treasure claims, cache openings, etc. to also roll encounters so long as they
+    advance non-combat time (handled by caller). The action_triggered flag is kept
+    for potential future conditional logic (e.g., actions explicitly opting out).
+    """
+    if not action_triggered:
         return
     try:
-        pace_key = "_encounter_cooldown"
-        miss_streak = session.get(pace_key, 0)
+        clock = GameClock.get()
+        last_tick_key = "_encounter_last_tick"
+        miss_key = "_encounter_miss_streak"
+        last_tick = session.get(last_tick_key)
+        miss_streak = session.get(miss_key, 0)
+        if last_tick is not None:
+            # Add additional virtual misses based on ticks elapsed since last movement-involving action
+            try:
+                gap = max(0, int(clock.tick) - int(last_tick))
+                if gap > 1:
+                    miss_streak += gap - 1
+            except Exception:
+                pass
         cfg = _load_spawn_config()
         base_chance = cfg["base"] + min(cfg["streak_bonus_max"], 0.01 * miss_streak * cfg.get("streak_unit", 2))
         roll_val = _r.random()
@@ -98,12 +126,14 @@ def maybe_spawn_encounter(instance, moved: bool, resp: dict):
                 resp["encounter"] = {"monster": monster, "combat_id": session_row.id}
             except Exception:
                 resp["encounter"] = {"monster": monster, "error": "combat_init_failed"}
-            session[pace_key] = 0
+            session[last_tick_key] = int(clock.tick)
+            session[miss_key] = 0
             if _debug_flag():
                 resp["encounter_chance"] = base_chance
                 resp["encounter_roll"] = roll_val
         else:
-            session[pace_key] = miss_streak + 1
+            session[last_tick_key] = int(clock.tick)
+            session[miss_key] = miss_streak + 1
             if _debug_flag():
                 resp["encounter_chance"] = base_chance
                 resp["encounter_roll"] = roll_val
@@ -111,7 +141,7 @@ def maybe_spawn_encounter(instance, moved: bool, resp: dict):
         pass
 
 
-def run_monster_patrols(dungeon, instance, resp: dict):  # resp unused currently but reserved
+def run_monster_patrols(dungeon, instance, resp: dict, *, tick_amount: int = 1):  # resp unused currently but reserved
     try:
         from app.models.entities import DungeonEntity as _DE
         from app.services.monster_patrol import maybe_patrol as _maybe_patrol
@@ -125,9 +155,16 @@ def run_monster_patrols(dungeon, instance, resp: dict):  # resp unused currently
             if m.get("in_combat"):
                 continue
             old_x, old_y = m.get("x"), m.get("y")
-            if _maybe_patrol(m, dungeon):
-                if m.get("slug") and (m.get("x") != old_x or m.get("y") != old_y):
-                    changed_positions.append((m.get("slug"), int(m.get("x")), int(m.get("y"))))
+            # Allow multiple patrol rolls for larger tick_amount (linear scaling, but cap to avoid runaway)
+            attempts = max(1, min(5, int(tick_amount)))
+            moved_this_monster = False
+            for _ in range(attempts):
+                if _maybe_patrol(m, dungeon):
+                    moved_this_monster = True
+                    # Continue loop to potentially chain additional steps? For now break after first to keep distance bounded per tick.
+                    break
+            if moved_this_monster and m.get("slug") and (m.get("x") != old_x or m.get("y") != old_y):
+                changed_positions.append((m.get("slug"), int(m.get("x")), int(m.get("y"))))
         if changed_positions:
             try:
                 for slug, mx, my in changed_positions:
@@ -147,8 +184,15 @@ def run_monster_patrols(dungeon, instance, resp: dict):  # resp unused currently
             try:
                 from app import socketio
 
-                payload = [{"slug": slug, "x": mx, "y": my} for slug, mx, my in changed_positions]
-                socketio.emit("entities_update", {"monsters": payload, "instance_id": instance.id}, namespace="/game")
+                # Emit full monster list (richer payload) so clients can avoid a follow-up fetch
+                full_list = []
+                try:
+                    for mm in dungeon.spawn_manager.monsters:  # type: ignore[attr-defined]
+                        if isinstance(mm, dict) and "x" in mm and "y" in mm:
+                            full_list.append({"slug": mm.get("slug"), "x": int(mm.get("x")), "y": int(mm.get("y"))})
+                except Exception:
+                    full_list = [{"slug": slug, "x": mx, "y": my} for slug, mx, my in changed_positions]
+                socketio.emit("entities_update", {"monsters": full_list, "instance_id": instance.id}, namespace="/game")
             except Exception:
                 pass
     except Exception:

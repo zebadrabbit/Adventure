@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from werkzeug.security import generate_password_hash
 
@@ -24,17 +26,22 @@ def test_autofill_characters_have_basic_gear(gear_client):
     r = gear_client.post("/autofill_characters")
     assert r.status_code in (200, 201)
     data = r.get_json()
+    # New schema: gear details are not returned; validate DB state instead.
     assert data["created"] == 4
-    for ch in data["characters"]:
-        gear = ch.get("gear")
-        # gear should be a dict mapping slot -> slug (may omit armor for some classes)
-        assert isinstance(gear, dict)
-        # Weapon is mandatory if any starter weapon available
-        assert "weapon" in gear
-        assert isinstance(gear["weapon"], str) and len(gear["weapon"]) > 0
-        # Armor is optional; if present must be non-empty string
-        if "armor" in gear:
-            assert isinstance(gear["armor"], str) and len(gear["armor"]) > 0
+    # Fetch characters directly to verify gear mapping persisted in model rows.
+    with gear_client.application.app_context():
+        chars = Character.query.filter_by(user_id=User.query.filter_by(username="gearuser").first().id).all()
+        assert len(chars) == 4
+        for c in chars:
+            try:
+                gear = json.loads(c.gear) if c.gear else {}
+            except Exception:
+                gear = {}
+            assert isinstance(gear, dict)
+            # Weapon slot should exist
+            assert "weapon" in gear and isinstance(gear["weapon"], str) and gear["weapon"]
+            if "armor" in gear:
+                assert isinstance(gear["armor"], str) and gear["armor"]
 
 
 def test_manual_character_creation_auto_equip(client, test_app):

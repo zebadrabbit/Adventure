@@ -19,6 +19,20 @@
   const FOG_CFG_KEY = 'adventureFogConfig';
   document.addEventListener('DOMContentLoaded', function () {
     const output = document.getElementById('dungeon-output');
+    // --- Game Tick HUD (shows global non-combat tick) ---
+    (function initGameTickHUD() {
+      try {
+        let hud = document.getElementById('game-tick-hud');
+        if (!hud) {
+          hud = document.createElement('div');
+          hud.id = 'game-tick-hud';
+          Object.assign(hud.style, { position: 'fixed', bottom: '8px', right: '12px', padding: '4px 8px', background: 'rgba(15,15,20,0.65)', color: '#c8c8c8', font: '11px monospace', border: '1px solid #444', borderRadius: '4px', zIndex: 9999 });
+          hud.textContent = 'Tick: —';
+          document.body.appendChild(hud);
+        }
+        window.__updateGameTickHUD = function (t) { if (typeof t === 'number') hud.textContent = 'Tick: ' + t; };
+      } catch (e) { /* ignore */ }
+    })();
     // Load party characters from data element injected by template (no inline scripts)
     (function loadPartyCharacters() {
       try {
@@ -30,6 +44,27 @@
           window.partyCharacters = parsed.map(p => ({ id: p.id, name: p.name, class: p.class || p.class_name || '' }));
         }
       } catch (e) { window.partyCharacters = window.partyCharacters || []; }
+    })();
+    // Initial entities fetch (monsters + revealed treasures) – one time
+    setTimeout(() => { try { refreshEntities(true); } catch (e) { } }, 150);
+
+    // --- WebSocket: subscribe to /game for monster patrol updates ---
+    (function initGameSocket() {
+      if (!(window.io && typeof window.io === 'function')) return; // socket.io client not loaded
+      try {
+        const gs = io('/game', { transports: ['websocket', 'polling'] });
+        gs.on('connect', () => { console.debug('[socket:/game] connected'); });
+        gs.on('disconnect', () => { console.debug('[socket:/game] disconnected'); });
+        gs.on('entities_update', (payload) => {
+          try {
+            if (payload && Array.isArray(payload.monsters)) {
+              renderMonsters(payload.monsters);
+            }
+          } catch (e) { console.warn('[socket:/game] entities_update render error', e); }
+        });
+        // Expose for debugging
+        window.gameSocket = gs;
+      } catch (e) { console.warn('[socket:/game] init failed', e); }
     })();
     // ------------------------------------------------------------------
     // Dynamic class color theming
@@ -150,6 +185,20 @@
     const moveEastBtn = document.getElementById('btn-move-e');
     const moveWestBtn = document.getElementById('btn-move-w');
     let availableExits = [];
+    // --- Begin entity fetch throttling/backoff additions ---
+    const ENTITY_MIN_INTERVAL = 1200; // Base minimum interval between entity map fetches (ms)
+    const ENTITY_MAX_BACKOFF = 15000; // Cap exponential backoff (ms)
+    let entityLastFetch = 0;          // performance.now() timestamp of last attempt completion
+    let entityFetchInFlight = false;  // Prevent overlapping fetches
+    let entityBackoffMs = 0;          // Dynamic backoff grows on 429s / failures
+    let entityEventDebounce = 0;      // Short debounce for rapid sequential movement events
+
+    // NOTE: We are moving to an event-driven model (movement + socket updates) instead of passive polling.
+    // scheduleNextEntityRefresh retained as a no-op (for graceful fallback if referenced elsewhere).
+    function scheduleNextEntityRefresh() {
+      // Intentionally empty: passive polling disabled.
+    }
+    // --- End entity fetch throttling/backoff additions ---
     let keyboardEnabled = true;
     const keyboardToggle = document.getElementById('toggle-keyboard-move');
     if (keyboardToggle) {
@@ -188,6 +237,7 @@
 
     // ---------------- Monster Entity Icon Layer -----------------
     let monsterLayerGroup = null;
+    let treasureLayerGroup = null;
     function ensureMonsterLayer() {
       if (!window.dungeonMap) return null;
       if (!monsterLayerGroup) {
@@ -195,19 +245,19 @@
       }
       return monsterLayerGroup;
     }
+    function ensureTreasureLayer() {
+      if (!window.dungeonMap) return null;
+      if (!treasureLayerGroup) {
+        treasureLayerGroup = L.layerGroup().addTo(window.dungeonMap);
+      }
+      return treasureLayerGroup;
+    }
 
     function iconForMonster(mon) {
-      const slug = mon.icon_slug || mon.slug || 'generic';
-      // Build URL path: we used family-slug pattern for some; fallback to slug only
-      const fname = slug.replace(/[^a-z0-9\-]/gi, '-').toLowerCase();
-      const known = {
-        'test-ai-mob': 'test-ai-mob',
-        'undead-skeleton': 'undead-skeleton',
-        'slime-green': 'slime-green'
-      };
-      let file = known[fname] || fname;
-      // If missing custom asset, fallback generic
-      return `/static/icons/${file}.svg`;
+      const slug = mon.icon_slug || mon.slug || mon.name || 'monster';
+      const fname = String(slug).replace(/[^a-z0-9\-]/gi, '-').toLowerCase();
+      // Prefer iconography directory (large curated set). If that 404s, onerror fallback triggers.
+      return `/static/iconography/${fname}.svg`;
     }
 
     function renderMonsters(monsters) {
@@ -222,12 +272,52 @@
           const lat = (y + 0.5) * TILE_SIZE;
           const lng = (x + 0.5) * TILE_SIZE;
           const iconUrl = iconForMonster(mon);
-          const html = `<div class="monster-icon" title="${mon.name || mon.slug || 'Monster'}"><img src="${iconUrl}" alt="${mon.name || mon.slug || 'Monster'}" style="width:32px;height:32px;filter:drop-shadow(0 0 4px #000);" /></div>`;
+          const title = mon.name || mon.slug || 'Monster';
+          // Include an onerror handler that swaps to a default inline SVG if the specific asset is missing.
+          const fallbackSVG = encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32" fill="#ff3fa4"><circle cx="12" cy="12" r="10" fill="#222" stroke="#ff3fa4" stroke-width="2"/><path d="M8 10h2v2H8zm6 0h2v2h-2zM9 15c1 .8 2.1 1.2 3 1.2s2-.4 3-1.2" stroke="#ff3fa4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>');
+          const html = `<div class="monster-icon" title="${title}"><img src="${iconUrl}" alt="${title}" class="monster-img" onerror="this.onerror=null;this.src='data:image/svg+xml,${fallbackSVG}';" /></div>`;
           const divIcon = L.divIcon({ html, className: 'monster-icon-wrapper', iconSize: [32, 32] });
           const marker = L.marker([lat, lng], { icon: divIcon, interactive: false, keyboard: false });
           layer.addLayer(marker);
         } catch (e) { /* ignore per-monster failures */ }
       });
+    }
+
+    function refreshEntities(force = false) {
+      const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      const effectiveInterval = Math.max(ENTITY_MIN_INTERVAL, entityBackoffMs);
+      // Debounce rapid bursts (e.g., key repeat) to at most one extra queued fetch per ~250ms
+      if (now - entityEventDebounce < 250 && !force) return;
+      entityEventDebounce = now;
+      if (!force) {
+        if (entityFetchInFlight) return;
+        if (now - entityLastFetch < effectiveInterval && entityBackoffMs === 0) return;
+      }
+      entityFetchInFlight = true;
+      let got429 = false;
+      fetch('/api/dungeon/map?entities=1')
+        .then(r => {
+          if (r.status === 429) { got429 = true; entityBackoffMs = Math.min(entityBackoffMs ? entityBackoffMs * 2 : 1500, ENTITY_MAX_BACKOFF); throw new Error('rate-limited'); }
+          if (!r.ok) { entityBackoffMs = Math.min(entityBackoffMs + 500, ENTITY_MAX_BACKOFF); throw new Error('HTTP ' + r.status); }
+          return r.json();
+        })
+        .then(data => {
+          if (!data) return;
+          const ents = Array.isArray(data.entities) ? data.entities : [];
+          const monsters = ents.filter(e => e.type === 'monster');
+          const treasures = ents.filter(e => e.type === 'treasure');
+          try { renderMonsters(monsters); } catch (e) { }
+          try { renderTreasures(treasures); } catch (e) { }
+          if (entityBackoffMs) { entityBackoffMs = Math.max(0, Math.floor(entityBackoffMs * 0.5) - 250); }
+        })
+        .catch(err => {
+          if (console && console.debug) console.debug('[entities] refresh failed', err.message, 'backoff', entityBackoffMs);
+        })
+        .finally(() => {
+          entityFetchInFlight = false;
+          entityLastFetch = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+          // No reschedule here: event-driven only.
+        });
     }
 
     // ------------------------------------------------------------
@@ -324,17 +414,24 @@
       })
         .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
         .then(data => {
+          if (data && typeof data.game_tick === 'number' && window.__updateGameTickHUD) {
+            window.__updateGameTickHUD(data.game_tick);
+          }
           if (data && data.desc && output) {
             renderLogFromDesc(String(data.desc));
             if (data.last_roll) {
               try { updateLastRollUI(data.last_roll); } catch (e) { }
             }
           }
-          // If an encounter spawned, redirect to combat screen
-          if (data && data.encounter && data.encounter.combat_id) {
-            const cid = data.encounter.combat_id;
-            try { sessionStorage.setItem('lastCombatId', String(cid)); } catch (e) { }
-            window.location.href = '/combat/' + cid;
+          // If an encounter spawned, redirect to combat screen (support both response formats)
+          let combatId = null;
+          if (data) {
+            if (data.encounter && data.encounter.combat_id) combatId = data.encounter.combat_id;
+            else if (data.combat_started && data.combat_id) combatId = data.combat_id;
+          }
+          if (combatId) {
+            try { sessionStorage.setItem('lastCombatId', String(combatId)); } catch (e) { }
+            window.location.href = '/combat/' + combatId;
             return; // abort further movement response handling
           }
           if (data && data.pos) {
@@ -354,6 +451,8 @@
               }
               // Update inline search buttons based on current tile
               updateInlineSearchButtons();
+              // Refresh entities (monsters/treasures) after move (event-driven)
+              refreshEntities();
             }
           }
           if (data && Array.isArray(data.exits)) {
@@ -400,10 +499,15 @@
       if (!allowed) { console.debug('[search] blocked: cannot search here (no notice marker at current pos?)'); return; }
       searchInFlight = true;
       console.debug('[search] starting search request');
-      fetch('/api/dungeon/search', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+      fetch('/api/dungeon/search_tile', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
         .then(r => r.json())
         .then(data => {
+          if (data && typeof data.game_tick === 'number' && window.__updateGameTickHUD) { window.__updateGameTickHUD(data.game_tick); }
           console.debug('[search] response payload', data);
+          // After revealing caches, refresh map entities to show newly visible treasure icons
+          if (data && typeof data.revealed_caches === 'number' && data.revealed_caches > 0) {
+            try { refreshEntities(); } catch (e) { }
+          }
           if (!output) return;
           // Prevent duplicates: remove any existing loot list before appending a new one
           try {
@@ -484,6 +588,7 @@
                         if (resWrap.ok && res && res.claimed) {
                           line.textContent = `Assigned ${res.item?.name || 'item'} to ${pc.name}.`;
                           wrapper.remove();
+                          if (typeof res.game_tick === 'number' && window.__updateGameTickHUD) { window.__updateGameTickHUD(res.game_tick); }
                           try { refreshNoticeMarkers(); } catch (e) { }
                           // Notify other UI (equipment modal) that character inventories changed
                           try { document.dispatchEvent(new CustomEvent('mud-characters-state-invalidated', { detail: { character_id: pc.id } })); } catch (e) { }
@@ -851,12 +956,7 @@
           refreshNoticeMarkers();
 
           // Render monster entities (patrolling / ambient) if provided
-          try {
-            if (Array.isArray(data.entities)) {
-              renderMonsters(data.entities);
-            }
-          } catch (e) { /* non-fatal */ }
-          try { if (Array.isArray(data.entities)) renderMonsters(data.entities); } catch (e) { }
+          // Monster render handled separately via refreshEntities path; keep minimal here
 
           for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {

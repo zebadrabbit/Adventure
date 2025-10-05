@@ -1,0 +1,23 @@
+/* dashboard.css: Styles for dashboard, cards, party, and chat widget */
+
+:root {
+    --mud-orange: #BA5624;
+    --mud-grey: #C0C5C1;
+    --mud-purple: #6C3A5C;
+    --mud-dark: #153131;
+    --mud-olive: #6F732F;
+    --mud-bg: #10191a;
+    --mud-bg-dark: #153131;
+}
+
+body {
+    background: var(--mud-bg-dark);
+    min-height: 100vh;
+    color: var(--mud-grey);
+}
+
+/* Icon button adjustments */
+.icon-btn svg,
+.icon-btn i {
+    pointer-events: none;
+}

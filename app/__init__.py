@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 """
 project: Adventure MUD
 module: __init__.py
@@ -19,7 +20,7 @@ import uuid
 from pathlib import Path
 
 from dotenv import load_dotenv
-from flask import Flask
+from flask import Flask, jsonify, request
 from flask_login import LoginManager
 from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
@@ -118,15 +119,22 @@ except Exception:
 
 
 # Register HTTP blueprints (import after app/db created but keep near top for clarity)
-from app.routes import auth, main  # noqa: E402
-from app.routes.admin import bp_admin  # noqa: E402
-from app.routes.config_api import bp_config  # noqa: E402
-from app.routes.dashboard import bp_dashboard  # noqa: E402
-from app.routes.dungeon_api import bp_dungeon  # noqa: E402
-from app.routes.inventory_api import bp_inventory  # noqa: E402
-from app.routes.loot_api import bp_loot  # noqa: E402
-from app.routes.seed_api import bp_seed  # noqa: E402
-from app.routes.user_prefs import bp_user_prefs  # noqa: E402
+from flask_login import current_user  # noqa: E402
+
+from app.services import rate_limiter as _rl  # noqa: E402
+
+# Blueprint imports intentionally placed after app/db initialization (runtime dependency ordering).
+from app.routes import auth, main  # noqa: E402  # isort: skip
+from app.routes.admin import bp_admin  # noqa: E402  # isort: skip
+from app.routes.combat_api import bp_combat  # new combat blueprint  # noqa: E402  # isort: skip
+from app.routes.config_api import bp_config  # noqa: E402  # isort: skip
+from app.routes.dashboard import bp_dashboard  # noqa: E402  # isort: skip
+from app.routes.dungeon_api import bp_dungeon  # noqa: E402  # isort: skip
+from app.routes.inventory_api import bp_inventory  # noqa: E402  # isort: skip
+from app.routes.loot_api import bp_loot  # noqa: E402  # isort: skip
+from app.routes.seed_api import bp_seed  # noqa: E402  # isort: skip
+from app.routes.user_prefs import bp_user_prefs  # noqa: E402  # isort: skip
+from app.routes.client_log_api import bp_client_log  # noqa: E402  # isort: skip
 
 app.register_blueprint(auth.bp)
 app.register_blueprint(main.bp)
@@ -138,8 +146,74 @@ app.register_blueprint(bp_loot)
 app.register_blueprint(bp_inventory)
 app.register_blueprint(bp_user_prefs)
 app.register_blueprint(bp_admin)
+app.register_blueprint(bp_combat)
+app.register_blueprint(bp_client_log)
+
+_DEFAULT_LIMIT = 120  # requests
+_DEFAULT_WINDOW = 60  # seconds
+
+
+@app.before_request
+def _apply_rate_limit():  # pragma: no cover - integration side-effect
+    """Apply per-endpoint fixed-window rate limiting to API routes only.
+
+    Design constraints / rationale:
+    - We intentionally DO NOT throttle page templates, static assets, or
+        websocket (engine.io) handshake/polling endpoints to avoid broken /
+        unstyled pages or stalled socket connections.
+    - Only JSON-style application endpoints mounted under /api/ are limited.
+    - Each (user or ip) x (endpoint) pair gets an independent bucket so a
+        chatty endpoint like movement does not starve others.
+    - Movement endpoint receives a much larger default allowance because it
+        can legitimately fire at a high frequency from the client.
+    If you extend API surface outside /api/ ensure you either move it under
+    that prefix or replicate the limiter logic explicitly.
+    """
+    path = request.path or ""
+    # Skip entirely for websocket engine.io handshake/polling endpoints and static assets.
+    if path.startswith("/socket.io/") or path.startswith("/static/"):
+        return None
+    # Only rate limit JSON API endpoints (all our API routes live under /api/)
+    if not path.startswith("/api/"):
+        return None
+    endpoint = request.endpoint
+    view = app.view_functions.get(endpoint) if endpoint else None
+    spec = _rl.resolve_spec(view) if view else None
+    limit = spec.limit if spec else _DEFAULT_LIMIT
+    window = spec.window if spec else _DEFAULT_WINDOW
+    # Provide a slightly larger shared budget for the very chatty movement endpoint if
+    # a custom spec wasn't already set (protect against partial page loads due to background
+    # polling + user interaction).
+    if endpoint == "dungeon.dungeon_move" and (not spec):
+        limit = max(limit, 600)  # allow 600 moves per window
+    # Key selection prefers authenticated user id to avoid penalizing shared IPs.
+    if hasattr(current_user, "is_authenticated") and current_user.is_authenticated:
+        ident = f"user:{getattr(current_user, 'id', 'anon')}"
+    else:
+        ident = f"ip:{request.remote_addr}"
+    # Separate bucket per endpoint to allow independent budgets while still preventing spam.
+    key = f"{ident}:{endpoint}:{window}"
+    limited, reset_in = _rl.should_rate_limit(key, limit=limit, window=window)
+    if limited:
+        resp = jsonify(
+            {
+                "error": "rate_limited",
+                "message": "Too many requests",
+                "retry_after": reset_in,
+                "limit": limit,
+                "window": window,
+            }
+        )
+        resp.status_code = 429
+        resp.headers["Retry-After"] = str(reset_in)
+        return resp
+    return None
+
 
 # Import websocket handlers so their event decorators register with Socket.IO (side-effect)
+from app.websockets import (
+    combat as _ws_combat,  # noqa: F401,E402  # registers /adventure namespace
+)
 from app.websockets import game as _ws_game  # noqa: F401,E402
 from app.websockets import lobby as _ws_lobby  # noqa: F401,E402
 
@@ -222,11 +296,16 @@ _run_lightweight_migrations()
 # when tests import the app before PYTEST_CURRENT_TEST is set (so the conditional bootstrap
 # below would be skipped). This is idempotent and safe for production startup.
 try:  # pragma: no cover - defensive import-time safeguard
+    from app.migrations import apply_migrations
     from app.server import _run_migrations, _seed_game_config, seed_items
 
     with app.app_context():
         db.create_all()
         _run_migrations()
+        try:
+            apply_migrations()
+        except Exception:
+            pass
         seed_items()
         _seed_game_config()
 except Exception:
@@ -345,9 +424,14 @@ def create_app():
     try:  # pragma: no cover - defensive
         with app.app_context():
             db.create_all()
+            from app.migrations import apply_migrations
             from app.server import _run_migrations, _seed_game_config, seed_items
 
             _run_migrations()
+            try:
+                apply_migrations()
+            except Exception:
+                pass
             seed_items()
             _seed_game_config()
     except Exception:  # swallow; normal startup path will also attempt

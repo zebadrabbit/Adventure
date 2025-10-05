@@ -22,6 +22,30 @@ from typing import Any, Dict, List, Optional
 from app import db, socketio
 from app.models.models import Character, CombatSession
 
+from .combat_constants import (
+    ACTOR_START_ACTION,
+    COMBAT_COMPLETE,
+    COMBAT_TURN_START,
+    MONSTER_ATTACK_HIT,
+    MONSTER_ATTACK_MISS,
+    MONSTER_CALL_HELP,
+    MONSTER_COOLDOWN_WAIT,
+    MONSTER_FLEE,
+    MONSTER_HESITATE,
+    MONSTER_INCAPACITATED_WAIT,
+    MONSTER_NO_TARGET_WAIT,
+    MONSTER_SPELL_HIT,
+    MONSTER_SPELL_MISS,
+    PLAYER_ATTACK_HIT,
+    PLAYER_ATTACK_MISS,
+    PLAYER_DEFEND,
+    PLAYER_FLEE_FAIL,
+    PLAYER_FLEE_SUCCESS,
+    PLAYER_SPELL_FIZZLE,
+    PLAYER_SPELL_HIT,
+    PLAYER_SPELL_MISS,
+    PLAYER_USE_ITEM,
+)
 from .combat_utils import apply_resistances
 from .loot_service import roll_loot
 from .monster_ai import select_action
@@ -53,7 +77,13 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
     defense = 5 + DEX // 3 + level // 2
     speed = 8 + DEX // 2
     mana_max = 20 + INT * 2
-    mana = min(int(base.get("mana", mana_max)), mana_max)
+    # Prefer persisted current_mana, fallback to legacy 'mana', else full
+    mana_source = base.get("current_mana", base.get("mana", mana_max))
+    try:
+        mana = int(mana_source)
+    except Exception:
+        mana = mana_max
+    mana = max(0, min(mana, mana_max))
     return {
         # Controller user id retained separately from participant (character) id.
         "controller_id": char.user_id,
@@ -94,7 +124,25 @@ def _base_player_snapshot(user_id: int) -> Dict[str, Any]:
             "buffs": [],
         }
     ]
-    return {"members": members}
+    # Lightweight shared inventory count(s) surfaced for UI gating (e.g. potion button visibility)
+    # For now we only expose healing potion count from the first character's inventory list.
+    potion_count = 0
+    try:
+        first_char = chars[0] if chars else None
+        if first_char and first_char.items:
+            inv_raw = json.loads(first_char.items)
+            if isinstance(inv_raw, list):
+                for entry in inv_raw:
+                    if isinstance(entry, str) and entry == "potion-healing":
+                        potion_count += 1
+                    elif isinstance(entry, dict) and entry.get("slug") == "potion-healing":
+                        try:
+                            potion_count += int(entry.get("qty", 1))
+                        except Exception:
+                            potion_count += 1
+    except Exception:
+        potion_count = potion_count or 0
+    return {"members": members, "item_counts": {"potion-healing": potion_count}}
 
 
 def _calc_initiative(party: Dict[str, Any], monster: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -114,6 +162,60 @@ def _calc_initiative(party: Dict[str, Any], monster: Dict[str, Any]) -> List[Dic
     order.append({"type": "monster", "id": monster.get("id"), "name": monster.get("name"), "roll": m_roll})
     order.sort(key=lambda x: x["roll"], reverse=True)
     return order
+
+
+def _capture_dungeon_snapshot(user_id: int) -> Dict[str, Any]:
+    """Capture a lightweight snapshot of the user's dungeon position/state.
+
+    Snapshot includes current instance id and coordinates plus seed if available.
+    Safe fallback to empty dict on any error. This avoids adding FK dependencies
+    into combat while allowing a 'return to dungeon' restore after combat.
+    """
+    try:
+        from sqlalchemy import text as _t
+
+        from app.models.models import User as _User
+
+        # Direct SQL to avoid importing full dungeon models (keeps coupling low)
+        row = db.session.execute(
+            _t("SELECT id, seed, pos_x, pos_y, pos_z FROM dungeon_instance WHERE user_id=:u ORDER BY id DESC LIMIT 1"),
+            {"u": user_id},
+        ).fetchone()
+        if not row:
+            return {}
+        snap = {
+            "instance_id": row[0],
+            "seed": row[1],
+            "pos": {"x": row[2], "y": row[3], "z": row[4]},
+        }
+        # Attempt to enrich with a small explored tiles sample (no new columns needed)
+        try:
+            user_row = db.session.get(_User, user_id)
+            if user_row and user_row.explored_tiles and row[1]:  # seed required to map subset
+                import json as _json
+
+                tiles_map = {}
+                try:
+                    tiles_map = _json.loads(user_row.explored_tiles)
+                except Exception:
+                    tiles_map = {}
+                seed_key = str(row[1])
+                raw_tiles = tiles_map.get(seed_key)
+                if isinstance(raw_tiles, str):
+                    coords = [c for c in raw_tiles.split(";") if c]
+                elif isinstance(raw_tiles, list):  # future-proof if format migrates
+                    coords = [str(c) for c in raw_tiles]
+                else:
+                    coords = []
+                # Keep only first 50 to bound payload size
+                if coords:
+                    snap["explored_sample"] = coords[:50]
+                    snap["explored_count"] = len(coords)
+        except Exception:
+            pass
+        return snap
+    except Exception:
+        return {}
 
 
 def start_session(user_id: int, monster: Dict[str, Any]) -> CombatSession:
@@ -136,6 +238,7 @@ def start_session(user_id: int, monster: Dict[str, Any]) -> CombatSession:
     initiative = _calc_initiative(party, monster)
     # Monster HP scaling already applied in monster dict (assumption)
     monster_hp = monster.get("hp", 50)
+    dungeon_snapshot = _capture_dungeon_snapshot(user_id)
     session = CombatSession(
         user_id=user_id,
         monster_json=json.dumps(monster),
@@ -146,6 +249,12 @@ def start_session(user_id: int, monster: Dict[str, Any]) -> CombatSession:
         active_index=0,
         log_json=json.dumps([{"ts": _now().isoformat(), "m": f"Encounter starts vs {monster.get('name')}"}]),
         version=1,
+        # Add snapshot JSON if column exists (older DBs may not have migrated yet)
+        **(
+            {"dungeon_snapshot_json": json.dumps(dungeon_snapshot)}
+            if hasattr(CombatSession, "dungeon_snapshot_json")
+            else {}
+        ),
     )
     db.session.add(session)
     db.session.commit()
@@ -218,9 +327,17 @@ def _load_session(combat_id: int) -> CombatSession:
     return CombatSession.query.filter_by(id=combat_id, archived=False).first()
 
 
-def _append_log(session: CombatSession, message: str):
+def _append_log(session: CombatSession, message: str, code: str | None = None):
+    """Append a combat log line.
+
+    Adds optional structured action code for downstream consumers (tests, UI accessibility).
+    Existing callers that do not supply a code remain backward compatible.
+    """
     logs = json.loads(session.log_json) if session.log_json else []
-    logs.append({"ts": _now().isoformat(), "m": message})
+    entry = {"ts": _now().isoformat(), "m": message}
+    if code:
+        entry["code"] = code
+    logs.append(entry)
     # Trim logs if very large (keep last 250)
     if len(logs) > 250:
         logs = logs[-250:]
@@ -244,6 +361,7 @@ def _is_monster_turn(session: CombatSession) -> bool:
 
 
 def _advance_turn(session: CombatSession):
+    """Advance to next initiative entry and reset phase to 'start'."""
     initiative = json.loads(session.initiative_json or "[]")
     if not initiative:
         return
@@ -251,21 +369,90 @@ def _advance_turn(session: CombatSession):
     if session.active_index >= len(initiative):
         session.active_index = 0
         session.combat_turn += 1
+    # Reset phases for new actor
+    session.phase = "start"
+    session.phase_step = 0
     session.version += 1
+    # Log whose turn it is (player name or monster). Helps players know next actor.
+    try:
+        actor = initiative[session.active_index]
+        if actor.get("type") == "player":
+            # Need player snapshot to map id -> name
+            party = json.loads(session.party_snapshot_json or "{}") or {}
+            name = None
+            for m in party.get("members", []):
+                if m.get("char_id") == actor.get("id"):
+                    name = m.get("name")
+                    break
+            if not name:
+                name = f"Player {actor.get('id')}"
+            _append_log(session, f"Turn {session.combat_turn}: {name}'s turn.", code=COMBAT_TURN_START)
+        else:
+            _append_log(
+                session, f"Turn {session.combat_turn}: {actor.get('name','Monster')}'s turn.", code=COMBAT_TURN_START
+            )
+    except Exception:
+        pass
+    # Emit lightweight turn_change event (non-critical). Clients may ignore if unimplemented.
+    try:
+        socketio.emit(
+            "turn_change",
+            {
+                "id": session.id,
+                "active_index": session.active_index,
+                "turn": session.combat_turn,
+                "phase": session.phase,
+            },
+            namespace="/adventure",
+        )
+    except Exception:
+        pass
+
+
+def _progress_phase(session: CombatSession):
+    """Move session.phase forward inside the active actor's turn.
+
+    Phases: start -> action -> end -> (advance turn)
+    Returns True if the turn advanced (i.e., phase cycle completed).
+    """
+    if session.phase == "start":
+        session.phase = "action"
+        # Log phase transition so players know they can act (or monster will act)
+        try:
+            initiative = json.loads(session.initiative_json or "[]")
+            actor = initiative[session.active_index]
+            if actor.get("type") == "player":
+                party = json.loads(session.party_snapshot_json or "{}") or {}
+                name = None
+                for m in party.get("members", []):
+                    if m.get("char_id") == actor.get("id"):
+                        name = m.get("name")
+                        break
+                name = name or f"Player {actor.get('id')}"
+                _append_log(session, f"{name} is acting.", code=ACTOR_START_ACTION)
+            else:
+                _append_log(session, f"{actor.get('name','Monster')} is acting (AI).", code=ACTOR_START_ACTION)
+        except Exception:
+            pass
+    elif session.phase == "action":
+        session.phase = "end"
+    elif session.phase == "end":
+        _advance_turn(session)
+        return True
+    session.version += 1
+    return False
 
 
 def _check_end(session: CombatSession):
-    # Monster defeat
+    # Monster defeat path
     if session.monster_hp is not None and session.monster_hp <= 0:
         monster = session.monster()
         rewards = roll_loot(monster) if monster else {}
         session.status = "complete"
-        _append_log(session, f"{monster.get('name')} defeated! Loot: {rewards}")
-        # Persist XP & loot to first character (simple placeholder logic)
+        _append_log(session, f"{monster.get('name')} defeated! Loot: {rewards}", code=COMBAT_COMPLETE)
         try:
             party = json.loads(session.party_snapshot_json or "{}") or {}
             char_rows = {c.id: c for c in Character.query.filter_by(user_id=session.user_id).all()}
-            # Distribute XP equally among present characters
             xp_total = int(monster.get("xp", 0)) if monster else 0
             members = party.get("members", [])
             share = int(xp_total / len(members)) if members else xp_total
@@ -279,18 +466,16 @@ def _check_end(session: CombatSession):
                         xp_map[str(m.get("char_id") or m.get("id"))] = share
                     except Exception:
                         pass
-            # Loot -> first character inventory for now
             if rewards.get("items") and char_rows:
                 first = next(iter(char_rows.values()))
-                items = []
+                inv_items: list = []
                 if first.items:
                     try:
-                        items = json.loads(first.items)
-                        if not isinstance(items, list):
-                            items = []
+                        inv_items = json.loads(first.items)
+                        if not isinstance(inv_items, list):
+                            inv_items = []
                     except Exception:
-                        items = []
-                # rewards['items'] now mapping slug->qty; fallback: if legacy list provided under items_list merge those
+                        inv_items = []
                 if isinstance(rewards.get("items"), dict):
                     for slug, qty in rewards.get("items", {}).items():
                         try:
@@ -298,17 +483,15 @@ def _check_end(session: CombatSession):
                         except Exception:
                             q = 1
                         for _ in range(max(1, q)):
-                            items.append(slug)
-                elif isinstance(rewards.get("items"), list):  # legacy
+                            inv_items.append(slug)
+                elif isinstance(rewards.get("items"), list):
                     for slug in rewards.get("items", []):
-                        items.append(slug)
-                # Include any legacy items_list (list of slugs) if provided and not already counted
+                        inv_items.append(slug)
                 if isinstance(rewards.get("items_list"), list):
                     for slug in rewards.get("items_list"):
-                        items.append(slug)
-                first.items = json.dumps(items)
+                        inv_items.append(slug)
+                first.items = json.dumps(inv_items)
                 db.session.add(first)
-            # Augment rewards with XP distribution metadata so clients/tests can introspect
             try:
                 rewards["xp"] = {"total": xp_total, "per_member": xp_map}
             except Exception:
@@ -316,21 +499,119 @@ def _check_end(session: CombatSession):
         except Exception:
             db.session.rollback()
         session.rewards_json = json.dumps(rewards)
+        try:
+            party = json.loads(session.party_snapshot_json or "{}") or {}
+            if rewards.get("items") or rewards.get("items_list"):
+                potion_count = 0
+                from json import loads as _loads
+
+                char_rows = (
+                    Character.query.filter_by(user_id=session.user_id).order_by(Character.id.asc()).limit(1).all()
+                )
+                first_char = char_rows[0] if char_rows else None
+                if first_char and first_char.items:
+                    try:
+                        inv_raw = _loads(first_char.items)
+                        if isinstance(inv_raw, list):
+                            for entry in inv_raw:
+                                if isinstance(entry, str) and entry == "potion-healing":
+                                    potion_count += 1
+                                elif isinstance(entry, dict) and entry.get("slug") == "potion-healing":
+                                    try:
+                                        potion_count += int(entry.get("qty", 1))
+                                    except Exception:
+                                        potion_count += 1
+                    except Exception:
+                        pass
+                counts = party.setdefault("item_counts", {})
+                counts["potion-healing"] = potion_count
+                session.party_snapshot_json = json.dumps(party)
+        except Exception:
+            pass
+        _persist_party_resources(session)
         set_combat_state(False)
-    else:
-        # All players dead?
-        party = json.loads(session.party_snapshot_json or "{}") or {}
-        alive = [m for m in party.get("members", []) if m.get("hp", 0) > 0]
-        if not alive:
-            session.status = "complete"
-            session.rewards_json = json.dumps({})
-            _append_log(session, "Party defeated.")
-            set_combat_state(False)
+        return
+    # Party defeat path
+    party = json.loads(session.party_snapshot_json or "{}") or {}
+    alive = [m for m in party.get("members", []) if m.get("hp", 0) > 0]
+    if not alive:
+        session.status = "complete"
+        session.rewards_json = json.dumps({})
+        _append_log(session, "Party defeated.", code=COMBAT_COMPLETE)
+        _persist_party_resources(session)
+        set_combat_state(False)
 
 
 def _emit_session(event: str, session: CombatSession):  # safe emit wrapper
     try:
         socketio.emit(event, session.to_dict(), namespace="/adventure")
+    except Exception:
+        pass
+
+
+def _emit_if_completed(session: CombatSession):
+    """Emit end/completion events if the session is no longer active.
+
+    Consolidates repeated logic scattered across action handlers. Always emits
+    'combat_end' for backward compatibility and 'combat_complete' (new) so
+    clients can differentiate finalization from interim updates.
+    """
+    if session.status != "active":
+        # Always emit legacy end event
+        _emit_session("combat_end", session)
+        # Also emit new completion event (idempotent if called multiple times)
+        try:
+            _emit_session("combat_complete", session)
+        except Exception:
+            pass
+
+
+def _persist_party_resources(session: CombatSession):
+    """Persist surviving party HP and mana back into Character.stats JSON.
+
+    Assumptions / Simplifications:
+    - Character.stats JSON contains (or can accept) 'hp' and 'mana' keys representing current values.
+    - We do not yet track max_hp/mana persistently outside stats snapshot; we only update current.
+    - Dead characters (hp <= 0) persist with hp=0.
+    - Silently ignores any character ids not found (e.g., temporary generated hero placeholder).
+    """
+    try:
+        if not session.party_snapshot_json:
+            return
+        import json as _json
+
+        party = _json.loads(session.party_snapshot_json) or {}
+        members = party.get("members", [])
+        if not members:
+            return
+        char_rows = {c.id: c for c in Character.query.filter_by(user_id=session.user_id).all()}
+        changed = False
+        for m in members:
+            cid = m.get("char_id") or m.get("id")
+            row = char_rows.get(cid)
+            if not row or not row.stats:
+                continue
+            try:
+                stats_obj = _json.loads(row.stats) if isinstance(row.stats, str) else {}
+            except Exception:
+                stats_obj = {}
+            # Update only the instantaneous current values
+            try:
+                stats_obj["hp"] = int(m.get("hp", stats_obj.get("hp", 0)))
+            except Exception:
+                pass
+            try:
+                stats_obj["current_mana"] = int(m.get("mana", stats_obj.get("current_mana", stats_obj.get("mana", 0))))
+            except Exception:
+                pass
+            row.stats = _json.dumps(stats_obj)
+            db.session.add(row)
+            changed = True
+        if changed:
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
     except Exception:
         pass
 
@@ -377,13 +658,13 @@ def player_attack(combat_id: int, user_id: int, version: int, actor_id: Optional
     else:
         hit = accuracy >= evasion
     if not hit:
-        _append_log(session, f"Player misses {monster.get('name')} (roll {acc_roll})")
+        _append_log(session, f"Player misses {monster.get('name')} (roll {acc_roll})", code=PLAYER_ATTACK_MISS)
         _advance_turn(session)
         _check_end(session)
         db.session.commit()
         _emit_session("combat_update", session)
-        if session.status != "active":
-            _emit_session("combat_end", session)
+        _emit_if_completed(session)
+        session = _auto_progress_monster_after_player(session)
         return {"ok": True, "state": session.to_dict(), "miss": True}
     base = atk
     variance = random.randint(-atk // 4, atk // 4)
@@ -395,13 +676,16 @@ def player_attack(combat_id: int, user_id: int, version: int, actor_id: Optional
     _append_log(
         session,
         f"Player hits {monster.get('name')} for {dmg}{' (CRIT)' if crit else ''} damage (HP {session.monster_hp})",
+        code=PLAYER_ATTACK_HIT,
     )
-    _advance_turn(session)
+    # After action resolution move to end phase (skipping remaining intermediate phases for now)
+    session.phase = "end"
+    _progress_phase(session)  # this will advance turn because phase becomes end -> progress -> next
     _check_end(session)
     db.session.commit()
     _emit_session("combat_update", session)
-    if session.status != "active":
-        _emit_session("combat_end", session)
+    _emit_if_completed(session)
+    session = _auto_progress_monster_after_player(session)
     return {"ok": True, "state": session.to_dict()}
 
 
@@ -431,16 +715,20 @@ def player_flee(combat_id: int, user_id: int, version: int, actor_id: Optional[i
     success = random.random() < 0.5
     if success:
         session.status = "complete"
-        _append_log(session, "Player flees successfully.")
+        _append_log(session, "Player flees successfully.", code=PLAYER_FLEE_SUCCESS)
+        _persist_party_resources(session)
         set_combat_state(False)
     else:
-        _append_log(session, "Flee attempt failed.")
-    _advance_turn(session)
+        _append_log(session, "Flee attempt failed.", code=PLAYER_FLEE_FAIL)
+    # Flee consumes the whole turn (advance immediately)
+    session.phase = "end"
+    _progress_phase(session)
     _check_end(session)
     db.session.commit()
     _emit_session("combat_update", session)
-    if session.status != "active":
-        _emit_session("combat_end", session)
+    _emit_if_completed(session)
+    if not success:  # Only if combat continues
+        session = _auto_progress_monster_after_player(session)
     return {"ok": True, "state": session.to_dict(), "fled": success}
 
 
@@ -472,7 +760,7 @@ def monster_auto_turn(session: CombatSession):
             monster_preview = session.monster() or {}
             last_turn = monster_preview.get("last_turn")
             if isinstance(last_turn, int) and session.combat_turn - last_turn < cooldown_turns:
-                _append_log(session, f"{monster_preview.get('name')} is waiting (cooldown).")
+                _append_log(session, f"{monster_preview.get('name')} waits (cooldown).", code=MONSTER_COOLDOWN_WAIT)
                 _advance_turn(session)
                 _check_end(session)
                 db.session.commit()
@@ -484,6 +772,16 @@ def monster_auto_turn(session: CombatSession):
         pass
     members = party.get("members", [])
     if not members:
+        # No viable targets; log an explicit wait so client sees monster acted
+        try:
+            monster_preview = session.monster() or {}
+            _append_log(
+                session, f"{monster_preview.get('name','Monster')} waits (no targets).", code=MONSTER_NO_TARGET_WAIT
+            )
+            db.session.commit()
+            _emit_session("combat_update", session)
+        except Exception:
+            pass
         return
     # Ensure effects list presence for each member to simplify later additions
     for m in members:
@@ -505,8 +803,7 @@ def monster_auto_turn(session: CombatSession):
         _check_end(session)
         db.session.commit()
         _emit_session("combat_update", session)
-        if session.status != "active":
-            _emit_session("combat_end", session)
+        _emit_if_completed(session)
         return
     # Pre-action veto (stun)
     can_act_flag, veto_logs = True, []
@@ -517,12 +814,17 @@ def monster_auto_turn(session: CombatSession):
     for msg in veto_logs:
         _append_log(session, msg)
     if not can_act_flag:
+        # If no specific veto logs were produced, add a generic waits/inactive line for clarity
+        if not veto_logs:
+            try:
+                _append_log(session, f"{monster.get('name')} waits (incapacitated).", code=MONSTER_INCAPACITATED_WAIT)
+            except Exception:
+                pass
         _advance_turn(session)
         _check_end(session)
         db.session.commit()
         _emit_session("combat_update", session)
-        if session.status != "active":
-            _emit_session("combat_end", session)
+        _emit_if_completed(session)
         return
     # AI delegation (still only basic attack). If monster has flag ai_enabled use selector.
     action = {"type": "attack", "target_index": 0}
@@ -548,7 +850,11 @@ def monster_auto_turn(session: CombatSession):
             attack_total = int_stat + acc_roll
             hit = True if crit else attack_total >= defender_evasion
             if not hit:
-                _append_log(session, f"{monster.get('name')}'s Firebolt misses {target['name']} (roll {acc_roll}).")
+                _append_log(
+                    session,
+                    f"{monster.get('name')}'s Firebolt misses {target['name']} (roll {acc_roll}).",
+                    code=MONSTER_SPELL_MISS,
+                )
             else:
                 roll = random.randint(1, 8) + random.randint(1, 8)
                 dmg = int(roll + int_stat * 0.6)
@@ -569,15 +875,21 @@ def monster_auto_turn(session: CombatSession):
                 _append_log(
                     session,
                     f"{monster.get('name')} casts Firebolt on {target['name']} for {dmg}{' (CRIT)' if crit else ''} damage (HP {target['hp']})",
+                    code=MONSTER_SPELL_HIT,
                 )
     elif action.get("type") == "flee":
         # Monster attempts to flee: end combat, no rewards
         session.status = "complete"
-        _append_log(session, f"{monster.get('name')} flees!")
+        _append_log(session, f"{monster.get('name')} flees!", code=MONSTER_FLEE)
+        _persist_party_resources(session)
         set_combat_state(False)
+        db.session.commit()
+        _emit_session("combat_update", session)
+        _emit_if_completed(session)
+        return
     elif action.get("type") == "help":
         # For now just a log entry; future: spawn ally or buff
-        _append_log(session, f"{monster.get('name')} calls for help!")
+        _append_log(session, f"{monster.get('name')} calls for help!", code=MONSTER_CALL_HELP)
     elif action.get("type") == "attack":
         idx = int(action.get("target_index", 0))
         if idx < 0 or idx >= len(members):
@@ -588,8 +900,7 @@ def monster_auto_turn(session: CombatSession):
         accuracy = m_base + acc_roll
         defender_evasion = target.get("defense", 5) + 10
         if acc_roll == 1:
-            _append_log(session, f"{monster.get('name')} misses {target['name']} (roll 1)")
-            # Persist last_turn even on early exit for cooldown logic
+            _append_log(session, f"{monster.get('name')} misses {target['name']} (roll 1)", code=MONSTER_ATTACK_MISS)
             try:
                 monster_data = session.monster() or {}
                 monster_data["last_turn"] = session.combat_turn
@@ -600,13 +911,13 @@ def monster_auto_turn(session: CombatSession):
             _check_end(session)
             db.session.commit()
             _emit_session("combat_update", session)
-            if session.status != "active":
-                _emit_session("combat_end", session)
+            _emit_if_completed(session)
             return
         hit = True if acc_roll == 20 else accuracy >= defender_evasion
         if not hit:
-            _append_log(session, f"{monster.get('name')} misses {target['name']} (roll {acc_roll})")
-            # Persist last_turn even on early exit for cooldown logic
+            _append_log(
+                session, f"{monster.get('name')} misses {target['name']} (roll {acc_roll})", code=MONSTER_ATTACK_MISS
+            )
             try:
                 monster_data = session.monster() or {}
                 monster_data["last_turn"] = session.combat_turn
@@ -617,8 +928,7 @@ def monster_auto_turn(session: CombatSession):
             _check_end(session)
             db.session.commit()
             _emit_session("combat_update", session)
-            if session.status != "active":
-                _emit_session("combat_end", session)
+            _emit_if_completed(session)
             return
         variance = random.randint(-m_base // 4, m_base // 4)
         dmg = max(1, m_base + variance)
@@ -632,10 +942,15 @@ def monster_auto_turn(session: CombatSession):
         target["hp"] = max(0, target.get("hp", 0) - dmg)
         party["members"][idx] = target
         session.party_snapshot_json = json.dumps(party)
-        _append_log(session, f"{monster.get('name')} hits {target['name']} for {dmg} damage (HP {target['hp']})")
+        _append_log(
+            session,
+            f"{monster.get('name')} hits {target['name']} for {dmg} damage (HP {target['hp']})",
+            code=MONSTER_ATTACK_HIT,
+        )
     else:
         # Unknown/idle action just advances turn
-        _append_log(session, f"{monster.get('name')} hesitates.")
+        _append_log(session, f"{monster.get('name')} hesitates.", code=MONSTER_HESITATE)
+    # (already coded above - kept for clarity)
     # Persist last action turn onto monster JSON so cooldown can reference next cycle
     try:
         monster_data = session.monster() or {}
@@ -643,12 +958,13 @@ def monster_auto_turn(session: CombatSession):
         session.monster_json = json.dumps(monster_data)
     except Exception:
         pass
-    _advance_turn(session)
+    # Monster completes its action; advance to next turn via end phase progression
+    session.phase = "end"
+    _progress_phase(session)
     _check_end(session)
     db.session.commit()
     _emit_session("combat_update", session)
-    if session.status != "active":
-        _emit_session("combat_end", session)
+    _emit_if_completed(session)
 
 
 def progress_monster_turn_if_needed(combat_id: int):
@@ -691,13 +1007,14 @@ def player_defend(combat_id: int, user_id: int, version: int, actor_id: Optional
             m["defending"] = True
             break
     session.party_snapshot_json = json.dumps(party)
-    _append_log(session, "Player braces for impact (Defend).")
-    _advance_turn(session)
+    _append_log(session, "Player braces for impact (Defend).", code=PLAYER_DEFEND)
+    session.phase = "end"
+    _progress_phase(session)
     _check_end(session)
     db.session.commit()
     _emit_session("combat_update", session)
-    if session.status != "active":
-        _emit_session("combat_end", session)
+    _emit_if_completed(session)
+    session = _auto_progress_monster_after_player(session)
     return {"ok": True, "state": session.to_dict(), "defend": True}
 
 
@@ -743,6 +1060,7 @@ def player_use_item(
     if not used:
         return {"error": "cannot_use"}
     # Attempt to remove the item from the first character's inventory list if present
+    removed_successfully = False
     try:
         char_row = Character.query.filter_by(user_id=session.user_id).first()
         if char_row and char_row.items:
@@ -763,6 +1081,7 @@ def player_use_item(
                     if entry == slug:
                         removed = True
                         changed = True
+                        removed_successfully = True
                         continue
                     new_inv.append(entry)
                 elif isinstance(entry, dict):
@@ -773,6 +1092,7 @@ def player_use_item(
                             new_inv.append(entry)
                         changed = True
                         removed = True
+                        removed_successfully = True
                     else:
                         new_inv.append(entry)
                 else:
@@ -782,14 +1102,24 @@ def player_use_item(
                 db.session.add(char_row)
     except Exception:
         pass
+    # Decrement surfaced party item counts if present and we actually removed an item.
+    try:
+        if removed_successfully:
+            counts = party.setdefault("item_counts", {})
+            if slug == "potion-healing":
+                current = int(counts.get("potion-healing", 0))
+                counts["potion-healing"] = max(0, current - 1)
+    except Exception:
+        pass
     session.party_snapshot_json = json.dumps(party)
-    _append_log(session, f"Player uses {slug}.")
-    _advance_turn(session)
+    _append_log(session, f"Player uses {slug}.", code=PLAYER_USE_ITEM)
+    session.phase = "end"
+    _progress_phase(session)
     _check_end(session)
     db.session.commit()
     _emit_session("combat_update", session)
-    if session.status != "active":
-        _emit_session("combat_end", session)
+    _emit_if_completed(session)
+    session = _auto_progress_monster_after_player(session)
     return {"ok": True, "state": session.to_dict(), "item_used": slug}
 
 
@@ -823,35 +1153,41 @@ def player_cast_spell(
     if not caster:
         return {"error": "no_caster"}
     cost = 5
-    if caster.get("mana", 0) < cost:
-        return {"error": "no_mana", "mana": caster.get("mana", 0)}
-    caster["mana"] -= cost
+    mana_available = caster.get("mana") if "mana" in caster else caster.get("current_mana", 0)
+    if mana_available < cost:
+        return {"error": "no_mana", "mana": mana_available}
+    mana_available -= cost
+    # Normalize storage back into both keys for backward compatibility
+    caster["mana"] = mana_available
+    caster["current_mana"] = mana_available
     int_stat = caster.get("int_stat", caster.get("attack", 10))
     # Spell accuracy: d20 + INT-based attack surrogate vs monster evasion (10 + armor)
     acc_roll = random.randint(1, 20)
     evasion = session.monster().get("armor", 0) + 10
     # Basic hit logic parallel to weapon attacks
     if acc_roll == 1:
-        _append_log(session, "Player's Firebolt fizzles (natural 1).")
+        _append_log(session, "Player's Firebolt fizzles (natural 1).", code=PLAYER_SPELL_FIZZLE)
         _advance_turn(session)
         _check_end(session)
         db.session.commit()
         _emit_session("combat_update", session)
         if session.status != "active":
             _emit_session("combat_end", session)
+        session = _auto_progress_monster_after_player(session)
         return {"ok": True, "state": session.to_dict(), "spell": spell, "miss": True}
     crit = acc_roll == 20
     # Always hit on natural 20; otherwise compare INT surrogate + roll to evasion
     attack_total = int_stat + acc_roll
     hit = True if crit else attack_total >= evasion
     if not hit:
-        _append_log(session, f"Player's Firebolt misses (roll {acc_roll}).")
+        _append_log(session, f"Player's Firebolt misses (roll {acc_roll}).", code=PLAYER_SPELL_MISS)
         _advance_turn(session)
         _check_end(session)
         db.session.commit()
         _emit_session("combat_update", session)
         if session.status != "active":
             _emit_session("combat_end", session)
+        session = _auto_progress_monster_after_player(session)
         return {"ok": True, "state": session.to_dict(), "spell": spell, "miss": True}
     roll = random.randint(1, 8) + random.randint(1, 8)
     dmg = int(roll + int_stat * 0.6)
@@ -868,11 +1204,39 @@ def player_cast_spell(
     _append_log(
         session,
         f"Player casts Firebolt for {dmg}{' (CRIT)' if crit else ''} damage (HP {session.monster_hp})",
+        code=PLAYER_SPELL_HIT,
     )
-    _advance_turn(session)
+    session.phase = "end"
+    _progress_phase(session)
     _check_end(session)
     db.session.commit()
     _emit_session("combat_update", session)
     if session.status != "active":
         _emit_session("combat_end", session)
+    session = _auto_progress_monster_after_player(session)
     return {"ok": True, "state": session.to_dict(), "spell": spell, "damage": dmg, "crit": crit}
+
+
+# ---------------- Auto Monster Progression Helper -----------------
+
+
+def _auto_progress_monster_after_player(session: CombatSession) -> CombatSession:
+    """If after a player action it's now the monster's turn, immediately run the monster AI.
+
+    Returns the (possibly reloaded) session so callers can serialize fresh state.
+    Safe no-op if combat ended or still a player's turn.
+    """
+    try:
+        if not session or session.status != "active":
+            return session
+        # Ensure we have latest DB state before deciding (commit already done by caller)
+        db.session.refresh(session)
+        if _is_monster_turn(session):
+            monster_auto_turn(session)  # commits & emits internally
+            # Reload to pick up monster action effects
+            refreshed = _load_session(session.id)
+            if refreshed:
+                return refreshed
+    except Exception:
+        pass
+    return session

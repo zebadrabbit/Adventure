@@ -184,12 +184,12 @@ CLASS_MAP = {
 
 # Centralized class color configuration (background & text plus optional border accent)
 CLASS_COLORS = {
-    "fighter": {"bg": "#7a3314", "fg": "#f2e2d8", "border": "#b44f21"},
-    "rogue": {"bg": "#454a1f", "fg": "#e5e5d1", "border": "#6f732f"},
-    "mage": {"bg": "#0f4d63", "fg": "#d2f2ff", "border": "#196e89"},
-    "cleric": {"bg": "#6a6f72", "fg": "#f5f5f5", "border": "#9aa1a5"},
-    "druid": {"bg": "#213826", "fg": "#d8f2dc", "border": "#2f5738"},
-    "ranger": {"bg": "#1d4a57", "fg": "#d8eef5", "border": "#2c6b7d"},
+    "fighter": {"bg": "#301d0b", "fg": "#f2e2d8", "border": "#271504"},
+    "rogue": {"bg": "#6F7A16", "fg": "#e5e5d1", "border": "#6d740f"},
+    "mage": {"bg": "#189bca", "fg": "#d2f2ff", "border": "#196e89"},
+    "cleric": {"bg": "#c3ccd1", "fg": "#f5f5f5", "border": "#9aa1a5"},
+    "druid": {"bg": "#FF7B00", "fg": "#d8f2dc", "border": "#574a2f"},
+    "ranger": {"bg": "#1a940a", "fg": "#d8eef5", "border": "#337d2c"},
 }
 
 

@@ -272,98 +272,48 @@ def delete_character(char_id):
 @bp_dashboard.route("/autofill_characters", methods=["POST"])
 @login_required
 def autofill_characters():
-    """Autofill the user's roster up to 4 characters with random class/name.
+    """Ensure the user has a party of exactly 4 selected characters.
 
-    Response JSON:
-        { "created": <int>, "total": <int>, "characters": [ {id,name,class,level}, ... ] }
-    Status Codes:
-        201 when one or more characters were created
-        200 when no creation was necessary (already had 4)
+    Rules:
+      - If user has <4 characters: create the missing number (random) so total becomes 4.
+      - If user already has >=4 characters: pick any 4 (lowest id deterministic) for the party.
+      - Always replaces session['party'] and session['last_party_ids'] with exactly 4 entries.
+      - Returns concise JSON describing the formed party.
     """
-    # Explicit guard (in addition to @login_required) to defend against any test that toggles LOGIN_DISABLED
-    if not current_user.is_authenticated or not session.get("_user_id"):
-        # If this looks like an AJAX/fetch request prefer JSON 401, else redirect
-        wants_json = request.headers.get("X-Requested-With") == "fetch" or "application/json" in (
-            request.headers.get("Accept") or ""
-        )
-        if wants_json:
-            return jsonify({"error": "unauthorized"}), 401
-        return redirect(url_for("auth.login"))
-    current_user_id = current_user.id
+    if not current_user.is_authenticated:
+        return jsonify({"error": "unauthorized"}), 401
+    uid = _stable_current_user_id()
+    if uid is None:
+        return jsonify({"error": "unauthorized"}), 401
 
-    existing = Character.query.filter_by(user_id=current_user_id).all()
-    existing, created = handle_autofill(existing, current_user_id)
+    # Fetch existing chars
+    chars = Character.query.filter_by(user_id=uid).order_by(Character.id.asc()).all()
+    have = len(chars)
+    created_count = 0
+    if have < 4:
+        # Create needed characters via existing helper (handle_autofill expects (existing, uid))
+        chars, created = handle_autofill(chars, uid)
+        created_count = len(created)
+        # Re-fetch list to include DB committed rows in deterministic order
+        chars = Character.query.filter_by(user_id=uid).order_by(Character.id.asc()).all()
+    # Select exactly 4 for party (deterministic: first 4 by id)
+    party_source = chars[:4]
+    from app.routes.dashboard_helpers import build_party_payload
 
-    # Prepare response payload
-    payload_chars = []
-    from app.models.models import Item
+    party = build_party_payload(party_source)
+    session["party"] = party
+    session["last_party_ids"] = [p["id"] for p in party]
 
-    for c in existing:
-        try:
-            s = json.loads(c.stats)
-        except Exception:
-            s = {}
-        coins = {k: s.get(k, 0) for k in ("gold", "silver", "copper")}
-        cls_name = (s.get("class") or "unknown").capitalize()
-        # Inventory expansion
-        try:
-            raw_inv = json.loads(c.items) if c.items else []
-        except Exception:
-            raw_inv = []
-        # Flatten any structured entries back into pure slug list
-        item_slugs = []
-        if isinstance(raw_inv, list):
-            for ent in raw_inv:
-                if isinstance(ent, str):
-                    item_slugs.append(ent)
-                elif isinstance(ent, dict):
-                    slug = ent.get("slug") or ent.get("name") or ent.get("id")
-                    if slug:
-                        try:
-                            qty = int(ent.get("qty", 1))
-                        except Exception:
-                            qty = 1
-                        if qty < 1:
-                            qty = 1
-                        item_slugs.extend([slug] * qty)
-        items = []
-        if item_slugs:
-            db_items = Item.query.filter(Item.slug.in_(item_slugs)).all()
-            by_slug = {i.slug: i for i in db_items}
-            for slug in item_slugs:
-                it = by_slug.get(slug)
-                if it:
-                    items.append({"slug": it.slug, "name": it.name, "type": it.type})
-        # Remove coin/class keys from stats copy for clarity
-        stats_copy = {k: v for k, v in s.items() if k not in ("gold", "silver", "copper", "class")}
-        payload_chars.append(
-            {
-                "id": c.id,
-                "name": c.name,
-                "class": cls_name,
-                "level": getattr(c, "level", 1),
-                "coins": coins,
-                "stats": stats_copy,
-                "inventory": items,
-                # Provide equipped gear mapping (empty dict if legacy or parse error)
-                "gear": (lambda _g: _g if isinstance(_g, dict) else {})(
-                    (lambda raw: (json.loads(raw) if isinstance(raw, str) else raw) if raw else {})(
-                        getattr(c, "gear", {})
-                    )
-                ),
-            }
-        )
-    status = 201 if created else 200
-    return (
-        jsonify(
-            {
-                "created": len(created),
-                "total": len(existing),
-                "characters": payload_chars,
-            }
-        ),
-        status,
-    )
+    # Minimal payload for client (only what it needs to reflect party state)
+    payload = {
+        "created": created_count,
+        "party_size": len(party),
+        "party": [
+            {"id": p["id"], "name": p["name"], "class": p["class"], "hp": p["hp"], "mana": p["mana"]} for p in party
+        ],
+        "total_characters": len(chars),
+    }
+    return jsonify(payload), (201 if created_count > 0 else 200)
 
 
 # Route to delete a character by id (POST)

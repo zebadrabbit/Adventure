@@ -68,10 +68,24 @@ def set_seed():
         db.session.commit()
         session["dungeon_instance_id"] = instance.id
     else:
+        old_seed = instance.seed
+        if old_seed != seed:
+            # Purge existing entities tied to this instance so new seed can reseed.
+            try:
+                from app.models import DungeonEntity, DungeonLoot
+
+                DungeonEntity.query.filter_by(instance_id=instance.id).delete(synchronize_session=False)
+                # Remove loot rows for old seed only (avoid nuking other seeds from other instances in multi-user future)
+                DungeonLoot.query.filter_by(seed=old_seed).delete(synchronize_session=False)
+            except Exception:
+                pass
         instance.seed = seed
-        # Reset position to 0,0,0 so next map call relocates to entrance
+        # Reset position to entrance relocation trigger
         instance.pos_x = instance.pos_y = instance.pos_z = 0
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
     session["dungeon_seed"] = seed
     return jsonify({"seed": seed, "dungeon_instance_id": instance.id})

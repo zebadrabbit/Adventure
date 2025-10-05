@@ -1,0 +1,41 @@
+.mud-item-tip {
+    max-width: 260px;
+}
+
+.mud-item-name {
+    font-size: 0.9rem;
+}
+
+.mud-item-meta {
+    font-size: 0.65rem;
+    letter-spacing: 0.25px;
+}
+
+.mud-item-desc {
+    line-height: 1.15rem;
+}
+
+.mud-item-effects {
+    font-family: monospace;
+    letter-spacing: 0.5px;
+}
+
+.mud-item-tooltip .tooltip-inner {
+    background: #20242a;
+    border: 1px solid #49515c;
+    padding: 6px 8px;
+    max-width: 280px;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    color: #e8eaf0;
+}
+
+/* Ensure loot dropdown menus render above map / log containers */
+.loot-list .dropdown-menu {
+    z-index: 1080;
+    /* above custom tooltip (1055) */
+}
+
+.mud-item-tooltip .tooltip-inner .mud-item-name {
+    font-size: 0.8rem;
+}

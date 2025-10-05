@@ -255,6 +255,18 @@ def handle_connect():
             join_room("mods")  # admins implicitly get mod messages
         elif stored_role == "mod":
             join_room("mods")
+        # Instrumentation hook (best-effort)
+        try:
+            from app.instrumentation.socket_stats import socket_stats as _ss
+
+            _ss.on_connect(
+                user_id=int(session_uid) if session_uid else None,
+                username=username,
+                sid=sid,
+                namespace="/",  # root namespace
+            )
+        except Exception:
+            pass
     except Exception:
         # Silently ignore connect bookkeeping errors
         pass
@@ -262,9 +274,15 @@ def handle_connect():
 
 @socketio.on("disconnect")
 def handle_disconnect():
-    """Cleanup online tracking on disconnect."""
+    """Cleanup online tracking + instrumentation on disconnect."""
     sid = request.sid
     online.pop(sid, None)
+    try:
+        from app.instrumentation.socket_stats import socket_stats as _ss
+
+        _ss.on_disconnect(sid)
+    except Exception:
+        pass
 
 
 @socketio.on("admin_online_users")

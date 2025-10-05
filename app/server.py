@@ -23,6 +23,7 @@ from sqlalchemy import text as _text
 from werkzeug.security import generate_password_hash
 
 from app import app, db, socketio
+from app.migrations import apply_migrations  # structured migrations
 from app.models.models import Item, User
 
 # Global event queue for admin shell. The Flask app reads this to publish
@@ -39,11 +40,23 @@ def start_server(host="0.0.0.0", port=5000, debug: bool = False):  # pragma: no 
     """
     with app.app_context():
         db.create_all()
-        _run_migrations()
+        _run_migrations()  # legacy additive migrations (safety net)
+        try:
+            apply_migrations()  # structured versioned migrations
+        except Exception:
+            pass
         seed_items()
         _run_migrations()  # ensure new columns after seeds
+        try:
+            apply_migrations()
+        except Exception:
+            pass
         _load_sql_item_seeds()
         _run_migrations()  # ensure after bulk load
+        try:
+            apply_migrations()
+        except Exception:
+            pass
         _seed_game_config()
         _configure_logging()
         # Seed default monster_ai config if missing (idempotent) to surface patrol keys

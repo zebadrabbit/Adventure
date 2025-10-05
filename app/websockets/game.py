@@ -18,6 +18,7 @@ from flask_login import current_user
 from flask_socketio import emit, join_room, leave_room
 
 from app import socketio
+from app.dungeon.entity_stream import build_snapshot, fetch_missing
 
 from .validation import (
     GAME_ACTION,
@@ -122,3 +123,62 @@ def handle_game_action(data):
     # Placeholder for future game logic
     emit("game_update", {"msg": f"Action processed: {action}"}, room=room)
     _log.info(event="game_action", room=room, action=action)
+
+
+@socketio.on("entities_sync_request")
+def handle_entities_sync_request(data):
+    """Client requests entity state since a given seq.
+
+    Payload: { instance_id: int, since_seq: int }
+    Emits back to requesting socket either:
+      - entities_snapshot (full) when since_seq too old or missing
+      - entities_delta (one-by-one) when replay possible (sent in order)
+    """
+    try:
+        instance_id = int((data or {}).get("instance_id"))
+        since_seq = int((data or {}).get("since_seq", 0))
+    except Exception:
+        emit("error", {"message": "bad_sync_request"})
+        return
+    # Fetch dungeon instance to build snapshot if needed
+    from app.models import DungeonInstance as _DI
+    from app.models.entities import DungeonEntity as _DE
+
+    inst = _DI.query.filter_by(id=instance_id, user_id=getattr(current_user, "id", None)).first()
+    if not inst:
+        emit("error", {"message": "instance_not_found"})
+        return
+    missing = fetch_missing(instance_id, since_seq)
+    if missing is None:
+        # Need snapshot
+        from app.models.models import GameClock as _GC
+
+        tick_val = 0
+        try:
+            tick_val = _GC.get().tick
+        except Exception:
+            pass
+        monsters = [_r.to_dict() for _r in _DE.query.filter_by(instance_id=inst.id, type="monster").all()]
+        treasures = [_r.to_dict() for _r in _DE.query.filter_by(instance_id=inst.id, type="treasure").all()]
+        snap = build_snapshot(instance_id, tick=tick_val, monsters=monsters, treasures=treasures)
+        emit("entities_snapshot", snap)
+        return
+    # Replay deltas
+    if not missing:
+        # Nothing new
+        emit(
+            "entities_delta",
+            {
+                "event": "entities_delta",
+                "instance_id": instance_id,
+                "seq": since_seq,
+                "tick": None,
+                "monsters_changed": [],
+                "monsters_removed": [],
+                "treasures_changed": [],
+                "treasures_removed": [],
+            },
+        )
+        return
+    for delta in missing:
+        emit("entities_delta", delta)

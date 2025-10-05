@@ -1,0 +1,40 @@
+:root {
+    --adv-ink: #0B0F12;
+    --adv-ink-2: #12171C;
+    --adv-crt: #1DF2A0;
+    --adv-amber: #FFC857;
+    --adv-cyan: #19C1FF;
+    --adv-magenta: #FF3FA4;
+    --adv-gold: #E9B44C;
+    --adv-gray: #8A97A6;
+    --adv-parchment: #F5F3E7;
+    --adv-white: #F8FAFB;
+}
+
+/* Bootstrap theme hooks */
+:root {
+    --bs-body-bg: var(--adv-ink);
+    --bs-body-color: var(--adv-white);
+
+    --bs-primary: var(--adv-crt);
+    --bs-secondary: var(--adv-gold);
+    --bs-success: #28D17C;
+    --bs-info: var(--adv-cyan);
+    --bs-warning: var(--adv-amber);
+    --bs-danger: var(--adv-magenta);
+    --bs-light: var(--adv-parchment);
+    --bs-dark: var(--adv-ink-2);
+
+    --bs-border-color: color-mix(in oklab, var(--adv-gray) 70%, transparent);
+    --bs-link-color: var(--adv-crt);
+    --bs-link-hover-color: color-mix(in oklab, var(--adv-crt) 85%, white);
+}
+
+/* Buttons: give a subtle CRT glow */
+.btn-primary {
+    --bs-btn-bg: var(--adv-crt);
+    --bs-btn-border-color: var(--adv-crt);
+    --bs-btn-hover-bg: color-mix(in oklab, var(--adv-crt) 85%, black);
+    --bs-btn-hover-border-color: color-mix(in oklab, var(--adv-crt) 75%, black);
+    box-shadow: 0 0 .6rem rgba(29, 242, 160, .35);
+}

@@ -17,12 +17,17 @@
  - Encounter spawning & patrol logic extracted to `app/dungeon/api_helpers/encounters.py` (removes inline duplication in `dungeon_api.py`).
  - Perception & search logic extracted to `app/dungeon/api_helpers/perception.py` consolidating notice tracking, rolls, and tile search handling.
  - Treasure claim flow extracted to `app/dungeon/api_helpers/treasure.py` (single responsibility, easier future extension for lockpicking/chest states).
+ - Turn-based combat (initial implementation): combat session model, initiative ordering, player actions (attack, flee, defend, cast_spell, use_item), monster auto AI turn, loot + XP distribution, optimistic concurrency via `version`.
+ - Combat REST endpoints under `combat_api.py` (`state`, `attack`, `flee`, `end_turn`) and polling UI (`combat.html` + `combat.js`) with redirect from movement when an encounter spawns.
+ - Phased turn engine scaffold (`phase` field on `CombatSession`, linear phases: start → action → end) enabling future insertion of start-of-turn effects and end-of-turn triggers without breaking API contract.
+ - Extended combat state JSON: `phase`, `phases` list, `active_entity`, `monster_max_hp`, percentage convenience fields (`hp_pct`, `mana_pct`, `monster_hp_pct`) for UI bars.
 
 ### Changed
  - `/api/dungeon/move` and `/api/dungeon/state` now share helper-based description & exits logic (less duplication, clearer tests).
  - Adventure client fog-of-war relies solely on local storage + in-memory sets (server persistence removed).
  - Admin fog modal simplified to local coverage only (removed server metrics & clear/sync controls).
  - README pruned deprecated seen tiles endpoint docs and clarifies client-only fog-of-war approach.
+ - README Combat section expanded with multi-character party support, action list, formulas, and new phase engine details.
 
 ### Removed
  - Legacy seen tiles subsystem (`/api/dungeon/seen*`) including rate limiting, compression, merge, metrics, and admin clear endpoints.

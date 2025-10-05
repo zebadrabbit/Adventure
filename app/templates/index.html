@@ -2,14 +2,15 @@
 {% block title %}MUD Game{% endblock %}
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="{{ asset_url('home.css') }}">
+<link rel="stylesheet" href="{{ asset_url('css/home.css') }}">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap" rel="stylesheet">
 {% endblock %}
 {% block content %}
 <div class="cover-bg">
     <div class="cover-container">
         <h1 class="cover-title mb-4">Adventure MUD</h1>
-        <p class="cover-lead">Step into a world of dungeons, dragons, and daring heroes. Create your character, join friends, and explore a living world that changes every week. Will you become a legend?</p>
+        <p class="cover-lead">Step into a world of dungeons, dragons, and daring heroes. Create your character, join
+            friends, and explore a living world that changes every week. Will you become a legend?</p>
         <div class="cover-btns mb-3">
             <a href="/login" class="btn btn-lg btn-warning fw-bold">Login</a>
             <a href="/register" class="btn btn-lg btn-outline-light fw-bold">Register</a>
