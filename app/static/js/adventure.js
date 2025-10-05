@@ -319,8 +319,8 @@
       }
       entityFetchInFlight = true;
       let got429 = false;
-  // Lighter REST fallback now that map layout is already loaded; we only need dynamic entities.
-  fetch('/api/dungeon/entities')
+      // Lighter REST fallback now that map layout is already loaded; we only need dynamic entities.
+      fetch('/api/dungeon/entities')
         .then(r => {
           if (r.status === 429) { got429 = true; entityBackoffMs = Math.min(entityBackoffMs ? entityBackoffMs * 2 : 1500, ENTITY_MAX_BACKOFF); throw new Error('rate-limited'); }
           if (!r.ok) { entityBackoffMs = Math.min(entityBackoffMs + 500, ENTITY_MAX_BACKOFF); throw new Error('HTTP ' + r.status); }
@@ -430,6 +430,53 @@
       });
     }
 
+    // Lightweight banner prompt (non-modal) to highlight search opportunity.
+    function showSearchPromptBanner() {
+      const id = 'search-prompt-banner';
+      if (document.getElementById(id)) {
+        // Refresh enable state of existing inline buttons
+        updateInlineSearchButtons();
+        return;
+      }
+      const banner = document.createElement('div');
+      banner.id = id;
+      banner.className = 'position-fixed top-0 start-50 translate-middle-x shadow';
+      Object.assign(banner.style, {
+        background: 'linear-gradient(90deg,#2d2612,#3b300f)',
+        color: '#ffc107',
+        font: '13px/1.2 monospace',
+        padding: '6px 12px 6px 12px',
+        border: '1px solid #775f14',
+        borderBottomLeftRadius: '6px',
+        borderBottomRightRadius: '6px',
+        zIndex: 9998,
+        letterSpacing: '.5px'
+      });
+      const txt = document.createElement('span');
+      txt.textContent = 'You sense something here. Consider searching.';
+      banner.appendChild(txt);
+      banner.appendChild(document.createTextNode(' '));
+      const act = document.createElement('button');
+      act.type = 'button';
+      act.className = 'btn btn-sm btn-warning py-0 px-2';
+      act.textContent = 'Search';
+      act.addEventListener('click', () => {
+        if (!canSearchHere()) return;
+        doSearch(act);
+      });
+      banner.appendChild(act);
+      const closeBtn = document.createElement('button');
+      closeBtn.type = 'button';
+      closeBtn.setAttribute('aria-label', 'Dismiss');
+      closeBtn.innerHTML = '&times;';
+      closeBtn.className = 'btn btn-sm btn-outline-warning ms-2 py-0 px-2';
+      closeBtn.addEventListener('click', () => { try { banner.remove(); } catch(e){} });
+      banner.appendChild(closeBtn);
+      document.body.appendChild(banner);
+      // Auto dismiss after ~12s to avoid clutter; keep if player hasn't searched
+      setTimeout(() => { try { banner.remove(); } catch(e){} }, 12000);
+    }
+
     function executeMove(dir) {
       moveInFlight = true;
       // Inner function to apply movement response consistently (shared by socket + REST fallback)
@@ -465,6 +512,7 @@
             }
             if (data.noticed_loot) {
               addNoticeMarker(data.pos[0], data.pos[1]);
+              try { showSearchPromptBanner(); } catch(e) { }
             }
             updateInlineSearchButtons();
             refreshEntities();
@@ -694,9 +742,12 @@
       const parts = String(desc).split(/\n+/);
       parts.forEach((p) => {
         const div = document.createElement('div');
-        const isRecallMsg = /You recall a suspicious spot here\.?$/.test(p);
-        const isCanSearchMsg = /You can Search this area\.?$/.test(p);
-        if (isRecallMsg || isCanSearchMsg) {
+  // Loot notice patterns: server currently emits "You notice something suspicious here.".
+  // Legacy patterns kept for backward compatibility with earlier phrasing.
+  const isRecallMsg = /You recall a suspicious spot here\.?$/i.test(p);
+  const isCanSearchMsg = /You can Search this area\.?$/i.test(p);
+  const isNoticeSuspicious = /You notice something suspicious here\.?$/i.test(p);
+  if (isRecallMsg || isCanSearchMsg || isNoticeSuspicious) {
           const span = document.createElement('span');
           span.textContent = p.replace(/\.?$/, '.');
           div.appendChild(span);
