@@ -77,7 +77,7 @@
                 reject(new Error('socket_timeout'));
               }, timeoutMs);
               function cleanup() {
-                try { gs.off(resultEvent, onResult); } catch (_) {}
+                try { gs.off(resultEvent, onResult); } catch (_) { }
                 clearTimeout(timer);
               }
               function onResult(data) {
@@ -319,7 +319,8 @@
       }
       entityFetchInFlight = true;
       let got429 = false;
-      fetch('/api/dungeon/map?entities=1')
+  // Lighter REST fallback now that map layout is already loaded; we only need dynamic entities.
+  fetch('/api/dungeon/entities')
         .then(r => {
           if (r.status === 429) { got429 = true; entityBackoffMs = Math.min(entityBackoffMs ? entityBackoffMs * 2 : 1500, ENTITY_MAX_BACKOFF); throw new Error('rate-limited'); }
           if (!r.ok) { entityBackoffMs = Math.min(entityBackoffMs + 500, ENTITY_MAX_BACKOFF); throw new Error('HTTP ' + r.status); }
@@ -550,7 +551,7 @@
         const foundWithItems = data && data.found && Array.isArray(data.items) && data.items.length;
         if (foundWithItems) {
           const hdr = document.createElement('div');
-            hdr.textContent = 'You search the area and discover:';
+          hdr.textContent = 'You search the area and discover:';
           output.appendChild(hdr);
           const list = document.createElement('div');
           list.className = 'loot-list mt-1';
