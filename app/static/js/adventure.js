@@ -438,9 +438,10 @@
         updateInlineSearchButtons();
         return;
       }
-      const banner = document.createElement('div');
+      const template = document.getElementById('notification-banner-template');
+      const banner = template ? template.content.cloneNode(true).querySelector('[data-notification-banner]') : document.createElement('div');
       banner.id = id;
-      banner.className = 'position-fixed top-0 start-50 translate-middle-x shadow';
+      banner.className = 'position-fixed top-0 start-50 translate-middle-x shadow alert alert-warning alert-dismissible fade show mb-0';
       Object.assign(banner.style, {
         background: 'linear-gradient(90deg,#2d2612,#3b300f)',
         color: '#ffc107',
@@ -452,29 +453,22 @@
         zIndex: 9998,
         letterSpacing: '.5px'
       });
-      const txt = document.createElement('span');
+      const txt = banner.querySelector('[data-field="message"]') || banner;
       txt.textContent = 'You sense something here. Consider searching.';
-      banner.appendChild(txt);
-      banner.appendChild(document.createTextNode(' '));
-      const act = document.createElement('button');
-      act.type = 'button';
-      act.className = 'btn btn-sm btn-warning py-0 px-2';
+      const act = banner.querySelector('[data-action="primary"]') || document.createElement('button');
+      if (!template) { act.type = 'button'; act.className = 'btn btn-sm btn-warning py-0 px-2'; }
       act.textContent = 'Search';
       act.addEventListener('click', () => {
         if (!canSearchHere()) return;
         doSearch(act);
       });
-      banner.appendChild(act);
-      const closeBtn = document.createElement('button');
-      closeBtn.type = 'button';
-      closeBtn.setAttribute('aria-label', 'Dismiss');
-      closeBtn.innerHTML = '&times;';
-      closeBtn.className = 'btn btn-sm btn-outline-warning ms-2 py-0 px-2';
-      closeBtn.addEventListener('click', () => { try { banner.remove(); } catch(e){} });
-      banner.appendChild(closeBtn);
+      const closeBtn = banner.querySelector('.btn-close');
+      if (closeBtn) {
+        closeBtn.addEventListener('click', () => { try { banner.remove(); } catch (e) { } });
+      }
       document.body.appendChild(banner);
       // Auto dismiss after ~12s to avoid clutter; keep if player hasn't searched
-      setTimeout(() => { try { banner.remove(); } catch(e){} }, 12000);
+      setTimeout(() => { try { banner.remove(); } catch (e) { } }, 12000);
     }
 
     function executeMove(dir) {
@@ -512,7 +506,7 @@
             }
             if (data.noticed_loot) {
               addNoticeMarker(data.pos[0], data.pos[1]);
-              try { showSearchPromptBanner(); } catch(e) { }
+              try { showSearchPromptBanner(); } catch (e) { }
             }
             updateInlineSearchButtons();
             refreshEntities();
@@ -644,12 +638,18 @@
               console.debug('[loot] Claim remains REST for now due to character assignment requirement; socket event returns generic loot only.');
             }
             const partyChars2 = (window.partyCharacters || []).filter(c => c && c.id && c.name);
+            const template = document.getElementById('loot-dropdown-item-template');
             if (!partyChars2.length) {
               const li = document.createElement('li'); li.innerHTML = '<span class="dropdown-item disabled">No party</span>'; menu.appendChild(li);
             } else {
               partyChars2.forEach(pc => {
                 const li = document.createElement('li');
-                const a = document.createElement('a'); a.href = '#'; a.className = 'dropdown-item'; a.textContent = pc.name;
+                const a = template ? template.content.cloneNode(true).querySelector('a') : document.createElement('a');
+                if (!template) { a.href = '#'; a.className = 'dropdown-item'; }
+                a.setAttribute('data-char-id', pc.id);
+                a.querySelector('[data-field="name"]').textContent = pc.name;
+                a.querySelector('[data-field="hp"]').textContent = pc.hp || 0;
+                a.querySelector('[data-field="hp-max"]').textContent = pc.hp_max || 0;
                 a.addEventListener('click', (ev) => {
                   ev.preventDefault(); hideTooltip(); btn.disabled = true;
                   fetch(`/api/dungeon/loot/claim/${it.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ character_id: pc.id }) })
@@ -742,12 +742,12 @@
       const parts = String(desc).split(/\n+/);
       parts.forEach((p) => {
         const div = document.createElement('div');
-  // Loot notice patterns: server currently emits "You notice something suspicious here.".
-  // Legacy patterns kept for backward compatibility with earlier phrasing.
-  const isRecallMsg = /You recall a suspicious spot here\.?$/i.test(p);
-  const isCanSearchMsg = /You can Search this area\.?$/i.test(p);
-  const isNoticeSuspicious = /You notice something suspicious here\.?$/i.test(p);
-  if (isRecallMsg || isCanSearchMsg || isNoticeSuspicious) {
+        // Loot notice patterns: server currently emits "You notice something suspicious here.".
+        // Legacy patterns kept for backward compatibility with earlier phrasing.
+        const isRecallMsg = /You recall a suspicious spot here\.?$/i.test(p);
+        const isCanSearchMsg = /You can Search this area\.?$/i.test(p);
+        const isNoticeSuspicious = /You notice something suspicious here\.?$/i.test(p);
+        if (isRecallMsg || isCanSearchMsg || isNoticeSuspicious) {
           const span = document.createElement('span');
           span.textContent = p.replace(/\.?$/, '.');
           div.appendChild(span);

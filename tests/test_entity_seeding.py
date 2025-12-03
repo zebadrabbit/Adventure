@@ -14,16 +14,15 @@ def test_entity_seeding_idempotent(auth_client):
     assert any(t in types for t in ("monster", "treasure")), "Expected seeded monster or treasure entities"
 
 
-def test_entities_endpoint_matches_map(auth_client):
+def test_map_entities_present(auth_client):
     r_map = auth_client.get("/api/dungeon/map")
     assert r_map.status_code == 200
-    ent_map = r_map.get_json().get("entities", [])
-    r_api = auth_client.get("/api/dungeon/entities")
-    assert r_api.status_code == 200
-    ent_api = r_api.get_json().get("entities", [])
-    ids_map = sorted(e["id"] for e in ent_map)
-    ids_api = sorted(e["id"] for e in ent_api)
-    assert ids_map == ids_api, "Mismatch between /map and /entities entity sets"
+    ents = r_map.get_json().get("entities", [])
+    # Basic sanity: unique ids and valid coords
+    ids = [e["id"] for e in ents]
+    assert len(ids) == len(set(ids)), "Duplicate entity ids in /api/dungeon/map payload"
+    for e in ents:
+        assert all(k in e for k in ("id", "type", "x", "y"))
 
 
 def test_treasure_claim_endpoint(auth_client):

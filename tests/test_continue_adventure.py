@@ -60,9 +60,8 @@ def test_patrol_persistence_best_effort(auth_client, monkeypatch):
     # Trigger movement hook multiple times to run patrol logic
     for _ in range(5):
         auth_client.post("/api/dungeon/move", json={"dir": ""})
-    # Re-fetch entities list
-    ents2 = auth_client.get("/api/dungeon/entities").get_json().get("entities", [])
-    updated = next((e for e in ents2 if e["id"] == target["id"]), None)
-    assert updated is not None
-    # Either it moved or patrol legitimately kept it (acceptable). If unchanged after forced 100% attempts, warn via assertion message.
+    # Re-fetch via map endpoint since entities REST endpoint removed
+    ents2_map = auth_client.get("/api/dungeon/map").get_json().get("entities", [])
+    updated = next((e for e in ents2_map if e["id"] == target["id"]), None)
+    assert updated is not None, "Patrol target entity missing after moves"
     assert (updated["x"], updated["y"]) != orig or True

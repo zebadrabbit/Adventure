@@ -100,8 +100,7 @@ def test_cache_open_flow(auth_client_cache, test_app):
     else:
         assert js2.get("error") in ("not_found", "no_instance", "wrong_type", "not_cache")
 
-    # 7. Sanity: ensure entity no longer in /api/dungeon/entities listing
-    ents_after = auth_client_cache.get("/api/dungeon/entities")
-    assert ents_after.status_code == 200
-    ids_after = {e["id"] for e in ents_after.get_json().get("entities", [])}
-    assert ent["id"] not in ids_after, "Cache entity still present after open"
+    # 7. Sanity: ensure entity row removed from DB
+    from app.models import DungeonEntity as _DE
+
+    assert _DE.query.filter_by(id=ent["id"]).first() is None, "Cache entity still present after open"

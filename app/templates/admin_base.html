@@ -1,5 +1,17 @@
 {% extends 'base.html' %}
 {% block title %}Admin | Adventure{% endblock %}
+
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="{{ asset_url('css/glass-theme.css') }}">
+<style>
+    body {
+        background: linear-gradient(135deg, #4c5270 0%, #5a3a52 100%);
+        background-attachment: fixed;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row mb-4">
     <div class="col-12 d-flex justify-content-between align-items-center">

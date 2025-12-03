@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block title %}Player Profile{% endblock %}
+
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="{{ asset_url('css/glass-theme.css') }}">
+<style>
+    body {
+        background: linear-gradient(135deg, #4c5270 0%, #5a3a52 100%);
+        background-attachment: fixed;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid profile-container">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="profile-title">Player Profile</h1>
+        </div>
+    </div>
+
+    <!-- Account Overview Card -->
+    <div class="row">
+        <div class="col-12">
+            <div class="section-card overview-card">
+                <h2 class="section-title">Account Overview</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">🎭</div>
+                        <div class="stat-value">{{ stats.total_characters }}</div>
+                        <div class="stat-label">Total Characters</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">✅</div>
+                        <div class="stat-value">{{ stats.active_characters }}</div>
+                        <div class="stat-label">Active</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">💀</div>
+                        <div class="stat-value">{{ stats.lost_characters }}</div>
+                        <div class="stat-label">Lost</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⭐</div>
+                        <div class="stat-value">{{ stats.highest_level or 0 }}</div>
+                        <div class="stat-label">Highest Level</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📈</div>
+                        <div class="stat-value">{{ stats.total_xp | default(0) | int }}</div>
+                        <div class="stat-label">Total XP</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Characters Card -->
+    <div class="row">
+        <div class="col-12">
+            <div class="section-card">
+                <div class="section-header">
+                    <h2 class="section-title">Your Characters</h2>
+                    <a href="{{ url_for('dashboard.dashboard') }}" class="btn-action">Manage Characters</a>
+                </div>
+                <div class="characters-list">
+                    {% if characters %}
+                    {% for char in characters %}
+                    <div class="character-item {% if char.current_hp <= 0 %}character-lost{% endif %}">
+                        <div class="character-info">
+                            <div class="character-main">
+                                <span class="character-name">{{ char.name }}</span>
+                                <span class="character-class">{{ char.char_class }}</span>
+                            </div>
+                            <span class="character-level">Level {{ char.level }}</span>
+                        </div>
+                        <div class="character-stats">
+                            <div class="stat-group">
+                                <span class="stat-label-sm">HP</span>
+                                <span class="character-hp">{{ char.current_hp }}/{{ char.max_hp }}</span>
+                            </div>
+                            <div class="stat-group">
+                                <span class="stat-label-sm">Mana</span>
+                                <span class="character-mana">{{ char.current_mana }}/{{ char.max_mana }}</span>
+                            </div>
+                            <div class="stat-group">
+                                <span class="stat-label-sm">XP</span>
+                                <span class="character-xp">{{ char.xp }}</span>
+                            </div>
+                            {% if char.current_hp <= 0 %} <span class="character-status-badge lost">Lost</span>
+                                {% else %}
+                                <span class="character-status-badge active">Active</span>
+                                {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <p class="empty-state">No characters created yet. <a
+                            href="{{ url_for('dashboard.dashboard') }}">Start your adventure!</a></p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Combat Stats Card -->
+    <div class="row">
+        <div class="col-12">
+            <div class="section-card">
+                <h2 class="section-title">Combat Statistics</h2>
+                <div class="stats-grid compact">
+                    <div class="stat-card">
+                        <div class="stat-icon">⚔️</div>
+                        <div class="stat-value">{{ stats.total_kills }}</div>
+                        <div class="stat-label">Total Kills</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">💀</div>
+                        <div class="stat-value">{{ stats.total_deaths }}</div>
+                        <div class="stat-label">Deaths</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">💰</div>
+                        <div class="stat-value">{{ (stats.total_gold / 100) | int }}</div>
+                        <div class="stat-label">Gold Looted</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📦</div>
+                        <div class="stat-value">{{ stats.total_items_looted }}</div>
+                        <div class="stat-label">Items Collected</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Section -->
+    <div class="row g-3 mb-3">
+        <!-- Recent Combat History Card -->
+        <div class="col-lg-6">
+            <div class="section-card h-100">
+                <h2 class="section-title">Recent Combat</h2>
+                <div class="history-table-container">
+                    {% if recent_combats %}
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Character</th>
+                                <th>Monster</th>
+                                <th>Outcome</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for combat in recent_combats %}
+                            <tr>
+                                <td>{{ combat.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>{{ combat.character.name }}</td>
+                                <td>{{ combat.monster.name if combat.monster else 'Unknown' }}</td>
+                                <td>
+                                    {% if combat.winner == 'player' %}
+                                    <span class="outcome-badge victory">Victory</span>
+                                    {% else %}
+                                    <span class="outcome-badge defeat">Defeat</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="empty-state">No combat history yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Loot Card -->
+        <div class="col-lg-6">
+            <div class="section-card h-100">
+                <h2 class="section-title">Recent Loot</h2>
+                <div class="history-table-container">
+                    {% if recent_loot %}
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Character</th>
+                                <th>Item</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for loot in recent_loot %}
+                            <tr>
+                                <td>{{ loot.claimed_at.strftime('%Y-%m-%d %H:%M') if loot.claimed_at else 'N/A' }}</td>
+                                <td>{{ loot.character.name }}</td>
+                                <td>{{ loot.item.name if loot.item else 'Unknown' }}</td>
+                                <td>{{ (loot.value_copper / 100) | int }}g</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="empty-state">No loot collected yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

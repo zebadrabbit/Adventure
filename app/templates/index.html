@@ -1,21 +1,118 @@
 {% extends 'base.html' %}
-{% block title %}MUD Game{% endblock %}
+{% block title %}Adventure MUD - Epic Multiplayer Dungeon Crawler{% endblock %}
 {% block head %}
 {{ super() }}
 <link rel="stylesheet" href="{{ asset_url('css/home.css') }}">
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap" rel="stylesheet">
+<style>
+    html,
+    body {
+        margin: 0 !important;
+        padding: 0 !important;
+        height: 100% !important;
+        width: 100% !important;
+        overflow-x: hidden !important;
+    }
+
+    body.d-flex {
+        display: block !important;
+    }
+
+    header {
+        display: none !important;
+    }
+
+    .hero-section {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100vw !important;
+        min-height: 100vh !important;
+    }
+
+    .hero-container {
+        margin: 0 !important;
+        max-width: 100% !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    .container {
+        max-width: 100% !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+</style>
 {% endblock %}
 {% block content %}
-<div class="cover-bg">
-    <div class="cover-container">
-        <h1 class="cover-title mb-4">Adventure MUD</h1>
-        <p class="cover-lead">Step into a world of dungeons, dragons, and daring heroes. Create your character, join
-            friends, and explore a living world that changes every week. Will you become a legend?</p>
-        <div class="cover-btns mb-3">
-            <a href="/login" class="btn btn-lg btn-warning fw-bold">Login</a>
-            <a href="/register" class="btn btn-lg btn-outline-light fw-bold">Register</a>
+<div class="hero-section">
+    <div class="hero-gradient"></div>
+    <div class="hero-grid"></div>
+
+    <div class="container hero-container">
+        <div class="row justify-content-center">
+            <div class="col-lg-10 col-xl-8">
+                <div class="hero-content">
+                    <div class="hero-badge mb-4">
+                        <i class="bi bi-stars"></i>
+                        <span>Real-time Multiplayer Adventure</span>
+                    </div>
+
+                    <h1 class="hero-title">
+                        Embark on Epic
+                        <span class="gradient-text">Adventures</span>
+                    </h1>
+
+                    <p class="hero-description">
+                        Explore procedurally generated dungeons, battle fierce monsters, collect legendary loot,
+                        and team up with friends in this modern multiplayer dungeon crawler.
+                    </p>
+
+                    <div class="hero-actions">
+                        <a href="/register" class="btn btn-hero-primary">
+                            <span>Start Your Journey</span>
+                            <i class="bi bi-arrow-right ms-2"></i>
+                        </a>
+                        <a href="/login" class="btn btn-hero-secondary">
+                            <i class="bi bi-box-arrow-in-right me-2"></i>
+                            <span>Sign In</span>
+                        </a>
+                    </div>
+
+                    <div class="hero-features">
+                        <div class="feature-item">
+                            <i class="bi bi-map"></i>
+                            <span>Procedural Dungeons</span>
+                        </div>
+                        <div class="feature-item">
+                            <i class="bi bi-lightning-charge"></i>
+                            <span>Real-time Combat</span>
+                        </div>
+                        <div class="feature-item">
+                            <i class="bi bi-people"></i>
+                            <span>Multiplayer Co-op</span>
+                        </div>
+                        <div class="feature-item">
+                            <i class="bi bi-gem"></i>
+                            <span>Epic Loot</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <footer class="mt-4 small text-secondary">&copy; 2025 Adventure MUD</footer>
+    </div>
+
+    <div class="hero-footer">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-6 text-center text-md-start">
+                    <p class="mb-0 text-muted small">© 2025 Adventure MUD. Built with ❤️ for adventurers.</p>
+                </div>
+                <div class="col-md-6 text-center text-md-end mt-3 mt-md-0">
+                    <a href="#" class="footer-link">Terms</a>
+                    <a href="#" class="footer-link">Privacy</a>
+                    <a href="#" class="footer-link">Support</a>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

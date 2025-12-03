@@ -1,47 +1,299 @@
-/* home.css: Landing page styles extracted from template */
+/* ===================================================================
+   HERO SECTION - Modern Landing Page
+   =================================================================== */
 
-html,
-body {
-    height: 100%;
+:root {
+    --hero-gradient-1: #6366f1;
+    --hero-gradient-2: #8b5cf6;
+    --hero-gradient-3: #ec4899;
 }
 
-/* Hero background for landing */
-.cover-bg {
+.hero-section {
+    position: relative;
     min-height: 100vh;
-    background: linear-gradient(135deg, #3e2723 0%, #a0522d 100%);
-    background-color: #4b2e05;
-    /* fallback color */
-    background-blend-mode: multiply;
-    color: #fff3e0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: linear-gradient(135deg, #0a0e27 0%, #141937 50%, #1a1f3a 100%);
+}
+
+/* Animated gradient overlay */
+.hero-gradient {
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 20% 50%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 80% 50%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 50% 80%, rgba(236, 72, 153, 0.1) 0%, transparent 50%);
+    animation: gradientShift 15s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes gradientShift {
+    0%, 100% { opacity: 0.8; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.05); }
+}
+
+/* Subtle grid pattern */
+.hero-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(99, 102, 241, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99, 102, 241, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+    mask-image: radial-gradient(ellipse at center, black 20%, transparent 70%);
+    pointer-events: none;
+}
+
+/* Main content container */
+.hero-container {
+    position: relative;
+    z-index: 10;
+    flex: 1;
     display: flex;
     align-items: center;
-    justify-content: center;
+    padding: 3rem 1rem;
 }
 
-/* Central container */
-.cover-container {
-    max-width: 42em;
-    padding: 2rem 2.5rem;
-    background: rgba(40, 20, 5, 0.92);
-    border-radius: 1.5rem;
-    box-shadow: 0 0 32px 0 #000a;
+.hero-content {
     text-align: center;
+    animation: fadeInUp 0.8s ease-out;
 }
 
-/* Title & lead copy */
-.cover-title {
-    font-family: 'Cinzel', serif;
-    font-size: 3rem;
-    letter-spacing: 0.05em;
-    color: #ffb74d;
-    /* aligns with footer accent */
-    text-shadow: 0 2px 8px #000a;
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-.cover-lead {
-    font-size: 1.3rem;
-    color: #ffe0b2;
-    margin-bottom: 2rem;
+/* Badge */
+.hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: 2rem;
+    color: #a5b4fc;
+    font-size: 0.875rem;
+    font-weight: 500;
+    letter-spacing: 0.025em;
+    animation: fadeInUp 0.8s ease-out 0.1s backwards;
 }
 
-/* Buttons row */
+.hero-badge i {
+    color: #6366f1;
+    font-size: 1rem;
+}
+
+/* Title */
+.hero-title {
+    font-size: clamp(2.5rem, 6vw, 4.5rem);
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 1.5rem;
+    color: #ffffff;
+    letter-spacing: -0.02em;
+    animation: fadeInUp 0.8s ease-out 0.2s backwards;
+}
+
+.gradient-text {
+    background: linear-gradient(135deg, var(--hero-gradient-1), var(--hero-gradient-2), var(--hero-gradient-3));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    background-size: 200% auto;
+    animation: shimmer 3s linear infinite;
+}
+
+@keyframes shimmer {
+    to {
+        background-position: 200% center;
+    }
+}
+
+/* Description */
+.hero-description {
+    font-size: clamp(1rem, 2vw, 1.25rem);
+    line-height: 1.7;
+    color: #94a3b8;
+    max-width: 48rem;
+    margin: 0 auto 2.5rem;
+    animation: fadeInUp 0.8s ease-out 0.3s backwards;
+}
+
+/* Action buttons */
+.hero-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 3rem;
+    animation: fadeInUp 0.8s ease-out 0.4s backwards;
+}
+
+.btn-hero-primary {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.875rem 2rem;
+    font-size: 1rem;
+    font-weight: 600;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    border: none;
+    border-radius: 0.75rem;
+    box-shadow:
+        0 4px 14px rgba(99, 102, 241, 0.4),
+        0 0 0 1px rgba(99, 102, 241, 0.1) inset;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-decoration: none;
+}
+
+.btn-hero-primary:hover {
+    transform: translateY(-2px);
+    box-shadow:
+        0 8px 24px rgba(99, 102, 241, 0.5),
+        0 0 0 1px rgba(99, 102, 241, 0.2) inset;
+    color: white;
+}
+
+.btn-hero-primary:active {
+    transform: translateY(0);
+}
+
+.btn-hero-secondary {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.875rem 2rem;
+    font-size: 1rem;
+    font-weight: 600;
+    background: rgba(99, 102, 241, 0.1);
+    color: #a5b4fc;
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: 0.75rem;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-decoration: none;
+}
+
+.btn-hero-secondary:hover {
+    background: rgba(99, 102, 241, 0.15);
+    border-color: rgba(99, 102, 241, 0.3);
+    transform: translateY(-2px);
+    color: #c7d2fe;
+}
+
+.btn-hero-secondary:active {
+    transform: translateY(0);
+}
+
+/* Feature highlights */
+.hero-features {
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    animation: fadeInUp 0.8s ease-out 0.5s backwards;
+}
+
+.feature-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #64748b;
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid rgba(51, 65, 85, 0.5);
+    border-radius: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.feature-item:hover {
+    color: #94a3b8;
+    border-color: rgba(99, 102, 241, 0.3);
+    background: rgba(99, 102, 241, 0.05);
+}
+
+.feature-item i {
+    color: #6366f1;
+    font-size: 1.125rem;
+}
+
+/* Footer */
+.hero-footer {
+    position: relative;
+    z-index: 10;
+    padding: 2rem 0;
+    border-top: 1px solid rgba(51, 65, 85, 0.3);
+    background: rgba(10, 14, 39, 0.6);
+    backdrop-filter: blur(10px);
+}
+
+.footer-link {
+    color: #64748b;
+    text-decoration: none;
+    font-size: 0.875rem;
+    margin-left: 1.5rem;
+    transition: color 0.2s ease;
+}
+
+.footer-link:hover {
+    color: #a5b4fc;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .hero-container {
+        padding: 2rem 1rem;
+    }
+
+    .hero-title {
+        margin-bottom: 1rem;
+    }
+
+    .hero-description {
+        margin-bottom: 2rem;
+    }
+
+    .hero-actions {
+        flex-direction: column;
+        align-items: stretch;
+        margin-bottom: 2rem;
+    }
+
+    .btn-hero-primary,
+    .btn-hero-secondary {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .hero-features {
+        gap: 1rem;
+    }
+
+    .feature-item {
+        font-size: 0.75rem;
+        padding: 0.375rem 0.75rem;
+    }
+}
+
+/* Remove default body margins/padding for landing page */
+body.landing-page {
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+}
+
+body.landing-page .hero-section {
+    margin: 0;
+    padding: 0;
+}

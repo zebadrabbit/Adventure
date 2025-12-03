@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Account Settings{% endblock %}
+
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="{{ asset_url('css/glass-theme.css') }}">
+<style>
+    body {
+        background: linear-gradient(135deg, #4c5270 0%, #5a3a52 100%);
+        background-attachment: fixed;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="settings-container">
+    <h1 class="settings-title">Account Settings</h1>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-messages">
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <div class="settings-grid">
+        <!-- Email Settings -->
+        <div class="settings-card">
+            <h2 class="card-title">Email Address</h2>
+            <form method="POST" action="{{ url_for('account.settings') }}" class="settings-form">
+                <div class="form-group">
+                    <label for="current_email" class="form-label">Current Email</label>
+                    <input type="email" id="current_email" class="form-input"
+                        value="{{ current_user.email or 'Not set' }}" disabled>
+                </div>
+
+                <div class="form-group">
+                    <label for="new_email" class="form-label">New Email</label>
+                    <input type="email" id="new_email" name="new_email" class="form-input"
+                        placeholder="Enter new email address" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirm_email" class="form-label">Confirm Email</label>
+                    <input type="email" id="confirm_email" name="confirm_email" class="form-input"
+                        placeholder="Confirm new email address" required>
+                </div>
+
+                <button type="submit" class="btn-primary">Update Email</button>
+            </form>
+        </div>
+
+        <!-- Password Settings -->
+        <div class="settings-card">
+            <h2 class="card-title">Change Password</h2>
+            <form method="POST" action="{{ url_for('account.settings') }}" class="settings-form">
+                <div class="form-group">
+                    <label for="current_password" class="form-label">Current Password</label>
+                    <input type="password" id="current_password" name="current_password" class="form-input"
+                        placeholder="Enter current password" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="new_password" class="form-label">New Password</label>
+                    <input type="password" id="new_password" name="new_password" class="form-input"
+                        placeholder="Enter new password" required minlength="6">
+                </div>
+
+                <div class="form-group">
+                    <label for="confirm_password" class="form-label">Confirm Password</label>
+                    <input type="password" id="confirm_password" name="confirm_password" class="form-input"
+                        placeholder="Confirm new password" required>
+                </div>
+
+                <button type="submit" class="btn-primary">Change Password</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -105,14 +105,16 @@ try:  # pragma: no cover - lightweight, defensive
 
     @event.listens_for(Engine, "connect")
     def _set_sqlite_pragma(dbapi_connection, connection_record):  # noqa: D401
-        try:
-            cursor = dbapi_connection.cursor()
-            cursor.execute("PRAGMA journal_mode=WAL")
-            cursor.execute("PRAGMA synchronous=NORMAL")
-            cursor.execute("PRAGMA busy_timeout=10000")  # 10 seconds
-            cursor.close()
-        except Exception:
-            pass
+        # Only apply PRAGMA commands to SQLite connections
+        if hasattr(dbapi_connection, "cursor") and "sqlite" in str(type(dbapi_connection)).lower():
+            try:
+                cursor = dbapi_connection.cursor()
+                cursor.execute("PRAGMA journal_mode=WAL")
+                cursor.execute("PRAGMA synchronous=NORMAL")
+                cursor.execute("PRAGMA busy_timeout=10000")  # 10 seconds
+                cursor.close()
+            except Exception:
+                pass
 
 except Exception:
     pass
@@ -135,6 +137,8 @@ from app.routes.loot_api import bp_loot  # noqa: E402  # isort: skip
 from app.routes.seed_api import bp_seed  # noqa: E402  # isort: skip
 from app.routes.user_prefs import bp_user_prefs  # noqa: E402  # isort: skip
 from app.routes.client_log_api import bp_client_log  # noqa: E402  # isort: skip
+from app.routes.account import bp_account  # noqa: E402  # isort: skip
+from app.routes.theme_api import bp_theme  # noqa: E402  # isort: skip
 
 app.register_blueprint(auth.bp)
 app.register_blueprint(main.bp)
@@ -148,6 +152,8 @@ app.register_blueprint(bp_user_prefs)
 app.register_blueprint(bp_admin)
 app.register_blueprint(bp_combat)
 app.register_blueprint(bp_client_log)
+app.register_blueprint(bp_account)
+app.register_blueprint(bp_theme)
 
 _DEFAULT_LIMIT = 120  # requests
 _DEFAULT_WINDOW = 60  # seconds

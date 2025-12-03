@@ -43,4 +43,3 @@ locked-chest.svg           # TREASURE hidden cache (revealed & lootable)
 # --- RESERVED FUTURE ICONS ---
 # Add here before using them in code so they survive a prune.
 # reserved-example.svg      # RESERVED placeholder example
-

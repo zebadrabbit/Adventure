@@ -1,0 +1,874 @@
+/* Glass Theme - Purple Gradient with Glass-morphism Design System */
+/* Consolidated from dashboard.html, profile.html, settings.html, and admin_themes.html */
+
+/* ========================================
+   PURPLE GRADIENT BACKGROUNDS
+   ======================================== */
+
+.theme-purple-gradient body,
+body.purple-gradient {
+    background: linear-gradient(135deg, #4c5270 0%, #5a3a52 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+    color: #fff;
+}
+
+/* ========================================
+   GLASS-MORPHISM CARDS
+   ======================================== */
+
+.glass-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.45);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.card-header-glass {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(217, 70, 239, 0.3));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 1rem 1.5rem;
+    border-radius: 16px 16px 0 0;
+}
+
+.card-header-glass h5,
+.card-header-glass h4,
+.card-header-glass h3 {
+    color: #fff;
+    font-weight: 600;
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+/* ========================================
+   FORM CONTROLS
+   ======================================== */
+
+.form-control-glass {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    transition: all 0.3s ease;
+}
+
+.form-control-glass::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.form-control-glass:focus {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: #a78bfa;
+    box-shadow: 0 0 0 0.25rem rgba(167, 139, 250, 0.25);
+    color: #fff;
+    outline: 0;
+}
+
+.form-select-glass {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    transition: all 0.3s ease;
+}
+
+.form-select-glass:focus {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: #a78bfa;
+    box-shadow: 0 0 0 0.25rem rgba(167, 139, 250, 0.25);
+    color: #fff;
+    outline: 0;
+}
+
+.form-select-glass option {
+    background: #4c1d95;
+    color: #fff;
+}
+
+/* ========================================
+   BUTTONS - GLASS VARIANTS
+   ======================================== */
+
+.btn-glass {
+    background: linear-gradient(135deg, #8b5cf6, #d946ef);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+}
+
+.btn-glass:hover {
+    background: linear-gradient(135deg, #7c3aed, #c026d3);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(139, 92, 246, 0.6);
+    color: #fff;
+}
+
+.btn-glass-secondary {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-glass-secondary:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: #fff;
+}
+
+/* Input group button fixes */
+.input-group .btn-glass-secondary {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-left: none;
+}
+
+.input-group .form-control-glass {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.btn-glass-danger {
+    background: rgba(239, 68, 68, 0.3);
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    color: #fff;
+    font-weight: 500;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-glass-danger:hover {
+    background: rgba(239, 68, 68, 0.5);
+    border-color: rgba(239, 68, 68, 0.7);
+    color: #fff;
+}
+
+.btn-outline-warning {
+    background: rgba(234, 179, 8, 0.2);
+    border: 1px solid rgba(234, 179, 8, 0.5);
+    color: #fff;
+}
+
+.btn-outline-warning:hover {
+    background: rgba(234, 179, 8, 0.4);
+    border-color: rgba(234, 179, 8, 0.7);
+    color: #fff;
+}
+
+.btn-outline-danger {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    color: #fff;
+}
+
+.btn-outline-danger:hover {
+    background: rgba(239, 68, 68, 0.4);
+    border-color: rgba(239, 68, 68, 0.7);
+    color: #fff;
+}
+
+/* ========================================
+   CHARACTER CARDS
+   ======================================== */
+
+.character-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    transition: all 0.3s ease;
+}
+
+.character-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(139, 92, 246, 0.4);
+    border-color: rgba(167, 139, 250, 0.5);
+}
+
+.character-card .card-header {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(139, 92, 246, 0.3));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    padding: 1rem;
+    border-radius: 16px 16px 0 0;
+}
+
+.character-card .card-body {
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    padding: 1.5rem;
+}
+
+.character-card .card-footer {
+    background: rgba(255, 255, 255, 0.05);
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 1rem;
+    border-radius: 0 0 16px 16px;
+}
+
+.character-item {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.character-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.3);
+    border-color: rgba(167, 139, 250, 0.4);
+}
+
+/* ========================================
+   CLASS BADGES
+   ======================================== */
+
+.class-badge {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.6), rgba(217, 70, 239, 0.6));
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 0.35rem 0.75rem;
+    font-weight: 600;
+    font-size: 0.75rem;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.fighter-badge {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.6), rgba(220, 38, 38, 0.6));
+}
+
+.mage-badge {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.6), rgba(37, 99, 235, 0.6));
+}
+
+.rogue-badge {
+    background: linear-gradient(135deg, rgba(234, 179, 8, 0.6), rgba(202, 138, 4, 0.6));
+}
+
+.cleric-badge {
+    background: linear-gradient(135deg, rgba(236, 252, 203, 0.6), rgba(190, 242, 100, 0.6));
+    color: #1f2937;
+}
+
+.ranger-badge {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.6), rgba(22, 163, 74, 0.6));
+}
+
+.druid-badge {
+    background: linear-gradient(135deg, rgba(132, 204, 22, 0.6), rgba(101, 163, 13, 0.6));
+}
+
+/* ========================================
+   STAT COMPONENTS
+   ======================================== */
+
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+}
+
+.stat-grid>div {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.5rem;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
+}
+
+.stat-grid>div:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(167, 139, 250, 0.3);
+}
+
+.stat-card {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(167, 139, 250, 0.3);
+    transform: translateY(-2px);
+}
+
+.stat-card h3 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0.5rem 0;
+}
+
+.stat-card p {
+    color: rgba(255, 255, 255, 0.8);
+    margin: 0;
+    font-size: 0.875rem;
+}
+
+/* Stat card icon/content layout (for admin dashboard) */
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+    flex-shrink: 0;
+}
+
+.stat-content {
+    flex: 1;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.6);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.25rem;
+}
+
+.stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: white;
+    margin: 0;
+}
+
+/* ========================================
+   PARTY & TEAM COMPONENTS
+   ======================================== */
+
+.party-counter {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(217, 70, 239, 0.4));
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.party-counter h3 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0;
+}
+
+.party-counter p {
+    color: rgba(255, 255, 255, 0.8);
+    margin: 0.5rem 0 0;
+    font-size: 0.875rem;
+}
+
+#party-table {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    min-height: 100px;
+}
+
+#party-table .party-member-row {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.2s ease;
+}
+
+#party-table .party-member-row:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(167, 139, 250, 0.4);
+}
+
+/* ========================================
+   WIDGETS
+   ======================================== */
+
+.seed-widget {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 1rem;
+}
+
+.seed-widget label {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.seed-widget input {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
+    border-radius: 6px;
+}
+
+.seed-widget input:focus {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: #a78bfa;
+    box-shadow: 0 0 0 0.25rem rgba(167, 139, 250, 0.25);
+    color: #fff;
+}
+
+.time-widget {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(139, 92, 246, 0.3));
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 1rem;
+    border-radius: 12px;
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.time-widget h6 {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.time-widget #time-tick-display {
+    color: #fff;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+/* ========================================
+   ALERTS
+   ======================================== */
+
+.alert-glass {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    color: #fff;
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+}
+
+/* ========================================
+   UTILITY STYLES
+   ======================================== */
+
+.coin-gold {
+    color: #fbbf24;
+    font-weight: 600;
+}
+
+.coin-silver {
+    color: #d1d5db;
+    font-weight: 600;
+}
+
+.coin-copper {
+    color: #d97706;
+    font-weight: 600;
+}
+
+.list-reset {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.list-reset li {
+    padding: 0.5rem;
+    margin-bottom: 0.25rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
+}
+
+.list-reset li:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(167, 139, 250, 0.3);
+}
+
+.icon-glow {
+    filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.6));
+}
+
+/* ========================================
+   TEXT OVERRIDES
+   ======================================== */
+
+.text-light {
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.text-muted {
+    color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.text-warning {
+    color: #fbbf24 !important;
+}
+
+.text-uppercase {
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    font-size: 0.75rem;
+}
+
+/* ========================================
+   BADGE OVERRIDES
+   ======================================== */
+
+.badge.bg-info {
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.6), rgba(6, 182, 212, 0.6)) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 0.35rem 0.75rem;
+    font-weight: 600;
+}
+
+/* ========================================
+   FORM CHECK OVERRIDES
+   ======================================== */
+
+.form-check-input {
+    background-color: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.form-check-input:checked {
+    background-color: #8b5cf6;
+    border-color: #a78bfa;
+}
+
+.form-check-input:focus {
+    border-color: #a78bfa;
+    box-shadow: 0 0 0 0.25rem rgba(167, 139, 250, 0.25);
+}
+
+.form-check-label {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* ========================================
+   LAYOUT CONTAINERS
+   ======================================== */
+
+.profile-container,
+.settings-container,
+.theme-manager-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1.5rem;
+}
+
+.section-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.section-card h3 {
+    color: #fff;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid rgba(139, 92, 246, 0.3);
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+
+@media (max-width: 768px) {
+
+    .glass-card,
+    .character-card {
+        margin-bottom: 1rem;
+    }
+
+    .party-counter h3 {
+        font-size: 1.5rem;
+    }
+
+    .stat-card h3 {
+        font-size: 1.5rem;
+    }
+
+    .profile-container,
+    .settings-container,
+    .theme-manager-container {
+        padding: 1rem;
+    }
+}
+
+/* ========================================
+   MISC
+   ======================================== */
+
+hr {
+    border-color: rgba(255, 255, 255, 0.2);
+    opacity: 1;
+}
+
+/* ========================================
+   ADMIN DASHBOARD COMPONENTS
+   ======================================== */
+
+.admin-section {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    padding: 1.25rem;
+}
+
+.broadcast-log {
+    max-height: 300px;
+    overflow-y: auto;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 0.75rem;
+    font-size: 0.875rem;
+}
+
+.mod-user-list {
+    max-height: 400px;
+    overflow-y: auto;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 0.75rem;
+}
+
+.content-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    transition: all 0.2s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.content-card:hover {
+    border-color: rgba(167, 139, 250, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(139, 92, 246, 0.3);
+}
+
+.content-icon {
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 1rem;
+    background: linear-gradient(135deg, #8b5cf6, #d946ef);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: white;
+}
+
+.content-card h5 {
+    margin-bottom: 0.5rem;
+    color: white;
+}
+
+.content-card p {
+    flex: 1;
+    margin-bottom: 1rem;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.user-item {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
+}
+
+.user-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(167, 139, 250, 0.3);
+}
+
+.user-name {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* ========================================
+   NAVBAR GLASS-MORPHISM
+   ======================================== */
+
+.navbar-dark {
+    background: rgba(255, 255, 255, 0.1) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.navbar-brand {
+    color: rgba(255, 255, 255, 0.95) !important;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    transition: color 0.2s ease;
+}
+
+.navbar-brand:hover {
+    color: #fff !important;
+}
+
+.nav-link {
+    color: rgba(255, 255, 255, 0.85) !important;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.nav-link:hover,
+.nav-link.active {
+    color: rgba(167, 139, 250, 1) !important;
+}
+
+.navbar-toggler {
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.navbar-toggler-icon {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(255, 255, 255, 0.85)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+}
+
+.dropdown-menu {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.dropdown-item {
+    color: rgba(255, 255, 255, 0.9);
+    transition: all 0.2s ease;
+}
+
+.dropdown-item:hover {
+    background: rgba(167, 139, 250, 0.3);
+    color: #fff;
+}
+
+.dropdown-header {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.dropdown-divider {
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.avatar-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #8b5cf6, #d946ef);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    color: white;
+}
+
+/* ========================================
+   FOOTER GLASS-MORPHISM
+   ======================================== */
+
+.footer-dark {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.footer-dark .brand {
+    color: rgba(167, 139, 250, 1);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.footer-dark a {
+    color: rgba(255, 255, 255, 0.8);
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.footer-dark a:hover {
+    color: rgba(167, 139, 250, 1);
+}
+
+.footer-dark .section-title {
+    color: rgba(255, 255, 255, 0.95);
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+}
+
+.footer-dark .text-muted {
+    color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.footer-dark .tiny {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.footer-social a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.2s ease;
+}
+
+.footer-social a:hover {
+    background: rgba(167, 139, 250, 0.3);
+    border-color: rgba(167, 139, 250, 0.5);
+    transform: translateY(-2px);
+}

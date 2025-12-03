@@ -19,6 +19,8 @@ import random
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+import structlog
+
 from app import db, socketio
 from app.models.models import Character, CombatSession
 
@@ -52,6 +54,8 @@ from .monster_ai import select_action
 from .status_effects import apply_start_of_turn, can_act
 from .time_service import set_combat_state
 
+logger = structlog.get_logger()
+
 
 def _now():
     return datetime.utcnow()
@@ -65,7 +69,8 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
         raw = _json.loads(char.stats) if char.stats else {}
         if isinstance(raw, dict):
             base = raw
-    except Exception:
+    except Exception as e:
+        logger.warning("Failed to parse character stats", char_id=char.id, exc_info=e)
         base = {}
     level = getattr(char, "level", 1) or 1
     STR = int(base.get("str", base.get("STR", 10)) or 10)
@@ -81,7 +86,8 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
     mana_source = base.get("current_mana", base.get("mana", mana_max))
     try:
         mana = int(mana_source)
-    except Exception:
+    except Exception as e:
+        logger.warning("Failed to parse mana value", char_id=char.id, mana_source=mana_source, exc_info=e)
         mana = mana_max
     mana = max(0, min(mana, mana_max))
     return {
@@ -138,9 +144,11 @@ def _base_player_snapshot(user_id: int) -> Dict[str, Any]:
                     elif isinstance(entry, dict) and entry.get("slug") == "potion-healing":
                         try:
                             potion_count += int(entry.get("qty", 1))
-                        except Exception:
+                        except Exception as e:
+                            logger.warning("Failed to parse potion quantity", entry=entry, exc_info=e)
                             potion_count += 1
-    except Exception:
+    except Exception as e:
+        logger.warning("Failed to parse inventory", char_id=first_char.id if first_char else None, exc_info=e)
         potion_count = potion_count or 0
     return {"members": members, "item_counts": {"potion-healing": potion_count}}
 

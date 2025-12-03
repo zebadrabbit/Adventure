@@ -1,0 +1,84 @@
+<h5 class="mb-3"><i class="bi bi-cloud-fog2 me-2"></i>Fog & Visibility Management</h5>
+<p class="text-muted mb-3">View and manage persisted explored tiles (server + localStorage). Use with caution.</p>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-6">
+        <div class="d-flex flex-wrap gap-2">
+            <button id="fog-admin-dump" class="btn btn-sm btn-outline-info">
+                <i class="bi bi-terminal me-1"></i>Dump Coverage
+            </button>
+            <button id="fog-admin-force-sync" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-arrow-repeat me-1"></i>Force Sync
+            </button>
+            <button id="fog-admin-clear-local" class="btn btn-sm btn-outline-warning">
+                <i class="bi bi-trash me-1"></i>Clear Local
+            </button>
+            <button id="fog-admin-clear-server" class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-trash3 me-1"></i>Clear Server
+            </button>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="fog-stats">
+            <div class="mb-2">
+                <span class="text-muted">Server Tiles:</span>
+                <strong id="fog-admin-server-count" class="ms-2">-</strong>
+            </div>
+            <div>
+                <span class="text-muted">Local Tiles:</span>
+                <strong id="fog-admin-local-count" class="ms-2">-</strong>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mb-3">
+    <h6 class="mb-2">Per-Seed Metrics</h6>
+    <div class="table-responsive">
+        <table class="table table-sm table-dark align-middle" id="fog-admin-metrics-table">
+            <thead>
+                <tr>
+                    <th>Seed</th>
+                    <th>Tiles</th>
+                    <th>Saved %</th>
+                    <th>Raw Size</th>
+                    <th>Stored</th>
+                    <th>Updated</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="7" class="text-muted text-center">(loading)</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="text-muted small" id="fog-admin-metrics-totals"></div>
+</div>
+
+<div class="mb-3">
+    <h6 class="mb-2">Fog Configuration</h6>
+    <pre class="fog-config-display" id="fog-admin-config">(loading...)</pre>
+</div>
+
+<style>
+    .fog-stats {
+        background: rgba(10, 14, 39, 0.4);
+        border: 1px solid rgba(99, 102, 241, 0.15);
+        border-radius: 8px;
+        padding: 1rem;
+    }
+
+    .fog-config-display {
+        background: rgba(10, 14, 39, 0.6);
+        border: 1px solid rgba(99, 102, 241, 0.15);
+        border-radius: 8px;
+        padding: 1rem;
+        font-size: 0.85rem;
+        color: #c7d2fe;
+        margin: 0;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+</style>

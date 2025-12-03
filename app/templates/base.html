@@ -6,7 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Adventure!{% endblock %}</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
-  <link rel="stylesheet" href="{{ asset_url('app.css') }}">
+  <link rel="stylesheet" href="{{ asset_url('css/base.css') }}">
+  <link rel="stylesheet" href="/api/admin/themes/active/css">
+  <link rel="stylesheet" href="{{ asset_url('css/app.css') }}">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
   <!-- footer.css & utilities.css merged into app.css -->
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='iconography/treasure-map.svg') }}">
@@ -70,15 +72,21 @@
               <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
                 <li><a class="dropdown-item" href="{{ url_for('dashboard.dashboard') }}"><i
                       class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
-                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#accountModal"><i
-                      class="bi bi-person-gear me-2"></i>Account & Settings</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('account.profile') }}"><i
+                      class="bi bi-person-circle me-2"></i>Profile</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('account.settings') }}"><i
+                      class="bi bi-person-gear me-2"></i>Settings</a></li>
                 {% if user_role == 'admin' %}
-                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#serverSettingsModal"><i
-                      class="bi bi-gear-wide-connected me-2"></i>Server Settings</a></li>
-                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#fogAdminModal"><i
-                      class="bi bi-cloud-fog2 me-2"></i>Fog & Visibility</a></li>
+                <li>
+                  <hr class="dropdown-divider">
+                </li>
+                <li>
+                  <h6 class="dropdown-header">Admin Tools</h6>
+                </li>
                 <li><a class="dropdown-item" href="{{ url_for('admin.dashboard') }}"><i
-                      class="bi bi-shield-lock me-2"></i>Admin Panel</a></li>
+                      class="bi bi-shield-lock me-2"></i>Admin Dashboard</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('admin.themes') }}"><i
+                      class="bi bi-palette me-2"></i>Themes</a></li>
                 {% endif %}
                 <li>
                   <hr class="dropdown-divider">
@@ -120,15 +128,6 @@
     integrity="sha384-2huaZvOR9iDzHqslqwpR87isEmrfxqyWOF7hr7BY6KG0+hVKLoEXMPUJw3ynWuhO"
     crossorigin="anonymous"></script>
   {% block scripts %}{% endblock %}
-  {% if current_user.is_authenticated %}
-  {% include 'partials/account_modal.html' %}
-  {% set user_role = (current_user.role if current_user.is_authenticated else 'user')|default('user', true) %}
-  {% if user_role == 'admin' %}
-  {% include 'partials/server_settings_modal.html' %}
-  {% include 'partials/fog_admin_modal.html' %}
-  <script src="{{ url_for('static', filename='js/fog_admin_modal.js') }}" defer></script>
-  {% endif %}
-  {% endif %}
 </body>
 
 </html>

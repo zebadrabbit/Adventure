@@ -1,48 +1,318 @@
 {% extends 'admin_base.html' %}
 {% block admin_content %}
-<div class="row g-4">
+
+{# Quick Stats Row #}
+<div class="row g-3 mb-4">
     <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body d-flex flex-column">
-                <h5 class="card-title">Users</h5>
-                <p class="flex-grow-1 small text-muted">Manage accounts, roles and bans.</p>
-                <a href="{{ url_for('admin.dashboard') }}#users" class="btn btn-sm btn-outline-primary mt-auto disabled"
-                    title="Coming soon">Open</a>
+        <div class="stat-card">
+            <div class="stat-icon bg-primary">
+                <i class="bi bi-people"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Total Users</div>
+                <div class="stat-value" data-stat="total">-</div>
             </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body d-flex flex-column">
-                <h5 class="card-title">Game Config</h5>
-                <p class="flex-grow-1 small text-muted">Tunable gameplay constants.</p>
-                <a href="{{ url_for('admin.dashboard') }}#config"
-                    class="btn btn-sm btn-outline-primary mt-auto disabled" title="Coming soon">Open</a>
+        <div class="stat-card">
+            <div class="stat-icon bg-success">
+                <i class="bi bi-person-check"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Online Now</div>
+                <div class="stat-value" data-stat="authenticated">-</div>
             </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body d-flex flex-column">
-                <h5 class="card-title">Items</h5>
-                <p class="flex-grow-1 small text-muted">Browse & import catalog items via CSV.</p>
-                <a href="{{ url_for('admin.dashboard') }}#items" class="btn btn-sm btn-outline-primary mt-auto disabled"
-                    title="Coming soon">Open</a>
+        <div class="stat-card">
+            <div class="stat-icon bg-info">
+                <i class="bi bi-controller"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Active Games</div>
+                <div class="stat-value" data-stat="rooms_tracked">-</div>
             </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body d-flex flex-column">
-                <h5 class="card-title">Monsters</h5>
-                <p class="flex-grow-1 small text-muted">Browse & import monster catalog via CSV.</p>
-                <a href="{{ url_for('admin.dashboard') }}#monsters"
-                    class="btn btn-sm btn-outline-primary mt-auto disabled" title="Coming soon">Open</a>
+        <div class="stat-card">
+            <div class="stat-icon bg-warning">
+                <i class="bi bi-clock"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Uptime</div>
+                <div class="stat-value" id="uptime-display">-</div>
             </div>
         </div>
     </div>
 </div>
-<hr class="my-4" />
-<p class="text-muted small mb-0">CSV import endpoints will appear here once implemented. This scaffold ensures
-    navigation & RBAC prior to wiring logic.</p>
+
+{# Main Content Tabs #}
+<div class="card">
+    <div class="card-header">
+        <ul class="nav nav-tabs card-header-tabs" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-server" type="button">
+                    <i class="bi bi-gear-wide-connected me-2"></i>Server
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-moderation" type="button">
+                    <i class="bi bi-shield-lock me-2"></i>Moderation
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-fog" type="button">
+                    <i class="bi bi-cloud-fog2 me-2"></i>Fog & Visibility
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-content" type="button">
+                    <i class="bi bi-box-seam me-2"></i>Content
+                </button>
+            </li>
+        </ul>
+    </div>
+    <div class="card-body">
+        <div class="tab-content">
+            {# Server Tab #}
+            <div class="tab-pane fade show active" id="tab-server">
+                <div class="row g-4">
+                    <div class="col-md-4">
+                        <div class="admin-section">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="mb-0"><i class="bi bi-people me-2"></i>Online Users</h5>
+                                <button class="btn btn-sm btn-outline-secondary" id="admin-refresh-status"
+                                    title="Refresh">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                </button>
+                            </div>
+                            <ul id="online-users" class="list-unstyled small mb-3"></ul>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">Auto Refresh</span>
+                                <select id="admin-refresh-interval" class="form-select">
+                                    <option value="20000" selected>20s</option>
+                                    <option value="10000">10s</option>
+                                    <option value="60000">60s</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="admin-section mt-3">
+                            <h6 class="mb-2"><i class="bi bi-speedometer me-2"></i>Performance</h6>
+                            <ul class="list-unstyled small mb-0">
+                                <li class="d-flex justify-content-between mb-1">
+                                    <span class="text-muted">Avg Dungeon Gen:</span>
+                                    <span data-stat="avg_dungeon_runtime_ms">-</span>ms
+                                </li>
+                                <li class="d-flex justify-content-between mb-1">
+                                    <span class="text-muted">Admins Online:</span>
+                                    <span data-stat="admins">-</span>
+                                </li>
+                                <li class="d-flex justify-content-between mb-1">
+                                    <span class="text-muted">Moderators:</span>
+                                    <span data-stat="mods">-</span>
+                                </li>
+                                <li class="d-flex justify-content-between mb-1">
+                                    <span class="text-muted">Banned Users:</span>
+                                    <span data-stat="banned">-</span>
+                                </li>
+                                <li class="d-flex justify-content-between">
+                                    <span class="text-muted">Muted Users:</span>
+                                    <span data-stat="muted">-</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="admin-section mt-3">
+                            <h6 class="mb-2"><i class="bi bi-joystick me-2"></i>Active Games</h6>
+                            <ul id="admin-active-games" class="list-unstyled small mb-0"></ul>
+                        </div>
+                    </div>
+
+                    <div class="col-md-8">
+                        <div class="admin-section">
+                            <h5 class="mb-3"><i class="bi bi-megaphone me-2"></i>Admin Broadcast</h5>
+                            <form id="admin-broadcast-form" autocomplete="off">
+                                <div class="row g-2 mb-3">
+                                    <div class="col-sm-4">
+                                        <select id="broadcast-target" class="form-select">
+                                            <option value="global">Global (everyone)</option>
+                                            <option value="admins">Admins</option>
+                                            <option value="mods">Moderators</option>
+                                            <option value="users">Normal Users</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-sm-8">
+                                        <div class="input-group">
+                                            <input type="text" id="broadcast-message" class="form-control"
+                                                placeholder="Type message..." maxlength="200" required>
+                                            <button class="btn btn-primary" type="submit">
+                                                <i class="bi bi-send"></i> Send
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                            <div class="broadcast-log" id="admin-broadcast-log"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {# Moderation Tab #}
+            <div class="tab-pane fade" id="tab-moderation">
+                <div class="admin-section">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i>User Moderation</h5>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-sm btn-outline-secondary active"
+                                data-mod-filter="all">All</button>
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                data-mod-filter="banned">Banned</button>
+                            <button type="button" class="btn btn-sm btn-outline-warning"
+                                data-mod-filter="muted">Muted</button>
+                        </div>
+                    </div>
+                    <div class="input-group mb-3">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" id="mod-search" class="form-control" placeholder="Search users..."
+                            maxlength="40">
+                    </div>
+                    <div class="mod-user-list" id="mod-list-wrapper">
+                        <ul class="list-unstyled mb-0" id="mod-user-list"></ul>
+                    </div>
+                    <div class="text-muted small mt-3">
+                        <i class="bi bi-info-circle me-1"></i>Actions update instantly; persistent flags sync on next
+                        connect.
+                    </div>
+                </div>
+            </div>
+
+            {# Fog Tab #}
+            <div class="tab-pane fade" id="tab-fog">
+                <div class="admin-section">
+                    {% include 'partials/fog_admin_content.html' %}
+                </div>
+            </div>
+
+            {# Content Tab #}
+            <div class="tab-pane fade" id="tab-content">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="content-card">
+                            <div class="content-icon">
+                                <i class="bi bi-gem"></i>
+                            </div>
+                            <h5>Items</h5>
+                            <p class="text-muted">Browse & import catalog items via CSV.</p>
+                            <a href="{{ url_for('admin.items') }}" class="btn btn-outline-primary btn-sm">
+                                Manage Items <i class="bi bi-arrow-right ms-2"></i>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="content-card">
+                            <div class="content-icon">
+                                <i class="bi bi-bug"></i>
+                            </div>
+                            <h5>Monsters</h5>
+                            <p class="text-muted">Browse & import monster catalog via CSV.</p>
+                            <a href="{{ url_for('admin.monsters') }}" class="btn btn-outline-primary btn-sm">
+                                Manage Monsters <i class="bi bi-arrow-right ms-2"></i>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="content-card">
+                            <div class="content-icon">
+                                <i class="bi bi-people"></i>
+                            </div>
+                            <h5>Users</h5>
+                            <p class="text-muted">Manage accounts, roles and permissions.</p>
+                            <a href="{{ url_for('admin.users') }}" class="btn btn-outline-primary btn-sm">
+                                Manage Users <i class="bi bi-arrow-right ms-2"></i>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="content-card">
+                            <div class="content-icon">
+                                <i class="bi bi-sliders"></i>
+                            </div>
+                            <h5>Game Config</h5>
+                            <p class="text-muted">Tunable gameplay constants and settings.</p>
+                            <a href="{{ url_for('admin.game_config') }}" class="btn btn-outline-primary btn-sm">
+                                Configure Game <i class="bi bi-arrow-right ms-2"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Templates for dynamic content -->
+<template id="user-list-item-template">
+    <li class="user-item d-flex align-items-center justify-content-between py-2 px-3 mb-2" data-user-id="">
+        <span class="user-name" data-field="username"></span>
+        <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-primary btn-sm" data-action="message" title="Message">
+                <i class="bi bi-chat"></i>
+            </button>
+            <button class="btn btn-outline-warning btn-sm" data-action="kick" title="Kick">
+                <i class="bi bi-box-arrow-right"></i>
+            </button>
+            <button class="btn btn-outline-danger btn-sm" data-action="ban" title="Ban">
+                <i class="bi bi-slash-circle"></i>
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" data-action="mute" title="Mute">
+                <i class="bi bi-mic-mute"></i>
+            </button>
+        </div>
+    </li>
+</template>
+
+<template id="banned-user-item-template">
+    <li class="user-item d-flex align-items-center justify-content-between py-2 px-3 mb-2" data-user-id="">
+        <span class="user-name text-danger" data-field="username"></span>
+        <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-success btn-sm" data-action="unban" title="Unban">
+                <i class="bi bi-check-circle"></i>
+            </button>
+        </div>
+    </li>
+</template>
+
+<template id="muted-user-item-template">
+    <li class="user-item d-flex align-items-center justify-content-between py-2 px-3 mb-2" data-user-id="">
+        <span class="user-name text-warning" data-field="username"></span>
+        <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-success btn-sm" data-action="unmute" title="Unmute">
+                <i class="bi bi-mic"></i>
+            </button>
+        </div>
+    </li>
+</template>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/admin-settings.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/fog_admin_modal.js') }}" defer></script>
+<script>
+    // Format uptime nicely
+    setInterval(() => {
+        const uptimeSec = parseInt(document.querySelector('[data-stat="uptime_s"]')?.textContent || '0');
+        if (uptimeSec > 0) {
+            const hours = Math.floor(uptimeSec / 3600);
+            const minutes = Math.floor((uptimeSec % 3600) / 60);
+            document.getElementById('uptime-display').textContent = `${hours}h ${minutes}m`;
+        }
+    }, 1000);
+</script>
 {% endblock %}

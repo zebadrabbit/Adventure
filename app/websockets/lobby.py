@@ -6,6 +6,7 @@ Events:
         Emits:   lobby_chat_message { user, message }
 """
 
+import structlog
 from flask import request
 from flask import session as flask_session
 from flask_login import current_user
@@ -19,6 +20,8 @@ from .validation import (
     validate,
 )
 
+logger = structlog.get_logger()
+
 # Track online users by session id
 online = {}
 # Moderation state (in-memory mirrors of persistent user flags)
@@ -29,23 +32,6 @@ _chat_history = {}  # username -> list[timestamp]
 RATE_LIMIT_MAX = 5
 RATE_LIMIT_WINDOW = 10  # seconds
 
-try:
-    from app.logging_utils import get_logger  # type: ignore
-
-    _log = get_logger("lobby")
-except Exception:  # pragma: no cover
-
-    class _Null:
-        def info(self, **k):
-            pass
-
-        def warn(self, **k):
-            pass
-
-        def error(self, **k):
-            pass
-
-    _log = _Null()
 _server_start_time = __import__("time").time()
 # Rolling dungeon generation runtime (ms) captured opportunistically when pipeline runs (optional injection)
 _dungeon_runtime_samples = []  # list of ints (ms)
@@ -57,8 +43,8 @@ def record_dungeon_runtime(ms):  # called from pipeline if desired (non-fatal if
         # cap samples to prevent unbounded growth
         if len(_dungeon_runtime_samples) > 200:
             del _dungeon_runtime_samples[:100]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to record dungeon runtime", ms=ms, exc_info=e)
 
 
 # Lazy import helper for game active rooms to avoid circular import
@@ -78,7 +64,8 @@ def _active_games_snapshot():
         # Sort by room name stable
         games.sort(key=lambda g: g["room"])
         return games
-    except Exception:
+    except Exception as e:
+        logger.warning("Failed to get active games snapshot", exc_info=e)
         return []
 
 
@@ -96,14 +83,16 @@ def _is_admin_entry(entry):
 def _user_role():
     try:
         return getattr(current_user, "role", "user") or "user"
-    except Exception:
+    except Exception as e:
+        logger.warning("Failed to get user role", exc_info=e)
         return "user"
 
 
 def _username():
     try:
         return getattr(current_user, "username", "Anonymous") or "Anonymous"
-    except Exception:
+    except Exception as e:
+        logger.warning("Failed to get username", exc_info=e)
         return "Anonymous"
 
 
@@ -148,7 +137,7 @@ def handle_lobby_chat_message(data):
                 u.muted = True
                 db.session.commit()
                 muted_usernames.add(user)
-                _log.warn(event="auto_mute", user=user, messages=len(hist))
+                logger.warn(event="auto_mute", user=user, messages=len(hist))
                 emit(
                     "admin_notice",
                     {"message": f"User {user} auto-muted for spam."},
@@ -170,7 +159,7 @@ def handle_lobby_chat_message(data):
     if user in muted_usernames:
         return
     emit("lobby_chat_message", {"user": user, "message": message}, room="global")
-    _log.info(event="lobby_chat", user=user, length=len(message))
+    logger.info(event="lobby_chat", user=user, length=len(message))
 
 
 @socketio.on("connect")
@@ -233,7 +222,7 @@ def handle_connect():
             try:
                 disconnect()
             finally:
-                _log.warn(event="reject_banned_connect", user=username)
+                logger.warn(event="reject_banned_connect", user=username)
                 return
         # Determine auth strictly via session presence to avoid leaked test monkeypatch state
         session_uid = flask_session.get("_user_id")
@@ -463,7 +452,7 @@ def handle_admin_direct_message(data):
             and dyn_username
             and dyn_username != entry.get("username")
         ):
-            _log.warn(
+            logger.warn(
                 event="admin_direct_message_denied_username_mismatch",
                 dyn_username=dyn_username,
                 entry_username=entry.get("username"),
@@ -480,7 +469,7 @@ def handle_admin_direct_message(data):
         session_uid_present = False
     if not (entry and entry.get("role") == "admin" and entry.get("is_auth") and session_uid_present):
         try:
-            _log.warn(
+            logger.warn(
                 event="admin_direct_message_denied",
                 reason="not_admin_strict",
                 entry_role=(entry or {}).get("role"),
@@ -493,7 +482,7 @@ def handle_admin_direct_message(data):
     message = (data or {}).get("message")
     if not target or not message or len(message) > 300:
         try:
-            _log.warn(
+            logger.warn(
                 event="admin_direct_message_invalid",
                 target=target,
                 length=(len(message) if message else 0),
@@ -505,7 +494,7 @@ def handle_admin_direct_message(data):
     if not sid:
         emit("error", {"message": f"User {target} not online"}, room=request.sid)
         try:
-            _log.warn(event="admin_direct_message_target_missing", target=target)
+            logger.warn(event="admin_direct_message_target_missing", target=target)
         except Exception:
             pass
         return
@@ -514,7 +503,7 @@ def handle_admin_direct_message(data):
     except Exception:
         from_user = "Admin"
     try:
-        _log.info(
+        logger.info(
             event="admin_direct_message_emit",
             from_user=from_user,
             to=target,
@@ -545,7 +534,7 @@ def handle_admin_kick_user(data):
         return
     sid = _sid_for_username(target)
     try:
-        _log.info(
+        logger.info(
             event="admin_kick_invoke",
             target=target,
             sid_found=bool(sid),
@@ -565,7 +554,7 @@ def handle_admin_kick_user(data):
             _disconnect(sid=sid)
         except Exception as e:  # pragma: no cover (best-effort)
             try:
-                _log.warn(event="admin_kick_disconnect_error", error=str(e))
+                logger.warn(event="admin_kick_disconnect_error", error=str(e))
             except Exception:
                 pass
     else:
@@ -587,7 +576,7 @@ def handle_admin_kick_user(data):
         for _sid, info in list(online.items()):
             if info.get("username") == target:
                 online.pop(_sid, None)
-        _log.info(
+        logger.info(
             event="admin_kick_post_removal",
             remaining=[v.get("username") for v in online.values()],
         )

@@ -19,11 +19,26 @@
         let cls = '';
         // Order matters: more specific patterns first
         if (/Turn \d+:/.test(msg)) cls = 'log-turn';
-        else if (/defeated!/i.test(msg)) cls = 'log-system';
+        else if (/(critical|crit)/i.test(msg)) cls = 'log-crit';
+        else if (/(dies|death|slain|killed|defeated)/i.test(msg)) cls = 'log-death';
+        else if (/victory|victorious|wins?|won/i.test(msg)) cls = 'log-victory';
         else if (/Loot:/i.test(msg)) cls = 'log-loot';
-        else if (/(casts|hits|attack)/i.test(msg)) cls = 'log-damage';
-        else if (/(heals?|regains|restores)/i.test(msg)) cls = 'log-heal';
-        else if (/Encounter starts/i.test(msg)) cls = 'log-system';
+        else if (/(curse|cursed|hex)/i.test(msg)) cls = 'log-curse';
+        else if (/(poison|poisoned|venom)/i.test(msg)) cls = 'log-poison';
+        else if (/(buff|blessed|enchant|strengthen)/i.test(msg)) cls = 'log-buff';
+        else if (/(debuff|weaken|vulnerability|vulnerable)/i.test(msg)) cls = 'log-debuff';
+        else if (/(stun|stunned|daze|dazed)/i.test(msg)) cls = 'log-stun';
+        else if (/(bleed|bleeding|hemorrhage)/i.test(msg)) cls = 'log-bleed';
+        else if (/(burn|burning|ignite|fire)/i.test(msg)) cls = 'log-burn';
+        else if (/(freeze|frozen|frost|ice)/i.test(msg)) cls = 'log-freeze';
+        else if (/(miss|misses|whiff)/i.test(msg)) cls = 'log-miss';
+        else if (/(block|blocked|parry|parried)/i.test(msg)) cls = 'log-block';
+        else if (/(dodge|dodges|evade|evaded)/i.test(msg)) cls = 'log-dodge';
+        else if (/(shield|armor|absorb)/i.test(msg)) cls = 'log-shield';
+        else if (/(flee|flees|retreat|escape)/i.test(msg)) cls = 'log-flee';
+        else if (/(heals?|regains|restores|recovery|regenerate)/i.test(msg)) cls = 'log-heal';
+        else if (/(casts?|hits?|attacks?|strikes?|damage|deals)/i.test(msg)) cls = 'log-damage';
+        else if (/(Encounter starts|defeated!)/i.test(msg)) cls = 'log-system';
         return { cls, msg };
     }
     function formatMessage(l) {
@@ -41,6 +56,46 @@
         return { text: ts + rawMsg, bare: rawMsg };
     }
     let processedLogCount = 0;
+    let typewriterQueue = [];
+    let isTyping = false;
+
+    function typewriterEffect(element, text, speed = 15) {
+        return new Promise((resolve) => {
+            let i = 0;
+            element.textContent = '';
+            const cursor = document.createElement('span');
+            cursor.className = 'terminal-cursor';
+            element.appendChild(cursor);
+
+            function type() {
+                if (i < text.length) {
+                    cursor.remove();
+                    element.textContent += text.charAt(i);
+                    element.appendChild(cursor);
+                    i++;
+                    setTimeout(type, speed + Math.random() * 10); // Variable speed like modem
+                } else {
+                    cursor.remove();
+                    resolve();
+                }
+            }
+            type();
+        });
+    }
+
+    async function processTypewriterQueue() {
+        if (isTyping || typewriterQueue.length === 0) return;
+        isTyping = true;
+
+        while (typewriterQueue.length > 0) {
+            const { element, text } = typewriterQueue.shift();
+            await typewriterEffect(element, text);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        isTyping = false;
+    }
+
     function appendLog(lines) {
         if (!Array.isArray(lines)) return;
         // If the incoming log shrank (e.g., server truncated) rebuild from scratch
@@ -50,6 +105,7 @@
             lastLogNode = null;
             lastLogCount = 1;
             processedLogCount = 0;
+            typewriterQueue = [];
         }
         // Process only new lines beyond processedLogCount
         for (let i = processedLogCount; i < lines.length; i++) {
@@ -69,14 +125,16 @@
                 lastLogSignature = signature;
                 lastLogCount = 1;
                 const div = document.createElement('div');
-                div.textContent = formatted;
                 if (cls) div.classList.add(cls);
                 lastLogNode = div;
                 logEl.appendChild(div);
+
+                // Add to typewriter queue
+                typewriterQueue.push({ element: div, text: formatted });
             }
         }
         processedLogCount = lines.length;
-        logEl.scrollTop = logEl.scrollHeight;
+        processTypewriterQueue();
     }
 
     function render(state) {
@@ -94,68 +152,64 @@
         const initiative = state.initiative || [];
         const activeIndex = state.active_index;
         const party = (state.party && state.party.members) || [];
-        // Build quick lookup of actor id -> initiative slot index
         const active = initiative[activeIndex];
         const itemCounts = (state.party && state.party.item_counts) || {};
+        const template = document.getElementById('party-member-template');
+
         party.forEach(mem => {
-            const col = document.createElement('div');
-            // Full-width inside the dedicated party column
-            col.className = 'col-md-12 col-lg-12 mb-3';
-            const card = document.createElement('div');
-            card.className = 'card h-100 party-member' + (active && active.type === 'player' && active.id === mem.char_id ? ' border-warning shadow' : '');
-            card.setAttribute('role', 'listitem');
-            if (active && active.type === 'player' && active.id === mem.char_id) {
+            // Clone template
+            const clone = template.content.cloneNode(true);
+            const container = clone.querySelector('.mb-3');
+            const card = clone.querySelector('.card');
+
+            // Set active state
+            const isActive = active && active.type === 'player' && active.id === mem.char_id;
+            if (isActive) {
+                card.classList.add('border-warning', 'shadow');
                 card.setAttribute('aria-current', 'true');
             }
-            const header = document.createElement('div');
-            header.className = 'card-header d-flex justify-content-between align-items-center';
-            header.innerHTML = '<span>' + (mem.name || 'Hero') + '</span>' +
-                '<span class="small text-muted">HP ' + mem.hp + '/' + mem.max_hp + ' | MP ' + mem.mana + '/' + mem.mana_max + '</span>';
-            const body = document.createElement('div');
-            body.className = 'card-body p-2';
-            const btnRow = document.createElement('div');
-            const canAct = active && active.type === 'player' && active.id === mem.char_id && state.status === 'active';
-            btnRow.className = 'd-flex flex-wrap gap-2';
-            const actions = [
-                { k: 'attack', label: 'Attack', cls: 'btn-outline-danger' },
-                { k: 'defend', label: 'Defend', cls: 'btn-outline-warning' },
-                { k: 'cast_firebolt', label: 'Firebolt', cls: 'btn-outline-primary', manaCost: 5 },
-                { k: 'use_potion', label: 'Potion', cls: 'btn-outline-success', needsPotion: true },
-                { k: 'flee', label: 'Flee', cls: 'btn-outline-secondary' },
-                { k: 'end_turn', label: 'End Turn', cls: 'btn-outline-dark' }
-            ];
-            actions.forEach(a => {
-                const b = document.createElement('button');
-                b.type = 'button';
-                b.className = 'btn btn-sm ' + a.cls;
-                b.textContent = a.label;
+
+            // Update data fields
+            clone.querySelector('[data-field="name"]').textContent = mem.name || 'Hero';
+            clone.querySelector('[data-field="hp"]').textContent = mem.hp;
+            clone.querySelector('[data-field="max_hp"]').textContent = mem.max_hp;
+            clone.querySelector('[data-field="mana"]').textContent = mem.mana;
+            clone.querySelector('[data-field="mana_max"]').textContent = mem.mana_max;
+
+            // Update action buttons
+            const canAct = isActive && state.status === 'active';
+            clone.querySelectorAll('button[data-action]').forEach(btn => {
+                const action = btn.dataset.action;
+
                 if (!canAct) {
-                    b.disabled = true;
+                    btn.disabled = true;
                 }
-                if (a.needsPotion) {
+
+                // Potion availability
+                if (btn.dataset.needsPotion) {
                     const potCount = itemCounts['potion-healing'] || 0;
                     if (potCount <= 0) {
-                        b.disabled = true;
-                        b.title = 'No potions available';
+                        btn.disabled = true;
+                        btn.title = 'No potions available';
                     } else {
-                        b.title = potCount + ' potion' + (potCount === 1 ? '' : 's') + ' remaining';
+                        btn.title = potCount + ' potion' + (potCount === 1 ? '' : 's') + ' remaining';
                     }
                 }
-                // Mana gating for Firebolt
-                if (canAct && a.k === 'cast_firebolt' && typeof mem.mana === 'number') {
-                    if (mem.mana < (a.manaCost || 0)) {
-                        b.disabled = true;
-                        b.title = 'Not enough mana';
+
+                // Mana gating
+                if (canAct && btn.dataset.manaCost) {
+                    const manaCost = parseInt(btn.dataset.manaCost);
+                    if (mem.mana < manaCost) {
+                        btn.disabled = true;
+                        btn.title = 'Not enough mana';
                     }
                 }
-                b.addEventListener('click', () => doAction(a.k, state.version, mem.char_id));
-                btnRow.appendChild(b);
+
+                // Add click handler
+                btn.addEventListener('click', () => doAction(action, state.version, mem.char_id));
             });
-            body.appendChild(btnRow);
-            card.appendChild(header);
-            card.appendChild(body);
-            col.appendChild(card);
-            partyContainer.appendChild(col);
+
+            partyContainer.appendChild(clone);
         });
         // If combat complete, show a return to dungeon action area (once)
         if (state.status === 'complete') {

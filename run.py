@@ -250,6 +250,16 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     mk_admin.add_argument("username", help="Username to promote")
     mk_admin.set_defaults(command="make-admin")
 
+    # reset-password
+    reset_pw = subparsers.add_parser(
+        "reset-password",
+        help="Reset a user's password",
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
+    reset_pw.add_argument("username", help="Username to reset password for")
+    reset_pw.add_argument("password", help="New password")
+    reset_pw.set_defaults(command="reset-password")
+
     # If no subcommand provided, default to server
     if len(argv) == 0:
         argv = ["server"]
@@ -515,6 +525,25 @@ def main(argv: list[str]) -> int:
                 user.role = "admin"
                 _db.session.commit()
                 print(f"Promoted '{username}' to admin")
+        return 0
+    elif mode == "reset-password":
+        from werkzeug.security import generate_password_hash
+
+        from app import create_app
+        from app import db as _db
+        from app.models.models import User
+
+        app = create_app()
+        username = getattr(args, "username")
+        password = getattr(args, "password")
+        with app.app_context():
+            user = User.query.filter_by(username=username).first()
+            if not user:
+                print(f"Error: User '{username}' not found")
+                return 1
+            user.password = generate_password_hash(password)
+            _db.session.commit()
+            print(f"Password reset for user '{username}'")
         return 0
     else:
         info_prefix = f"{Fore.CYAN}[INFO]{Style.RESET_ALL}" if _COLOR_ENABLED else "[INFO]"

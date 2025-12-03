@@ -2,9 +2,24 @@
 {% block title %}Combat{% endblock %}
 {% block content %}
 <div class="container mt-3 combat-container" id="combat-root" data-combat-id="{{ combat_id }}">
-    <div class="row g-3 combat-layout">
-        <!-- Left: Monster panel (col-lg-3) -->
-        <div class="col-lg-3 col-md-4 order-lg-1 order-1" id="combat-left">
+    <div class="row combat-layout">
+        <!-- Left: Party panels / actions -->
+        <div class="col-xl-4 col-lg-4 col-md-4 col-sm-12" id="combat-left" role="group" aria-label="Party members">
+            <div id="party-panels" role="list"><!-- Party member panels injected here --></div>
+            <div id="combat-rewards-anchor"></div>
+        </div>
+        <!-- Center: Combat log -->
+        <div class="col-xl-5 col-lg-5 col-md-5 col-sm-12" id="combat-center">
+            <div class="card d-flex flex-column" aria-label="Combat log and turn feed">
+                <div class="card-header">Combat Log</div>
+                <div class="card-body p-2 d-flex flex-column combat-log-wrapper">
+                    <div id="combat-log" class="flex-grow-1 combat-log" role="log" aria-live="polite"
+                        aria-relevant="additions"></div>
+                </div>
+            </div>
+        </div>
+        <!-- Right: Monster panel -->
+        <div class="col-xl-3 col-lg-3 col-md-3 col-sm-12" id="combat-right">
             <div class="card monster-panel" id="monster-panel" role="group" aria-label="Monster status">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span id="monster-name">Monster</span>
@@ -19,24 +34,37 @@
                 </div>
             </div>
         </div>
-        <!-- Center: Combat log (col-lg-5) -->
-        <div class="col-lg-5 col-md-12 order-lg-2 order-3" id="combat-center">
-            <div class="card d-flex flex-column" aria-label="Combat log and turn feed">
-                <div class="card-header">Combat Log</div>
-                <div class="card-body p-2 d-flex flex-column combat-log-wrapper">
-                    <div id="combat-log" class="flex-grow-1 combat-log" role="log" aria-live="polite"
-                        aria-relevant="additions"></div>
-                </div>
-            </div>
-        </div>
-        <!-- Right: Party panels / actions (col-lg-4) -->
-        <div class="col-lg-4 col-md-8 order-lg-3 order-2" id="combat-right" role="group" aria-label="Party members">
-            <div class="col" id="party-panels" role="list"><!-- Party member panels injected here --></div>
-            <div id="combat-rewards-anchor"></div>
-        </div>
     </div>
     <div id="combat-turn-live" class="visually-hidden" aria-live="assertive" aria-atomic="true"></div>
 </div>
+
+{# Template for party member cards #}
+<template id="party-member-template">
+    <div class="mb-3">
+        <div class="card h-100 party-member" role="listitem">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span data-field="name">Hero</span>
+                <span class="small text-muted">
+                    HP <span data-field="hp">0</span>/<span data-field="max_hp">0</span> |
+                    MP <span data-field="mana">0</span>/<span data-field="mana_max">0</span>
+                </span>
+            </div>
+            <div class="card-body p-2">
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-danger" data-action="attack">Attack</button>
+                    <button type="button" class="btn btn-sm btn-outline-warning" data-action="defend">Defend</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="cast_firebolt"
+                        data-mana-cost="5">Firebolt</button>
+                    <button type="button" class="btn btn-sm btn-outline-success" data-action="use_potion"
+                        data-needs-potion="true">Potion</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="flee">Flee</button>
+                    <button type="button" class="btn btn-sm btn-outline-dark" data-action="end_turn">End Turn</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
 {% endblock %}
 {% block scripts %}
 <link rel="stylesheet" href="{{ asset_url('css/combat.css') }}">

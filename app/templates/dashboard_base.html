@@ -1,10 +1,11 @@
 {% extends 'base.html' %}
 {% block head %}
-  {{ super() }}
-  <link rel="stylesheet" href="{{ asset_url('dashboard.css') }}">
-  <!-- utilities.css merged into app.css -->
+{{ super() }}
+<link rel="stylesheet" href="{{ asset_url('css/glass-theme.css') }}">
+<link rel="stylesheet" href="{{ asset_url('css/dashboard.css') }}">
+<!-- utilities.css merged into app.css -->
 {% endblock %}
 
 {% block content %}
-  {% block dashboard_content %}{% endblock %}
+{% block dashboard_content %}{% endblock %}
 {% endblock %}

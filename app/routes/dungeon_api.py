@@ -14,10 +14,11 @@ import json
 import threading
 from functools import wraps
 
+import structlog
 from flask import Blueprint, current_app, jsonify, render_template, request, session
 from flask_login import current_user, login_required
 
-from app import db  # moved up to satisfy E402
+from app import db
 from app.dungeon import DOOR, ROOM, TUNNEL, Dungeon
 from app.dungeon.api_helpers.encounters import (
     maybe_spawn_encounter,
@@ -33,15 +34,17 @@ from app.dungeon.api_helpers.tiles import char_to_type
 from app.dungeon.api_helpers.treasure import (
     claim_treasure_entity as _claim_treasure_entity,
 )
-from app.loot.generator import LootConfig, generate_loot_for_seed  # added
+from app.loot.generator import LootConfig, generate_loot_for_seed
 from app.models import DungeonEntity
 from app.models.dungeon_instance import DungeonInstance
 from app.models.models import Character, GameClock
-from app.services import spawn_service  # monster spawning
+from app.services import spawn_service
 from app.services.loot_service import roll_loot
 from app.services.rate_limiter import (
-    rate_limit as rate_limit_decorator,  # route-level custom limits
+    rate_limit as rate_limit_decorator,
 )
+
+logger = structlog.get_logger()
 
 """NOTE: Legacy seen-tiles subsystem removed.
 
@@ -167,7 +170,8 @@ def dungeon_move():
         if moved:
             try:
                 db.session.commit()
-            except Exception:
+            except Exception as e:
+                logger.exception("Failed to commit movement", user_id=current_user.id, exc_info=e)
                 db.session.rollback()
                 moved = False
 
@@ -185,7 +189,8 @@ def dungeon_move():
                 try:
                     if monster_ent.data:
                         mdata = json.loads(monster_ent.data)
-                except Exception:
+                except Exception as e:
+                    logger.warning("Failed to parse monster data", entity_id=monster_ent.id, exc_info=e)
                     mdata = {}
                 monster_payload = {
                     "slug": monster_ent.slug,

@@ -1,4 +1,5 @@
-/* dashboard.css: Styles for dashboard, cards, party, and chat widget */
+/* dashboard.css: Dashboard-specific styles */
+/* Glass theme imported via base template */
 
 :root {
     --mud-orange: #BA5624;
@@ -10,10 +11,12 @@
     --mud-bg-dark: #153131;
 }
 
+/* Purple gradient background for dashboard */
 body {
-    background: var(--mud-bg-dark);
+    background: linear-gradient(135deg, #4c5270 0%, #5a3a52 100%);
+    background-attachment: fixed;
     min-height: 100vh;
-    color: var(--mud-grey);
+    color: #fff;
 }
 
 /* Icon button adjustments */

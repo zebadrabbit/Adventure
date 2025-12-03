@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+
+{% block title %}Theme Manager{% endblock %}
+
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="{{ asset_url('css/glass-theme.css') }}">
+<style>
+    body {
+        background: linear-gradient(135deg, #4c5270 0%, #5a3a52 100%);
+        background-attachment: fixed;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="theme-manager-container">
+    <div class="theme-header-section">
+        <h1 class="page-title">
+            <i class="bi bi-palette-fill me-2"></i>
+            Theme Manager
+        </h1>
+        <button id="newThemeBtn" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-2"></i>New Theme
+        </button>
+    </div>
+
+    <div id="notificationContainer"></div>
+
+    <div id="themesList" class="themes-grid">
+        <!-- Themes will be rendered here by JavaScript -->
+        <div class="loading-state">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Theme Modal -->
+<div class="modal fade" id="themeModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-palette me-2"></i>
+                    <span id="modalTitle">Create Theme</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="themeForm">
+                    <!-- Basic Info -->
+                    <div class="section-card mb-4">
+                        <h6 class="section-title">Basic Information</h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="themeName" class="form-label">Theme Name</label>
+                                <input type="text" class="form-control" id="themeName" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="themeDescription" class="form-label">Description</label>
+                                <input type="text" class="form-control" id="themeDescription">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Brand Colors -->
+                    <div class="section-card mb-4">
+                        <h6 class="section-title">Brand Colors</h6>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Primary</label>
+                                <div class="color-input-group">
+                                    <input type="color" class="form-control color-picker" id="primary" value="#6366f1">
+                                    <input type="text" class="form-control hex-input" id="primary_hex" value="#6366f1"
+                                        pattern="^#[0-9A-Fa-f]{6}$">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Secondary</label>
+                                <div class="color-input-group">
+                                    <input type="color" class="form-control color-picker" id="secondary"
+                                        value="#8b5cf6">
+                                    <input type="text" class="form-control hex-input" id="secondary_hex" value="#8b5cf6"
+                                        pattern="^#[0-9A-Fa-f]{6}$">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Semantic Colors -->
+                    <div class="section-card mb-4">
+                        <h6 class="section-title">Semantic Colors</h6>
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Success</label>
+                                <div class="color-input-group">
+                                    <input type="color" class="form-control color-picker" id="success" value="#22c55e">
+                                    <input type="text" class="form-control hex-input" id="success_hex" value="#22c55e">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Danger</label>
+                                <div class="color-input-group">
+                                    <input type="color" class="form-control color-picker" id="danger" value="#ef4444">
+                                    <input type="text" class="form-control hex-input" id="danger_hex" value="#ef4444">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Warning</label>
+                                <div class="color-input-group">
+                                    <input type="color" class="form-control color-picker" id="warning" value="#f59e0b">
+                                    <input type="text" class="form-control hex-input" id="warning_hex" value="#f59e0b">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Info</label>
+                                <div class="color-input-group">
+                                    <input type="color" class="form-control color-picker" id="info" value="#3b82f6">
+                                    <input type="text" class="form-control hex-input" id="info_hex" value="#3b82f6">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grayscale Colors -->
+                    <div class="section-card mb-4">
+                        <h6 class="section-title">Grayscale Colors</h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Light</label>
+                                <div class="color-input-group">
+                                    <input type="color" class="form-control color-picker" id="light" value="#f8f9fa">
+                                    <input type="text" class="form-control hex-input" id="light_hex" value="#f8f9fa">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Dark</label>
+                                <div class="color-input-group">
+                                    <input type="color" class="form-control color-picker" id="dark" value="#212529">
+                                    <input type="text" class="form-control hex-input" id="dark_hex" value="#212529">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Background & Text -->
+                    <div class="section-card mb-4">
+                        <h6 class="section-title">Background & Text</h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Body Background</label>
+                                <div class="color-input-group">
+                                    <input type="color" class="form-control color-picker" id="body_bg" value="#0f172a">
+                                    <input type="text" class="form-control hex-input" id="body_bg_hex" value="#0f172a">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Body Text</label>
+                                <div class="color-input-group">
+                                    <input type="color" class="form-control color-picker" id="body_color"
+                                        value="#f1f5f9">
+                                    <input type="text" class="form-control hex-input" id="body_color_hex"
+                                        value="#f1f5f9">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Links -->
+                    <div class="section-card mb-4">
+                        <h6 class="section-title">Link Colors</h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Link Color</label>
+                                <div class="color-input-group">
+                                    <input type="color" class="form-control color-picker" id="link_color"
+                                        value="#6366f1">
+                                    <input type="text" class="form-control hex-input" id="link_color_hex"
+                                        value="#6366f1">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Link Hover</label>
+                                <div class="color-input-group">
+                                    <input type="color" class="form-control color-picker" id="link_hover_color"
+                                        value="#8b5cf6">
+                                    <input type="text" class="form-control hex-input" id="link_hover_color_hex"
+                                        value="#8b5cf6">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Components -->
+                    <div class="section-card">
+                        <h6 class="section-title">Component Colors</h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Border Color</label>
+                                <div class="color-input-group">
+                                    <input type="color" class="form-control color-picker" id="border_color"
+                                        value="#334155">
+                                    <input type="text" class="form-control hex-input" id="border_color_hex"
+                                        value="#334155">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Card Background</label>
+                                <div class="color-input-group">
+                                    <input type="color" class="form-control color-picker" id="card_bg" value="#1e293b">
+                                    <input type="text" class="form-control hex-input" id="card_bg_hex" value="#1e293b">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveThemeBtn">
+                    <i class="bi bi-save me-2"></i>Save Theme
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/theme-manager.js') }}"></script>
+{% endblock %}

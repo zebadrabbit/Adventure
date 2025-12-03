@@ -18,11 +18,12 @@ def test_persist_after_monster_defeat(auth_client):
     monster = {"slug": "slime", "name": "Slime", "hp": 1, "damage": 1, "speed": 5}
     session = combat_service.start_session(user.id, monster)
     party = json.loads(session.party_snapshot_json)
+    actor_id = party["members"][0]["char_id"]
     party["members"][0]["hp"] = 12
     party["members"][0]["mana"] = 7
     session.party_snapshot_json = json.dumps(party)
     db.session.commit()
-    combat_service.player_attack(session.id, user.id, session.version, actor_id=party["members"][0]["char_id"])
+    combat_service.player_attack(session.id, user.id, session.version, actor_id=actor_id)
     fresh_char = db.session.get(Character, char.id)
     stats = json.loads(fresh_char.stats)
     # Some characters may not originally have an 'hp' field; persistence injects it.
@@ -36,6 +37,7 @@ def test_persist_after_player_flee(auth_client, monkeypatch):
     monster = {"slug": "orc", "name": "Orc", "hp": 30, "damage": 2, "speed": 5}
     session = combat_service.start_session(user.id, monster)
     party = json.loads(session.party_snapshot_json)
+    actor_id = party["members"][0]["char_id"]
     party["members"][0]["hp"] = 25
     party["members"][0]["mana"] = 3
     session.party_snapshot_json = json.dumps(party)
@@ -43,9 +45,11 @@ def test_persist_after_player_flee(auth_client, monkeypatch):
     import random as _random
 
     monkeypatch.setattr(_random, "random", lambda: 0.0)
-    combat_service.player_flee(session.id, user.id, session.version, actor_id=party["members"][0]["char_id"])
-    fresh_char = db.session.get(Character, char.id)
-    stats = json.loads(fresh_char.stats)
+    combat_service.player_flee(session.id, user.id, session.version, actor_id=actor_id)
+    # Assert against the actual combat actor row (actor_id) rather than first character
+    # to avoid ordering dependence if multiple characters exist for the user.
+    fresh_actor = db.session.get(Character, actor_id)
+    stats = json.loads(fresh_actor.stats)
     assert stats.get("hp") == 25
     assert stats.get("current_mana", stats.get("mana")) == 3
 
@@ -55,7 +59,7 @@ def test_action_codes_present(auth_client, monkeypatch):
     monster = {"slug": "dummy", "name": "Dummy", "hp": 50, "damage": 0, "speed": 5, "armor": 500}
     session = combat_service.start_session(user.id, monster)
     party = json.loads(session.party_snapshot_json)
-    actor_id = party["members"][0]["char_id"]
+    actor_id = party["members"][0]["char_id"]  # explicit actor id reference
     import random as _random
 
     def fake_randint(a, b):

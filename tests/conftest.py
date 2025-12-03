@@ -166,6 +166,22 @@ def auth_client(test_app, client):
             db.session.commit()
         else:
             new_char = char_exists
+        # Normalize baseline transient resource fields each test to prevent order-dependent leakage
+        try:
+            import json as _json
+
+            stats_obj = _json.loads(new_char.stats) if new_char.stats else {}
+            # Reset hp so combat sessions re-derive consistent max and tests controlling snapshot succeed
+            if "hp" in stats_obj:
+                stats_obj["hp"] = int(stats_obj.get("hp", 0))  # keep existing numeric form
+            # Ensure current_mana key mirrors mana baseline if absent
+            if "current_mana" in stats_obj:
+                stats_obj["current_mana"] = int(stats_obj.get("current_mana", stats_obj.get("mana", 30)))
+            new_char.stats = _json.dumps(stats_obj)
+            db.session.add(new_char)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
         inst = DungeonInstance.query.filter_by(user_id=user.id).first()
         if not inst:
             inst = DungeonInstance(user_id=user.id, seed=1234, pos_x=0, pos_y=0, pos_z=0)
@@ -196,3 +212,16 @@ def _clear_websocket_state():
     except Exception:
         pass
     yield
+
+
+@pytest.fixture(autouse=True)
+def _ensure_db_session_cleanup(test_app):
+    """Force database session rollback and cleanup after each test to prevent state leakage."""
+    yield
+    try:
+        from app import db
+
+        db.session.remove()
+        db.session.rollback()
+    except Exception:
+        pass

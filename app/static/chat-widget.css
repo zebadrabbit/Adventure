@@ -1,5 +1,0 @@
-/* Deprecated: chat-widget.css
-   This file previously held chat widget specific styles. After consolidation
-   into app.css it now only exists as a thin stub to avoid 404s while templates
-   are updated. Safe to remove once all references to asset_url('chat-widget.css')
-   are gone. */

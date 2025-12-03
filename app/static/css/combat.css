@@ -4,22 +4,124 @@
 }
 
 .combat-layout {
-    align-items: stretch;
+    align-items: flex-start;
 }
 
-#combat-left .monster-panel {
-    min-height: 300px;
+#combat-left {
+    /* Party members stack vertically */
+    position: relative;
 }
 
-#combat-right .combat-log-wrapper {
+#party-panels {
+    display: flex;
+    flex-direction: column;
+
+}
+
+#combat-center {
+    /* Combat log wrapper handles height */
+    position: relative;
+}
+
+#combat-right {
+    /* Monster panel at top */
+    position: relative;
+}
+
+#combat-center .card {
+    min-height: 600px;
+}
+
+#combat-right .monster-panel {
+    /* No min-height forcing it down */
+    position: relative;
+}
+
+#combat-center .combat-log-wrapper {
     height: 100%;
 }
 
 #combat-log {
     overflow-y: auto;
-    font-family: var(--bs-font-monospace, monospace);
-    font-size: 0.8rem;
-    line-height: 1.1rem;
+    font-family: 'Courier New', 'Consolas', monospace;
+    font-size: 0.85rem;
+    line-height: 1.3rem;
+    background: #0a0e14;
+    color: #33ff33;
+    padding: 1rem;
+    border-radius: 0;
+    position: relative;
+    text-shadow: 0 0 2px #33ff33;
+}
+
+/* CRT scanline effect */
+#combat-log::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(0deg,
+            rgba(0, 0, 0, 0.15),
+            rgba(0, 0, 0, 0.15) 1px,
+            transparent 1px,
+            transparent 2px);
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Subtle screen flicker */
+@keyframes flicker {
+    0% {
+        opacity: 0.97;
+    }
+
+    50% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0.97;
+    }
+}
+
+#combat-log::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(18, 16, 16, 0.1);
+    opacity: 0;
+    animation: flicker 0.15s infinite;
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* Terminal cursor */
+.terminal-cursor {
+    display: inline-block;
+    width: 0.6em;
+    height: 1em;
+    background-color: #33ff33;
+    animation: blink 1s step-end infinite;
+    vertical-align: text-bottom;
+    margin-left: 2px;
+}
+
+@keyframes blink {
+    50% {
+        opacity: 0;
+    }
+}
+
+/* Log entry base styles */
+#combat-log>div {
+    position: relative;
+    z-index: 3;
+    margin: 2px 0;
 }
 
 @media (max-width: 991.98px) {
@@ -43,19 +145,111 @@
 }
 
 .combat-log .log-damage {
-    color: #dc3545;
+    color: #ff5555;
+    text-shadow: 0 0 3px #ff5555;
 }
 
 .combat-log .log-heal {
-    color: #20c997;
+    color: #50fa7b;
+    text-shadow: 0 0 3px #50fa7b;
 }
 
 .combat-log .log-turn {
-    color: #ffc107;
+    color: #f1fa8c;
     font-weight: 600;
+    text-shadow: 0 0 3px #f1fa8c;
 }
 
 .combat-log .log-system {
-    color: #6c757d;
+    color: #6272a4;
     font-style: italic;
+}
+
+.combat-log .log-loot {
+    color: #f1fa8c;
+    font-weight: 600;
+    text-shadow: 0 0 4px #f1fa8c;
+}
+
+.combat-log .log-curse {
+    color: #bd93f9;
+    text-shadow: 0 0 3px #bd93f9;
+}
+
+.combat-log .log-poison {
+    color: #50fa7b;
+    text-shadow: 0 0 3px #50fa7b;
+}
+
+.combat-log .log-buff {
+    color: #8be9fd;
+    text-shadow: 0 0 3px #8be9fd;
+}
+
+.combat-log .log-debuff {
+    color: #ffb86c;
+    text-shadow: 0 0 3px #ffb86c;
+}
+
+.combat-log .log-crit {
+    color: #ff5555;
+    font-weight: 700;
+    text-shadow: 0 0 5px #ff5555;
+}
+
+.combat-log .log-miss {
+    color: #6272a4;
+    font-style: italic;
+}
+
+.combat-log .log-block {
+    color: #8be9fd;
+    text-shadow: 0 0 3px #8be9fd;
+}
+
+.combat-log .log-dodge {
+    color: #8be9fd;
+    text-shadow: 0 0 3px #8be9fd;
+}
+
+.combat-log .log-shield {
+    color: #bd93f9;
+    text-shadow: 0 0 3px #bd93f9;
+}
+
+.combat-log .log-stun {
+    color: #f1fa8c;
+    text-shadow: 0 0 3px #f1fa8c;
+}
+
+.combat-log .log-bleed {
+    color: #ff5555;
+    text-shadow: 0 0 3px #ff5555;
+}
+
+.combat-log .log-burn {
+    color: #ffb86c;
+    text-shadow: 0 0 3px #ffb86c;
+}
+
+.combat-log .log-freeze {
+    color: #8be9fd;
+    text-shadow: 0 0 3px #8be9fd;
+}
+
+.combat-log .log-death {
+    color: #ff5555;
+    font-weight: 700;
+    text-shadow: 0 0 5px #ff5555;
+}
+
+.combat-log .log-flee {
+    color: #bd93f9;
+    font-style: italic;
+}
+
+.combat-log .log-victory {
+    color: #50fa7b;
+    font-weight: 700;
+    text-shadow: 0 0 5px #50fa7b;
 }

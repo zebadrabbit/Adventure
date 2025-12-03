@@ -44,3 +44,5 @@ test-results/
 
 # Ruff linter cache
 .ruff_cache/
+
+.Downloaded_Assets/

@@ -82,6 +82,13 @@ def dashboard():
     return render_template("admin_dashboard.html")
 
 
+@bp_admin.route("/themes")
+@admin_required
+def themes():
+    """Theme management page."""
+    return render_template("admin_themes.html")
+
+
 # ----------------------------- Items --------------------------------------
 
 REQUIRED_ITEM_COLUMNS = [

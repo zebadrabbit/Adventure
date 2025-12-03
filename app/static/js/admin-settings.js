@@ -42,10 +42,13 @@
   function renderUsers(users) {
     if (!onlineList) return;
     onlineList.innerHTML = '';
+    const template = document.getElementById('user-list-item-template');
     (users || []).forEach(u => {
-      const li = document.createElement('li');
-      li.className = 'd-flex justify-content-between align-items-center mb-1';
-      const left = document.createElement('span');
+      const li = template ? template.content.cloneNode(true).querySelector('li') : document.createElement('li');
+      if (!template) { li.className = 'd-flex justify-content-between align-items-center mb-1'; }
+      li.setAttribute('data-user-id', u.username);
+
+      const left = li.querySelector('[data-field="username"]') || li.querySelector('.user-name') || document.createElement('span');
       let badges = `<span class="badge bg-${u.role === 'admin' ? 'danger' : (u.role === 'mod' ? 'warning text-dark' : 'secondary')} me-1">${u.role}</span>`;
       if (window.ADMIN_MODERATION && window.ADMIN_MODERATION.muted?.includes(u.username)) {
         badges += '<span class="badge bg-secondary me-1">muted</span>';
@@ -54,50 +57,62 @@
         badges += '<span class="badge bg-dark me-1">banned</span>';
       }
       left.innerHTML = `${badges}${u.username}`;
-      const btnGroup = document.createElement('span');
+
       if (u.role !== 'admin') { // avoid self-kick or admin->admin by default
-        const msgBtn = document.createElement('button');
-        msgBtn.className = 'btn btn-sm btn-outline-primary me-1';
-        msgBtn.textContent = 'Msg';
-        msgBtn.addEventListener('click', () => {
-          const m = prompt(`Message to ${u.username}`);
-          if (m && m.trim()) {
-            socket.emit('admin_direct_message', { to: u.username, message: m.trim() });
-          }
-        });
-        const kickBtn = document.createElement('button');
-        kickBtn.className = 'btn btn-sm btn-outline-danger';
-        kickBtn.textContent = 'Kick';
-        kickBtn.addEventListener('click', () => {
-          if (confirm(`Disconnect ${u.username}?`)) {
-            socket.emit('admin_kick_user', { user: u.username });
-          }
-        });
         const isBanned = window.ADMIN_MODERATION?.banned?.includes(u.username);
         const isMuted = window.ADMIN_MODERATION?.muted?.includes(u.username);
-        const banBtn = document.createElement('button');
-        banBtn.className = 'btn btn-sm ' + (isBanned ? 'btn-dark' : 'btn-outline-dark') + ' me-1';
-        banBtn.textContent = isBanned ? 'Unban' : 'Ban';
-        banBtn.addEventListener('click', () => {
-          if (isBanned) {
-            socket.emit('admin_unban_user', { user: u.username });
-          } else if (confirm(`Ban ${u.username}? They will be disconnected and blocked.`)) {
-            socket.emit('admin_ban_user', { user: u.username });
-          }
-        });
-        const muteBtn = document.createElement('button');
-        muteBtn.className = 'btn btn-sm ' + (isMuted ? 'btn-secondary' : 'btn-outline-secondary');
-        muteBtn.textContent = isMuted ? 'Unmute' : 'Mute';
-        muteBtn.addEventListener('click', () => {
-          if (isMuted) {
-            socket.emit('admin_unmute_user', { user: u.username });
-          } else {
-            socket.emit('admin_mute_user', { user: u.username });
-          }
-        });
-        btnGroup.appendChild(msgBtn); btnGroup.appendChild(kickBtn); btnGroup.appendChild(banBtn); btnGroup.appendChild(muteBtn);
+
+        const msgBtn = li.querySelector('[data-action="message"]');
+        if (msgBtn) {
+          msgBtn.addEventListener('click', () => {
+            const m = prompt(`Message to ${u.username}`);
+            if (m && m.trim()) {
+              socket.emit('admin_direct_message', { to: u.username, message: m.trim() });
+            }
+          });
+        }
+
+        const kickBtn = li.querySelector('[data-action="kick"]');
+        if (kickBtn) {
+          kickBtn.addEventListener('click', () => {
+            if (confirm(`Disconnect ${u.username}?`)) {
+              socket.emit('admin_kick_user', { user: u.username });
+            }
+          });
+        }
+
+        const banBtn = li.querySelector('[data-action="ban"]');
+        if (banBtn) {
+          banBtn.className = 'btn btn-sm ' + (isBanned ? 'btn-dark' : 'btn-outline-dark') + ' me-1';
+          banBtn.innerHTML = isBanned ? '<i class="bi bi-check-circle"></i>' : '<i class="bi bi-slash-circle"></i>';
+          banBtn.title = isBanned ? 'Unban' : 'Ban';
+          banBtn.addEventListener('click', () => {
+            if (isBanned) {
+              socket.emit('admin_unban_user', { user: u.username });
+            } else if (confirm(`Ban ${u.username}? They will be disconnected and blocked.`)) {
+              socket.emit('admin_ban_user', { user: u.username });
+            }
+          });
+        }
+
+        const muteBtn = li.querySelector('[data-action="mute"]');
+        if (muteBtn) {
+          muteBtn.className = 'btn btn-sm ' + (isMuted ? 'btn-secondary' : 'btn-outline-secondary');
+          muteBtn.innerHTML = isMuted ? '<i class="bi bi-mic"></i>' : '<i class="bi bi-mic-mute"></i>';
+          muteBtn.title = isMuted ? 'Unmute' : 'Mute';
+          muteBtn.addEventListener('click', () => {
+            if (isMuted) {
+              socket.emit('admin_unmute_user', { user: u.username });
+            } else {
+              socket.emit('admin_mute_user', { user: u.username });
+            }
+          });
+        }
+      } else {
+        // Remove action buttons for admins
+        const btnGroup = li.querySelector('.btn-group');
+        if (btnGroup) btnGroup.remove();
       }
-      li.appendChild(left); li.appendChild(btnGroup);
       onlineList.appendChild(li);
     });
   }
@@ -125,32 +140,54 @@
       modUserList.appendChild(li); return;
     }
     list.sort((a, b) => a.username.localeCompare(b.username));
+    const userTemplate = document.getElementById('user-list-item-template');
+    const bannedTemplate = document.getElementById('banned-user-item-template');
+    const mutedTemplate = document.getElementById('muted-user-item-template');
+
     list.forEach(u => {
-      const li = document.createElement('li');
-      li.className = 'd-flex justify-content-between align-items-center mb-1';
-      const left = document.createElement('span');
+      let template = userTemplate;
+      if (u.isBanned && bannedTemplate) template = bannedTemplate;
+      else if (u.isMuted && mutedTemplate) template = mutedTemplate;
+
+      const li = template ? template.content.cloneNode(true).querySelector('li') : document.createElement('li');
+      if (!template) { li.className = 'd-flex justify-content-between align-items-center mb-1'; }
+      li.setAttribute('data-user-id', u.username);
+
+      const left = li.querySelector('[data-field="username"]') || li.querySelector('.user-name') || document.createElement('span');
       let badges = '';
       if (u.isBanned) badges += '<span class="badge bg-dark me-1">banned</span>';
       if (u.isMuted) badges += '<span class="badge bg-secondary me-1">muted</span>';
       badges += `<span class="badge bg-${u.role === 'admin' ? 'danger' : (u.role === 'mod' ? 'warning text-dark' : 'info')} me-1">${u.role}</span>`;
       left.innerHTML = `${badges}${u.username}`;
-      const actions = document.createElement('span');
+
       if (u.role !== 'admin') {
-        const banBtn = document.createElement('button');
-        banBtn.className = 'btn btn-sm ' + (u.isBanned ? 'btn-dark' : 'btn-outline-dark') + ' me-1';
-        banBtn.textContent = u.isBanned ? 'Unban' : 'Ban';
-        banBtn.addEventListener('click', () => {
-          socket.emit(u.isBanned ? 'admin_unban_user' : 'admin_ban_user', { user: u.username });
-        });
-        const muteBtn = document.createElement('button');
-        muteBtn.className = 'btn btn-sm ' + (u.isMuted ? 'btn-secondary' : 'btn-outline-secondary');
-        muteBtn.textContent = u.isMuted ? 'Unmute' : 'Mute';
-        muteBtn.addEventListener('click', () => {
-          socket.emit(u.isMuted ? 'admin_unmute_user' : 'admin_mute_user', { user: u.username });
-        });
-        actions.appendChild(banBtn); actions.appendChild(muteBtn);
+        const banBtn = li.querySelector('[data-action="ban"]') || li.querySelector('[data-action="unban"]');
+        if (banBtn) {
+          banBtn.className = 'btn btn-sm ' + (u.isBanned ? 'btn-dark' : 'btn-outline-dark') + ' me-1';
+          banBtn.innerHTML = u.isBanned ? '<i class="bi bi-check-circle"></i>' : '<i class="bi bi-slash-circle"></i>';
+          banBtn.title = u.isBanned ? 'Unban' : 'Ban';
+          banBtn.setAttribute('data-action', u.isBanned ? 'unban' : 'ban');
+          banBtn.addEventListener('click', () => {
+            socket.emit(u.isBanned ? 'admin_unban_user' : 'admin_ban_user', { user: u.username });
+          });
+        }
+
+        const muteBtn = li.querySelector('[data-action="mute"]') || li.querySelector('[data-action="unmute"]');
+        if (muteBtn) {
+          muteBtn.className = 'btn btn-sm ' + (u.isMuted ? 'btn-secondary' : 'btn-outline-secondary');
+          muteBtn.innerHTML = u.isMuted ? '<i class="bi bi-mic"></i>' : '<i class="bi bi-mic-mute"></i>';
+          muteBtn.title = u.isMuted ? 'Unmute' : 'Mute';
+          muteBtn.setAttribute('data-action', u.isMuted ? 'unmute' : 'mute');
+          muteBtn.addEventListener('click', () => {
+            socket.emit(u.isMuted ? 'admin_unmute_user' : 'admin_mute_user', { user: u.username });
+          });
+        }
+      } else {
+        // Remove action buttons for admins
+        const btnGroup = li.querySelector('.btn-group');
+        if (btnGroup) btnGroup.remove();
       }
-      li.appendChild(left); li.appendChild(actions); modUserList.appendChild(li);
+      modUserList.appendChild(li);
     });
   }
 
