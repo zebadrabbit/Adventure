@@ -35,6 +35,19 @@ class Theme(db.Model):
     # Border and component colors
     border_color = db.Column(db.String(7), nullable=False, default="#334155")
     card_bg = db.Column(db.String(7), nullable=False, default="#1e293b")
+    card_opacity = db.Column(db.Float, nullable=False, default=0.1)  # 0.0 to 1.0
+
+    # Gradient background settings
+    gradient_angle = db.Column(db.Integer, nullable=False, default=135)
+    gradient_start = db.Column(db.String(7), nullable=False, default="#4c5270")
+    gradient_end = db.Column(db.String(7), nullable=False, default="#5a3a52")
+
+    # Background image settings
+    background_image = db.Column(db.String(255), nullable=True)
+    bg_position = db.Column(db.String(50), nullable=False, default="center")
+    bg_size = db.Column(db.String(50), nullable=False, default="cover")
+    bg_repeat = db.Column(db.String(50), nullable=False, default="no-repeat")
+    bg_attachment = db.Column(db.String(50), nullable=False, default="scroll")
 
     # Active theme flag
     is_active = db.Column(db.Boolean, nullable=False, default=False)
@@ -64,14 +77,33 @@ class Theme(db.Model):
             "link_hover_color": self.link_hover_color,
             "border_color": self.border_color,
             "card_bg": self.card_bg,
+            "card_opacity": self.card_opacity,
+            "gradient": {
+                "angle": self.gradient_angle,
+                "start": self.gradient_start,
+                "end": self.gradient_end,
+            },
+            "background_image": self.background_image,
+            "bg_position": self.bg_position,
+            "bg_size": self.bg_size,
+            "bg_repeat": self.bg_repeat,
+            "bg_attachment": self.bg_attachment,
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
 
+    def _hex_to_rgb(self, hex_color):
+        """Convert hex color to RGB tuple."""
+        hex_color = hex_color.lstrip("#")
+        return tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
+
     def to_css_variables(self):
         """Generate CSS custom properties string."""
-        return f"""
+        # Convert card_bg hex to RGB for opacity support
+        r, g, b = self._hex_to_rgb(self.card_bg)
+
+        css = f"""
 :root {{
     --bs-primary: {self.primary};
     --bs-secondary: {self.secondary};
@@ -87,5 +119,50 @@ class Theme(db.Model):
     --bs-link-hover-color: {self.link_hover_color};
     --bs-border-color: {self.border_color};
     --bs-card-bg: {self.card_bg};
+
+    --adv-primary: {self.primary};
+    --adv-primary-hover: {self.secondary};
+    --adv-secondary: {self.secondary};
+    --adv-success: {self.success};
+    --adv-danger: {self.danger};
+    --adv-warning: {self.warning};
+    --adv-link-color: {self.link_color};
+    --adv-link-hover-color: {self.link_hover_color};
+}}
+
+body {{
+"""
+        # Add background image if present
+        if self.background_image:
+            css += f"""    background: linear-gradient({self.gradient_angle}deg, {self.gradient_start}, {self.gradient_end}), url({self.background_image}) !important;
+    background-position: {self.bg_position} !important;
+    background-size: {self.bg_size} !important;
+    background-repeat: {self.bg_repeat} !important;
+    background-attachment: {self.bg_attachment} !important;
+"""
+        else:
+            css += f"""    background: linear-gradient({self.gradient_angle}deg, {self.gradient_start}, {self.gradient_end}) !important;
+    background-attachment: fixed !important;
+"""
+        css += "}\n\n"
+        css += f"""a {{
+    color: {self.link_color} !important;
+}}
+
+a:hover {{
+    color: {self.link_hover_color} !important;
+}}
+
+.card, .glass-panel, .section-card {{
+    background: rgba({r}, {g}, {b}, {self.card_opacity}) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37) !important;
+}}
+
+.card:hover, .glass-panel:hover {{
+    border-color: rgba(255, 255, 255, 0.3) !important;
 }}
 """
+        return css

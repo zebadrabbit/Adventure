@@ -19,7 +19,14 @@ from app.routes.dungeon_api import get_cached_dungeon  # noqa: E402
 
 @pytest.fixture(scope="session")
 def test_app():
-    os.environ.setdefault("DATABASE_URL", "sqlite:///instance/test.db")
+    # Use in-memory PostgreSQL for tests if available, otherwise require DATABASE_URL
+    test_db_url = os.getenv("TEST_DATABASE_URL") or os.getenv("DATABASE_URL")
+    if not test_db_url:
+        raise ValueError(
+            "DATABASE_URL or TEST_DATABASE_URL environment variable is required for tests. "
+            "Set it to a PostgreSQL connection string."
+        )
+    os.environ["DATABASE_URL"] = test_db_url
     app = create_app()
     app.config.update({"TESTING": True, "WTF_CSRF_ENABLED": False, "LOGIN_DISABLED": False})
     return app

@@ -1,4 +1,13 @@
-/* Combat layout enhancements */
+/* Combat page - Glass-morphism theme */
+
+/* Purple gradient background */
+body {
+    background: linear-gradient(135deg, #4c5270 0%, #5a3a52 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+    color: #fff;
+}
+
 .combat-container {
     max-width: 1400px;
 }
@@ -8,35 +17,76 @@
 }
 
 #combat-left {
-    /* Party members stack vertically */
     position: relative;
 }
 
 #party-panels {
     display: flex;
     flex-direction: column;
-
 }
 
 #combat-center {
-    /* Combat log wrapper handles height */
     position: relative;
 }
 
 #combat-right {
-    /* Monster panel at top */
     position: relative;
 }
 
-#combat-center .card {
+/* Glass cards */
+.combat-container .card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    transition: all 0.3s ease;
     min-height: 600px;
 }
 
-#combat-right .monster-panel {
-    /* No min-height forcing it down */
-    position: relative;
+.combat-container .card:hover {
+    border-color: rgba(255, 255, 255, 0.3);
+    box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.45);
 }
 
+.combat-container .card-header {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(217, 70, 239, 0.3));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 1rem 1.25rem;
+    border-radius: 16px 16px 0 0;
+    color: #fff;
+    font-weight: 600;
+}
+
+.combat-container .card-body {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* Party member cards */
+.party-member {
+    min-height: auto !important;
+    margin-bottom: 1rem;
+}
+
+.party-member .card-header {
+    font-size: 0.95rem;
+}
+
+.party-member .card-body {
+    padding: 1rem;
+}
+
+/* Monster panel */
+.monster-panel {
+    min-height: auto !important;
+}
+
+#monster-traits {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Combat log */
 #combat-center .combat-log-wrapper {
     height: 100%;
 }
@@ -46,12 +96,13 @@
     font-family: 'Courier New', 'Consolas', monospace;
     font-size: 0.85rem;
     line-height: 1.3rem;
-    background: #0a0e14;
+    background: rgba(10, 14, 20, 0.6);
     color: #33ff33;
     padding: 1rem;
-    border-radius: 0;
+    border-radius: 8px;
     position: relative;
     text-shadow: 0 0 2px #33ff33;
+    border: 1px solid rgba(51, 255, 51, 0.2);
 }
 
 /* CRT scanline effect */
@@ -124,6 +175,101 @@
     margin: 2px 0;
 }
 
+/* Glass-morphism buttons */
+.combat-container .btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.9);
+    transition: all 0.2s ease;
+}
+
+.combat-container .btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+.combat-container .btn-outline-danger {
+    border-color: rgba(239, 68, 68, 0.5);
+    color: rgba(248, 113, 113, 1);
+}
+
+.combat-container .btn-outline-danger:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.7);
+}
+
+.combat-container .btn-outline-warning {
+    border-color: rgba(251, 191, 36, 0.5);
+    color: rgba(252, 211, 77, 1);
+}
+
+.combat-container .btn-outline-warning:hover {
+    background: rgba(251, 191, 36, 0.2);
+    border-color: rgba(251, 191, 36, 0.7);
+}
+
+.combat-container .btn-outline-primary {
+    border-color: rgba(139, 92, 246, 0.5);
+    color: rgba(167, 139, 250, 1);
+}
+
+.combat-container .btn-outline-primary:hover {
+    background: rgba(139, 92, 246, 0.2);
+    border-color: rgba(139, 92, 246, 0.7);
+}
+
+.combat-container .btn-outline-success {
+    border-color: rgba(34, 197, 94, 0.5);
+    color: rgba(134, 239, 172, 1);
+}
+
+.combat-container .btn-outline-success:hover {
+    background: rgba(34, 197, 94, 0.2);
+    border-color: rgba(34, 197, 94, 0.7);
+}
+
+.combat-container .btn-outline-secondary {
+    border-color: rgba(156, 163, 175, 0.5);
+    color: rgba(209, 213, 219, 1);
+}
+
+.combat-container .btn-outline-secondary:hover {
+    background: rgba(156, 163, 175, 0.2);
+    border-color: rgba(156, 163, 175, 0.7);
+}
+
+.combat-container .btn-outline-dark {
+    border-color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.combat-container .btn-outline-dark:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Progress bars */
+.combat-container .progress {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+.combat-container .progress-bar {
+    background: linear-gradient(90deg, #ef4444, #dc2626);
+    border-radius: 10px;
+}
+
+/* Badges */
+.combat-container .badge {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
+    padding: 0.35rem 0.65rem;
+}
+
 @media (max-width: 991.98px) {
 
     /* Stack right column below on smaller screens */
@@ -131,12 +277,12 @@
         order: 3;
         margin-top: 1rem;
     }
-
 }
 
-/* Active party member highlight (mirrors card border) */
+/* Active party member highlight */
 .party-member.border-warning {
-    box-shadow: 0 0 0.5rem rgba(255, 193, 7, 0.5);
+    border-color: rgba(251, 191, 36, 0.6) !important;
+    box-shadow: 0 0 0.5rem rgba(251, 191, 36, 0.5);
 }
 
 /* Trim duplicate timestamp groups visually */

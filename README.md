@@ -4,15 +4,34 @@ _Formerly: Adventure MUD (Multi-User Dungeon)_
 
 [![CI](https://github.com/zebadrabbit/Adventure/actions/workflows/ci.yml/badge.svg)](https://github.com/zebadrabbit/Adventure/actions/workflows/ci.yml)
 
-A modern web-based multiplayer dungeon adventure game built with Python (Flask, Flask-SocketIO), SQLite, and Bootstrap.
+A modern web-based multiplayer dungeon adventure game built with Python (Flask, Flask-SocketIO), PostgreSQL, and Bootstrap.
 
 > Quick Links: [Dungeon Generation](docs/DUNGEON_GENERATION.md) · [Teleports](docs/TELEPORTS.md) · [Development Workflow](docs/DEVELOPMENT.md) · [Architecture](docs/architecture.md) · [Combat System](#combat-system)
+
+## Prerequisites
+
+- **Python 3.10+**
+- **PostgreSQL 13+** (required - SQLite is no longer supported)
+- A PostgreSQL database with credentials
 
 ## TL;DR Quick Start
 
 ```bash
+# 1. Set up PostgreSQL database
+createdb adventure_mud  # or use your preferred method
+
+# 2. Configure environment
+export DATABASE_URL="postgresql://username:password@localhost/adventure_mud"
+export SECRET_KEY="your-secret-key-here"
+
+# 3. Install dependencies and run
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+
+# 4. Run migrations
+alembic upgrade head
+
+# 5. Start the server
 python run.py server  # visit http://localhost:5000
 
 # Run tests / lint / format

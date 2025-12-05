@@ -1,11 +1,182 @@
-/* auth.css: Shared styles for login/register cards */
+/* auth.css: Glass-morphism authentication pages */
+
+/* Purple gradient background for auth pages */
+body {
+    background: linear-gradient(135deg, #4c5270 0%, #5a3a52 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+    color: #fff;
+}
 
 .auth-page {
-    min-height: 80vh;
+    min-height: 90vh;
+    padding: 2rem 1rem;
 }
 
 .auth-card {
     width: 100%;
-    max-width: 400px;
-    border-radius: 1rem;
+    max-width: 440px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    padding: 2.5rem !important;
+    transition: all 0.3s ease;
+}
+
+.auth-card:hover {
+    box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.45);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.auth-card h2 {
+    color: #fff;
+    font-weight: 700;
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.auth-card .subtitle {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.95rem;
+    margin-bottom: 2rem;
+}
+
+/* Glass form controls */
+.auth-card .form-label {
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.auth-card .form-control {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    color: #fff;
+    padding: 0.875rem 1rem;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+}
+
+.auth-card .form-control:focus {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(167, 139, 250, 0.6);
+    color: #fff;
+    box-shadow: 0 0 0 0.25rem rgba(167, 139, 250, 0.15);
+    outline: none;
+}
+
+.auth-card .form-control::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.auth-card .form-control:-webkit-autofill,
+.auth-card .form-control:-webkit-autofill:hover,
+.auth-card .form-control:-webkit-autofill:focus {
+    -webkit-text-fill-color: #fff;
+    -webkit-box-shadow: 0 0 0px 1000px rgba(139, 92, 246, 0.2) inset;
+    transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Submit button */
+.auth-card .btn-primary {
+    background: linear-gradient(135deg, var(--adv-primary), var(--adv-secondary));
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    padding: 0.875rem 1.5rem;
+    font-weight: 600;
+    font-size: 1.05rem;
+    transition: all 0.3s ease;
+    margin-top: 1rem;
+}
+
+.auth-card .btn-primary:hover {
+    background: linear-gradient(135deg, var(--adv-primary-hover), var(--adv-secondary));
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(var(--bs-primary-rgb, 99, 102, 241), 0.4);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+.auth-card .btn-primary:active {
+    transform: translateY(0);
+}
+
+/* Close button */
+.auth-card .btn-close {
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.auth-card .btn-close:hover {
+    opacity: 1;
+}
+
+/* Footer links */
+.auth-footer {
+    text-align: center;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.auth-footer a {
+    color: rgba(167, 139, 250, 1);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+.auth-footer a:hover {
+    color: rgba(217, 70, 239, 1);
+    text-decoration: underline;
+}
+
+/* Password requirements */
+.password-hint {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: 0.25rem;
+}
+
+/* Error messages */
+.auth-card .alert {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    border-radius: 12px;
+    color: rgba(255, 255, 255, 0.95);
+    margin-bottom: 1.5rem;
+}
+
+/* Success messages */
+.auth-card .alert-success {
+    background: rgba(34, 197, 94, 0.2);
+    border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+/* Form validation feedback */
+.auth-card .invalid-feedback {
+    color: rgba(248, 113, 113, 1);
+    font-size: 0.85rem;
+}
+
+.auth-card .valid-feedback {
+    color: rgba(134, 239, 172, 1);
+    font-size: 0.85rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+    .auth-card {
+        max-width: 100%;
+        padding: 1.5rem !important;
+        border-radius: 16px;
+    }
+
+    .auth-card h2 {
+        font-size: 1.75rem;
+    }
 }

@@ -46,6 +46,9 @@ def create_theme():
     if existing:
         return jsonify({"error": "Theme name already exists"}), 400
 
+    # Extract gradient data
+    gradient_data = data.get("gradient", {})
+
     theme = Theme(
         name=data["name"],
         description=data.get("description"),
@@ -63,6 +66,15 @@ def create_theme():
         link_hover_color=data.get("link_hover_color", "#8b5cf6"),
         border_color=data.get("border_color", "#334155"),
         card_bg=data.get("card_bg", "#1e293b"),
+        card_opacity=float(data.get("card_opacity", 0.1)),
+        gradient_angle=int(gradient_data.get("angle", 135)),
+        gradient_start=gradient_data.get("start", "#4c5270"),
+        gradient_end=gradient_data.get("end", "#5a3a52"),
+        background_image=data.get("background_image"),
+        bg_position=data.get("bg_position", "center"),
+        bg_size=data.get("bg_size", "cover"),
+        bg_repeat=data.get("bg_repeat", "no-repeat"),
+        bg_attachment=data.get("bg_attachment", "scroll"),
         created_by=current_user.id,
     )
 
@@ -121,6 +133,30 @@ def update_theme(theme_id):
         theme.border_color = data["border_color"]
     if "card_bg" in data:
         theme.card_bg = data["card_bg"]
+    if "card_opacity" in data:
+        theme.card_opacity = float(data["card_opacity"])
+
+    # Update gradient fields
+    if "gradient" in data:
+        gradient_data = data["gradient"]
+        if "angle" in gradient_data:
+            theme.gradient_angle = int(gradient_data["angle"])
+        if "start" in gradient_data:
+            theme.gradient_start = gradient_data["start"]
+        if "end" in gradient_data:
+            theme.gradient_end = gradient_data["end"]
+
+    # Update background image fields
+    if "background_image" in data:
+        theme.background_image = data["background_image"]
+    if "bg_position" in data:
+        theme.bg_position = data["bg_position"]
+    if "bg_size" in data:
+        theme.bg_size = data["bg_size"]
+    if "bg_repeat" in data:
+        theme.bg_repeat = data["bg_repeat"]
+    if "bg_attachment" in data:
+        theme.bg_attachment = data["bg_attachment"]
 
     db.session.commit()
 
@@ -196,6 +232,8 @@ def get_active_theme():
 @bp_theme.route("/active/css", methods=["GET"])
 def get_active_theme_css():
     """Get CSS variables for the active theme (public endpoint)."""
+    from flask import make_response
+
     theme = Theme.query.filter_by(is_active=True).first()
     if not theme:
         # Return default CSS
@@ -217,6 +255,56 @@ def get_active_theme_css():
     --bs-card-bg: #1e293b;
 }
 """
-        return css, 200, {"Content-Type": "text/css"}
+        response = make_response(css, 200)
+        response.headers["Content-Type"] = "text/css"
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
 
-    return theme.to_css_variables(), 200, {"Content-Type": "text/css"}
+    css = theme.to_css_variables()
+    response = make_response(css, 200)
+    response.headers["Content-Type"] = "text/css"
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
+
+@bp_theme.route("/upload-background", methods=["POST"])
+@login_required
+@admin_required
+def upload_background():
+    """Upload a background image for a theme."""
+    import os
+
+    from flask import current_app
+    from werkzeug.utils import secure_filename
+
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "No file selected"}), 400
+
+    # Validate file type
+    allowed_extensions = {"png", "jpg", "jpeg", "gif", "webp"}
+    filename = secure_filename(file.filename)
+    if "." not in filename or filename.rsplit(".", 1)[1].lower() not in allowed_extensions:
+        return jsonify({"error": "Invalid file type. Allowed: png, jpg, jpeg, gif, webp"}), 400
+
+    # Save file
+    upload_dir = os.path.join(current_app.root_path, "static", "themes", "backgrounds")
+    os.makedirs(upload_dir, exist_ok=True)
+
+    # Generate unique filename
+    import time
+
+    unique_filename = f"{int(time.time())}_{filename}"
+    filepath = os.path.join(upload_dir, unique_filename)
+    file.save(filepath)
+
+    # Return URL
+    url = f"/static/themes/backgrounds/{unique_filename}"
+    return jsonify({"url": url}), 200

@@ -3,8 +3,7 @@
 Adventure MUD Setup Script
 
 Interactive, colorful bootstrap utility to configure environment, initialize the
-SQLite database (or other configured DB), run (lightweight) migrations, and
-create an initial admin user.
+database, run migrations, and create an initial admin user.
 
 Now includes verbosity flags and future secret key auto-generation hook.
 """
@@ -63,7 +62,7 @@ if ENV_FILE.exists():
             existing_env[k.strip()] = v.strip()
 
 DEFAULT_SECRET = existing_env.get("SECRET_KEY", "dev-secret-change-me")
-DEFAULT_DB = existing_env.get("DATABASE_URL", f'sqlite:///{(INSTANCE_DIR/"mud.db").as_posix()}')
+DEFAULT_DB = existing_env.get("DATABASE_URL", "")
 DEFAULT_CORS = existing_env.get("CORS_ALLOWED_ORIGINS", "*")
 
 parser = argparse.ArgumentParser(description="Interactive / non-interactive setup for Adventure MUD")

@@ -1,29 +1,45 @@
 {% extends 'base.html' %}
-{% block title %}Login - MUD Game{% endblock %}
+{% block title %}Login - Adventure{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-center align-items-center auth-page">
-    <div class="card shadow-lg p-4 bg-dark text-white auth-card">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h2 class="mb-0">Sign in</h2>
+    <div class="auth-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div>
+                <h2>Welcome Back</h2>
+                <p class="subtitle">Sign in to continue your adventure</p>
+            </div>
             <a href="/" class="btn-close btn-close-white" aria-label="Close"></a>
         </div>
-        <form method="POST">
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ 'danger' if category == 'error' else category }}" role="alert">
+            {{ message }}
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <form method="POST" novalidate>
             <div class="mb-3">
                 <label for="username" class="form-label">Username or Email</label>
-                <input type="text" class="form-control form-control-lg bg-dark text-white border-secondary"
-                    id="username" name="username" required autocomplete="username">
+                <input type="text" class="form-control form-control-lg" id="username" name="username"
+                    placeholder="Enter your username or email" required autocomplete="username" autofocus>
             </div>
             <div class="mb-3">
                 <label for="password" class="form-label">Password</label>
-                <input type="password" class="form-control form-control-lg bg-dark text-white border-secondary"
-                    id="password" name="password" required autocomplete="current-password">
+                <input type="password" class="form-control form-control-lg" id="password" name="password"
+                    placeholder="Enter your password" required autocomplete="current-password">
             </div>
-            <button type="submit" class="btn btn-primary btn-lg w-100">Sign in</button>
+            <button type="submit" class="btn btn-primary btn-lg w-100">
+                <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+            </button>
         </form>
-        <div class="text-center mt-3">
-            <small>Don't have an account? <a href="/register" class="text-info">Register here</a>.</small>
+
+        <div class="auth-footer">
+            <small>Don't have an account? <a href="/register">Create one now</a></small>
         </div>
-        <!-- Third-party sign-in options removed -->
     </div>
 </div>
 {% endblock %}

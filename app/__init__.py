@@ -64,14 +64,12 @@ app.config.update(
     DUNGEON_ENABLE_GENERATION_METRICS=bool(os.getenv("DUNGEON_ENABLE_GENERATION_METRICS", "1") == "1"),
 )
 
-engine_opts = {}
-if database_url.startswith("sqlite:///"):
-    # Provide a generous timeout to mitigate transient lock contention in tests
-    engine_opts["connect_args"] = {
-        "timeout": 10,  # busy timeout (seconds) for sqlite
-        "check_same_thread": False,  # allow usage across threads like socketio / test harness
-    }
-    # Future: poolclass=StaticPool for in-memory usage; for file DB we keep defaults.
+# PostgreSQL connection pooling options
+engine_opts = {
+    "pool_pre_ping": True,  # Verify connections before using
+    "pool_recycle": 300,  # Recycle connections after 5 minutes
+}
+
 db = SQLAlchemy(app, session_options={"expire_on_commit": False}, engine_options=engine_opts)
 login_manager = LoginManager(app)
 login_manager.login_view = "auth.login"

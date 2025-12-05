@@ -1,27 +1,46 @@
 {% extends 'base.html' %}
-{% block title %}Register - MUD Game{% endblock %}
+{% block title %}Register - Adventure{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-center align-items-center auth-page">
-    <div class="card shadow-lg p-4 bg-dark text-white auth-card">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h2 class="mb-0">Sign up</h2>
+    <div class="auth-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div>
+                <h2>Create Account</h2>
+                <p class="subtitle">Join the adventure today</p>
+            </div>
             <a href="/" class="btn-close btn-close-white" aria-label="Close"></a>
         </div>
-        <form method="POST">
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ 'danger' if category == 'error' else category }}" role="alert">
+            {{ message }}
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <form method="POST" novalidate>
             <div class="mb-3">
-                <label for="username" class="form-label">Email address</label>
-                <input type="text" class="form-control form-control-lg bg-dark text-white border-secondary"
-                    id="username" name="username" required autocomplete="username">
+                <label for="username" class="form-label">Email Address</label>
+                <input type="email" class="form-control form-control-lg" id="username" name="username"
+                    placeholder="your.email@example.com" required autocomplete="email" autofocus>
+                <div class="password-hint">We'll use this for account recovery</div>
             </div>
             <div class="mb-3">
                 <label for="password" class="form-label">Password</label>
-                <input type="password" class="form-control form-control-lg bg-dark text-white border-secondary"
-                    id="password" name="password" required autocomplete="new-password">
+                <input type="password" class="form-control form-control-lg" id="password" name="password"
+                    placeholder="Create a strong password" required autocomplete="new-password" minlength="8">
+                <div class="password-hint">At least 8 characters recommended</div>
             </div>
-            <button type="submit" class="btn btn-primary btn-lg w-100">Sign up</button>
+            <button type="submit" class="btn btn-primary btn-lg w-100">
+                <i class="bi bi-person-plus me-2"></i>Create Account
+            </button>
         </form>
-        <div class="text-center mt-3">
-            <small>Already have an account? <a href="/login" class="text-info">Login here</a>.</small>
+
+        <div class="auth-footer">
+            <small>Already have an account? <a href="/login">Sign in here</a></small>
         </div>
     </div>
 </div>

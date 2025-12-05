@@ -68,8 +68,8 @@ body.purple-gradient {
 
 .form-control-glass:focus {
     background: rgba(255, 255, 255, 0.2);
-    border-color: #a78bfa;
-    box-shadow: 0 0 0 0.25rem rgba(167, 139, 250, 0.25);
+    border-color: var(--adv-primary);
+    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb, 167, 139, 250), 0.25);
     color: #fff;
     outline: 0;
 }
@@ -85,8 +85,8 @@ body.purple-gradient {
 
 .form-select-glass:focus {
     background: rgba(255, 255, 255, 0.2);
-    border-color: #a78bfa;
-    box-shadow: 0 0 0 0.25rem rgba(167, 139, 250, 0.25);
+    border-color: var(--adv-primary);
+    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb, 167, 139, 250), 0.25);
     color: #fff;
     outline: 0;
 }
@@ -101,7 +101,7 @@ body.purple-gradient {
    ======================================== */
 
 .btn-glass {
-    background: linear-gradient(135deg, #8b5cf6, #d946ef);
+    background: linear-gradient(135deg, var(--adv-primary), var(--adv-secondary));
     border: 1px solid rgba(255, 255, 255, 0.3);
     color: #fff;
     font-weight: 600;
@@ -437,8 +437,8 @@ body.purple-gradient {
 
 .seed-widget input:focus {
     background: rgba(255, 255, 255, 0.2);
-    border-color: #a78bfa;
-    box-shadow: 0 0 0 0.25rem rgba(167, 139, 250, 0.25);
+    border-color: var(--adv-primary);
+    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb, 167, 139, 250), 0.25);
     color: #fff;
 }
 
@@ -564,13 +564,13 @@ body.purple-gradient {
 }
 
 .form-check-input:checked {
-    background-color: #8b5cf6;
-    border-color: #a78bfa;
+    background-color: var(--adv-primary);
+    border-color: var(--adv-primary);
 }
 
 .form-check-input:focus {
-    border-color: #a78bfa;
-    box-shadow: 0 0 0 0.25rem rgba(167, 139, 250, 0.25);
+    border-color: var(--adv-primary);
+    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb, 167, 139, 250), 0.25);
 }
 
 .form-check-label {
@@ -693,7 +693,7 @@ hr {
     width: 60px;
     height: 60px;
     margin: 0 auto 1rem;
-    background: linear-gradient(135deg, #8b5cf6, #d946ef);
+    background: linear-gradient(135deg, var(--adv-primary), var(--adv-secondary));
     border-radius: 12px;
     display: flex;
     align-items: center;
@@ -760,7 +760,7 @@ hr {
 
 .nav-link:hover,
 .nav-link.active {
-    color: rgba(167, 139, 250, 1) !important;
+    color: var(--adv-primary) !important;
 }
 
 .navbar-toggler {
@@ -804,7 +804,7 @@ hr {
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #8b5cf6, #d946ef);
+    background: linear-gradient(135deg, var(--adv-primary), var(--adv-secondary));
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -825,7 +825,7 @@ hr {
 }
 
 .footer-dark .brand {
-    color: rgba(167, 139, 250, 1);
+    color: var(--adv-primary);
     font-weight: 700;
     letter-spacing: 0.5px;
 }
@@ -837,7 +837,7 @@ hr {
 }
 
 .footer-dark a:hover {
-    color: rgba(167, 139, 250, 1);
+    color: var(--adv-primary);
 }
 
 .footer-dark .section-title {
