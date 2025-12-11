@@ -2,226 +2,346 @@
 {% from 'macros/svg_icon.html' import svg_icon %}
 {% from 'macros/seed_widget.html' import seed_widget %}
 
+{% block head %}
+{{ super() }}
+{% endblock %}
+
 {% block dashboard_content %}
 
-{% if validation_error %}
-<div class="alert alert-glass" role="alert">
-    {{ validation_error }}
-    <div class="small" style="opacity: 0.8;">Select characters by checking the boxes on your cards.</div>
-    <div class="small" style="opacity: 0.8;">You can choose between 1 and 4 party members.</div>
-    <button type="button" class="btn btn-sm btn-glass-secondary mt-2"
-        onclick="document.getElementById('autofill-party-btn').click()">
-        Autofill Party
-    </button>
-</div>
-{% endif %}
-
-<div class="time-widget">
-    <h6>Game Time</h6>
-    <div id="time-tick-display">
-        <span id="dashboard-time-tick">{{ game_clock.tick if game_clock else 0 }}</span>
+<!-- Tactical HUD - Top Right -->
+<div class="tactical-hud">
+    <div class="hud-status">
+        <span class="label">[ GAME CLOCK ]</span>
+        <span class="value" id="dashboard-time-tick">{{ game_clock.tick if game_clock else 0 }}</span>
     </div>
 </div>
 
-<div class="row mb-4 align-items-start g-4">
-    <!-- Character creation card -->
-    <div class="col-md-6 col-lg-4 d-flex flex-column">
-        <div class="card glass-card h-100">
-            <div class="card-header-glass">
-                <h5>{{ svg_icon('plus-circle', 20, 'me-2') }}Create a Character</h5>
+<!-- Mission Briefing (Main Content) -->
+<div class="mission-briefing">
+
+    <!-- Alert/Warning Banner -->
+    {% if validation_error %}
+    <div class="alert-tactical">
+        <div class="d-flex align-items-start gap-3">
+            <i class="bi bi-exclamation-triangle-fill" style="font-size: 1.5rem; color: var(--dungeon-warn);"></i>
+            <div class="flex-grow-1">
+                <strong>[ PARTY FORMATION ERROR ]</strong>
+                <div class="mt-2">{{ validation_error }}</div>
+                <div class="small mt-1" style="opacity: 0.85;">Select adventurers by clicking SELECT on their cards.
+                </div>
+                <div class="small" style="opacity: 0.85;">Party size: 1-4 adventurers required.</div>
+                <button type="button" class="tactical-btn-secondary mt-3" style="font-size: 0.85rem; padding: 8px 16px;"
+                    onclick="document.getElementById('autofill-party-btn').click()">
+                    {{ svg_icon('shuffle', 16, 'me-1') }} AUTO-FILL PARTY
+                </button>
             </div>
-            <div class="card-body">
-                <form method="POST">
-                    <div class="mb-3">
-                        <label for="name" class="form-label text-light">Name</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control form-control-glass" id="name" name="name"
-                                placeholder="Your hero's name" required aria-label="Character name"
-                                aria-describedby="randomize-name">
-                            <button class="btn btn-glass-secondary" type="button" id="randomize-name"
-                                title="Randomize name">
-                                {{ svg_icon('dice-5', 20) }}
-                            </button>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Page Header -->
+    <div class="briefing-header">
+        <h2>{{ svg_icon('dungeon-gate', 28, 'me-3 align-text-bottom') }}TAVERN HALL</h2>
+        <div class="subtitle">Gather your party // Equip adventurers // Embark on quest</div>
+    </div>
+
+    <!-- Top Row: Character Creation + Squad Status -->
+    <div class="row mb-4 g-4">
+
+        <!-- Recruit New Adventurer -->
+        <div class="col-lg-5 col-xl-4">
+            <div class="tactical-panel h-100">
+                <div class="panel-header">
+                    <h5>{{ svg_icon('plus-circle', 20, 'me-2') }}RECRUIT ADVENTURER</h5>
+                </div>
+                <div class="panel-body">
+                    <form method="POST" class="loadout-form" style="background: none; border: none; padding: 0;">
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Character Name</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="name" name="name"
+                                    placeholder="Enter adventurer name" required>
+                                <button class="btn tactical-btn-secondary" type="button" id="randomize-name"
+                                    title="Generate random name" style="padding: 10px 15px;">
+                                    {{ svg_icon('dice-5', 20) }}
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <label for="char_class" class="form-label">Class</label>
+                            <select class="form-select" id="char_class" name="char_class" required>
+                                <option value="fighter">FIGHTER - Sword & Shield</option>
+                                <option value="rogue">ROGUE - Shadow & Blade</option>
+                                <option value="mage">MAGE - Arcane Arts</option>
+                                <option value="cleric">CLERIC - Divine Healer</option>
+                                <option value="ranger">RANGER - Bow & Arrow</option>
+                                <option value="druid">DRUID - Nature's Wrath</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn deploy-btn">
+                            {{ svg_icon('plus-circle', 20, 'me-2') }}HIRE ADVENTURER
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Party Assembly Panel -->
+        <div class="col-lg-7 col-xl-8">
+            <div class="tactical-panel h-100">
+                <div class="panel-header">
+                    <h5>{{ svg_icon('people-fill', 20, 'me-2') }}PARTY ROSTER</h5>
+                    <span class="badge"><span id="party-count">0</span> / 4 READY</span>
+                </div>
+                <div class="panel-body">
+                    <div class="deployment-panel" style="background: none; border: none; padding: 0;">
+                        <div class="party-counter">
+                            <h3 id="party-count-display">0/4</h3>
+                            <p>Party Members</p>
+                        </div>
+
+                        <div id="party-table" class="mb-3" style="min-height: 60px;"></div>
+
+                        <form method="POST" id="begin-adventure-form">
+                            <input type="hidden" name="form" value="start_adventure">
+                            <div id="party-hidden-inputs"></div>
+
+                            <div class="d-flex flex-column gap-3">
+                                <button type="button" id="autofill-party-btn" class="tactical-btn-secondary">
+                                    {{ svg_icon('shuffle', 20, 'me-2') }} AUTO-FILL PARTY
+                                </button>
+
+                                <button type="submit" id="begin-adventure-btn" class="deploy-btn" disabled>
+                                    {{ svg_icon('dungeon-gate', 24, 'me-2 align-text-bottom') }} ENTER DUNGEON
+                                </button>
+
+                                {% if session.get('dungeon_instance_id') and session.get('last_party_ids') %}
+                                <form method="POST" class="m-0" id="continue-adventure-form">
+                                    <input type="hidden" name="form" value="continue_adventure">
+                                    <button type="submit" class="tactical-btn-secondary w-100">
+                                        {{ svg_icon('campfire', 20, 'me-2') }} CONTINUE QUEST
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+
+                            <div class="mt-4">
+                                {{ seed_widget(dungeon_seed) }}
+                            </div>
+
+                            <!-- Merchant Shops -->
+                            <div class="mt-4">
+                                <div class="subtitle mb-3">{{ svg_icon('cash', 16, 'me-2') }}MERCHANTS</div>
+                                <div class="d-flex flex-column gap-2">
+                                    <button type="button"
+                                        class="tactical-btn-secondary d-flex align-items-center justify-content-between"
+                                        onclick="window.tradingSystem && tradingSystem.openMerchant('general-merchant', {{ characters[0].id if characters else 1 }})">
+                                        <span><i class="bi bi-basket me-2"></i> General Store</span>
+                                        <span class="badge"
+                                            style="background: rgba(212, 165, 116, 0.2); font-size: 0.65rem;">OPEN</span>
+                                    </button>
+                                    <button type="button"
+                                        class="tactical-btn-secondary d-flex align-items-center justify-content-between"
+                                        onclick="window.tradingSystem && tradingSystem.openMerchant('weapon-shop', {{ characters[0].id if characters else 1 }})">
+                                        <span>{{ svg_icon('bloody-sword', 16, 'me-2') }} Weapon Smith</span>
+                                        <span class="badge"
+                                            style="background: rgba(212, 165, 116, 0.2); font-size: 0.65rem;">OPEN</span>
+                                    </button>
+                                    <button type="button"
+                                        class="tactical-btn-secondary d-flex align-items-center justify-content-between"
+                                        onclick="window.tradingSystem && tradingSystem.openMerchant('armor-shop', {{ characters[0].id if characters else 1 }})">
+                                        <span><i class="bi bi-shield-fill me-2"></i> Armor Smith</span>
+                                        <span class="badge"
+                                            style="background: rgba(212, 165, 116, 0.2); font-size: 0.65rem;">OPEN</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Party Management -->
+                            <div class="mt-4">
+                                <div class="subtitle mb-3">{{ svg_icon('people-fill', 16, 'me-2') }}PARTY</div>
+                                <div class="d-flex flex-column gap-2">
+                                    <button type="button" class="tactical-btn-secondary"
+                                        onclick="window.partySystem && partySystem.openParty(1)">
+                                        <i class="bi bi-people-fill me-2"></i> Manage Party
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Skill Trees -->
+                            <div class="mt-4">
+                                <div class="subtitle mb-3">{{ svg_icon('star-fill', 16, 'me-2') }}SKILLS</div>
+                                <div class="d-flex flex-column gap-2">
+                                    <button type="button" class="tactical-btn-secondary"
+                                        onclick="window.skillTreeSystem && skillTreeSystem.openSkillTree({{ characters[0].id if characters else 1 }})">
+                                        <i class="bi bi-star-fill me-2"></i> Skill Tree
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Achievements -->
+                            <div class="mt-4">
+                                <div class="subtitle mb-3">{{ svg_icon('trophy-fill', 16, 'me-2') }}ACHIEVEMENTS</div>
+                                <div class="d-flex flex-column gap-2">
+                                    <button type="button" class="tactical-btn-secondary"
+                                        onclick="window.achievementSystem && achievementSystem.openAchievements({{ characters[0].id if characters else 1 }})">
+                                        <i class="bi bi-trophy-fill me-2"></i> Achievements
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Divider -->
+    <div class="briefing-header" style="margin-top: 50px; margin-bottom: 30px;">
+        <h2>{{ svg_icon('people-fill', 28, 'me-3 align-text-bottom') }}AVAILABLE ADVENTURERS</h2>
+        <div class="subtitle">Review attributes // Manage equipment // Select for quest</div>
+    </div>
+
+    <!-- Operative Cards (Character Cards) -->
+    <div class="row g-4">
+        {% for c in characters %}
+        <div class="col-12 col-md-6 col-xl-4">
+            <div class="operative-card {% if session.get('party') %}{% for p in session.get('party') %}{% if p.id == c.id %}selected{% endif %}{% endfor %}{% endif %}"
+                data-id="{{ c.id }}">
+
+                <!-- Operative Header -->
+                <div class="operative-header">
+                    <div class="operative-name">
+                        <span class="icon-28">
+                            {% set class_lower = c.class_name.lower() %}
+                            {% if class_lower == 'fighter' %}
+                            {{ svg_icon('swords-power', 24) }}
+                            {% elif class_lower == 'mage' %}
+                            {{ svg_icon('fire-silhouette', 24) }}
+                            {% elif class_lower == 'rogue' %}
+                            {{ svg_icon('rogue', 24) }}
+                            {% elif class_lower == 'druid' %}
+                            {{ svg_icon('heavy-thorny-triskelion', 24) }}
+                            {% elif class_lower == 'cleric' %}
+                            {{ svg_icon('aura', 24) }}
+                            {% elif class_lower == 'ranger' %}
+                            {{ svg_icon('bowman', 24) }}
+                            {% else %}
+                            <i class="bi bi-person-fill"></i>
+                            {% endif %}
+                        </span>
+                        <span>{{ c.name }}</span>
+                    </div>
+                    <div class="operative-meta">
+                        <span class="class-badge {{ c.class_name|lower }}-badge">{{ c.class_name }}</span>
+                        <span class="badge">LV{{ c.level }}</span>
+                    </div>
+                </div>
+
+                <!-- Operative Body -->
+                <div class="operative-body">
+
+                    <!-- XP Progress -->
+                    <div
+                        style="font-size: 0.85rem; padding: 8px 12px; background: rgba(13, 10, 10, 0.6); border: 1px solid var(--dungeon-border);">
+                        <span style="color: var(--dungeon-text-dim);">EXPERIENCE:</span>
+                        <span style="color: var(--dungeon-accent);">{{ c.xp }}</span> /
+                        <span style="color: var(--dungeon-text-dim);">{{ c.xp_next }}</span>
+                        <span style="opacity: 0.7; margin-left: 8px;">(Next: LV{{ c.level + 1 }})</span>
+                    </div>
+
+                    <!-- Stats Block -->
+                    <div class="stat-block">
+                        <h6>{{ svg_icon('bar-chart', 16, 'me-1') }}ATTRIBUTES</h6>
+                        <div class="stat-grid">
+                            <div><span class="fw-bold">STR</span>{{ c.stats.str }}</div>
+                            <div><span class="fw-bold">DEX</span>{{ c.stats.dex }}</div>
+                            <div><span class="fw-bold">INT</span>{{ c.stats.int }}</div>
+                            <div><span class="fw-bold">WIS</span>{{ c.stats.wis }}</div>
+                            <div><span class="fw-bold">CHA</span>{{ c.stats.cha }}</div>
+                            <div><span class="fw-bold">CON</span>{{ c.stats.con }}</div>
+                            <div><span class="fw-bold">HP</span>{{ c.stats.hp }}</div>
+                            <div><span class="fw-bold">MP</span>{{ c.stats.mana }}</div>
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="char_class" class="form-label text-light">Class</label>
-                        <select class="form-select form-select-glass" id="char_class" name="char_class" required>
-                            <option value="fighter">Fighter</option>
-                            <option value="rogue">Rogue</option>
-                            <option value="mage">Mage</option>
-                            <option value="cleric">Cleric</option>
-                            <option value="ranger">Ranger</option>
-                            <option value="druid">Druid</option>
-                        </select>
+
+                    <!-- Resources -->
+                    <div class="resource-bar">
+                        <span class="coin-gold">{{ svg_icon('cash', 18, 'me-1') }}{{ c.coins.gold }}g</span>
+                        <span class="coin-silver">{{ svg_icon('two-coins', 18, 'me-1') }}{{ c.coins.silver }}s</span>
+                        <span class="coin-copper">{{ svg_icon('token', 18, 'me-1') }}{{ c.coins.copper }}c</span>
                     </div>
-                    <button type="submit" class="btn btn-glass w-100">Create Character</button>
-                </form>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6 col-lg-8">
-        <div class="card glass-card">
-            <div class="card-header-glass d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">{{ svg_icon('people-fill', 20, 'me-2') }}Your Party</h5>
-                <span class="badge bg-info"><span id="party-count">0</span> / 4 selected</span>
-            </div>
-            <div class="card-body">
-                <div class="party-counter">
-                    <h3 id="party-count-display">0/4</h3>
-                    <p>Characters Selected</p>
-                </div>
-                <div id="party-table" class="mt-3"></div>
-                <form method="POST" id="begin-adventure-form" class="mt-3 d-flex flex-column gap-2">
-                    <input type="hidden" name="form" value="start_adventure">
-                    <div id="party-hidden-inputs"></div>
-                    <div class="d-flex flex-column gap-2">
-                        <button type="button" id="autofill-party-btn" class="btn btn-glass-secondary"
-                            title="Autofill party with random characters">
-                            {{ svg_icon('shuffle', 20, 'me-2') }} Autofill Party
-                        </button>
-                        <button type="submit" id="begin-adventure-btn" class="btn btn-glass" disabled>
-                            {{ svg_icon('dungeon-gate', 20, 'me-2 align-text-bottom') }} Begin Adventure
-                        </button>
-                        {% if session.get('dungeon_instance_id') and session.get('last_party_ids') %}
-                        <form method="POST" class="m-0" id="continue-adventure-form">
-                            <input type="hidden" name="form" value="continue_adventure">
-                            <button type="submit" class="btn btn-glass-secondary w-100"
-                                title="Resume your previous dungeon instance with the last party">
-                                {{ svg_icon('campfire', 20, 'me-2 align-text-bottom') }} Continue Adventure
-                            </button>
-                        </form>
+
+                    <!-- Inventory -->
+                    <div class="stat-block" style="flex-grow: 1;">
+                        <h6>{{ svg_icon('knapsack', 16, 'me-1') }}EQUIPMENT</h6>
+                        {% if c.inventory and c.inventory|length > 0 %}
+                        <div class="inventory-list">
+                            <ul>
+                                {% for it in c.inventory %}
+                                <li>
+                                    {% if it.type == 'weapon' %}
+                                    {{ svg_icon('bloody-sword', 16) }}
+                                    {% elif it.type == 'armor' %}
+                                    {{ svg_icon('shield', 16) }}
+                                    {% elif it.type == 'potion' %}
+                                    {{ svg_icon('potion-ball', 16) }}
+                                    {% elif it.type == 'tool' %}
+                                    {{ svg_icon('anvil', 16) }}
+                                    {% elif it.type == 'ring' %}
+                                    {{ svg_icon('ring', 16) }}
+                                    {% elif it.type == 'scroll' %}
+                                    {{ svg_icon('scroll-unfurled', 16) }}
+                                    {% else %}
+                                    {{ svg_icon('chest', 16) }}
+                                    {% endif %}
+                                    <span>{{ it.name }}</span>
+                                    <span style="opacity: 0.6; margin-left: auto;">[{{ it.type }}]</span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% else %}
+                        <div style="opacity: 0.5; font-size: 0.85rem; padding: 12px; text-align: center;">
+                            [ UNARMED ]
+                        </div>
                         {% endif %}
                     </div>
-                    <div class="mt-3">
-                        {{ seed_widget(dungeon_seed) }}
+                </div>
+
+                <!-- Operative Footer -->
+                <div class="operative-footer">
+                    <form action="{{ url_for('dashboard.delete_character', char_id=c.id) }}" method="post"
+                        onsubmit="return confirm('⚠️ DISMISS {{ c.name }}?\n\nThis action is permanent and cannot be undone.');">
+                        <button class="tactical-btn-danger">
+                            {{ svg_icon('trash-can', 16, 'me-1') }} DISMISS
+                        </button>
+                    </form>
+                    <div class="btn-group">
+                        <button class="tactical-btn-secondary btn-equip-panel" data-char-id="{{ c.id }}"
+                            title="Equipment Panel" style="padding: 8px 12px;">
+                            {{ svg_icon('anvil', 18) }}
+                        </button>
+                        <button class="tactical-btn-secondary btn-bag-panel" data-char-id="{{ c.id }}" title="Inventory"
+                            style="padding: 8px 12px;">
+                            {{ svg_icon('knapsack', 18) }}
+                        </button>
                     </div>
-                </form>
+                    <input type="checkbox" class="party-select d-none" id="char-select-{{ c.id }}" data-id="{{ c.id }}"
+                        data-name="{{ c.name }}" data-class="{{ c.class_name }}" {% if session.get('party') %}{% for p
+                        in session.get('party') %}{% if p.id==c.id %}checked{% endif %}{% endfor %}{% endif %}>
+                    <label for="char-select-{{ c.id }}" class="select-operative" style="cursor: pointer; margin: 0;">
+                        <span class="select-text">{% if session.get('party') %}{% for p in session.get('party') %}{% if
+                            p.id == c.id %}SELECTED{% else %}SELECT{% endif %}{% endfor %}{% else %}SELECT{% endif
+                            %}</span>
+                    </label>
+                </div>
             </div>
         </div>
+        {% endfor %}
     </div>
 </div>
 
-<hr class="my-5">
-
-<div class="row g-4">
-    {% for c in characters %}
-    <div class="col-12 col-md-6 col-lg-4">
-        <div class="card character-card h-100" data-id="{{ c.id }}">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span class="d-flex align-items-center">
-                    {% set class_lower = c.class_name.lower() %}
-                    <span class="me-2 icon-28 u-flex-center">
-                        {% if class_lower == 'fighter' %}
-                        {{ svg_icon('swords-power', 24, 'icon-glow') }}
-                        {% elif class_lower == 'mage' %}
-                        {{ svg_icon('fire-silhouette', 24, 'icon-glow') }}
-                        {% elif class_lower == 'rogue' %}
-                        {{ svg_icon('rogue', 24, 'icon-glow') }}
-                        {% elif class_lower == 'druid' %}
-                        {{ svg_icon('heavy-thorny-triskelion', 24, 'icon-glow') }}
-                        {% elif class_lower == 'cleric' %}
-                        {{ svg_icon('aura', 24, 'icon-glow') }}
-                        {% elif class_lower == 'ranger' %}
-                        {{ svg_icon('bowman', 24, 'icon-glow') }}
-                        {% else %}
-                        <i class="bi bi-person-fill"></i>
-                        {% endif %}
-                    </span>
-                    <span>{{ c.name }}</span>
-                </span>
-                <div class="d-flex align-items-center gap-2">
-                    <span class="badge class-badge {{ c.class_name|lower }}-badge">{{ c.class_name }}</span>
-                    <span class="badge bg-info">Lvl {{ c.level }}</span>
-                    <div class="form-check m-0">
-                        {% set in_party = false %}
-                        {% if session.get('party') %}
-                        {% for p in session.get('party') %}
-                        {% if p.id == c.id %}{% set in_party = true %}{% endif %}
-                        {% endfor %}
-                        {% endif %}
-                        <input class="form-check-input party-select" type="checkbox" value="{{ c.id }}"
-                            id="party-{{ c.id }}" data-id="{{ c.id }}" data-name="{{ c.name }}"
-                            data-class="{{ c.class_name }}" {% if in_party %}checked{% endif %}>
-                        <label class="form-check-label small" for="party-{{ c.id }}">Select</label>
-                    </div>
-                </div>
-            </div>
-            <div class="card-body">
-                <div class="mb-2">
-                    <span class="text-warning">XP:</span>
-                    <span class="text-light">{{ c.xp }} / {{ c.xp_next }} (to level {{ c.level + 1 }})</span>
-                </div>
-                <div class="mb-3">
-                    <h6 class="text-uppercase">Stats</h6>
-                    <div class="stat-grid">
-                        <div><span class="fw-bold">STR</span>: {{ c.stats.str }}</div>
-                        <div><span class="fw-bold">DEX</span>: {{ c.stats.dex }}</div>
-                        <div><span class="fw-bold">INT</span>: {{ c.stats.int }}</div>
-                        <div><span class="fw-bold">WIS</span>: {{ c.stats.wis }}</div>
-                        <div><span class="fw-bold">CHA</span>: {{ c.stats.cha }}</div>
-                        <div><span class="fw-bold">CON</span>: {{ c.stats.con }}</div>
-                        <div><span class="fw-bold">HP</span>: {{ c.stats.hp }}</div>
-                        <div><span class="fw-bold">Mana</span>: {{ c.stats.mana }}</div>
-                    </div>
-                </div>
-                <div class="d-flex justify-content-center align-items-center gap-3 mb-3">
-                    <span title="Gold" class="coin-gold">{{ svg_icon('cash', 18, 'me-1 coin-gold') }} {{ c.coins.gold
-                        }}</span>
-                    <span title="Silver" class="coin-silver">{{ svg_icon('two-coins', 18, 'me-1 coin-silver') }} {{
-                        c.coins.silver }}</span>
-                    <span title="Copper" class="coin-copper">{{ svg_icon('token', 18, 'me-1 coin-copper') }} {{
-                        c.coins.copper }}</span>
-                </div>
-                <h6 class="text-uppercase">{{ svg_icon('knapsack', 18, 'me-1 align-text-bottom') }} Inventory
-                </h6>
-                {% if c.inventory and c.inventory|length > 0 %}
-                <ul class="small mb-0 list-reset">
-
-                    {% for it in c.inventory %}
-                    <li>
-                        {% if it.type == 'weapon' %}
-                        {{ svg_icon('bloody-sword', 18, 'me-1') }}
-                        {% elif it.type == 'armor' %}
-                        {{ svg_icon('shield', 18, 'me-1') }}
-                        {% elif it.type == 'potion' %}
-                        {{ svg_icon('potion-ball', 18, 'me-1') }}
-                        {% elif it.type == 'tool' %}
-                        {{ svg_icon('anvil', 18, 'me-1') }}
-                        {% elif it.type == 'ring' %}
-                        {{ svg_icon('ring', 18, 'me-1') }}
-                        {% elif it.type == 'scroll' %}
-                        {{ svg_icon('scroll-unfurled', 18, 'me-1') }}
-                        {% else %}
-                        {{ svg_icon('chest', 18, 'me-1') }}
-                        {% endif %}
-                        {{ it.name }} <span class="text-muted">({{ it.type }})</span>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                <div class="small" style="opacity: 0.7;">No items</div>
-                {% endif %}
-            </div>
-            <div class="card-footer d-flex justify-content-between">
-                <form action="{{ url_for('dashboard.delete_character', char_id=c.id) }}" method="post"
-                    onsubmit="return confirm('Delete {{ c.name }}?');">
-                    <button class="btn btn-sm btn-glass-danger" aria-label="Delete {{ c.name }}"
-                        data-bs-title="Delete {{ c.name }}" data-mud-tooltip="1">{{ svg_icon('trash-can',16) }}</button>
-                </form>
-                <div class="btn-group" role="group" aria-label="Character inventory controls">
-                    <button class="btn btn-sm btn-outline-warning btn-equip-panel icon-btn" data-char-id="{{ c.id }}"
-                        aria-label="Equipment" data-bs-title="Equipment" data-mud-tooltip="1">{{
-                        svg_icon('anvil',18,'icon-inline') }}</button>
-                    <button class="btn btn-sm btn-outline-warning btn-bag-panel icon-btn" data-char-id="{{ c.id }}"
-                        aria-label="Bags" data-bs-title="Bags" data-mud-tooltip="1">{{
-                        svg_icon('knapsack',18,'icon-inline') }}</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endfor %}
-</div>
 {% endblock %}
 
 {# Chat widget - positioned fixed at bottom-left #}
@@ -230,28 +350,26 @@
         <ul class="nav nav-tabs flex-grow-1 mb-0" id="chatTabNav" role="tablist">
             <li class="nav-item" role="presentation">
                 <button class="nav-link active" id="tab-general" data-bs-toggle="tab" data-bs-target="#chat-general"
-                    type="button" role="tab" aria-controls="chat-general" aria-selected="true">General</button>
+                    type="button" role="tab">TAVERN CHAT</button>
             </li>
-            <!-- Dynamic tabs will be inserted here -->
         </ul>
         <button id="lobby-chat-toggle-btn" class="btn btn-sm btn-outline-secondary ms-2 btn-square-32"
-            title="Expand/Collapse Chat">
+            title="Toggle Chat">
             <i class="bi bi-chevron-up" id="lobby-chat-chevron"></i>
         </button>
     </div>
     <div class="mud-chat-body d-flex flex-column chat-body-240">
         <div class="tab-content flex-grow-1 d-flex flex-column" id="chatTabContent">
-            <div class="tab-pane fade show active d-flex flex-column h-100" id="chat-general" role="tabpanel"
-                aria-labelledby="tab-general">
+            <div class="tab-pane fade show active d-flex flex-column h-100" id="chat-general" role="tabpanel">
                 <div class="chat-messages flex-grow-1" id="lobby-chat-messages-general"></div>
                 <form class="chat-form mt-2" id="lobby-chat-form-general" autocomplete="off">
-                    <input type="text" id="lobby-chat-input-general" class="form-control"
-                        placeholder="Type a message..." maxlength="200" required />
-                    <button type="submit" id="lobby-chat-send-general" class="btn btn-primary"><i
-                            class="bi bi-send"></i></button>
+                    <input type="text" id="lobby-chat-input-general" class="form-control" placeholder="Type message..."
+                        maxlength="200" required />
+                    <button type="submit" id="lobby-chat-send-general" class="btn btn-primary">
+                        <i class="bi bi-send"></i>
+                    </button>
                 </form>
             </div>
-            <!-- Dynamic tab panes will be inserted here -->
         </div>
     </div>
 </div>
@@ -261,7 +379,253 @@
 <script src="{{ asset_url('js/dashboard.js') }}"></script>
 <script src="{{ asset_url('js/tooltips.js') }}"></script>
 <script src="{{ asset_url('js/equipment.js') }}"></script>
+<script src="{{ asset_url('js/equipment-enhanced.js') }}"></script>
+<script src="{{ asset_url('js/character-progression.js') }}"></script>
+<script src="{{ asset_url('js/loot-distribution.js') }}"></script>
+<script src="{{ asset_url('js/quest-system.js') }}"></script>
+<script src="{{ asset_url('js/trading-system.js') }}"></script>
 <script src="{{ asset_url('js/seed-widget.js') }}"></script>
 <script src="{{ asset_url('js/dashboard-autofill.js') }}"></script>
 <script src="{{ asset_url('js/character.js') }}"></script>
+<script>
+    // Update select button text when party changes
+    document.addEventListener('DOMContentLoaded', function () {
+        const updateSelectButtons = () => {
+            document.querySelectorAll('.select-operative').forEach(btn => {
+                const isSelected = btn.dataset.selected === 'true' || btn.classList.contains('selected');
+                btn.querySelector('.select-text').textContent = isSelected ? 'SELECTED' : 'SELECT';
+                if (isSelected) {
+                    btn.classList.add('selected');
+                    btn.closest('.operative-card').classList.add('selected');
+                }
+            });
+        };
+
+        // Hook into party selection
+        document.querySelectorAll('.party-select').forEach(checkbox => {
+            checkbox.addEventListener('change', updateSelectButtons);
+        });
+
+        updateSelectButtons();
+
+        // Add equipped item badges
+        if (window.equipmentManager) {
+            document.querySelectorAll('.operative-card').forEach(card => {
+                const charId = card.dataset.id;
+                if (!charId) return;
+
+                // Fetch character data to show equipped count
+                fetch(`/api/characters/${charId}`)
+                    .then(r => r.json())
+                    .then(char => {
+                        const gearCount = Object.keys(char.gear || {}).filter(slot => char.gear[slot]).length;
+                        if (gearCount > 0) {
+                            const equipBtn = card.querySelector('.btn-equip-panel');
+                            if (equipBtn) {
+                                equipBtn.style.position = 'relative';
+                                const badge = document.createElement('span');
+                                badge.className = 'position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success';
+                                badge.style.fontSize = '0.65rem';
+                                badge.textContent = gearCount;
+                                equipBtn.appendChild(badge);
+                            }
+                        }
+                    })
+                    .catch(() => { });
+            });
+        }
+    });
+</script>
+
+<!-- Party Management Modal -->
+<div id="partyModal" class="party-modal">
+    <div class="party-modal-content">
+        <div class="party-modal-header">
+            <div>
+                <h2 class="party-modal-title" id="partyName">Party</h2>
+                <div class="party-stats-summary">
+                    <div class="party-stat-item">
+                        <span class="party-stat-label">Level:</span>
+                        <span id="partyLevel">1</span>
+                    </div>
+                    <div class="party-stat-item">
+                        <span class="party-stat-label">Members:</span>
+                        <span id="partyMembers">0</span>
+                    </div>
+                    <div class="party-stat-item">
+                        <span class="party-stat-label">💰</span>
+                        <span id="partySharedGold">0</span>
+                    </div>
+                </div>
+            </div>
+            <button class="party-close-btn" onclick="partySystem.closeModal()">&times;</button>
+        </div>
+
+        <div class="party-tabs">
+            <button class="party-tab active" data-tab="formation" onclick="partySystem.switchTab('formation')">
+                Formation
+            </button>
+            <button class="party-tab" data-tab="members" onclick="partySystem.switchTab('members')">
+                Members
+            </button>
+            <button class="party-tab" data-tab="inventory" onclick="partySystem.switchTab('inventory')">
+                Shared Inventory
+            </button>
+            <button class="party-tab" data-tab="buffs" onclick="partySystem.switchTab('buffs')">
+                Buffs
+            </button>
+        </div>
+
+        <div class="party-tab-content">
+            <!-- Formation Tab -->
+            <div id="formationTab" class="party-tab-pane active">
+                <div class="formation-editor">
+                    <div class="formation-zones">
+                        <div class="formation-zone front" id="frontZone">
+                            <div class="formation-zone-header">
+                                <span class="formation-zone-label">Front Line</span>
+                                <span class="formation-zone-count">0 members</span>
+                            </div>
+                            <div class="formation-members"></div>
+                        </div>
+
+                        <div class="formation-zone middle" id="middleZone">
+                            <div class="formation-zone-header">
+                                <span class="formation-zone-label">Middle Line</span>
+                                <span class="formation-zone-count">0 members</span>
+                            </div>
+                            <div class="formation-members"></div>
+                        </div>
+
+                        <div class="formation-zone back" id="backZone">
+                            <div class="formation-zone-header">
+                                <span class="formation-zone-label">Back Line</span>
+                                <span class="formation-zone-count">0 members</span>
+                            </div>
+                            <div class="formation-members"></div>
+                        </div>
+                    </div>
+
+                    <div class="formation-preview" id="formationPreview">
+                        <!-- Preview renders here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Members Tab -->
+            <div id="membersTab" class="party-tab-pane">
+                <div class="party-members-grid" id="partyMembersList">
+                    <!-- Members render here -->
+                </div>
+            </div>
+
+            <!-- Shared Inventory Tab -->
+            <div id="inventoryTab" class="party-tab-pane">
+                <div class="shared-inventory-header">
+                    <div class="shared-gold-display">
+                        <span>Party Treasury:</span>
+                        <span class="shared-gold-amount" id="sharedGoldAmount">0</span>
+                    </div>
+                    <div class="shared-inventory-actions">
+                        <button class="shared-inventory-btn">Contribute Items</button>
+                        <button class="shared-inventory-btn">Contribute Gold</button>
+                    </div>
+                </div>
+                <div class="shared-items-grid" id="sharedItemsList">
+                    <!-- Shared items render here -->
+                </div>
+            </div>
+
+            <!-- Buffs Tab -->
+            <div id="buffsTab" class="party-tab-pane">
+                <div class="party-buffs-grid" id="partyBuffsList">
+                    <!-- Buffs render here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Skill Tree Modal -->
+<div id="skillModal" class="skill-modal">
+    <div class="skill-modal-content">
+        <div class="skill-modal-header">
+            <div class="skill-modal-title-group">
+                <h2 class="skill-modal-title">Skill Trees</h2>
+                <div class="skill-modal-subtitle">Unlock powerful abilities and enhance your character</div>
+            </div>
+            <div class="talent-points-display">
+                <span class="talent-points-label">Talent Points:</span>
+                <span class="talent-points-value" id="talentPointsValue">0</span>
+            </div>
+            <button class="skill-close-btn" onclick="skillTreeSystem.closeModal()">&times;</button>
+        </div>
+
+        <div class="tree-selector" id="treeSelector">
+            <!-- Tree selector buttons render here -->
+        </div>
+
+        <div class="skill-tree-container">
+            <div class="skill-tree-canvas" id="skillTreeCanvas">
+                <!-- Skill nodes render here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Skill Tooltip -->
+<div id="skillTooltip" class="skill-tooltip">
+    <!-- Tooltip content renders dynamically -->
+</div>
+
+<!-- Achievement Modal -->
+<div id="achievementModal" class="achievement-modal">
+    <div class="achievement-modal-content">
+        <div class="achievement-header">
+            <div>
+                <h2>{{ svg_icon('trophy-fill', 28, 'me-2') }}Achievements</h2>
+                <div class="achievement-stats">
+                    <div class="achievement-stat">
+                        <i class="bi bi-star-fill"></i>
+                        <span>Points: <span id="achievementTotalPoints" class="achievement-stat-value">0</span></span>
+                    </div>
+                    <div class="achievement-stat">
+                        <i class="bi bi-trophy-fill"></i>
+                        <span>Unlocked: <span id="achievementUnlockedCount"
+                                class="achievement-stat-value">0/0</span></span>
+                    </div>
+                </div>
+            </div>
+            <button class="achievement-close-btn" onclick="achievementSystem.closeAchievements()">
+                <i class="bi bi-x-lg"></i> Close
+            </button>
+        </div>
+
+        <div class="achievement-category-tabs" id="achievementCategoryTabs">
+            <!-- Category tabs render here -->
+        </div>
+
+        <div class="achievement-list-container">
+            <div class="achievement-list" id="achievementList">
+                <!-- Achievement cards render here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Achievement Notification Toast -->
+<div id="achievementNotification" class="achievement-notification">
+    <div class="achievement-notification-icon" id="achievementNotificationIcon">
+        🏆
+    </div>
+    <div class="achievement-notification-content">
+        <div class="achievement-notification-title">Achievement Unlocked!</div>
+        <div class="achievement-notification-name" id="achievementNotificationName">Achievement Name</div>
+        <div class="achievement-notification-reward" id="achievementNotificationReward">+100 gold</div>
+    </div>
+</div>
+
+<script src="{{ asset_url('js/party-management.js') }}"></script>
+<script src="{{ asset_url('js/skill-tree.js') }}"></script>
+<script src="{{ asset_url('js/achievement-system.js') }}"></script>
 {% endblock %}

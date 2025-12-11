@@ -1,0 +1,9 @@
+Archetype,Rank,BaseHP,HPPerLevel,BaseDamage,DamagePerLevel,ArmorClassBase,ArmorClassPerLevel,XPBase,XPPerLevel,LootMultiplier,Notes
+Trash,Normal,25,10,4,2,10,0.3,15,5,1.0,Baseline fodder enemies; appear in groups
+Skirmisher,Normal,35,12,6,2.5,11,0.35,20,7,1.1,"Fast movers; moderate damage, lower HP"
+Brute,Normal,55,16,8,3,12,0.4,30,10,1.2,Slow but tanky melee frontliners
+Caster,Normal,30,11,10,3.5,10,0.25,28,9,1.2,"Low HP, high ranged/magic damage"
+Elite,Elite,120,30,16,5,13,0.5,80,20,2.0,Upgraded normal archetypes; tinted visuals and extra abilities
+Champion,Elite,160,36,18,6,14,0.6,110,25,2.5,Harder elites; occasional mini-encounters
+Miniboss,Boss,260,50,22,7,15,0.7,200,40,3.0,Guardians or lieutenants before main boss
+Boss,Boss,400,70,26,8.5,16,0.8,400,70,4.0,Main dungeon bosses; unique mechanics

@@ -3,9 +3,9 @@
    =================================================================== */
 
 :root {
-    --hero-gradient-1: #6366f1;
-    --hero-gradient-2: #8b5cf6;
-    --hero-gradient-3: #ec4899;
+    --hero-gradient-1: #d4a574;
+    --hero-gradient-2: #c17a3a;
+    --hero-gradient-3: #8b6f47;
 }
 
 .hero-section {
@@ -14,7 +14,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    background: linear-gradient(135deg, #0a0e27 0%, #141937 50%, #1a1f3a 100%);
+    background: linear-gradient(135deg, #0d0a0a 0%, #1a1512 50%, #26211c 100%);
 }
 
 /* Animated gradient overlay */
@@ -22,16 +22,25 @@
     position: absolute;
     inset: 0;
     background:
-        radial-gradient(circle at 20% 50%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
-        radial-gradient(circle at 80% 50%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
-        radial-gradient(circle at 50% 80%, rgba(236, 72, 153, 0.1) 0%, transparent 50%);
+        radial-gradient(circle at 20% 50%, rgba(212, 165, 116, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 80% 50%, rgba(193, 122, 58, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 50% 80%, rgba(139, 111, 71, 0.06) 0%, transparent 50%);
     animation: gradientShift 15s ease-in-out infinite;
     pointer-events: none;
 }
 
 @keyframes gradientShift {
-    0%, 100% { opacity: 0.8; transform: scale(1); }
-    50% { opacity: 1; transform: scale(1.05); }
+
+    0%,
+    100% {
+        opacity: 0.8;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 1;
+        transform: scale(1.05);
+    }
 }
 
 /* Subtle grid pattern */
@@ -39,8 +48,8 @@
     position: absolute;
     inset: 0;
     background-image:
-        linear-gradient(rgba(99, 102, 241, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(99, 102, 241, 0.03) 1px, transparent 1px);
+        linear-gradient(rgba(212, 165, 116, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(212, 165, 116, 0.03) 1px, transparent 1px);
     background-size: 50px 50px;
     mask-image: radial-gradient(ellipse at center, black 20%, transparent 70%);
     pointer-events: none;
@@ -66,6 +75,7 @@
         opacity: 0;
         transform: translateY(30px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -89,7 +99,7 @@
 }
 
 .hero-badge i {
-    color: #6366f1;
+    color: #d4a574;
     font-size: 1rem;
 }
 
@@ -99,9 +109,10 @@
     font-weight: 800;
     line-height: 1.1;
     margin-bottom: 1.5rem;
-    color: #ffffff;
+    color: #e8dcc8;
     letter-spacing: -0.02em;
     animation: fadeInUp 0.8s ease-out 0.2s backwards;
+    font-family: Georgia, 'Times New Roman', serif;
 }
 
 .gradient-text {
@@ -123,7 +134,7 @@
 .hero-description {
     font-size: clamp(1rem, 2vw, 1.25rem);
     line-height: 1.7;
-    color: #94a3b8;
+    color: #a89c8a;
     max-width: 48rem;
     margin: 0 auto 2.5rem;
     animation: fadeInUp 0.8s ease-out 0.3s backwards;
@@ -145,13 +156,13 @@
     padding: 0.875rem 2rem;
     font-size: 1rem;
     font-weight: 600;
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-    color: white;
+    background: linear-gradient(135deg, #d4a574 0%, #c17a3a 100%);
+    color: #0d0a0a;
     border: none;
     border-radius: 0.75rem;
     box-shadow:
-        0 4px 14px rgba(99, 102, 241, 0.4),
-        0 0 0 1px rgba(99, 102, 241, 0.1) inset;
+        0 4px 14px rgba(212, 165, 116, 0.4),
+        0 0 0 1px rgba(212, 165, 116, 0.1) inset;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     text-decoration: none;
 }
@@ -159,9 +170,9 @@
 .btn-hero-primary:hover {
     transform: translateY(-2px);
     box-shadow:
-        0 8px 24px rgba(99, 102, 241, 0.5),
-        0 0 0 1px rgba(99, 102, 241, 0.2) inset;
-    color: white;
+        0 8px 24px rgba(212, 165, 116, 0.5),
+        0 0 0 1px rgba(212, 165, 116, 0.2) inset;
+    color: #0d0a0a;
 }
 
 .btn-hero-primary:active {
@@ -174,9 +185,9 @@
     padding: 0.875rem 2rem;
     font-size: 1rem;
     font-weight: 600;
-    background: rgba(99, 102, 241, 0.1);
-    color: #a5b4fc;
-    border: 1px solid rgba(99, 102, 241, 0.2);
+    background: rgba(212, 165, 116, 0.1);
+    color: #d4a574;
+    border: 1px solid rgba(212, 165, 116, 0.2);
     border-radius: 0.75rem;
     backdrop-filter: blur(10px);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -184,10 +195,10 @@
 }
 
 .btn-hero-secondary:hover {
-    background: rgba(99, 102, 241, 0.15);
-    border-color: rgba(99, 102, 241, 0.3);
+    background: rgba(212, 165, 116, 0.15);
+    border-color: rgba(212, 165, 116, 0.3);
     transform: translateY(-2px);
-    color: #c7d2fe;
+    color: #e8c9a0;
 }
 
 .btn-hero-secondary:active {
@@ -207,24 +218,24 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    color: #64748b;
+    color: #8a7d6f;
     font-size: 0.875rem;
     font-weight: 500;
     padding: 0.5rem 1rem;
-    background: rgba(15, 23, 42, 0.5);
-    border: 1px solid rgba(51, 65, 85, 0.5);
+    background: rgba(26, 21, 18, 0.5);
+    border: 1px solid rgba(61, 50, 38, 0.5);
     border-radius: 0.5rem;
     transition: all 0.3s ease;
 }
 
 .feature-item:hover {
-    color: #94a3b8;
-    border-color: rgba(99, 102, 241, 0.3);
-    background: rgba(99, 102, 241, 0.05);
+    color: #d4a574;
+    border-color: rgba(212, 165, 116, 0.3);
+    background: rgba(212, 165, 116, 0.05);
 }
 
 .feature-item i {
-    color: #6366f1;
+    color: #d4a574;
     font-size: 1.125rem;
 }
 
@@ -233,13 +244,13 @@
     position: relative;
     z-index: 10;
     padding: 2rem 0;
-    border-top: 1px solid rgba(51, 65, 85, 0.3);
-    background: rgba(10, 14, 39, 0.6);
+    border-top: 1px solid rgba(61, 50, 38, 0.3);
+    background: rgba(13, 10, 10, 0.8);
     backdrop-filter: blur(10px);
 }
 
 .footer-link {
-    color: #64748b;
+    color: #8a7d6f;
     text-decoration: none;
     font-size: 0.875rem;
     margin-left: 1.5rem;
@@ -247,7 +258,7 @@
 }
 
 .footer-link:hover {
-    color: #a5b4fc;
+    color: #d4a574;
 }
 
 /* Responsive adjustments */

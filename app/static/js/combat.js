@@ -52,20 +52,18 @@
                 else rawMsg = rawMsg.replace(/Loot:.*/, 'Loot: ' + itemMatches.join(', '));
             } catch (e) { /* ignore */ }
         }
-        const ts = (l.ts ? '[' + l.ts.split('T')[1].split('.')[0] + '] ' : '');
-        return { text: ts + rawMsg, bare: rawMsg };
+        return { text: rawMsg, bare: rawMsg };
     }
     let processedLogCount = 0;
     let typewriterQueue = [];
     let isTyping = false;
 
-    function typewriterEffect(element, text, speed = 15) {
+    function typewriterEffect(element, text, speed = 5) {
         return new Promise((resolve) => {
             let i = 0;
             element.textContent = '';
             const cursor = document.createElement('span');
             cursor.className = 'terminal-cursor';
-            element.appendChild(cursor);
 
             function type() {
                 if (i < text.length) {
@@ -73,9 +71,9 @@
                     element.textContent += text.charAt(i);
                     element.appendChild(cursor);
                     i++;
-                    setTimeout(type, speed + Math.random() * 10); // Variable speed like modem
+                    setTimeout(type, speed + Math.random() * 3); // Variable speed like modem
                 } else {
-                    cursor.remove();
+                    // Keep cursor at end of line
                     resolve();
                 }
             }
@@ -89,6 +87,13 @@
 
         while (typewriterQueue.length > 0) {
             const { element, text } = typewriterQueue.shift();
+
+            // Remove cursor from previous log entry
+            const existingCursor = logEl.querySelector('.terminal-cursor');
+            if (existingCursor) {
+                existingCursor.remove();
+            }
+
             await typewriterEffect(element, text);
             logEl.scrollTop = logEl.scrollHeight;
         }
@@ -147,6 +152,18 @@
         const pct = maxHp > 0 ? Math.max(0, Math.min(100, (curHp / maxHp) * 100)) : 0;
         monsterHpBar.style.width = pct + '%';
         monsterHpBar.textContent = curHp + ' / ' + maxHp;
+
+        // Show damage if HP changed
+        if (window.combatEffects && state.last_damage_to_monster) {
+            const dmg = state.last_damage_to_monster;
+            const panel = document.getElementById('monster-panel');
+            if (panel && dmg.amount) {
+                window.combatEffects.showDamage(panel, dmg.amount, {
+                    isCritical: dmg.is_critical,
+                    isMiss: dmg.is_miss
+                });
+            }
+        }
         // Party panels
         partyContainer.innerHTML = '';
         const initiative = state.initiative || [];
@@ -155,34 +172,122 @@
         const active = initiative[activeIndex];
         const itemCounts = (state.party && state.party.item_counts) || {};
         const template = document.getElementById('party-member-template');
+        const actionPanel = document.getElementById('combat-action-panel');
+        const activeCharName = document.getElementById('active-char-name');
+
+        let activeCharId = null;
+        let activeMember = null;
 
         party.forEach(mem => {
             // Clone template
             const clone = template.content.cloneNode(true);
-            const container = clone.querySelector('.mb-3');
-            const card = clone.querySelector('.card');
+            const container = clone.querySelector('.party-member-wrapper');
+            const card = clone.querySelector('.tactical-panel');
+
+            // Set char id for click handling
+            card.dataset.charId = mem.char_id;
 
             // Set active state
             const isActive = active && active.type === 'player' && active.id === mem.char_id;
             if (isActive) {
-                card.classList.add('border-warning', 'shadow');
+                card.classList.add('border-warning', 'shadow', 'active-turn');
                 card.setAttribute('aria-current', 'true');
+                activeCharId = mem.char_id;
+                activeMember = mem;
             }
 
             // Update data fields
             clone.querySelector('[data-field="name"]').textContent = mem.name || 'Hero';
-            clone.querySelector('[data-field="hp"]').textContent = mem.hp;
-            clone.querySelector('[data-field="max_hp"]').textContent = mem.max_hp;
-            clone.querySelector('[data-field="mana"]').textContent = mem.mana;
-            clone.querySelector('[data-field="mana_max"]').textContent = mem.mana_max;
+            clone.querySelector('[data-field="level"]').textContent = 'Lv ' + (mem.level || 1);
+
+            // Update class badge
+            const classBadge = clone.querySelector('[data-field="class-badge"]');
+            const charClass = (mem.char_class || 'fighter').toLowerCase();
+            if (classBadge) {
+                classBadge.textContent = (mem.char_class || 'Fighter').charAt(0).toUpperCase() + (mem.char_class || 'Fighter').slice(1);
+                classBadge.className = `badge class-badge ${charClass}-badge`;
+            }
+
+            // Update HP
+            const hpText = clone.querySelector('[data-field="hp-text"]');
+            const hpBar = clone.querySelector('[data-field="hp-bar"]');
+            if (hpText) hpText.textContent = `${mem.hp}/${mem.max_hp}`;
+            if (hpBar) {
+                const hpPct = mem.max_hp > 0 ? (mem.hp / mem.max_hp * 100) : 0;
+                hpBar.style.width = hpPct + '%';
+            }
+
+            // Show damage/heal if character HP changed
+            if (window.combatEffects && state.last_damage_to_party) {
+                const charDmg = state.last_damage_to_party[mem.char_id];
+                if (charDmg && charDmg.amount) {
+                    // Delay slightly to let DOM update
+                    setTimeout(() => {
+                        const charCard = partyContainer.querySelector(`[data-char-id="${mem.char_id}"]`);
+                        if (charCard) {
+                            window.combatEffects.showDamage(charCard, charDmg.amount, {
+                                isCritical: charDmg.is_critical,
+                                isMiss: charDmg.is_miss,
+                                isHeal: charDmg.is_heal
+                            });
+                        }
+                    }, 50);
+                }
+            }
+
+            // Update Mana
+            const manaText = clone.querySelector('[data-field="mana-text"]');
+            const manaBar = clone.querySelector('[data-field="mana-bar"]');
+            if (manaText) manaText.textContent = `${mem.mana}/${mem.mana_max}`;
+            if (manaBar) {
+                const manaPct = mem.mana_max > 0 ? (mem.mana / mem.mana_max * 100) : 0;
+                manaBar.style.width = manaPct + '%';
+            }
+
+            partyContainer.appendChild(clone);
+        });
+
+        // Setup centralized action panel
+        if (actionPanel && activeCharId && activeMember) {
+            const canAct = state.status === 'active';
+            actionPanel.style.display = 'block';
+            if (activeCharName) {
+                activeCharName.textContent = '- ' + (activeMember.name || 'Hero');
+            }
+
+            const charClass = (activeMember.char_class || 'fighter').toLowerCase();
+            const intStat = activeMember.int_stat || 10;
+            const strStat = activeMember.str_stat || 10;
+            const dexStat = activeMember.dex_stat || 10;
+
+            // Define which classes can use spells
+            const spellcastingClasses = ['mage', 'cleric', 'druid', 'sorcerer', 'warlock', 'bard', 'paladin', 'ranger'];
+            const canCastSpells = spellcastingClasses.includes(charClass) || intStat >= 12;
+
+            // Define melee-focused classes
+            const meleeFocused = ['fighter', 'barbarian', 'paladin', 'monk', 'ranger'];
+            const isPhysical = meleeFocused.includes(charClass) || strStat >= 14;
 
             // Update action buttons
-            const canAct = isActive && state.status === 'active';
-            clone.querySelectorAll('button[data-action]').forEach(btn => {
+            actionPanel.querySelectorAll('button[data-action]').forEach(btn => {
                 const action = btn.dataset.action;
+                let shouldHide = false;
+
+                // Hide spell buttons for non-casters
+                if (action.startsWith('cast_') && !canCastSpells) {
+                    shouldHide = true;
+                }
+
+                if (shouldHide) {
+                    btn.style.display = 'none';
+                    return;
+                }
+                btn.style.display = '';
 
                 if (!canAct) {
                     btn.disabled = true;
+                } else {
+                    btn.disabled = false;
                 }
 
                 // Potion availability
@@ -199,18 +304,20 @@
                 // Mana gating
                 if (canAct && btn.dataset.manaCost) {
                     const manaCost = parseInt(btn.dataset.manaCost);
-                    if (mem.mana < manaCost) {
+                    if (activeMember.mana < manaCost) {
                         btn.disabled = true;
-                        btn.title = 'Not enough mana';
+                        btn.title = 'Not enough mana (' + manaCost + ' required)';
                     }
                 }
 
-                // Add click handler
-                btn.addEventListener('click', () => doAction(action, state.version, mem.char_id));
+                // Remove old listeners and add new one
+                const newBtn = btn.cloneNode(true);
+                btn.parentNode.replaceChild(newBtn, btn);
+                newBtn.addEventListener('click', () => doAction(action, state.version, activeCharId));
             });
-
-            partyContainer.appendChild(clone);
-        });
+        } else if (actionPanel) {
+            actionPanel.style.display = 'none';
+        }
         // If combat complete, show a return to dungeon action area (once)
         if (state.status === 'complete') {
             let existing = document.getElementById('combat-return-container');
@@ -286,13 +393,49 @@
     async function doAction(action, version, actorId) {
         let endpoint;
         let payload = { version: version, actor_id: actorId };
+        let spellType = null;
+
         if (action === 'attack') endpoint = '/api/combat/' + combatId + '/attack';
         else if (action === 'defend') endpoint = '/api/combat/' + combatId + '/defend';
-        else if (action === 'cast_firebolt') { endpoint = '/api/combat/' + combatId + '/cast'; payload.spell = 'firebolt'; }
-        else if (action === 'use_potion') { endpoint = '/api/combat/' + combatId + '/use_item'; payload.slug = 'potion-healing'; }
+        else if (action === 'cast_firebolt') {
+            endpoint = '/api/combat/' + combatId + '/cast';
+            payload.spell = 'firebolt';
+            spellType = 'firebolt';
+        }
+        else if (action === 'cast_ice_shard') {
+            endpoint = '/api/combat/' + combatId + '/cast';
+            payload.spell = 'ice_shard';
+            spellType = 'ice_shard';
+        }
+        else if (action === 'cast_lightning') {
+            endpoint = '/api/combat/' + combatId + '/cast';
+            payload.spell = 'lightning';
+            spellType = 'lightning';
+        }
+        else if (action === 'use_potion') {
+            endpoint = '/api/combat/' + combatId + '/use_item';
+            payload.slug = 'potion-healing';
+            spellType = 'heal';
+        }
         else if (action === 'flee') endpoint = '/api/combat/' + combatId + '/flee';
         else if (action === 'end_turn') endpoint = '/api/combat/' + combatId + '/end_turn';
         else return;
+
+        // Show visual effect for spells
+        if (window.combatEffects && spellType) {
+            const casterCard = partyContainer.querySelector(`[data-char-id="${actorId}"]`);
+            const targetPanel = spellType === 'heal' ? casterCard : document.getElementById('monster-panel');
+            if (casterCard && targetPanel) {
+                window.combatEffects.createParticles(casterCard, targetPanel, spellType);
+
+                // Add casting glow to button
+                const btn = document.querySelector(`[data-action="${action}"]`);
+                if (btn) {
+                    btn.classList.add('casting');
+                    setTimeout(() => btn.classList.remove('casting'), 800);
+                }
+            }
+        }
         try {
             const r = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             const j = await r.json();
@@ -331,6 +474,37 @@
         socket.on('combat_complete', (state) => {
             if (state && state.id === combatId) {
                 render(state);
+
+                // Check for XP rewards and trigger progression updates
+                if (state.rewards && state.rewards.xp && state.rewards.xp.per_member) {
+                    const xpRewards = state.rewards.xp.per_member;
+
+                    // Notify character progression system if available
+                    if (window.characterProgression) {
+                        Object.keys(xpRewards).forEach(charId => {
+                            const xpGained = xpRewards[charId];
+                            if (xpGained > 0) {
+                                // Update XP bar and check for level-up
+                                window.characterProgression.updateXPBar(charId, true);
+                            }
+                        });
+                    }
+                }
+
+                // Trigger loot distribution modal if items were awarded
+                if (state.rewards && (state.rewards.items || state.rewards.items_list)) {
+                    // Fire event for loot distribution system
+                    document.dispatchEvent(new CustomEvent('combat-complete', {
+                        detail: { combatId: state.id, rewards: state.rewards }
+                    }));
+
+                    // Auto-show loot modal after brief delay
+                    if (window.lootDistribution) {
+                        setTimeout(() => {
+                            window.lootDistribution.checkForLoot(state.id);
+                        }, 1500);
+                    }
+                }
             }
         });
         socket.on('disconnect', () => {

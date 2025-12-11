@@ -1,0 +1,401 @@
+{% extends "admin_base_new.html" %}
+
+{% block page_title %}Dungeon Settings{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <!-- Generation Settings -->
+    <div class="col-12">
+        <div class="card bg-dark text-light border-secondary">
+            <div class="card-body">
+                <h5 class="card-title mb-3"><i class="bi bi-map me-2"></i>Dungeon Generation</h5>
+
+                <form id="dungeonSettingsForm">
+                    <div class="row g-3">
+                        <!-- Map Size -->
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                Map Size
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Dungeon grid dimensions (width x height)"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary" id="map_size"
+                                value="{{ config.map_size or 75 }}" min="50" max="150">
+                        </div>
+
+                        <!-- Room Density -->
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                Room Density
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Percentage of map filled with rooms (0.1-0.5)"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="room_density" value="{{ config.room_density or 0.25 }}" min="0.1" max="0.5"
+                                step="0.05">
+                        </div>
+
+                        <!-- Monster Density -->
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                Monster Density
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Base encounter spawn rate per tile (0.05-0.3)"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="monster_density" value="{{ config.monster_density or 0.15 }}" min="0.05" max="0.3"
+                                step="0.05">
+                        </div>
+
+                        <!-- Elite Spawn Rate -->
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                Elite Spawn Rate
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Percentage of elite monsters (0.03-0.15)"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="elite_spawn_rate" value="{{ config.elite_spawn_rate or 0.05 }}" min="0.03"
+                                max="0.15" step="0.01">
+                        </div>
+
+                        <!-- Boss Count -->
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                Boss Count (per tier)
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Number of boss lairs per dungeon tier"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="boss_count" value="{{ config.boss_count or 2 }}" min="1" max="5">
+                        </div>
+
+                        <!-- Loot Node Density -->
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                Loot Node Density
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Treasure spawn rate (0.05-0.2)"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="loot_density" value="{{ config.loot_density or 0.1 }}" min="0.05" max="0.2"
+                                step="0.01">
+                        </div>
+                    </div>
+
+                    <hr class="border-secondary my-4">
+
+                    <!-- Scaling Multipliers -->
+                    <h6 class="mb-3">Difficulty Scaling</h6>
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">
+                                HP Multiplier per Tier
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Monster HP scaling (1.0-2.0)"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="hp_mult_per_tier" value="{{ config.hp_mult_per_tier or 1.15 }}" min="1.0" max="2.0"
+                                step="0.05">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">
+                                Damage Multiplier per Tier
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Monster damage scaling (1.0-2.0)"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="dmg_mult_per_tier" value="{{ config.dmg_mult_per_tier or 1.1 }}" min="1.0" max="2.0"
+                                step="0.05">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">
+                                XP Multiplier per Tier
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="XP reward scaling (1.0-3.0)"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="xp_mult_per_tier" value="{{ config.xp_mult_per_tier or 1.25 }}" min="1.0" max="3.0"
+                                step="0.05">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">
+                                Loot Quality per Tier
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Loot rarity boost (1.0-2.0)"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="loot_mult_per_tier" value="{{ config.loot_mult_per_tier or 1.2 }}" min="1.0"
+                                max="2.0" step="0.05">
+                        </div>
+                    </div>
+
+                    <hr class="border-secondary my-4">
+
+                    <!-- Extraction Settings -->
+                    <h6 class="mb-3">Extraction System</h6>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                Early Exit XP Penalty (%)
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="XP penalty for extracting before all bosses defeated"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="early_exit_xp_penalty" value="{{ config.early_exit_xp_penalty or 30 }}" min="0"
+                                max="50">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                Early Exit Loot Penalty (%)
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Loot quality penalty for early extraction"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="early_exit_loot_penalty" value="{{ config.early_exit_loot_penalty or 20 }}" min="0"
+                                max="50">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                Full Clear Loot Bonus (%)
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Loot bonus for clearing 100% of dungeon"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="full_clear_bonus" value="{{ config.full_clear_bonus or 25 }}" min="0" max="100">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                Flawless Run XP Bonus (%)
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="XP bonus for completing with no deaths"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="flawless_xp_bonus" value="{{ config.flawless_xp_bonus or 25 }}" min="0" max="100">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                Speed Clear Time (minutes)
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Time threshold for speed clear bonus"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="speed_clear_time" value="{{ config.speed_clear_time or 30 }}" min="10" max="60">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                Speed Clear Gold Bonus (%)
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Gold bonus for beating speed clear time"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="speed_clear_bonus" value="{{ config.speed_clear_bonus or 50 }}" min="0" max="100">
+                        </div>
+                    </div>
+
+                    <hr class="border-secondary my-4">
+
+                    <!-- Affixes -->
+                    <h6 class="mb-3">Dungeon Affixes (Enable/Disable)</h6>
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="affix_frenzied" {{ 'checked' if
+                                    config.affixes.frenzied else '' }}>
+                                <label class="form-check-label">
+                                    Frenzied <span class="text-muted small">(+30% attack speed)</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="affix_bolstered" {{ 'checked' if
+                                    config.affixes.bolstered else '' }}>
+                                <label class="form-check-label">
+                                    Bolstered <span class="text-muted small">(+100% HP)</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="affix_volcanic" {{ 'checked' if
+                                    config.affixes.volcanic else '' }}>
+                                <label class="form-check-label">
+                                    Volcanic <span class="text-muted small">(ground eruptions)</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="affix_necrotic" {{ 'checked' if
+                                    config.affixes.necrotic else '' }}>
+                                <label class="form-check-label">
+                                    Necrotic <span class="text-muted small">(DoT aura)</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="affix_arcane" {{ 'checked' if
+                                    config.affixes.arcane else '' }}>
+                                <label class="form-check-label">
+                                    Arcane <span class="text-muted small">(beams)</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="affix_cursed" {{ 'checked' if
+                                    config.affixes.cursed else '' }}>
+                                <label class="form-check-label">
+                                    Cursed <span class="text-muted small">(shrine penalties)</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <button type="button" class="btn btn-primary" onclick="saveDungeonSettings()">
+                            <i class="bi bi-save me-1"></i> Save Settings
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="resetDungeonSettings()">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i> Reset to Defaults
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Config Preview -->
+    <div class="col-12">
+        <div class="card bg-dark text-light border-secondary">
+            <div class="card-body">
+                <h6 class="mb-3">Configuration Preview (JSON)</h6>
+                <pre id="configPreview" class="bg-black text-light p-3 rounded"
+                    style="max-height: 300px; overflow-y: auto;">{{ config | tojson(indent=2) }}</pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="dungeonToast" class="toast bg-dark text-light border-secondary" role="alert">
+        <div class="toast-header bg-dark text-light border-secondary">
+            <strong class="me-auto">Dungeon Settings</strong>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body" id="dungeonToastBody"></div>
+    </div>
+</div>
+
+<script>
+    // Initialize tooltips
+    document.addEventListener('DOMContentLoaded', function () {
+        const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+        tooltips.forEach(el => new bootstrap.Tooltip(el));
+
+        // Update preview on input change
+        const inputs = document.querySelectorAll('#dungeonSettingsForm input');
+        inputs.forEach(input => {
+            input.addEventListener('change', updatePreview);
+        });
+
+        updatePreview();
+    });
+
+    function showToast(message, type = 'info') {
+        const toast = document.getElementById('dungeonToast');
+        const toastBody = document.getElementById('dungeonToastBody');
+        toastBody.textContent = message;
+
+        toast.classList.remove('bg-success', 'bg-danger', 'bg-warning');
+        if (type === 'success') toast.classList.add('bg-success');
+        else if (type === 'error') toast.classList.add('bg-danger');
+        else if (type === 'warning') toast.classList.add('bg-warning');
+
+        const bsToast = new bootstrap.Toast(toast);
+        bsToast.show();
+    }
+
+    function getCurrentConfig() {
+        return {
+            map_size: parseInt(document.getElementById('map_size').value),
+            room_density: parseFloat(document.getElementById('room_density').value),
+            monster_density: parseFloat(document.getElementById('monster_density').value),
+            elite_spawn_rate: parseFloat(document.getElementById('elite_spawn_rate').value),
+            boss_count: parseInt(document.getElementById('boss_count').value),
+            loot_density: parseFloat(document.getElementById('loot_density').value),
+            hp_mult_per_tier: parseFloat(document.getElementById('hp_mult_per_tier').value),
+            dmg_mult_per_tier: parseFloat(document.getElementById('dmg_mult_per_tier').value),
+            xp_mult_per_tier: parseFloat(document.getElementById('xp_mult_per_tier').value),
+            loot_mult_per_tier: parseFloat(document.getElementById('loot_mult_per_tier').value),
+            early_exit_xp_penalty: parseInt(document.getElementById('early_exit_xp_penalty').value),
+            early_exit_loot_penalty: parseInt(document.getElementById('early_exit_loot_penalty').value),
+            full_clear_bonus: parseInt(document.getElementById('full_clear_bonus').value),
+            flawless_xp_bonus: parseInt(document.getElementById('flawless_xp_bonus').value),
+            speed_clear_time: parseInt(document.getElementById('speed_clear_time').value),
+            speed_clear_bonus: parseInt(document.getElementById('speed_clear_bonus').value),
+            affixes: {
+                frenzied: document.getElementById('affix_frenzied').checked,
+                bolstered: document.getElementById('affix_bolstered').checked,
+                volcanic: document.getElementById('affix_volcanic').checked,
+                necrotic: document.getElementById('affix_necrotic').checked,
+                arcane: document.getElementById('affix_arcane').checked,
+                cursed: document.getElementById('affix_cursed').checked
+            }
+        };
+    }
+
+    function updatePreview() {
+        const config = getCurrentConfig();
+        document.getElementById('configPreview').textContent = JSON.stringify(config, null, 2);
+    }
+
+    function saveDungeonSettings() {
+        const config = getCurrentConfig();
+
+        fetch('/admin/v2/settings/dungeon/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Dungeon settings saved successfully', 'success');
+                } else {
+                    showToast('Error: ' + (data.error || 'Unknown error'), 'error');
+                }
+            })
+            .catch(err => showToast('Error: ' + err.message, 'error'));
+    }
+
+    function resetDungeonSettings() {
+        if (!confirm('Reset all dungeon settings to defaults?')) return;
+
+        fetch('/admin/v2/settings/dungeon/reset', {
+            method: 'POST'
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Settings reset to defaults', 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showToast('Error: ' + (data.error || 'Unknown error'), 'error');
+                }
+            })
+            .catch(err => showToast('Error: ' + err.message, 'error'));
+    }
+</script>
+{% endblock %}

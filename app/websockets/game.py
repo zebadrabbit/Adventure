@@ -14,28 +14,15 @@ Emits:
 # Structure: { room_name: { 'members': set([sid,...]), 'created': timestamp } }
 import time
 
+from flask import session
 from flask_login import current_user
 from flask_socketio import emit, join_room, leave_room
-from flask import session
 
-from app import db
-from app.models.dungeon_instance import DungeonInstance
-from app.models import DungeonEntity
-from app.routes.dungeon_api import (
-    get_cached_dungeon,
-    ROOM,
-    TUNNEL,
-    DOOR,
-    char_to_type,
-)
-from app.dungeon.api_helpers.perception import (
-    get_noticed_coords as _get_noticed_coords_helper,
-)
+from app import db, socketio
 from app.dungeon.api_helpers.encounters import maybe_spawn_encounter
-from app.routes.dungeon_api import advance_non_combat_time  # reuse existing logic
-import json as _json
-
-from app import socketio
+from app.models import DungeonEntity
+from app.models.dungeon_instance import DungeonInstance
+from app.routes.dungeon_api import advance_non_combat_time
 
 from .validation import (
     GAME_ACTION,
@@ -144,6 +131,7 @@ def handle_game_action(data):
 
 # ------------------ Adventure Real-Time Events ------------------
 
+
 def _emit_error(msg: str, code: str = "bad_request"):
     emit(
         "error",
@@ -167,181 +155,55 @@ def ws_dungeon_move(payload):  # pragma: no cover - exercised via integration, t
         direction = (payload or {}).get("dir", "").lower()
     except Exception:
         direction = ""
+
     dungeon_instance_id = session.get("dungeon_instance_id")
     if not dungeon_instance_id:
         return _emit_error("no_instance", code="no_instance")
+
     instance = db.session.get(DungeonInstance, dungeon_instance_id)
     if not instance:
         return _emit_error("no_instance", code="no_instance")
-    MAP_SIZE = 75
-    dungeon = get_cached_dungeon(instance.seed, (MAP_SIZE, MAP_SIZE, 1))
-    walkable_chars = {ROOM, TUNNEL, DOOR, getattr(dungeon, "TELEPORT", "P"), "P"}
-    noop = False
-    if direction == "":
-        noop = True
-    elif direction not in ("n", "s", "e", "w"):
-        noop = True
-    moved = False
-    if not noop:
-        deltas = {"n": (0, 1), "s": (0, -1), "e": (1, 0), "w": (-1, 0)}
-        dx, dy = deltas[direction]
-        nx, ny = instance.pos_x + dx, instance.pos_y + dy
-        if 0 <= nx < MAP_SIZE and 0 <= ny < MAP_SIZE and dungeon.grid[nx][ny] in walkable_chars:
-            instance.pos_x, instance.pos_y = nx, ny
-            moved = True
-        else:
-            for alt in ["n", "e", "s", "w"]:
-                if alt == direction:
-                    continue
-                adx, ady = deltas[alt]
-                tx, ty = instance.pos_x + adx, instance.pos_y + ady
-                if 0 <= tx < MAP_SIZE and 0 <= ty < MAP_SIZE and dungeon.grid[tx][ty] in walkable_chars:
-                    instance.pos_x, instance.pos_y = tx, ty
-                    moved = True
-                    break
-        if moved:
-            try:
-                db.session.commit()
-            except Exception:
-                db.session.rollback()
-                moved = False
-    combat_started = False
-    combat_id = None
-    encounter_payload = None
-    if moved:
-        try:
-            monster_ent = DungeonEntity.query.filter_by(
-                instance_id=instance.id,
-                type="monster",
-                x=instance.pos_x,
-                y=instance.pos_y,
-                z=instance.pos_z,
-            ).first()
-            if monster_ent:
-                mdata = {}
-                try:
-                    if monster_ent.data:
-                        mdata = _json.loads(monster_ent.data)
-                except Exception:
-                    mdata = {}
-                monster_payload = {
-                    "slug": monster_ent.slug,
-                    "name": monster_ent.name or monster_ent.slug,
-                    "hp": monster_ent.hp_current or mdata.get("hp", 30),
-                    "damage": mdata.get("damage", 6),
-                    "speed": mdata.get("speed", 10),
-                }
-                from app.services import combat_service as _combat_service
 
-                session_row = _combat_service.start_session(current_user.id, monster_payload)
-                combat_id = session_row.id
-                combat_started = True
-                try:
-                    db.session.delete(monster_ent)
-                    db.session.commit()
-                except Exception:
-                    db.session.rollback()
-        except Exception:
-            pass
-    encounter_debug = {}
-    if (moved or not noop) and not combat_started:
-        maybe_spawn_encounter(instance, bool(moved or not noop), resp := {})
-        if "encounter" in resp:
-            combat_started = True
-            combat_id = resp["encounter"].get("combat_id")
-            encounter_payload = resp["encounter"]
-            if "encounter_chance" in resp:
-                encounter_debug["encounter_chance"] = resp["encounter_chance"]
-            if "encounter_roll" in resp:
-                encounter_debug["encounter_roll"] = resp["encounter_roll"]
-        else:
-            if "encounter_chance" in resp:
-                encounter_debug["encounter_chance"] = resp["encounter_chance"]
-            if "encounter_roll" in resp:
-                encounter_debug["encounter_roll"] = resp["encounter_roll"]
-    x, y, z = instance.pos_x, instance.pos_y, instance.pos_z
-    tile_char = dungeon.grid[x][y]
-    desc = f"You are in a {char_to_type(tile_char)}."
-    exits_map = []
-    for d, (dx2, dy2) in {"n": (0, 1), "s": (0, -1), "e": (1, 0), "w": (-1, 0)}.items():
-        tx, ty = x + dx2, y + dy2
-        if 0 <= tx < MAP_SIZE and 0 <= ty < MAP_SIZE and dungeon.grid[tx][ty] in walkable_chars:
-            exits_map.append(d)
-    if exits_map:
-        cardinal_full = {"n": "north", "s": "south", "e": "east", "w": "west"}
-        desc += " Exits: " + ", ".join(cardinal_full[e].capitalize() for e in exits_map) + "."
-    noticed_flag = False
+    # Use shared movement handler
+    from app.dungeon.movement_handler import process_movement
+
     try:
-        coords_tmp = _get_noticed_coords_helper(instance)
-        for cx, cy in coords_tmp:
-            if cx == x and cy == y:
-                noticed_flag = True
-                desc = (desc + "\n" + "You notice something suspicious here.").strip()
-                break
-    except Exception:
-        pass
-    resp = {
-        "ok": True,
-        "moved": moved,
-        "pos": [x, y, z],
-        "desc": desc,
-        "exits": exits_map,
-        "noticed_loot": noticed_flag,
-    }
-    if encounter_debug:
-        resp.update(encounter_debug)
-    if combat_started and combat_id is not None:
-        resp["combat_started"] = True
-        resp["combat_id"] = combat_id
-        resp["encounter"] = encounter_payload or {"combat_id": combat_id}
-    else:
-        try:
-            tick_val = advance_non_combat_time(instance, tick_amount=1)
-            if tick_val is not None:
-                resp["game_tick"] = int(tick_val)
-        except Exception:
-            pass
-    emit("dungeon_move_result", resp)
+        moved, resp = process_movement(instance, direction)
+        emit("dungeon_move_result", resp)
+    except Exception as e:
+        from app.logging_utils import get_logger
+
+        logger = get_logger(__name__)
+        logger.error(event="movement_failed", error=str(e))
+        return _emit_error("movement_failed", code="error")
 
 
 @socketio.on("dungeon_search_tile", namespace="/game")
 def ws_dungeon_search_tile(_payload):  # pragma: no cover - thin wrapper over service logic
+    from app.dungeon.api_helpers.perception import search_current_tile
+
     dungeon_instance_id = session.get("dungeon_instance_id")
     if not dungeon_instance_id:
         return _emit_error("no_instance", code="no_instance")
     instance = db.session.get(DungeonInstance, dungeon_instance_id)
     if not instance:
         return _emit_error("no_instance", code="no_instance")
-    rows = DungeonEntity.query.filter_by(
-        instance_id=instance.id, x=instance.pos_x, y=instance.pos_y, z=instance.pos_z
-    ).all()
-    revealed = 0
-    for r in rows:
-        if r.type == "treasure" and r.data:
-            try:
-                meta = _json.loads(r.data)
-                if isinstance(meta, dict) and meta.get("hidden"):
-                    meta["hidden"] = False
-                    r.data = _json.dumps(meta)
-                    db.session.add(r)
-                    revealed += 1
-            except Exception:
-                continue
-    if revealed:
-        try:
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-            revealed = 0
-    noticed_loot = any(r.type == "treasure" for r in rows)
+
+    # Call the actual search logic from perception.py
+    success, payload, status = search_current_tile(instance)
+
+    # Advance time
     tick_val = None
     try:
         tick_val = advance_non_combat_time(instance, tick_amount=2)
     except Exception:
         pass
-    resp = {"revealed_caches": revealed, "noticed_loot": noticed_loot}
+
+    resp = payload.copy() if isinstance(payload, dict) else {}
     if tick_val is not None:
         resp["game_tick"] = int(tick_val)
+
+    # Check for encounter spawn
     try:
         maybe_spawn_encounter(instance, True, enc_dbg := {})
         if enc_dbg.get("encounter") and "encounter" not in resp:
@@ -351,6 +213,7 @@ def ws_dungeon_search_tile(_payload):  # pragma: no cover - thin wrapper over se
             resp["encounter_roll"] = enc_dbg.get("encounter_roll")
     except Exception:
         pass
+
     emit("dungeon_search_result", resp)
 
 
@@ -385,7 +248,11 @@ def ws_dungeon_claim_loot(payload):  # pragma: no cover
         tick_val = advance_non_combat_time(instance, tick_amount=1)
     except Exception:
         pass
-    resp = {"claimed": True, "items": [i.to_dict() if hasattr(i, "to_dict") else getattr(i, "slug", str(i)) for i in items], "count": len(items)}
+    resp = {
+        "claimed": True,
+        "items": [i.to_dict() if hasattr(i, "to_dict") else getattr(i, "slug", str(i)) for i in items],
+        "count": len(items),
+    }
     if tick_val is not None:
         resp["game_tick"] = int(tick_val)
     emit("dungeon_claim_result", resp)

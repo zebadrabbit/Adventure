@@ -32,6 +32,15 @@ from typing import Any, Dict, List, Tuple
 _DEFAULT_SPECIAL_CHANCE = 0.25
 _MAX_BASE_DROPS = 3  # cap simple rolls to avoid floods
 
+# Boss loot multipliers
+_BOSS_DROP_MULTIPLIER = 3  # Bosses drop 3x more items
+_BOSS_SPECIAL_CHANCE = 0.75  # 75% chance for special drops from bosses
+
+
+def _is_boss(monster: Dict[str, Any]) -> bool:
+    """Check if monster is a boss."""
+    return monster.get("archetype") == "Boss" or monster.get("is_boss", False)
+
 
 def _parse_loot_table(raw: str | None) -> Tuple[List[str], Dict[str, float]]:
     """Return ordered list and weight mapping.
@@ -69,9 +78,20 @@ def roll_loot(monster: Dict[str, Any], rng: random.Random | None = None) -> Dict
     rng = rng or random
     raw_table = monster.get("loot_table")
     items_ordered, weights = _parse_loot_table(raw_table)
+
+    # Boss loot enhancement
+    is_boss = _is_boss(monster)
+    max_drops = _MAX_BASE_DROPS * _BOSS_DROP_MULTIPLIER if is_boss else _MAX_BASE_DROPS
+    special_chance_override = _BOSS_SPECIAL_CHANCE if is_boss else _DEFAULT_SPECIAL_CHANCE
+
     # Collect raw drops in a list first then collapse to mapping slug->qty for stable representation.
     drops: List[str] = []
-    rolls_meta: Dict[str, Any] = {"base_pool": items_ordered, "weights": weights, "special": None}
+    rolls_meta: Dict[str, Any] = {
+        "base_pool": items_ordered,
+        "weights": weights,
+        "special": None,
+        "is_boss": is_boss,
+    }
 
     # Special drop logic
     special_slug = monster.get("special_drop_slug")
@@ -85,18 +105,18 @@ def roll_loot(monster: Dict[str, Any], rng: random.Random | None = None) -> Dict
                 # normalize key without directive
                 weights[special_slug] = weights.pop(k)
                 items_ordered = [special_slug if x == k else x for x in items_ordered]
-        chance = 1.0 if guaranteed else _DEFAULT_SPECIAL_CHANCE
+        chance = 1.0 if guaranteed else special_chance_override
         rolled = rng.random() < chance
         if rolled:
             drops.append(special_slug)
         rolls_meta["special"] = {"slug": special_slug, "rolled": rolled, "chance": chance}
 
-    # Base table sampling (simple: up to MAX_BASE_DROPS unique entries, weighted w/out replacement)
+    # Base table sampling (simple: up to max_drops unique entries, weighted w/out replacement)
     pool = [slug for slug in items_ordered if slug not in drops]
     if pool and weights:
         total_w = sum(weights.get(slug, 0.0) for slug in pool)
         # Up to max draws
-        draws = min(_MAX_BASE_DROPS, len(pool))
+        draws = min(max_drops, len(pool))
         for _ in range(draws):
             if total_w <= 0:
                 break
@@ -114,6 +134,16 @@ def roll_loot(monster: Dict[str, Any], rng: random.Random | None = None) -> Dict
             # remove chosen & recompute total
             pool = [p for p in pool if p != chosen]
             total_w = sum(weights.get(slug, 0.0) for slug in pool)
+
+    # Boss always drops a key (33% rusty, 50% master, 17% boss key)
+    if is_boss:
+        key_roll = rng.random()
+        if key_roll < 0.33:
+            drops.append("rusty-key")
+        elif key_roll < 0.83:
+            drops.append("master-key")
+        else:
+            drops.append("boss-key")
 
     # Collapse to quantity mapping; maintain legacy compatibility by also returning list under items_list.
     qty_map: Dict[str, int] = {}

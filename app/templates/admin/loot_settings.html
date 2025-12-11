@@ -1,0 +1,399 @@
+{% extends "admin_base_new.html" %}
+
+{% block page_title %}Loot Settings{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <!-- Loot Generation Settings -->
+    <div class="col-12">
+        <div class="card bg-dark text-light border-secondary">
+            <div class="card-body">
+                <h5 class="card-title mb-3"><i class="bi bi-gem me-2"></i>Loot Generation</h5>
+
+                <form id="lootSettingsForm">
+                    <div class="row g-3">
+                        <!-- Base Drop Rate -->
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                Base Drop Rate
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Probability of loot drop from enemies (0.3-1.0)"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="base_drop_rate" value="{{ config.base_drop_rate or 0.6 }}" min="0.3" max="1.0"
+                                step="0.05">
+                        </div>
+
+                        <!-- Magic Find Effectiveness -->
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                Magic Find Effectiveness
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="How much player MF% affects drop quality (0.5-2.0)"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="magic_find_mult" value="{{ config.magic_find_mult or 1.0 }}" min="0.5" max="2.0"
+                                step="0.1">
+                        </div>
+
+                        <!-- Gold Multiplier -->
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                Gold Multiplier
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Global gold drop multiplier (0.5-3.0)"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="gold_multiplier" value="{{ config.gold_multiplier or 1.0 }}" min="0.5" max="3.0"
+                                step="0.1">
+                        </div>
+                    </div>
+
+                    <hr class="border-secondary my-4">
+
+                    <!-- Rarity Distribution -->
+                    <h6 class="mb-3">Rarity Distribution (Weights)</h6>
+                    <div class="row g-3">
+                        <div class="col-md-2">
+                            <label class="form-label">
+                                Common
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Weight for common items (default 600)"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="rarity_common" value="{{ config.rarity_weights.common or 600 }}" min="0" max="1000">
+                        </div>
+
+                        <div class="col-md-2">
+                            <label class="form-label">
+                                Uncommon
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Weight for uncommon items (default 250)"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="rarity_uncommon" value="{{ config.rarity_weights.uncommon or 250 }}" min="0"
+                                max="1000">
+                        </div>
+
+                        <div class="col-md-2">
+                            <label class="form-label">
+                                Rare
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Weight for rare items (default 100)"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="rarity_rare" value="{{ config.rarity_weights.rare or 100 }}" min="0" max="500">
+                        </div>
+
+                        <div class="col-md-2">
+                            <label class="form-label">
+                                Epic
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Weight for epic items (default 35)"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="rarity_epic" value="{{ config.rarity_weights.epic or 35 }}" min="0" max="200">
+                        </div>
+
+                        <div class="col-md-2">
+                            <label class="form-label">
+                                Legendary
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Weight for legendary items (default 13)"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="rarity_legendary" value="{{ config.rarity_weights.legendary or 13 }}" min="0"
+                                max="100">
+                        </div>
+
+                        <div class="col-md-2">
+                            <label class="form-label">
+                                Mythic
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Weight for mythic items (default 2)"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="rarity_mythic" value="{{ config.rarity_weights.mythic or 2 }}" min="0" max="50">
+                        </div>
+                    </div>
+
+                    <hr class="border-secondary my-4">
+
+                    <!-- Category Distribution -->
+                    <h6 class="mb-3">Item Category Distribution (%)</h6>
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">
+                                Weapons
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Percentage of drops that are weapons"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="category_weapons" value="{{ config.category_weights.weapons or 40 }}" min="0"
+                                max="100">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">
+                                Armor
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Percentage of drops that are armor"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="category_armor" value="{{ config.category_weights.armor or 30 }}" min="0" max="100">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">
+                                Consumables
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Percentage of drops that are consumables"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="category_consumables" value="{{ config.category_weights.consumables or 20 }}"
+                                min="0" max="100">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">
+                                Jewelry
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Percentage of drops that are jewelry"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="category_jewelry" value="{{ config.category_weights.jewelry or 10 }}" min="0"
+                                max="100">
+                        </div>
+                    </div>
+
+                    <hr class="border-secondary my-4">
+
+                    <!-- Boss & Elite Bonuses -->
+                    <h6 class="mb-3">Special Enemy Bonuses</h6>
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">
+                                Elite Loot Multiplier
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Loot quality multiplier for elite enemies"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="elite_loot_mult" value="{{ config.elite_loot_mult or 2.5 }}" min="1.0" max="5.0"
+                                step="0.1">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">
+                                Boss Loot Multiplier
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Loot quality multiplier for bosses"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="boss_loot_mult" value="{{ config.boss_loot_mult or 4.0 }}" min="1.0" max="10.0"
+                                step="0.5">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">
+                                Boss Guaranteed Rarity
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Minimum rarity guaranteed from boss drops"></i>
+                            </label>
+                            <select class="form-select bg-dark text-light border-secondary" id="boss_min_rarity">
+                                <option value="common" {{ 'selected' if config.boss_min_rarity=='common' else '' }}>
+                                    Common</option>
+                                <option value="uncommon" {{ 'selected' if config.boss_min_rarity=='uncommon' else '' }}>
+                                    Uncommon</option>
+                                <option value="rare" {{ 'selected' if config.boss_min_rarity=='rare' else '' }}>Rare
+                                </option>
+                                <option value="epic" {{ 'selected' if config.boss_min_rarity=='epic' else '' }}>Epic
+                                </option>
+                                <option value="legendary" {{ 'selected' if config.boss_min_rarity=='legendary' else ''
+                                    }}>Legendary</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">
+                                Boss Cache Size
+                                <i class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                    title="Number of items in boss loot cache"></i>
+                            </label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary"
+                                id="boss_cache_size" value="{{ config.boss_cache_size or 3 }}" min="1" max="10">
+                        </div>
+                    </div>
+
+                    <hr class="border-secondary my-4">
+
+                    <!-- Advanced Options -->
+                    <h6 class="mb-3">Advanced Options</h6>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="smart_loot" {{ 'checked' if
+                                    config.smart_loot else '' }}>
+                                <label class="form-check-label">
+                                    Smart Loot <span class="text-muted small">(70% class-appropriate drops)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="unique_protection" {{ 'checked' if
+                                    config.unique_protection else '' }}>
+                                <label class="form-check-label">
+                                    Unique Protection <span class="text-muted small">(avoid duplicate uniques)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="level_scaling" {{ 'checked' if
+                                    config.level_scaling else '' }}>
+                                <label class="form-check-label">
+                                    Level Scaling <span class="text-muted small">(better rolls at higher levels)</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <button type="button" class="btn btn-primary" onclick="saveLootSettings()">
+                            <i class="bi bi-save me-1"></i> Save Settings
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="resetLootSettings()">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i> Reset to Defaults
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Config Preview -->
+    <div class="col-12">
+        <div class="card bg-dark text-light border-secondary">
+            <div class="card-body">
+                <h6 class="mb-3">Configuration Preview (JSON)</h6>
+                <pre id="configPreview" class="bg-black text-light p-3 rounded"
+                    style="max-height: 300px; overflow-y: auto;">{{ config | tojson(indent=2) }}</pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="lootToast" class="toast bg-dark text-light border-secondary" role="alert">
+        <div class="toast-header bg-dark text-light border-secondary">
+            <strong class="me-auto">Loot Settings</strong>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body" id="lootToastBody"></div>
+    </div>
+</div>
+
+<script>
+    // Initialize tooltips
+    document.addEventListener('DOMContentLoaded', function () {
+        const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+        tooltips.forEach(el => new bootstrap.Tooltip(el));
+
+        // Update preview on input change
+        const inputs = document.querySelectorAll('#lootSettingsForm input, #lootSettingsForm select');
+        inputs.forEach(input => {
+            input.addEventListener('change', updatePreview);
+        });
+
+        updatePreview();
+    });
+
+    function showToast(message, type = 'info') {
+        const toast = document.getElementById('lootToast');
+        const toastBody = document.getElementById('lootToastBody');
+        toastBody.textContent = message;
+
+        toast.classList.remove('bg-success', 'bg-danger', 'bg-warning');
+        if (type === 'success') toast.classList.add('bg-success');
+        else if (type === 'error') toast.classList.add('bg-danger');
+        else if (type === 'warning') toast.classList.add('bg-warning');
+
+        const bsToast = new bootstrap.Toast(toast);
+        bsToast.show();
+    }
+
+    function getCurrentConfig() {
+        return {
+            base_drop_rate: parseFloat(document.getElementById('base_drop_rate').value),
+            magic_find_mult: parseFloat(document.getElementById('magic_find_mult').value),
+            gold_multiplier: parseFloat(document.getElementById('gold_multiplier').value),
+            rarity_weights: {
+                common: parseInt(document.getElementById('rarity_common').value),
+                uncommon: parseInt(document.getElementById('rarity_uncommon').value),
+                rare: parseInt(document.getElementById('rarity_rare').value),
+                epic: parseInt(document.getElementById('rarity_epic').value),
+                legendary: parseInt(document.getElementById('rarity_legendary').value),
+                mythic: parseInt(document.getElementById('rarity_mythic').value)
+            },
+            category_weights: {
+                weapons: parseInt(document.getElementById('category_weapons').value),
+                armor: parseInt(document.getElementById('category_armor').value),
+                consumables: parseInt(document.getElementById('category_consumables').value),
+                jewelry: parseInt(document.getElementById('category_jewelry').value)
+            },
+            elite_loot_mult: parseFloat(document.getElementById('elite_loot_mult').value),
+            boss_loot_mult: parseFloat(document.getElementById('boss_loot_mult').value),
+            boss_min_rarity: document.getElementById('boss_min_rarity').value,
+            boss_cache_size: parseInt(document.getElementById('boss_cache_size').value),
+            smart_loot: document.getElementById('smart_loot').checked,
+            unique_protection: document.getElementById('unique_protection').checked,
+            level_scaling: document.getElementById('level_scaling').checked
+        };
+    }
+
+    function updatePreview() {
+        const config = getCurrentConfig();
+        document.getElementById('configPreview').textContent = JSON.stringify(config, null, 2);
+    }
+
+    function saveLootSettings() {
+        const config = getCurrentConfig();
+
+        fetch('/admin/v2/settings/loot/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Loot settings saved successfully', 'success');
+                } else {
+                    showToast('Error: ' + (data.error || 'Unknown error'), 'error');
+                }
+            })
+            .catch(err => showToast('Error: ' + err.message, 'error'));
+    }
+
+    function resetLootSettings() {
+        if (!confirm('Reset all loot settings to defaults?')) return;
+
+        fetch('/admin/v2/settings/loot/reset', {
+            method: 'POST'
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Settings reset to defaults', 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showToast('Error: ' + (data.error || 'Unknown error'), 'error');
+                }
+            })
+            .catch(err => showToast('Error: ' + err.message, 'error'));
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,29 @@
+ItemID,Name,CategoryID,BaseRarity,MinLevel,MaxLevel,BaseDamageBonus,PrimaryStat,SecondaryStat,SocketCount,FlavorTag,Notes
+wp_swd_rusty_short,Rusty Shortsword,sword_1h,Common,1,5,0,STR/DEX,,0,Starter,Barely better than a stick
+wp_swd_adventurer,Adventurer's Blade,sword_1h,Uncommon,3,12,1,STR/DEX,+2 DEX,0,Balanced,Reliable early-game sword
+wp_swd_knights_oath,Knight's Oath,sword_1h,Rare,8,25,3,STR,+2 CON,1,Defensive,Favored by sworn protectors
+wp_swd_singing_edge,Singing Edge,sword_1h,Epic,15,40,5,DEX,+3 CHA,1,Finesse,Emits a faint humming tune in battle
+wp_swd_sunbreaker,Sunbreaker,sword_1h,Legendary,25,50,7,STR,+4 CHA,2,Radiant,On-kill flashes briefly with radiant light
+wp_gswd_twohands,Soldier's Greatsword,sword_2h,Common,1,10,0,STR,,0,Heavy,Standard-issue two-handed sword
+wp_gswd_reaper,Grave Reaper,sword_2h,Rare,10,30,4,STR,+2 STR,1,Cleave,Favored by executioners
+wp_gswd_stormcleaver,Stormcleaver,sword_2h,Epic,18,50,7,STR,+3 DEX,2,Lightning,Often found scorched by its own power
+wp_axe_woodcutter,Woodcutter's Axe,axe_1h,Common,1,8,0,STR,,0,Brutal,A basic but solid chopping axe
+wp_axe_raiders,Raider's Hatchet,axe_1h,Uncommon,4,15,1,STR,+2 STR,0,Aggressive,Favored by bandits and raiders
+wp_axe_skullsplitter,Skullsplitter,axe_1h,Rare,10,28,3,STR,+2 CON,1,Brutal,Leaves nasty fractures in armor and bone
+wp_axe2_brutal,Brutal Greataxe,axe_2h,Uncommon,5,18,1,STR,+1 STR,0,HighVariance,Swings slow but hits like a wagon
+wp_axe2_berserker,Berserker's Cry,axe_2h,Epic,18,45,6,STR,+3 CON,1,Rage,Whispers for blood in the wielder's mind
+wp_pole_halberd_guard,Guard's Halberd,polearm,Common,3,15,0,STR,,0,Reach,Used by city walls and caravan guards
+wp_pole_vanguard,Vanguard Halberd,polearm,Rare,12,32,3,STR,+2 CON,1,Control,Excellent for battlefield control
+wp_pole_dragonspear,Dragonspine Glaive,polearm,Legendary,25,50,6,STR,+4 STR,2,Bosskiller,Said to pierce dragon scales
+wp_dag_practice,Practice Dagger,dagger,Common,1,5,0,DEX,,0,Training,Blunt edges make it safer than most
+wp_dag_shadow,Shadow Stiletto,dagger,Rare,8,28,2,DEX,+2 DEX,1,Assassin,Almost vanishes in dim light
+wp_dag_heartseeker,Heartseeker,dagger,Legendary,20,50,4,DEX,+3 DEX,+2 CHA,2,Crit,Rumored to find gaps in any armor
+wp_bow_hunters,Hunter's Longbow,bow,Uncommon,4,16,1,DEX,+2 WIS,0,Ranged,Reliable companion of many rangers
+wp_bow_skyfall,Skyfall,bow,Epic,16,45,4,DEX,+3 DEX,1,Aerial,"Arrows arc strangely, as if guided by wind"
+wp_xbow_simple,Simple Crossbow,xbow_light,Common,1,10,0,DEX,,0,Ranged,Basic but deadly in careful hands
+wp_xbow_sniper,Sniper's Gale,xbow_light,Legendary,22,50,5,DEX,+3 INT,+2 DEX,1,Precision,Favored by patient killers
+wp_staff_apprentice,Apprentice's Quarterstaff,staff,Common,1,8,0,INT/WIS,,0,Focus,Basic channeling tool for casters
+wp_staff_oakheart,Oakheart Staff,staff,Rare,8,30,2,WIS,+2 WIS,1,Nature,"Warm to the touch, smells faintly of moss"
+wp_staff_starsong,Starsong Rod,wand,Epic,18,50,4,INT,+3 CHA,2,Arcane,Softly chimes under a night sky
+wp_fist_wrappings,Initiate's Handwraps,fist,Common,1,10,0,DEX/WIS,,0,Monk,Simple wraps with faint temple markings
+wp_fist_tigers_paw,Tiger's Paw,fist,Rare,10,40,3,DEX,+3 DEX,1,Combo,Empowers rapid flurries of strikes

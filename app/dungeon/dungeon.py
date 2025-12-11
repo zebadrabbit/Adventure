@@ -31,11 +31,12 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple
 
-# Support modules (kept under old/ directory currently)
-from .tiles import CAVE, DOOR, ROOM, TUNNEL, WALL, TELEPORT
 from . import tunnels as tunnels_mod
 from .config import DungeonConfig
 from .rooms import Room, place_rooms
+
+# Support modules (kept under old/ directory currently)
+from .tiles import CAVE, DOOR, ROOM, TELEPORT, TUNNEL, WALL
 
 # Extended door variants: SECRET_DOOR starts sealed (non-walkable) until revealed; LOCKED_DOOR currently
 # behaves like a normal door but provides a hook for future lock/key mechanics.
@@ -104,6 +105,8 @@ class Dungeon:
         self._repair_corridor_gaps()
         # Final connectivity enforcement (after pruning & repairs) to eliminate any remaining unreachable rooms
         self._enforce_full_room_connectivity()
+        # Add decoy dead-end tunnels to obscure secret doors
+        self._add_decoy_tunnels()
         # Re-run door sanity & de-duplication in case new corridors introduced adjacency anomalies
         self._door_sanity_pass()
         self._dedupe_adjacent_doors()
@@ -209,14 +212,25 @@ class Dungeon:
             return True
         return False
 
-    def is_walkable(self, x: int, y: int) -> bool:
+    def is_walkable(self, x: int, y: int, unlocked_doors=None) -> bool:
+        """Check if a tile is walkable.
+
+        Args:
+            x, y: Coordinates
+            unlocked_doors: Optional set of (x,y) tuples for unlocked doors
+        """
         if not (0 <= x < self.config.width and 0 <= y < self.config.height):
             return False
-        return self.grid[x][y] in (
+        cell = self.grid[x][y]
+        if cell == LOCKED_DOOR:
+            # Locked doors are only walkable if unlocked
+            if unlocked_doors is None:
+                return False
+            return (x, y) in unlocked_doors
+        return cell in (
             ROOM,
             TUNNEL,
             DOOR,
-            LOCKED_DOOR,
             TELEPORT,
         )  # secret doors not walkable until revealed
 
@@ -272,6 +286,76 @@ class Dungeon:
     def _connect_rooms(self):
         # Delegate to existing tunneling logic (MST + BFS corridor carving + door pruning)
         tunnels_mod.connect_rooms_with_tunnels(self.grid, self.rooms, self.config)
+
+    # ------------------------------------------------------------------
+    # Decoy Dead-End Tunnels: Add random short tunnels to obscure secret doors
+    # ------------------------------------------------------------------
+    def _add_decoy_tunnels(self):
+        """Add 2-4 short dead-end tunnels (length 2-5) to make secret doors less obvious.
+
+        These decoy tunnels start from existing tunnel/door tiles and extend into cave areas,
+        creating legitimate-looking corridors that don't actually connect to anything.
+        This makes it less obvious when a tunnel stops at what appears to be a wall (secret door).
+        """
+        w, h = self.config.width, self.config.height
+
+        # Collect all existing tunnel tiles as potential starting points
+        tunnel_tiles = [(x, y) for x in range(w) for y in range(h) if self.grid[x][y] == TUNNEL]
+
+        if not tunnel_tiles:
+            return
+
+        # Determine number of decoy tunnels to add (2-4)
+        num_decoys = self._rng.randint(2, 4)
+
+        for _ in range(num_decoys):
+            if not tunnel_tiles:
+                break
+
+            # Pick a random tunnel tile as starting point
+            start_idx = self._rng.randint(0, len(tunnel_tiles) - 1)
+            start_x, start_y = tunnel_tiles[start_idx]
+
+            # Determine tunnel length (2-5 tiles)
+            length = self._rng.randint(2, 5)
+
+            # Pick a random direction (prioritize directions with cave tiles)
+            directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+            self._rng.shuffle(directions)
+
+            # Try each direction until we find one with enough cave space
+            for dx, dy in directions:
+                carved = 0
+                x, y = start_x, start_y
+
+                # Try to carve in this direction
+                for step in range(length):
+                    nx, ny = x + dx, y + dy
+
+                    # Check bounds
+                    if not (0 <= nx < w and 0 <= ny < h):
+                        break
+
+                    # Only carve through cave tiles
+                    if self.grid[nx][ny] != CAVE:
+                        break
+
+                    # Don't carve next to rooms (would create unwanted doors)
+                    room_adjacent = any(
+                        0 <= ax < w and 0 <= ay < h and self.grid[ax][ay] == ROOM
+                        for ax, ay in ((nx + 1, ny), (nx - 1, ny), (nx, ny + 1), (nx, ny - 1))
+                    )
+                    if room_adjacent:
+                        break
+
+                    # Carve the tunnel
+                    self.grid[nx][ny] = TUNNEL
+                    carved += 1
+                    x, y = nx, ny
+
+                # If we carved at least 2 tiles, consider this decoy successful
+                if carved >= 2:
+                    break
 
     # ------------------------------------------------------------------
     # Post-processing: Dead-end pruning (remove leaf corridor chains not leading to rooms)

@@ -40,6 +40,20 @@ ITEM_FILES_ORDER = [
     "items_misc.sql",
 ]
 
+AFFIX_FILES = [
+    "procedural_affixes_seed.sql",
+]
+
+WEAPON_CATEGORY_FILES = [
+    "weapon_categories_seed.sql",
+]
+
+ENEMY_SCALING_FILES = [
+    "enemy_archetypes_seed.sql",
+    "dungeon_tiers_seed.sql",
+    "dungeon_affixes_seed.sql",
+]
+
 
 def _existing_sql_files(files: Iterable[str]):
     for name in files:
@@ -195,12 +209,69 @@ def reseed_items(clear_first: bool = False, verbose: bool = True) -> None:
                 if verbose:
                     print(" OK")
 
+        # Load procedural affixes
+        for path in _existing_sql_files(AFFIX_FILES):
+            if verbose:
+                print(f"[reseed] Loading {path.name} ...", end="")
+            try:
+                execute_sql_file(path)
+            except Exception as e:
+                if verbose:
+                    print(" ERROR")
+                raise RuntimeError(f"Failed loading {path.name}: {e}") from e
+            else:
+                if verbose:
+                    print(" OK")
+
+        # Load weapon categories
+        for path in _existing_sql_files(WEAPON_CATEGORY_FILES):
+            if verbose:
+                print(f"[reseed] Loading {path.name} ...", end="")
+            try:
+                execute_sql_file(path)
+            except Exception as e:
+                if verbose:
+                    print(" ERROR")
+                raise RuntimeError(f"Failed loading {path.name}: {e}") from e
+            else:
+                if verbose:
+                    print(" OK")
+
+        # Load enemy scaling system
+        for path in _existing_sql_files(ENEMY_SCALING_FILES):
+            if verbose:
+                print(f"[reseed] Loading {path.name} ...", end="")
+            try:
+                execute_sql_file(path)
+            except Exception as e:
+                if verbose:
+                    print(" ERROR")
+                raise RuntimeError(f"Failed loading {path.name}: {e}") from e
+            else:
+                if verbose:
+                    print(" OK")
+
         if verbose:
             # Quick count summary
+            from app.models.affix import ProceduralAffix
+            from app.models.dungeon_tier import DungeonAffix, DungeonTier
+            from app.models.enemy_archetype import EnemyArchetype
             from app.models.models import Item
+            from app.models.weapon_category import WeaponCategory
 
             total = db.session.query(Item).count()
+            affix_count = db.session.query(ProceduralAffix).count()
+            weapon_cat_count = db.session.query(WeaponCategory).count()
+            archetype_count = db.session.query(EnemyArchetype).count()
+            tier_count = db.session.query(DungeonTier).count()
+            dungeon_affix_count = db.session.query(DungeonAffix).count()
             print(f"[reseed] Done. Item table now has {total} rows.")
+            print(f"[reseed] ProceduralAffix table has {affix_count} rows.")
+            print(f"[reseed] WeaponCategory table has {weapon_cat_count} rows.")
+            print(f"[reseed] EnemyArchetype table has {archetype_count} rows.")
+            print(f"[reseed] DungeonTier table has {tier_count} rows.")
+            print(f"[reseed] DungeonAffix table has {dungeon_affix_count} rows.")
+            print(f"[reseed] WeaponCategory table has {weapon_cat_count} rows.")
 
 
 __all__ = [

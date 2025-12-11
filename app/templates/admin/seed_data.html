@@ -1,0 +1,194 @@
+{% extends "admin_base_new.html" %}
+
+{% block page_title %}Seed Data{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <!-- Items Seed -->
+    <div class="col-md-6">
+        <div class="card bg-dark text-light border-secondary">
+            <div class="card-body">
+                <h5 class="card-title mb-3"><i class="bi bi-box me-2"></i>Seed Items</h5>
+                <p class="text-muted small">Import items from CSV or run SQL seed scripts.</p>
+
+                <form id="itemsSeedForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label">CSV File</label>
+                        <input type="file" class="form-control bg-dark text-light border-secondary" name="file"
+                            accept=".csv" id="itemsFile">
+                        <div class="form-text text-muted">
+                            Required columns: slug, name, type, description, value_copper, level, rarity
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="uploadItems()">
+                        <i class="bi bi-upload me-1"></i> Upload Items CSV
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="runSqlSeed('items')">
+                        <i class="bi bi-play-circle me-1"></i> Run SQL Seed
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monsters Seed -->
+    <div class="col-md-6">
+        <div class="card bg-dark text-light border-secondary">
+            <div class="card-body">
+                <h5 class="card-title mb-3"><i class="bi bi-bug me-2"></i>Seed Monsters</h5>
+                <p class="text-muted small">Import monsters from CSV or run SQL seed scripts.</p>
+
+                <form id="monstersSeedForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label">CSV File</label>
+                        <input type="file" class="form-control bg-dark text-light border-secondary" name="file"
+                            accept=".csv" id="monstersFile">
+                        <div class="form-text text-muted">
+                            Required columns: slug, name, level_min, level_max, base_hp, base_damage, armor, speed,
+                            rarity, family, xp_base
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="uploadMonsters()">
+                        <i class="bi bi-upload me-1"></i> Upload Monsters CSV
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="runSqlSeed('monsters')">
+                        <i class="bi bi-play-circle me-1"></i> Run SQL Seed
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="col-12" id="resultsCard" style="display: none;">
+        <div class="card bg-dark text-light border-secondary">
+            <div class="card-body">
+                <h5 class="card-title mb-3"><i class="bi bi-check-circle me-2"></i>Seed Results</h5>
+                <div id="resultsContent"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="seedToast" class="toast bg-dark text-light border-secondary" role="alert">
+        <div class="toast-header bg-dark text-light border-secondary">
+            <strong class="me-auto">Seed Data</strong>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body" id="seedToastBody"></div>
+    </div>
+</div>
+
+<script>
+    function showToast(message, type = 'info') {
+        const toast = document.getElementById('seedToast');
+        const toastBody = document.getElementById('seedToastBody');
+        toastBody.textContent = message;
+
+        toast.classList.remove('bg-success', 'bg-danger', 'bg-warning');
+        if (type === 'success') toast.classList.add('bg-success');
+        else if (type === 'error') toast.classList.add('bg-danger');
+        else if (type === 'warning') toast.classList.add('bg-warning');
+
+        const bsToast = new bootstrap.Toast(toast);
+        bsToast.show();
+    }
+
+    function showResults(data) {
+        const resultsCard = document.getElementById('resultsCard');
+        const resultsContent = document.getElementById('resultsContent');
+
+        let html = '';
+        if (data.errors && data.errors.length > 0) {
+            html += '<div class="alert alert-danger">';
+            html += '<h6>Errors:</h6><ul>';
+            data.errors.forEach(err => {
+                html += `<li>${err}</li>`;
+            });
+            html += '</ul></div>';
+        }
+
+        if (data.imported !== undefined && data.imported !== null) {
+            html += `<div class="alert alert-success">Successfully imported ${data.imported} records</div>`;
+        }
+
+        if (data.message) {
+            html += `<div class="alert alert-info">${data.message}</div>`;
+        }
+
+        resultsContent.innerHTML = html;
+        resultsCard.style.display = 'block';
+    }
+
+    function uploadItems() {
+        const fileInput = document.getElementById('itemsFile');
+        if (!fileInput.files[0]) {
+            showToast('Please select a file', 'warning');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        showToast('Uploading items...', 'info');
+
+        fetch('/admin/items', {
+            method: 'POST',
+            body: formData
+        })
+            .then(r => r.text())
+            .then(html => {
+                showToast('Items uploaded', 'success');
+                // Parse the response HTML to extract results
+                setTimeout(() => location.reload(), 1500);
+            })
+            .catch(err => showToast('Error: ' + err.message, 'error'));
+    }
+
+    function uploadMonsters() {
+        const fileInput = document.getElementById('monstersFile');
+        if (!fileInput.files[0]) {
+            showToast('Please select a file', 'warning');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        showToast('Uploading monsters...', 'info');
+
+        fetch('/admin/monsters', {
+            method: 'POST',
+            body: formData
+        })
+            .then(r => r.text())
+            .then(html => {
+                showToast('Monsters uploaded', 'success');
+                setTimeout(() => location.reload(), 1500);
+            })
+            .catch(err => showToast('Error: ' + err.message, 'error'));
+    }
+
+    function runSqlSeed(type) {
+        if (!confirm(`Run SQL seed for ${type}?`)) return;
+
+        showToast(`Running ${type} seed...`, 'info');
+
+        fetch(`/admin/v2/tools/seed/${type}`, {
+            method: 'POST'
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(data.message || 'Seed completed', 'success');
+                    if (data.details) showResults(data.details);
+                } else {
+                    showToast('Error: ' + (data.error || 'Unknown error'), 'error');
+                }
+            })
+            .catch(err => showToast('Error: ' + err.message, 'error'));
+    }
+</script>
+{% endblock %}

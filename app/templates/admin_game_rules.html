@@ -1,0 +1,140 @@
+{% extends 'admin_base.html' %}
+{% block admin_breadcrumb %}<li class="breadcrumb-item active" aria-current="page">Game Rules</li>{% endblock %}
+{% block admin_content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="h4 mb-3">Game Rules & Modifiers</h2>
+            <p class="text-muted mb-4">Configure gameplay difficulty, rewards, and environmental settings.</p>
+
+            <form method="post">
+                <div class="card-glass mb-4">
+                    <div class="card-header-glass">
+                        <h5 class="mb-0"><i class="bi bi-award me-2"></i>Rewards & Progression</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">XP Multiplier</label>
+                                <input type="number" step="0.1" min="0.1" max="10" name="xp_multiplier"
+                                    value="{{ rules.xp_multiplier }}" class="form-control" required>
+                                <small class="form-text text-muted">Multiplier for experience points gained (1.0 =
+                                    normal)</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Gold Multiplier</label>
+                                <input type="number" step="0.1" min="0.1" max="10" name="gold_multiplier"
+                                    value="{{ rules.gold_multiplier }}" class="form-control" required>
+                                <small class="form-text text-muted">Multiplier for gold rewards (1.0 = normal)</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Loot Drop Multiplier</label>
+                                <input type="number" step="0.1" min="0.1" max="5" name="loot_drop_multiplier"
+                                    value="{{ rules.loot_drop_multiplier }}" class="form-control" required>
+                                <small class="form-text text-muted">Affects loot drop rates and quantity (1.0 =
+                                    normal)</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Death Penalty (%)</label>
+                                <input type="number" step="1" min="0" max="100" name="death_penalty_percent"
+                                    value="{{ rules.death_penalty_percent }}" class="form-control" required>
+                                <small class="form-text text-muted">Percentage of XP/gold lost on death</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-glass mb-4">
+                    <div class="card-header-glass">
+                        <h5 class="mb-0"><i class="bi bi-lightning-charge me-2"></i>Combat & Difficulty</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Encounter Spawn Rate</label>
+                                <input type="number" step="0.01" min="0" max="1" name="encounter_spawn_rate"
+                                    value="{{ rules.encounter_spawn_rate }}" class="form-control" required>
+                                <small class="form-text text-muted">Probability of monster encounter per move
+                                    (0.0-1.0)</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Monster HP Multiplier</label>
+                                <input type="number" step="0.1" min="0.1" max="10" name="monster_hp_multiplier"
+                                    value="{{ rules.monster_hp_multiplier }}" class="form-control" required>
+                                <small class="form-text text-muted">Multiplier for monster health (1.0 = normal)</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Monster Damage Multiplier</label>
+                                <input type="number" step="0.1" min="0.1" max="10" name="monster_damage_multiplier"
+                                    value="{{ rules.monster_damage_multiplier }}" class="form-control" required>
+                                <small class="form-text text-muted">Multiplier for monster damage (1.0 = normal)</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Critical Hit Multiplier</label>
+                                <input type="number" step="0.1" min="1" max="5" name="critical_hit_multiplier"
+                                    value="{{ rules.critical_hit_multiplier }}" class="form-control" required>
+                                <small class="form-text text-muted">Damage multiplier for critical hits (2.0 =
+                                    double)</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-glass mb-4">
+                    <div class="card-header-glass">
+                        <h5 class="mb-0"><i class="bi bi-eye me-2"></i>Vision & Environment</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Fog Density</label>
+                                <input type="number" step="0.05" min="0" max="1" name="fog_density"
+                                    value="{{ rules.fog_density }}" class="form-control" required>
+                                <small class="form-text text-muted">Fog of war opacity (0.0 = none, 1.0 = thick)</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Vision Range (tiles)</label>
+                                <input type="number" step="1" min="1" max="20" name="vision_range"
+                                    value="{{ rules.vision_range }}" class="form-control" required>
+                                <small class="form-text text-muted">How many tiles players can see around them</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-glass mb-4">
+                    <div class="card-header-glass">
+                        <h5 class="mb-0"><i class="bi bi-gear me-2"></i>Gameplay Mechanics</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Rest Heal Percent</label>
+                                <input type="number" step="5" min="0" max="100" name="rest_heal_percent"
+                                    value="{{ rules.rest_heal_percent }}" class="form-control" required>
+                                <small class="form-text text-muted">HP/MP restored when resting (% of max)</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Skill Check DC</label>
+                                <input type="number" step="1" min="5" max="30" name="skill_check_difficulty"
+                                    value="{{ rules.skill_check_difficulty }}" class="form-control" required>
+                                <small class="form-text text-muted">Difficulty Class for skill checks (perception,
+                                    etc.)</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between">
+                    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save me-2"></i>Save Game Rules
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

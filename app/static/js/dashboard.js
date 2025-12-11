@@ -125,5 +125,27 @@
             const cb = card.querySelector('.party-select');
         });
 
+        // Add form submission validation and logging
+        const adventureForm = document.getElementById('begin-adventure-form');
+        if (adventureForm) {
+            adventureForm.addEventListener('submit', function (e) {
+                const formData = new FormData(adventureForm);
+                const partyIds = formData.getAll('party_ids');
+                console.log('[dashboard] Form submission - party_ids:', partyIds);
+
+                if (partyIds.length === 0) {
+                    e.preventDefault();
+                    alert('No party members selected. Please select 1-4 characters or click Autofill Party.');
+                    return false;
+                }
+                if (partyIds.length > 4) {
+                    e.preventDefault();
+                    alert('Too many party members selected. Maximum is 4.');
+                    return false;
+                }
+                console.log('[dashboard] Form validation passed, submitting...');
+            });
+        }
+
     })();
 })();

@@ -1,0 +1,13 @@
+CategoryID,Name,WeaponType,Hands,BaseDiceCount,BaseDie,PrimaryStat,CritMultiplier,AttackSpeed,Tags,AllowedClasses,Notes
+sword_1h,One-Handed Sword,Melee,1,1,d8,STR/DEX,1.5,1.0,Versatile;Finesse,Fighter;Paladin;Ranger;Rogue;Bard;Warlock,Core melee weapon; flexible builds
+sword_2h,Greatsword,Melee,2,2,d6,STR,1.7,0.85,Heavy;Sweeping,Fighter;Barbarian;Paladin,Big cleave damage; slower swings
+axe_1h,Hand Axe,Melee,1,1,d6,STR,1.6,1.05,Thrown;Brutal,Fighter;Barbarian;Ranger,Can be thrown; slightly higher crit flavor
+axe_2h,Greataxe,Melee,2,1,d12,STR,1.8,0.8,Heavy;Brutal,Fighter;Barbarian;Paladin,High variance damage; great with crit builds
+polearm,Halberd,Melee,2,1,d10,STR,1.6,0.9,Reach;Heavy,Fighter;Paladin,Extra reach; great frontline zoning
+dagger,Dagger,Melee,1,1,d4,DEX,1.6,1.2,Finesse;Light;Thrown,Rogue;Bard;Wizard;Sorcerer;Warlock,"Fast, crit-friendly, good off-hand"
+bow,Longbow,Ranged,2,1,d10,DEX,1.5,1.0,Ranged;Two-Handed,Ranger;Fighter;Rogue,Primary ranged physical damage
+xbow_light,Light Crossbow,Ranged,2,1,d8,DEX,1.7,0.9,Ranged;Reload,Rogue;Wizard;Warlock;Cleric,High per-shot damage; slower reloads
+staff,Quarterstaff,Melee,1/2,1,d6,STR/INT/WIS,1.4,1.0,Focus;Versatile,Wizard;Druid;Cleric;Warlock;Sorcerer;Monk,Doubles as spellcasting focus
+wand,Wand,Magic,1,1,d6,INT/CHA,1.5,1.1,Magic;Focus,Wizard;Warlock;Sorcerer,Amplifies spell-based builds
+fist,Unarmed Strikes,Melee,0,1,d4,DEX/WIS,1.5,1.3,Finesse;Special,Monk,Improves with level; ki-scaling
+shield_bash,Shield Bash,Melee,1,1,d4,STR,1.4,0.9,Defensive;Control,Fighter;Paladin;Cleric,Secondary attack for shield users

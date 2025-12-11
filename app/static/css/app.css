@@ -27,31 +27,31 @@
      * If a removed style is reported, search original file notes above.
 --------------------------------------------------------------------*/
 
-/* === 1. Modern Clean Theme ============================================== */
+/* === 1. Medieval Dark Fantasy Theme ===================================== */
 :root {
-  /* Base Colors - Clean & Professional */
-  --adv-bg: #0a0e27;
-  --adv-bg-secondary: #141937;
-  --adv-surface: #1a1f3a;
-  --adv-surface-hover: #232952;
+  /* Base Colors - Dark Dungeon */
+  --adv-bg: #0d0a0a;
+  --adv-bg-secondary: #1a1512;
+  --adv-surface: #1a1512;
+  --adv-surface-hover: #26211c;
 
-  /* Accent Colors - Vibrant but Refined */
-  --adv-primary: #6366f1;
-  --adv-primary-hover: #4f46e5;
-  --adv-secondary: #8b5cf6;
-  --adv-accent: #06b6d4;
-  --adv-success: #10b981;
-  --adv-warning: #f59e0b;
-  --adv-danger: #ef4444;
+  /* Accent Colors - Medieval Amber Theme */
+  --adv-primary: #d4a574;
+  --adv-primary-hover: #e8c9a0;
+  --adv-secondary: #c17a3a;
+  --adv-accent: #8b6f47;
+  --adv-success: #4a6741;
+  --adv-warning: #c17a3a;
+  --adv-danger: #8b2e2e;
 
-  /* Text Colors */
-  --adv-text: #e2e8f0;
-  --adv-text-muted: #94a3b8;
-  --adv-text-dim: #64748b;
+  /* Text Colors - Parchment & Candlelight */
+  --adv-text: #d4c5b0;
+  --adv-text-muted: #a89c8a;
+  --adv-text-dim: #8a7d6f;
 
-  /* Borders & Dividers */
-  --adv-border: rgba(148, 163, 184, 0.12);
-  --adv-border-hover: rgba(148, 163, 184, 0.24);
+  /* Borders & Dividers - Worn Medieval */
+  --adv-border: rgba(61, 50, 38, 0.5);
+  --adv-border-hover: rgba(212, 165, 116, 0.3);
 
   /* Shadows */
   --adv-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
@@ -63,7 +63,7 @@
   --bs-body-bg: var(--adv-bg);
   --bs-body-color: var(--adv-text);
   --bs-primary: var(--adv-primary);
-  --bs-primary-rgb: 99, 102, 241;
+  --bs-primary-rgb: 212, 165, 116;
   --bs-secondary: var(--adv-secondary);
   --bs-success: var(--adv-success);
   --bs-info: var(--adv-accent);
@@ -84,22 +84,22 @@ body {
   letter-spacing: -0.01em;
 }
 
-/* Buttons - Clean & Modern */
+/* Buttons - Medieval Style */
 .btn-primary {
   --bs-btn-bg: var(--adv-primary);
   --bs-btn-border-color: var(--adv-primary);
   --bs-btn-hover-bg: var(--adv-primary-hover);
   --bs-btn-hover-border-color: var(--adv-primary-hover);
   --bs-btn-active-bg: var(--adv-primary-hover);
-  --bs-btn-color: white;
+  --bs-btn-color: #0d0a0a;
   font-weight: 500;
   border-radius: 0.5rem;
-  box-shadow: 0 1px 2px 0 rgba(99, 102, 241, 0.1), 0 0 0 1px rgba(99, 102, 241, 0.05);
+  box-shadow: 0 1px 2px 0 rgba(212, 165, 116, 0.1), 0 0 0 1px rgba(212, 165, 116, 0.05);
   transition: all 0.15s ease;
 }
 
 .btn-primary:hover {
-  box-shadow: 0 4px 8px 0 rgba(99, 102, 241, 0.3), 0 0 0 1px rgba(99, 102, 241, 0.1);
+  box-shadow: 0 4px 8px 0 rgba(212, 165, 116, 0.3), 0 0 0 1px rgba(212, 165, 116, 0.1);
   transform: translateY(-1px);
 }
 
@@ -132,15 +132,15 @@ body {
 }
 
 .card-header {
-  background: rgba(99, 102, 241, 0.05);
+  background: rgba(212, 165, 116, 0.05);
   border-bottom: 1px solid var(--adv-border);
   font-weight: 600;
   letter-spacing: -0.01em;
 }
 
-/* Navigation - Clean & Elevated */
+/* Navigation - Medieval Stone */
 .navbar-dark {
-  background: rgba(26, 31, 58, 0.95) !important;
+  background: rgba(26, 21, 18, 0.95) !important;
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--adv-border);
   box-shadow: var(--adv-shadow);
@@ -259,7 +259,7 @@ body {
 }
 
 .icon-glow {
-  filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.5));
+  filter: drop-shadow(0 0 8px rgba(212, 165, 116, 0.5));
 }
 
 /* Map & Game Areas */
@@ -371,7 +371,7 @@ body {
   transform-origin: 50% 50%;
   pointer-events: none;
   transition: transform 120ms ease;
-  filter: drop-shadow(0 0 4px rgba(99, 102, 241, 0.6));
+  filter: drop-shadow(0 0 4px rgba(212, 165, 116, 0.6));
 }
 
 /* Movement Pad - Refined */
@@ -410,7 +410,7 @@ body {
 .movement-pad button:focus-visible:not(:disabled) {
   background: var(--adv-surface-hover);
   border-color: var(--adv-primary);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2), var(--adv-shadow);
+  box-shadow: 0 0 0 2px rgba(212, 165, 116, 0.2), var(--adv-shadow);
   outline: none;
 }
 
@@ -591,7 +591,7 @@ body {
   background: var(--adv-surface-hover);
   border-color: var(--adv-primary);
   color: var(--adv-text);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  box-shadow: 0 0 0 3px rgba(212, 165, 116, 0.1);
 }
 
 .form-control::placeholder {
@@ -609,7 +609,7 @@ body {
   --bs-table-bg: transparent;
   --bs-table-color: var(--adv-text);
   --bs-table-border-color: var(--adv-border);
-  --bs-table-hover-bg: rgba(99, 102, 241, 0.05);
+  --bs-table-hover-bg: rgba(212, 165, 116, 0.05);
 }
 
 .table thead th {
@@ -658,6 +658,25 @@ body {
   background: rgba(6, 182, 212, 0.1);
   border-color: rgba(6, 182, 212, 0.3);
   color: #67e8f9;
+}
+
+/* === Debug Loot Markers (Admin Debug Mode) ============================= */
+@keyframes debug-loot-pulse {
+
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+
+  50% {
+    opacity: 0.9;
+  }
+}
+
+.debug-loot-marker {
+  animation: debug-loot-pulse 2s ease-in-out infinite;
+  /* Prevent any positioning shifts during animation */
+  transform-origin: center center;
 }
 
 /* End Consolidated */

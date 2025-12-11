@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Admin Panel{% endblock %} - Adventure</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --sidebar-width: 260px;
+            --header-height: 60px;
+        }
+
+        body {
+            background: #0a0e27;
+            color: #e0e7ff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        .admin-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .admin-sidebar {
+            width: var(--sidebar-width);
+            background: linear-gradient(180deg, #1a1f3a 0%, #0d1123 100%);
+            border-right: 1px solid rgba(99, 102, 241, 0.2);
+            position: fixed;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+
+        .admin-brand {
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(99, 102, 241, 0.15);
+        }
+
+        .admin-brand h4 {
+            margin: 0;
+            color: #818cf8;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .admin-nav {
+            padding: 1rem 0;
+        }
+
+        .nav-section-title {
+            padding: 0.75rem 1.5rem;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #6366f1;
+            font-weight: 600;
+            margin-top: 1rem;
+        }
+
+        .nav-section-title:first-child {
+            margin-top: 0;
+        }
+
+        .admin-nav-link {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1.5rem;
+            color: #c7d2fe;
+            text-decoration: none;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .admin-nav-link:hover {
+            background: rgba(99, 102, 241, 0.1);
+            color: #e0e7ff;
+        }
+
+        .admin-nav-link.active {
+            background: rgba(99, 102, 241, 0.15);
+            border-left-color: #818cf8;
+            color: #fff;
+        }
+
+        .admin-nav-link i {
+            width: 20px;
+            text-align: center;
+            font-size: 1.1rem;
+        }
+
+        .admin-main {
+            margin-left: var(--sidebar-width);
+            flex: 1;
+            min-height: 100vh;
+        }
+
+        .admin-header {
+            height: var(--header-height);
+            background: rgba(13, 17, 35, 0.8);
+            border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            padding: 0 2rem;
+            justify-content: space-between;
+        }
+
+        .admin-header h5 {
+            margin: 0;
+            font-weight: 600;
+            color: #e0e7ff;
+        }
+
+        .admin-user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .admin-content {
+            padding: 2rem;
+        }
+
+        .config-card {
+            background: linear-gradient(135deg, rgba(26, 31, 58, 0.6) 0%, rgba(13, 17, 35, 0.8) 100%);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .config-card h6 {
+            color: #818cf8;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-label {
+            color: #c7d2fe;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .form-control,
+        .form-select {
+            background: rgba(10, 14, 39, 0.6);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            color: #e0e7ff;
+        }
+
+        .form-control:focus,
+        .form-select:focus {
+            background: rgba(10, 14, 39, 0.8);
+            border-color: #818cf8;
+            color: #fff;
+            box-shadow: 0 0 0 0.25rem rgba(129, 140, 248, 0.25);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            border: none;
+            font-weight: 500;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+        }
+
+        .btn-outline-secondary {
+            border-color: rgba(99, 102, 241, 0.3);
+            color: #c7d2fe;
+        }
+
+        .btn-outline-secondary:hover {
+            background: rgba(99, 102, 241, 0.1);
+            border-color: #818cf8;
+            color: #fff;
+        }
+
+        .text-muted {
+            color: #94a3b8 !important;
+        }
+
+        .badge {
+            font-weight: 500;
+        }
+
+        pre {
+            background: rgba(10, 14, 39, 0.8);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 8px;
+            padding: 1rem;
+            color: #c7d2fe;
+            font-size: 0.875rem;
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+
+<body>
+    <div class="admin-container">
+        <!-- Sidebar Navigation -->
+        <aside class="admin-sidebar">
+            <div class="admin-brand">
+                <h4>
+                    <i class="bi bi-gear-fill"></i>
+                    Admin Panel
+                </h4>
+            </div>
+
+            <nav class="admin-nav">
+                <!-- Game Settings -->
+                <div class="nav-section-title">Game Settings</div>
+                <a href="{{ url_for('admin_new.fog_settings') }}"
+                    class="admin-nav-link {% if request.endpoint == 'admin_new.fog_settings' %}active{% endif %}">
+                    <i class="bi bi-cloud-fog2"></i>
+                    <span>Fog & Visibility</span>
+                </a>
+                <a href="{{ url_for('admin_new.combat_settings') }}"
+                    class="admin-nav-link {% if request.endpoint == 'admin_new.combat_settings' %}active{% endif %}">
+                    <i class="bi bi-sword"></i>
+                    <span>Combat Rules</span>
+                </a>
+                <a href="{{ url_for('admin_new.loot_settings') }}"
+                    class="admin-nav-link {% if request.endpoint == 'admin_new.loot_settings' %}active{% endif %}">
+                    <i class="bi bi-gem"></i>
+                    <span>Loot & Rewards</span>
+                </a>
+                <a href="{{ url_for('admin_new.dungeon_settings') }}"
+                    class="admin-nav-link {% if request.endpoint == 'admin_new.dungeon_settings' %}active{% endif %}">
+                    <i class="bi bi-map"></i>
+                    <span>Dungeon Generation</span>
+                </a>
+                <a href="{{ url_for('admin_new.progression_settings') }}"
+                    class="admin-nav-link {% if request.endpoint == 'admin_new.progression_settings' %}active{% endif %}">
+                    <i class="bi bi-graph-up"></i>
+                    <span>Progression & XP</span>
+                </a>
+
+                <!-- Server Management -->
+                <div class="nav-section-title">Server Management</div>
+                <a href="{{ url_for('admin_new.server_status') }}"
+                    class="admin-nav-link {% if request.endpoint == 'admin_new.server_status' %}active{% endif %}">
+                    <i class="bi bi-server"></i>
+                    <span>Server Status</span>
+                </a>
+                <a href="{{ url_for('admin_new.logs') }}"
+                    class="admin-nav-link {% if request.endpoint == 'admin_new.logs' %}active{% endif %}">
+                    <i class="bi bi-file-text"></i>
+                    <span>Logs</span>
+                </a>
+                <a href="{{ url_for('admin_new.database') }}"
+                    class="admin-nav-link {% if request.endpoint == 'admin_new.database' %}active{% endif %}">
+                    <i class="bi bi-database"></i>
+                    <span>Database</span>
+                </a>
+
+                <!-- User Management -->
+                <div class="nav-section-title">User Management</div>
+                <a href="{{ url_for('admin_new.users') }}"
+                    class="admin-nav-link {% if request.endpoint == 'admin_new.users' %}active{% endif %}">
+                    <i class="bi bi-people"></i>
+                    <span>Users</span>
+                </a>
+                <a href="{{ url_for('admin_new.characters') }}"
+                    class="admin-nav-link {% if request.endpoint == 'admin_new.characters' %}active{% endif %}">
+                    <i class="bi bi-person-badge"></i>
+                    <span>Characters</span>
+                </a>
+                <a href="{{ url_for('admin_new.moderation') }}"
+                    class="admin-nav-link {% if request.endpoint == 'admin_new.moderation' %}active{% endif %}">
+                    <i class="bi bi-shield-check"></i>
+                    <span>Moderation</span>
+                </a>
+
+                <!-- Tools -->
+                <div class="nav-section-title">Tools</div>
+                <a href="{{ url_for('admin_new.seed_data') }}"
+                    class="admin-nav-link {% if request.endpoint == 'admin_new.seed_data' %}active{% endif %}">
+                    <i class="bi bi-box-seam"></i>
+                    <span>Seed Data</span>
+                </a>
+                <a href="{{ url_for('admin_new.debug') }}"
+                    class="admin-nav-link {% if request.endpoint == 'admin_new.debug' %}active{% endif %}">
+                    <i class="bi bi-bug"></i>
+                    <span>Debug Tools</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="admin-main">
+            <header class="admin-header">
+                <h5>{% block page_title %}Admin Dashboard{% endblock %}</h5>
+                <div class="admin-user-info">
+                    <span class="text-muted">{{ current_user.username }}</span>
+                    <a href="{{ url_for('dashboard.dashboard') }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-box-arrow-left me-1"></i> Exit Admin
+                    </a>
+                </div>
+            </header>
+
+            <div class="admin-content">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/fog-config.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

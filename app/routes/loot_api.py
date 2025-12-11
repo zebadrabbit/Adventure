@@ -8,9 +8,11 @@ from flask_login import current_user, login_required
 
 from app import db
 from app.inventory.utils import add_item, can_add_item, dump_inventory, load_inventory
+from app.loot.affix_generator import generate_item_name, get_affix_stats
+from app.models.affix import ItemAffix
 from app.models.dungeon_instance import DungeonInstance
 from app.models.loot import DungeonLoot
-from app.models.models import Character, Item
+from app.models.models import Character, CombatSession, Item
 
 bp_loot = Blueprint("loot", __name__)
 
@@ -41,6 +43,14 @@ def list_loot():
         item = db.session.get(Item, r.item_id)
         if not item:
             continue
+
+        # Get affixes for this loot placement
+        affixes = ItemAffix.query.filter_by(dungeon_seed=inst.seed, x=r.x, y=r.y, z=r.z).all()
+
+        # Generate procedural name and stats
+        item_name = generate_item_name(item, affixes) if affixes else item.name
+        affix_stats = get_affix_stats(affixes) if affixes else {}
+
         loot.append(
             {
                 "id": r.id,
@@ -48,9 +58,19 @@ def list_loot():
                 "y": r.y,
                 "z": r.z,
                 "slug": item.slug,
-                "name": item.name,
+                "name": item_name,
+                "base_name": item.name,
                 "rarity": getattr(item, "rarity", "common"),
                 "level": getattr(item, "level", 0),
+                "affixes": [
+                    {
+                        "name": a.affix.name,
+                        "stat": a.affix.affected_stat,
+                        "value": round(a.rolled_value, 1),
+                    }
+                    for a in affixes
+                ],
+                "stats": affix_stats,
             }
         )
     return jsonify({"loot": loot})
@@ -216,3 +236,187 @@ def claim_loot(loot_id: int):
             "encumbrance": enc_state,
         }
     )
+
+
+@bp_loot.route("/api/loot/pending")
+@login_required
+def get_pending_loot():
+    """Get pending loot from recent combat session.
+
+    Returns loot items that haven't been distributed yet, along with party info.
+    Query params: combat_id (optional) - specific combat session
+    """
+    import json
+
+    combat_id = request.args.get("combat_id", type=int)
+
+    # Find most recent completed combat for this user
+    query = CombatSession.query.filter_by(user_id=current_user.id, status="complete")
+    if combat_id:
+        query = query.filter_by(id=combat_id)
+
+    combat = query.order_by(CombatSession.id.desc()).first()
+    if not combat:
+        return jsonify({"loot": [], "party": []})
+
+    # Check if loot has already been distributed
+    if hasattr(combat, "loot_distributed") and combat.loot_distributed:
+        return jsonify({"loot": [], "party": []})
+
+    # Parse rewards
+    try:
+        rewards = json.loads(combat.rewards_json or "{}")
+    except Exception:
+        rewards = {}
+
+    # Get items from rewards
+    loot_items = []
+    items_data = rewards.get("items", {})
+
+    if isinstance(items_data, dict):
+        for slug, qty in items_data.items():
+            item = Item.query.filter_by(slug=slug).first()
+            if item:
+                for _ in range(int(qty)):
+                    loot_items.append(
+                        {
+                            "id": f"{slug}_{len(loot_items)}",  # Unique ID for frontend
+                            "slug": slug,
+                            "name": item.name,
+                            "type": item.type,
+                            "rarity": item.rarity,
+                            "description": item.description,
+                            "effects": _get_item_effects(item),
+                        }
+                    )
+    elif isinstance(items_data, list):
+        for slug in items_data:
+            item = Item.query.filter_by(slug=slug).first()
+            if item:
+                loot_items.append(
+                    {
+                        "id": f"{slug}_{len(loot_items)}",
+                        "slug": slug,
+                        "name": item.name,
+                        "type": item.type,
+                        "rarity": item.rarity,
+                        "description": item.description,
+                        "effects": _get_item_effects(item),
+                    }
+                )
+
+    # Get party members from combat snapshot
+    try:
+        party_snapshot = json.loads(combat.party_snapshot_json or "{}")
+        members = party_snapshot.get("members", [])
+        party = [
+            {
+                "id": m.get("char_id"),
+                "name": m.get("name"),
+                "class": m.get("class", "Unknown"),
+                "level": m.get("level", 1),
+            }
+            for m in members
+            if m.get("char_id")
+        ]
+    except Exception:
+        party = []
+
+    return jsonify({"loot": loot_items, "party": party, "combat_id": combat.id})
+
+
+@bp_loot.route("/api/loot/confirm", methods=["POST"])
+@login_required
+def confirm_loot_distribution():
+    """Confirm loot distribution and assign items to characters.
+
+    Body: { combat_id: int, assignments: { lootItemId: characterId } }
+    """
+    import json
+
+    data = request.get_json()
+    combat_id = data.get("combat_id")
+    assignments = data.get("assignments", {})
+
+    if not combat_id:
+        return jsonify({"error": "combat_id required"}), 400
+
+    # Verify combat session belongs to user
+    combat = db.session.get(CombatSession, combat_id)
+    if not combat or combat.user_id != current_user.id:
+        return jsonify({"error": "Combat session not found"}), 404
+
+    if combat.status != "complete":
+        return jsonify({"error": "Combat not complete"}), 400
+
+    # Build slug list from assignments
+    assigned_items = {}  # characterId -> [slugs]
+
+    for loot_id, char_id in assignments.items():
+        # Extract slug from loot_id (format: "slug_index")
+        slug = "_".join(loot_id.split("_")[:-1]) if "_" in loot_id else loot_id
+
+        if char_id not in assigned_items:
+            assigned_items[char_id] = []
+        assigned_items[char_id].append(slug)
+
+    # Assign items to characters
+    for char_id, slugs in assigned_items.items():
+        character = db.session.get(Character, char_id)
+        if not character or character.user_id != current_user.id:
+            continue
+
+        # Load current inventory
+        inv = load_inventory(character.items)
+
+        # Add each item
+        for slug in slugs:
+            item = Item.query.filter_by(slug=slug).first()
+            if item:
+                # Check encumbrance
+                if can_add_item(inv, character.stats, slug, 1):
+                    add_item(inv, slug, 1)
+
+        # Save updated inventory
+        character.items = dump_inventory(inv)
+
+    # Mark loot as distributed
+    # Add loot_distributed flag to combat session if not exists
+    if not hasattr(combat, "loot_distributed"):
+        # For now, we'll use a marker in rewards_json
+        try:
+            rewards_data = json.loads(combat.rewards_json or "{}")
+            rewards_data["_distributed"] = True
+            combat.rewards_json = json.dumps(rewards_data)
+        except Exception:
+            pass
+
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({"error": "Database error"}), 500
+
+    return jsonify({"success": True, "assigned": len(assignments)})
+
+
+def _get_item_effects(item: Item) -> dict:
+    """Extract stat effects from an item for display."""
+    slug = (item.slug or "").lower()
+    t = (item.type or "").lower()
+
+    # Simple defaults based on type
+    if t == "weapon":
+        if "bow" in slug or "dagger" in slug:
+            return {"dex": 1}
+        if "staff" in slug:
+            return {"int": 1}
+        return {"str": 1}
+    if t == "armor":
+        return {"con": 1}
+    if t == "ring":
+        return {"wis": 1}
+    if t in ("amulet", "necklace"):
+        return {"cha": 1}
+
+    return {}

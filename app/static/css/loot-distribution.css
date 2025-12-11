@@ -1,0 +1,412 @@
+/* Loot Distribution System */
+
+/* Loot Distribution Modal */
+.loot-distribution-modal {
+    background: radial-gradient(circle at center, rgba(100, 180, 255, 0.15), transparent),
+        linear-gradient(135deg, rgba(30, 30, 40, 0.98), rgba(20, 20, 30, 0.98));
+    border: 2px solid rgba(251, 191, 36, 0.5);
+    border-radius: 16px;
+    box-shadow: 0 0 60px rgba(251, 191, 36, 0.4), 0 8px 32px rgba(0, 0, 0, 0.6);
+    max-width: 900px;
+}
+
+.loot-distribution-header {
+    text-align: center;
+    padding: 2rem 2rem 1rem;
+    background: linear-gradient(180deg, rgba(251, 191, 36, 0.15) 0%, transparent 100%);
+    border-bottom: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.loot-distribution-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #fbbf24;
+    text-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
+    margin-bottom: 0.5rem;
+}
+
+.loot-subtitle {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.9rem;
+}
+
+/* Loot Items Grid */
+.loot-items-container {
+    padding: 1.5rem;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.loot-items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+}
+
+.loot-item-card {
+    background: linear-gradient(135deg, rgba(40, 40, 50, 0.9), rgba(30, 30, 40, 0.95));
+    border: 2px solid rgba(100, 100, 120, 0.4);
+    border-radius: 12px;
+    padding: 1rem;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+}
+
+.loot-item-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(251, 191, 36, 0.6);
+    box-shadow: 0 4px 20px rgba(251, 191, 36, 0.2);
+}
+
+.loot-item-card.assigned {
+    border-color: rgba(74, 222, 128, 0.6);
+    background: linear-gradient(135deg, rgba(40, 60, 45, 0.9), rgba(30, 50, 35, 0.95));
+}
+
+.loot-item-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.loot-item-icon {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, rgba(60, 60, 70, 0.8), rgba(50, 50, 60, 0.9));
+    border: 2px solid rgba(100, 100, 120, 0.5);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.loot-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.loot-item-name {
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.loot-item-type {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.6);
+    text-transform: capitalize;
+}
+
+.loot-item-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.loot-stat-badge {
+    background: rgba(100, 180, 255, 0.2);
+    border: 1px solid rgba(100, 180, 255, 0.4);
+    border-radius: 6px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    color: #64b4ff;
+}
+
+.loot-assigned-to {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.85rem;
+    color: #4ade80;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.loot-assigned-to i {
+    font-size: 1rem;
+}
+
+/* Party Member Selector */
+.party-member-selector {
+    padding: 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(20, 20, 30, 0.5);
+}
+
+.party-member-selector-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.party-members-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.75rem;
+}
+
+.party-member-option {
+    background: linear-gradient(135deg, rgba(40, 40, 50, 0.7), rgba(30, 30, 40, 0.8));
+    border: 2px solid rgba(100, 100, 120, 0.3);
+    border-radius: 8px;
+    padding: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.party-member-option:hover {
+    border-color: rgba(251, 191, 36, 0.6);
+    transform: translateY(-2px);
+    box-shadow: 0 2px 10px rgba(251, 191, 36, 0.2);
+}
+
+.party-member-option.selected {
+    border-color: #4ade80;
+    background: linear-gradient(135deg, rgba(40, 60, 45, 0.8), rgba(30, 50, 35, 0.9));
+}
+
+.party-member-icon {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, rgba(60, 60, 70, 0.8), rgba(50, 50, 60, 0.9));
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.party-member-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.party-member-name {
+    font-weight: 600;
+    color: #fff;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.party-member-class {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.6);
+    text-transform: capitalize;
+}
+
+/* Modal Footer */
+.loot-distribution-footer {
+    padding: 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.loot-summary {
+    flex: 1;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.9rem;
+}
+
+.loot-summary-highlight {
+    color: #4ade80;
+    font-weight: 600;
+}
+
+.loot-action-buttons {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.loot-btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.9rem;
+}
+
+.loot-btn-primary {
+    background: linear-gradient(135deg, #4ade80, #22c55e);
+    color: #000;
+}
+
+.loot-btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(74, 222, 128, 0.4);
+}
+
+.loot-btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.loot-btn-secondary {
+    background: rgba(100, 100, 120, 0.3);
+    border: 2px solid rgba(100, 100, 120, 0.5);
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.loot-btn-secondary:hover {
+    background: rgba(100, 100, 120, 0.5);
+    border-color: rgba(100, 100, 120, 0.7);
+}
+
+/* Rarity Colors */
+.loot-item-card[data-rarity="common"] .loot-item-icon {
+    border-color: rgba(156, 163, 175, 0.5);
+    background: linear-gradient(135deg, rgba(75, 85, 99, 0.3), rgba(55, 65, 81, 0.4));
+}
+
+.loot-item-card[data-rarity="uncommon"] .loot-item-icon {
+    border-color: rgba(34, 197, 94, 0.5);
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(22, 163, 74, 0.3));
+}
+
+.loot-item-card[data-rarity="rare"] .loot-item-icon {
+    border-color: rgba(59, 130, 246, 0.5);
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.3));
+}
+
+.loot-item-card[data-rarity="epic"] .loot-item-icon {
+    border-color: rgba(168, 85, 247, 0.5);
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(147, 51, 234, 0.3));
+}
+
+.loot-item-card[data-rarity="legendary"] .loot-item-icon {
+    border-color: rgba(251, 191, 36, 0.5);
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.3));
+}
+
+.loot-item-card[data-rarity="mythic"] .loot-item-icon {
+    border-color: rgba(236, 72, 153, 0.5);
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.2), rgba(219, 39, 119, 0.3));
+}
+
+/* Animations */
+@keyframes lootAppear {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.9);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.loot-item-card {
+    animation: lootAppear 0.4s ease-out backwards;
+}
+
+.loot-item-card:nth-child(1) {
+    animation-delay: 0.05s;
+}
+
+.loot-item-card:nth-child(2) {
+    animation-delay: 0.1s;
+}
+
+.loot-item-card:nth-child(3) {
+    animation-delay: 0.15s;
+}
+
+.loot-item-card:nth-child(4) {
+    animation-delay: 0.2s;
+}
+
+.loot-item-card:nth-child(5) {
+    animation-delay: 0.25s;
+}
+
+.loot-item-card:nth-child(6) {
+    animation-delay: 0.3s;
+}
+
+/* Quick Assign Buttons */
+.quick-assign-buttons {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.quick-assign-btn {
+    padding: 0.25rem 0.75rem;
+    background: rgba(100, 100, 120, 0.3);
+    border: 1px solid rgba(100, 100, 120, 0.5);
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.quick-assign-btn:hover {
+    background: rgba(100, 100, 120, 0.5);
+    border-color: rgba(251, 191, 36, 0.6);
+    color: #fbbf24;
+}
+
+/* Toast notification for item assignments */
+.loot-toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: linear-gradient(135deg, rgba(40, 40, 50, 0.95), rgba(30, 30, 40, 0.98));
+    border: 2px solid rgba(74, 222, 128, 0.6);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+    z-index: 9999;
+    animation: toastSlide 0.3s ease-out;
+}
+
+@keyframes toastSlide {
+    from {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.loot-toast-close {
+    margin-left: 1rem;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.loot-toast-close:hover {
+    opacity: 1;
+}

@@ -1,0 +1,25 @@
+ItemID,Name,Slot,BaseRarity,MinLevel,MaxLevel,ArmorBase,PrimaryStat,SecondaryStat,SocketCount,FlavorTag,Notes
+ar_cloth_threadbare,Threadbare Robes,Chest_Cloth,Common,1,5,4,INT,,0,Starter,Offers more modesty than protection
+ar_cloth_magewrap,Magewrap Tunic,Chest_Cloth,Uncommon,3,15,6,INT,+1 INT,0,Caster,Lightly enchanted for focus
+ar_cloth_starsilk,Starsilk Vestments,Chest_Cloth,Epic,18,50,12,INT,+3 WIS,+2 CHA,1,Caster,Threads shimmer faintly in darkness
+ar_leather_worn,Worn Leathers,Chest_Leather,Common,1,8,6,DEX,,0,Rogue,Scuffed but flexible
+ar_leather_shadow,Shadow Jerkin,Chest_Leather,Rare,8,30,10,DEX,+2 DEX,+1 INT,1,Stealth,Seems to drink in surrounding light
+ar_leather_nightstalker,Nightstalker Harness,Chest_Leather,Legendary,22,50,14,DEX,+3 DEX,+2 CHA,2,Assassin,Silent as a held breath
+ar_mail_chain,Chain Shirt,Chest_Mail,Common,3,12,10,STR,,0,Soldier,Rattles faintly on movement
+ar_mail_guard,Guard's Hauberk,Chest_Mail,Uncommon,5,20,13,STR,+1 CON,0,Defensive,Favored by city watch sergeants
+ar_mail_saints,Saint's Hauberk,Chest_Mail,Epic,18,50,18,STR,+3 CON,+1 WIS,1,Holy,Etched with faded holy script
+ar_plate_rusted,Rustfleck Plate,Chest_Plate,Common,5,15,14,STR,,0,Heavy,Hefty and poorly maintained
+ar_plate_knight,Knight's Cuirass,Chest_Plate,Rare,10,35,18,STR,+2 CON,1,Tank,Keeps you standing when others fall
+ar_plate_dragonscale,Dragonscale Aegis,Chest_Plate,Mythic,28,50,24,STR,+4 CON,+3 WIS,2,Endgame,Said to be forged from ancient scales
+ar_head_cloth,Initiate's Hood,Head_Cloth,Common,1,8,2,INT,,0,Caster,"Minimal padding, maximum draft"
+ar_head_leather,Tracker's Hood,Head_Leather,Uncommon,4,18,4,DEX,+1 WIS,0,Ranger,Smells faintly of pine
+ar_head_plate,Templar Helm,Head_Plate,Rare,12,40,8,STR,+2 CON,1,Tank,Vision slit is narrower than you'd like
+ar_hands_cloth,Simple Gloves,Hands_Cloth,Common,1,10,1,DEX,,0,Utility,Good for not leaving fingerprints
+ar_hands_leather,Cutpurse Grips,Hands_Leather,Rare,6,30,3,DEX,+2 DEX,+1 INT,1,Rogue,Edges are roughened for better grip
+ar_hands_plate,Gauntlets of Duty,Hands_Plate,Epic,16,50,6,STR,+3 STR,+1 CON,1,Defensive,Heavy but reassuring
+ar_feet_cloth,Threadbare Slippers,Feet_Cloth,Common,1,8,1,INT,,0,Caster,Extremely flammable
+ar_feet_leather,Silent Steps,Feet_Leather,Rare,8,35,3,DEX,+2 DEX,+5% MoveSpeed,1,Stealth,Footfalls nearly vanish on stone
+ar_feet_plate,Guardian Sabatons,Feet_Plate,Epic,18,50,5,STR,+2 CON,+5% MoveSpeed,1,Tank,The ground seems to accept your weight
+ar_shield_wood,Wooden Buckler,Shield,Common,1,10,3,STR,,0,Basic,Better than your forearm. Slightly.
+ar_shield_kite,Kite Shield,Shield,Uncommon,5,20,6,STR,+1 CON,0,Defensive,Standard-issue knight shield
+ar_shield_sanctuary,Bulwark of Sanctuary,Shield,Legendary,20,50,10,STR,+3 CON,+2 WIS,2,Holy,Many heroes have survived behind it

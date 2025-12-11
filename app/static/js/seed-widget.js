@@ -1,14 +1,14 @@
 // Seed widget logic (centralized on dashboard page)
-(function(){
+(function () {
   document.addEventListener('DOMContentLoaded', () => {
     const container = document.getElementById('seed-widget');
     if (!container) return; // Not present
-  const btnNew = document.getElementById('btn-new-seed');
-  const btnApply = null; // removed button
+    const btnNew = document.getElementById('btn-new-seed');
+    const btnApply = null; // removed button
     const input = document.getElementById('input-custom-seed');
     const status = document.getElementById('seed-status');
 
-    function setStatus(msg, kind='info') {
+    function setStatus(msg, kind = 'info') {
       // Now minimized: we suppress success chatter per updated UX; only show errors.
       if (!status) return;
       if (kind === 'error') {
@@ -20,12 +20,12 @@
       }
     }
 
-  let debounceTimer = null;
-  const DEBOUNCE_MS = 450;
+    let debounceTimer = null;
+    const DEBOUNCE_MS = 450;
 
-  async function postSeed(seedValue, regenerate=false) {
+    async function postSeed(seedValue, regenerate = false) {
       try {
-  // No verbose status on start per UX revision.
+        // No verbose status on start per UX revision.
         const payload = {};
         if (seedValue !== undefined && seedValue !== null && seedValue !== '') payload.seed = seedValue;
         if (regenerate) payload.regenerate = true;
@@ -34,10 +34,10 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        if (!resp.ok) throw new Error('HTTP '+resp.status);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const data = await resp.json();
-  // Write resulting seed into the input so user sees current value.
-  if (input) input.value = data.seed;
+        // Write resulting seed into the input so user sees current value.
+        if (input) input.value = data.seed;
         // Optionally update any global seed badge if present later
         const badge = document.getElementById('dungeon-seed-badge');
         if (badge) badge.textContent = 'seed: ' + data.seed;
@@ -66,7 +66,7 @@
           e.preventDefault();
           if (debounceTimer) clearTimeout(debounceTimer);
           const val = input.value.trim();
-            if (val.length > 0) postSeed(val, false);
+          if (val.length > 0) postSeed(val, false);
         }
       });
       input.addEventListener('blur', () => {
@@ -78,6 +78,14 @@
 
     // Initialize status with current seed if present
     const initial = container.getAttribute('data-initial-seed');
-  if (initial && input) input.value = initial;
+    if (initial && input) {
+      input.value = initial;
+    } else if (input && (!initial || initial.trim() === '')) {
+      // Generate random seed if none exists
+      const randomSeed = Math.floor(Math.random() * 1000000) + 1;
+      input.value = randomSeed;
+      // Set it on the server without showing status message
+      postSeed(randomSeed, false);
+    }
   });
 })();

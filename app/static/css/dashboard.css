@@ -11,10 +11,8 @@
     --mud-bg-dark: #153131;
 }
 
-/* Purple gradient background for dashboard */
+/* Background applied by theme system */
 body {
-    background: linear-gradient(135deg, #4c5270 0%, #5a3a52 100%);
-    background-attachment: fixed;
     min-height: 100vh;
     color: #fff;
 }
@@ -56,7 +54,7 @@ body {
 }
 
 .card-header {
-    background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(217, 70, 239, 0.3));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--adv-primary) 30%, transparent), color-mix(in srgb, var(--adv-secondary) 30%, transparent));
     border-bottom: 1px solid rgba(255, 255, 255, 0.2);
     padding: 1rem 1.25rem;
     border-radius: 16px 16px 0 0;
@@ -137,4 +135,150 @@ body {
 .btn-outline-warning:hover {
     background: rgba(251, 191, 36, 0.2);
     border-color: rgba(251, 191, 36, 0.7);
+}
+
+/* Chat widget styling */
+.mud-chat-widget {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 16px rgba(31, 38, 135, 0.37);
+}
+
+.chat-header {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--adv-primary) 30%, transparent), color-mix(in srgb, var(--adv-secondary) 30%, transparent));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 0.75rem 1rem;
+    border-radius: 16px 16px 0 0;
+}
+
+.chat-header .nav-tabs {
+    border: none;
+}
+
+.chat-header .nav-link {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    padding: 0.5rem 1rem;
+    transition: all 0.2s ease;
+}
+
+.chat-header .nav-link:hover {
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.chat-header .nav-link.active {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.2);
+    border-bottom: 2px solid color-mix(in srgb, var(--adv-primary) 80%, transparent);
+}
+
+.chat-messages {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 1rem;
+    overflow-y: auto;
+    border-radius: 8px;
+}
+
+.chat-form {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.chat-form .form-control {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    border-radius: 8px;
+}
+
+.chat-form .form-control:focus {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: color-mix(in srgb, var(--adv-primary) 60%, transparent);
+    color: #fff;
+    box-shadow: 0 0 0 0.25rem color-mix(in srgb, var(--adv-primary) 15%, transparent);
+}
+
+.chat-form .form-control::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+/* Time widget enhancement */
+.time-widget {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    z-index: 1000;
+    min-width: 150px;
+    padding: 1rem;
+}
+
+/* Alert improvements */
+.alert-glass {
+    background: rgba(59, 130, 246, 0.2);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.alert-glass.alert-warning {
+    background: rgba(251, 191, 36, 0.2);
+    border-color: rgba(251, 191, 36, 0.4);
+    color: rgba(255, 255, 255, 0.95);
+}
+
+.alert-glass.alert-danger {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
+.alert-glass.alert-success {
+    background: rgba(34, 197, 94, 0.2);
+    border-color: rgba(34, 197, 94, 0.4);
+}
+
+/* Form controls in dashboard */
+.form-control,
+.form-select {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    border-radius: 8px;
+}
+
+.form-control:focus,
+.form-select:focus {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: color-mix(in srgb, var(--adv-primary) 60%, transparent);
+    color: #fff;
+    box-shadow: 0 0 0 0.25rem color-mix(in srgb, var(--adv-primary) 15%, transparent);
+}
+
+.form-control::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.form-select option {
+    background: #1e293b;
+    color: #fff;
+}
+
+/* Character cards footer */
+.card-footer {
+    background: rgba(0, 0, 0, 0.2);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 1rem 1.25rem;
+}
+
+/* Horizontal rule styling */
+hr {
+    border: none;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--adv-primary) 50%, transparent), transparent);
+    margin: 2rem 0;
 }

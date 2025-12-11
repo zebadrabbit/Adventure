@@ -27,12 +27,14 @@ routes will be added in subsequent patches.
 
 from __future__ import annotations
 
+import json
 from functools import wraps
 from typing import Callable
 
 from flask import (
     Blueprint,
     abort,
+    flash,
     redirect,
     render_template,
     request,
@@ -73,13 +75,32 @@ def admin_required(fn: Callable):
 @bp_admin.route("/")
 @admin_required
 def dashboard():
-    """Admin landing page.
+    """Admin landing page - redirect to new modular admin panel."""
+    return redirect(url_for("admin_new.fog_settings"))
 
-    Provides quick links to user management, config, items & monsters. Will
-    later display recent import activity & basic stats.
-    """
 
-    return render_template("admin_dashboard.html")
+@bp_admin.route("/api/game-config", methods=["GET"])
+@admin_required
+def api_game_config():
+    """API endpoint to fetch all game config as JSON."""
+    rows = GameConfig.query.all()
+    return {"configs": [{"key": r.key, "value": r.value} for r in rows]}
+
+
+@bp_admin.route("/api/debug-mode", methods=["POST"])
+@admin_required
+def api_debug_mode():
+    """Toggle admin debug mode for revealing hidden map elements."""
+    from flask import jsonify, session
+
+    data = request.get_json() or {}
+    enabled = data.get("enabled", False)
+
+    # Store in session
+    session["admin_debug_mode"] = bool(enabled)
+    session.modified = True
+
+    return jsonify({"success": True, "debug_mode": bool(enabled)})
 
 
 @bp_admin.route("/themes")
@@ -457,6 +478,68 @@ def game_config():
         return redirect(url_for("admin.game_config"))
     rows = GameConfig.query.order_by(GameConfig.key.asc()).all()
     return render_template("admin_game_config.html", rows=rows)
+
+
+@bp_admin.route("/game-rules", methods=["GET", "POST"])
+@admin_required
+def game_rules():
+    """Manage gameplay modifiers and difficulty settings."""
+    if request.method == "POST":
+        # Define all the game rule parameters
+        rules = {
+            "encounter_spawn_rate": float(request.form.get("encounter_spawn_rate", 0.15)),
+            "xp_multiplier": float(request.form.get("xp_multiplier", 1.0)),
+            "gold_multiplier": float(request.form.get("gold_multiplier", 1.0)),
+            "loot_drop_multiplier": float(request.form.get("loot_drop_multiplier", 1.0)),
+            "monster_hp_multiplier": float(request.form.get("monster_hp_multiplier", 1.0)),
+            "monster_damage_multiplier": float(request.form.get("monster_damage_multiplier", 1.0)),
+            "fog_density": float(request.form.get("fog_density", 0.0)),
+            "vision_range": int(request.form.get("vision_range", 10)),
+            "rest_heal_percent": float(request.form.get("rest_heal_percent", 50.0)),
+            "skill_check_difficulty": int(request.form.get("skill_check_difficulty", 13)),
+            "critical_hit_multiplier": float(request.form.get("critical_hit_multiplier", 2.0)),
+            "death_penalty_percent": float(request.form.get("death_penalty_percent", 10.0)),
+        }
+
+        # Save to database
+        for key, value in rules.items():
+            row = GameConfig.query.filter_by(key=f"game_rules.{key}").first()
+            if not row:
+                row = GameConfig(key=f"game_rules.{key}", value=json.dumps(value))
+                db.session.add(row)
+            else:
+                row.value = json.dumps(value)
+
+        db.session.commit()
+        flash("Game rules updated successfully!", "success")
+        return redirect(url_for("admin.game_rules"))
+
+    # Load current values from database
+    def get_rule(key, default):
+        row = GameConfig.query.filter_by(key=f"game_rules.{key}").first()
+        if row:
+            try:
+                return json.loads(row.value)
+            except (json.JSONDecodeError, ValueError):
+                return default
+        return default
+
+    rules = {
+        "encounter_spawn_rate": get_rule("encounter_spawn_rate", 0.15),
+        "xp_multiplier": get_rule("xp_multiplier", 1.0),
+        "gold_multiplier": get_rule("gold_multiplier", 1.0),
+        "loot_drop_multiplier": get_rule("loot_drop_multiplier", 1.0),
+        "monster_hp_multiplier": get_rule("monster_hp_multiplier", 1.0),
+        "monster_damage_multiplier": get_rule("monster_damage_multiplier", 1.0),
+        "fog_density": get_rule("fog_density", 0.0),
+        "vision_range": get_rule("vision_range", 10),
+        "rest_heal_percent": get_rule("rest_heal_percent", 50.0),
+        "skill_check_difficulty": get_rule("skill_check_difficulty", 13),
+        "critical_hit_multiplier": get_rule("critical_hit_multiplier", 2.0),
+        "death_penalty_percent": get_rule("death_penalty_percent", 10.0),
+    }
+
+    return render_template("admin_game_rules.html", rules=rules)
 
 
 @bp_admin.route("/users/<int:user_id>/ban", methods=["POST"])

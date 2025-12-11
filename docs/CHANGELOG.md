@@ -1,6 +1,47 @@
 # Changelog
 ## [Unreleased]
 ### Added
+- **HP/MP Persistence Fixes**:
+  - `_derive_stats()` now reads persisted current HP from `Character.stats['hp']`
+  - Combat sessions start with actual current HP instead of always max HP
+  - Dashboard party payload shows real current HP/MP values (not hardcoded full)
+  - Dungeon state API (`/api/dungeon/state`) includes party array with current HP/MP
+  - Complete end-to-end persistence: Character.stats → combat → back to Character.stats
+  - Fixes issue where players got free healing between combats
+  - Fixes issue where adventure screen showed incorrect HP/MP bars
+- **Boss Combat System** (`app/services/boss_abilities.py`):
+  - Boss-specific abilities: AOE attacks, self-buffs, healing, minion summoning
+  - Phase transitions at 25% HP (enrage) and 10% HP (desperate)
+  - Cooldown system for abilities (3-6 turns depending on ability)
+  - Level-gated ability unlocks (AOE at 1, buff at 3, summon at 5, heal at 7)
+  - Enhanced loot: 3x item drops, 75% special drop chance, guaranteed key drop
+  - Integration with combat service during monster_auto_turn()
+- **Dungeon Extraction System** (`POST /api/dungeon/extract`):
+  - Progress tracking: bosses_defeated, bosses_total, elites_defeated, monsters_defeated
+  - Extraction available when all bosses defeated
+  - Completion rewards: 1000×tier base XP + 50×elites + 10×monsters (capped at 500)
+  - Progress indicators in dungeon state API response
+  - Boss kill detection in combat with archetype tracking (Boss/Elite/Monster)
+- **Locked Door System** (documented in `docs/LOCKED_DOORS.md`):
+  - Locked doors (`L`) now non-walkable until unlocked
+  - Key items: rusty-key (common), master-key (rare), boss-key (epic)
+  - Rogue lockpicking: DEX-based skill check (DC = 10 + tier×2)
+  - Unlock API endpoint (`POST /api/dungeon/unlock`) with key and lockpick methods
+  - Lockpick mechanics: 1d20 + DEX_mod vs DC, critical failure (roll=1) breaks lockpicks
+  - Unlocked doors persist per dungeon instance via unlocked_doors_json column
+  - Boss loot always includes a key (33% rusty, 50% master, 17% boss-key)
+- **Combat Bug Fixes**:
+  - Dead characters (HP=0) can no longer take actions
+  - Monster/boss AI now targets alive characters with lowest HP (smart targeting)
+  - Boss AOE abilities filter out dead targets
+  - Auto-advance turn with "unconscious" message when dead character attempts action
+- Database migrations:
+  - `5b9c0df13fba`: Added bosses_total, elites_defeated, monsters_defeated columns
+  - `ed130ef69bb4`: Added unlocked_doors_json column for door state persistence
+- Movement system updates:
+  - `Dungeon.is_walkable()` now accepts optional unlocked_doors parameter
+  - All movement helpers pass unlocked_doors set for proper door traversal
+  - Dungeon state API returns unlocked_doors list for client awareness
 - Frontend Autofill button on Dashboard invoking `/autofill_characters` endpoint.
 - Richer `/autofill_characters` JSON response (stats, coins, inventory) for future SPA enhancements.
 - Corner tunnel nub pruning pass removing single-cell tunnel tiles that only diagonally touch rooms.
@@ -23,11 +64,19 @@
  - Extended combat state JSON: `phase`, `phases` list, `active_entity`, `monster_max_hp`, percentage convenience fields (`hp_pct`, `mana_pct`, `monster_hp_pct`) for UI bars.
 
 ### Changed
+ - Combat targeting: Monsters now prioritize low-HP alive targets instead of always targeting index 0
+ - Boss loot service: Enhanced drop rates and guaranteed key drops for progression
  - `/api/dungeon/move` and `/api/dungeon/state` now share helper-based description & exits logic (less duplication, clearer tests).
  - Adventure client fog-of-war relies solely on local storage + in-memory sets (server persistence removed).
  - Admin fog modal simplified to local coverage only (removed server metrics & clear/sync controls).
  - README pruned deprecated seen tiles endpoint docs and clarifies client-only fog-of-war approach.
  - README Combat section expanded with multi-character party support, action list, formulas, and new phase engine details.
+
+### Fixed
+- **Critical Combat Bugs**:
+  - Dead characters no longer able to attack (HP validation added to all player actions)
+  - Boss AI targeting: Fixed hardcoded index 0 targeting, now selects valid alive targets
+  - Boss AOE attacks properly skip dead party members
 
 ### Removed
  - Legacy seen tiles subsystem (`/api/dungeon/seen*`) including rate limiting, compression, merge, metrics, and admin clear endpoints.
@@ -35,9 +84,14 @@
  - Server sync & merge logic for seen tiles in `adventure.js` and `fog_admin_modal.js`.
 
 ### Notes
+ - Boss combat system provides challenging encounters with dynamic abilities and phase-based behavior
+ - Extraction system gives players a clear completion objective and rewards full dungeon clears
+ - Locked door system adds strategic depth: rogues get utility, non-rogues need to find/manage keys
+ - Combat bugs fixed ensure proper D&D 5e rules compliance (dead = unconscious, cannot act)
  - Backward compatibility shim `_char_to_type` remains temporarily to avoid immediate test refactors referencing the old symbol.
  - Future refactor slices planned: extract encounter spawning, loot noticing, treasure claiming into dedicated helpers for further modularity.
  - Removal of seen tiles endpoints is a breaking change for any external clients; migrate to client-managed fog-of-war.
+
 
 ## [0.6.0] - 2025-09-24
 ### Added

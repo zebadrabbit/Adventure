@@ -1,9 +1,7 @@
 /* auth.css: Glass-morphism authentication pages */
 
-/* Purple gradient background for auth pages */
+/* Background applied by theme system */
 body {
-    background: linear-gradient(135deg, #4c5270 0%, #5a3a52 100%);
-    background-attachment: fixed;
     min-height: 100vh;
     color: #fff;
 }

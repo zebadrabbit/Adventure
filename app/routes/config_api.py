@@ -108,8 +108,13 @@ STARTER_ITEMS = {
     "mage": ["oak-staff", "potion-mana", "potion-mana"],
     "cleric": ["oak-staff", "potion-healing", "potion-mana"],
     "ranger": ["hunting-bow", "dagger", "potion-healing"],
-    # Added 'oak-staff' so druids receive an auto-equip eligible weapon.
     "druid": ["oak-staff", "herbal-pouch", "potion-healing", "potion-mana"],
+    "barbarian": ["iron-axe", "potion-healing", "potion-healing"],
+    "bard": ["dagger", "potion-healing", "potion-mana"],
+    "monk": ["potion-healing", "potion-mana"],
+    "paladin": ["short-sword", "wooden-shield", "potion-healing"],
+    "sorcerer": ["oak-staff", "potion-mana", "potion-mana"],
+    "warlock": ["oak-staff", "potion-mana", "potion-healing"],
 }
 BASE_STATS = {
     "fighter": {
@@ -172,6 +177,66 @@ BASE_STATS = {
         "mana": 16,
         "hp": 14,
     },
+    "barbarian": {
+        "str": 18,
+        "con": 16,
+        "dex": 12,
+        "cha": 8,
+        "int": 6,
+        "wis": 10,
+        "mana": 0,
+        "hp": 24,
+    },
+    "bard": {
+        "str": 8,
+        "con": 10,
+        "dex": 14,
+        "cha": 16,
+        "int": 12,
+        "wis": 10,
+        "mana": 14,
+        "hp": 12,
+    },
+    "monk": {
+        "str": 10,
+        "con": 12,
+        "dex": 16,
+        "cha": 8,
+        "int": 10,
+        "wis": 14,
+        "mana": 10,
+        "hp": 14,
+    },
+    "paladin": {
+        "str": 16,
+        "con": 14,
+        "dex": 10,
+        "cha": 14,
+        "int": 8,
+        "wis": 12,
+        "mana": 10,
+        "hp": 18,
+    },
+    "sorcerer": {
+        "str": 6,
+        "con": 10,
+        "dex": 12,
+        "cha": 16,
+        "int": 10,
+        "wis": 8,
+        "mana": 20,
+        "hp": 10,
+    },
+    "warlock": {
+        "str": 8,
+        "con": 12,
+        "dex": 10,
+        "cha": 16,
+        "int": 12,
+        "wis": 10,
+        "mana": 18,
+        "hp": 12,
+    },
 }
 CLASS_MAP = {
     "fighter": "Fighter",
@@ -180,6 +245,12 @@ CLASS_MAP = {
     "cleric": "Cleric",
     "ranger": "Ranger",
     "druid": "Druid",
+    "barbarian": "Barbarian",
+    "bard": "Bard",
+    "monk": "Monk",
+    "paladin": "Paladin",
+    "sorcerer": "Sorcerer",
+    "warlock": "Warlock",
 }
 
 # Centralized class color configuration (background & text plus optional border accent)
@@ -190,6 +261,12 @@ CLASS_COLORS = {
     "cleric": {"bg": "#c3ccd1", "fg": "#f5f5f5", "border": "#9aa1a5"},
     "druid": {"bg": "#FF7B00", "fg": "#d8f2dc", "border": "#574a2f"},
     "ranger": {"bg": "#1a940a", "fg": "#d8eef5", "border": "#337d2c"},
+    "barbarian": {"bg": "#8b2e2e", "fg": "#ffd8d8", "border": "#6d1f1f"},
+    "bard": {"bg": "#9b59b6", "fg": "#f5e6ff", "border": "#7d3c98"},
+    "monk": {"bg": "#d4a574", "fg": "#2d2419", "border": "#a67c52"},
+    "paladin": {"bg": "#f39c12", "fg": "#2d1f0a", "border": "#c87f0a"},
+    "sorcerer": {"bg": "#e74c3c", "fg": "#fff5f5", "border": "#c0392b"},
+    "warlock": {"bg": "#2c3e50", "fg": "#ecf0f1", "border": "#1a252f"},
 }
 
 

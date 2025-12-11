@@ -1,0 +1,677 @@
+/* Party Management System Styles */
+
+/* ========== Party Management Modal ========== */
+.party-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 3000;
+    overflow-y: auto;
+    animation: fadeIn 0.2s;
+}
+
+.party-modal.active {
+    display: block;
+}
+
+.party-modal-content {
+    position: relative;
+    max-width: 1200px;
+    margin: 30px auto;
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 2px solid #3498db;
+}
+
+.party-modal-header {
+    background: linear-gradient(135deg, #2980b9 0%, #3498db 100%);
+    padding: 20px 30px;
+    border-radius: 10px 10px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #2c3e50;
+}
+
+.party-modal-title {
+    font-size: 26px;
+    font-weight: bold;
+    color: #ecf0f1;
+    margin: 0;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.party-stats-summary {
+    display: flex;
+    gap: 20px;
+    font-size: 14px;
+    color: #ecf0f1;
+}
+
+.party-stat-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.party-stat-label {
+    font-weight: bold;
+    opacity: 0.9;
+}
+
+.party-close-btn {
+    background: rgba(231, 76, 60, 0.9);
+    border: none;
+    color: white;
+    font-size: 24px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.party-close-btn:hover {
+    background: #c0392b;
+    transform: scale(1.1);
+}
+
+/* ========== Party Tabs ========== */
+.party-tabs {
+    display: flex;
+    background: #34495e;
+    border-bottom: 2px solid #2c3e50;
+}
+
+.party-tab {
+    flex: 1;
+    padding: 15px;
+    background: transparent;
+    border: none;
+    color: #bdc3c7;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    border-bottom: 3px solid transparent;
+}
+
+.party-tab:hover {
+    background: rgba(52, 152, 219, 0.1);
+    color: #ecf0f1;
+}
+
+.party-tab.active {
+    background: rgba(52, 152, 219, 0.2);
+    color: #3498db;
+    border-bottom-color: #3498db;
+}
+
+/* ========== Tab Content Areas ========== */
+.party-tab-content {
+    padding: 25px;
+    min-height: 400px;
+}
+
+.party-tab-pane {
+    display: none;
+}
+
+.party-tab-pane.active {
+    display: block;
+    animation: fadeIn 0.3s;
+}
+
+/* ========== Formation Editor ========== */
+.formation-editor {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 25px;
+}
+
+.formation-zones {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.formation-zone {
+    background: rgba(52, 73, 94, 0.6);
+    border: 2px dashed #7f8c8d;
+    border-radius: 8px;
+    padding: 15px;
+    min-height: 120px;
+    transition: all 0.3s;
+}
+
+.formation-zone.front {
+    border-color: #e74c3c;
+}
+
+.formation-zone.middle {
+    border-color: #f39c12;
+}
+
+.formation-zone.back {
+    border-color: #3498db;
+}
+
+.formation-zone-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.formation-zone-label {
+    font-weight: bold;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.formation-zone.front .formation-zone-label {
+    color: #e74c3c;
+}
+
+.formation-zone.middle .formation-zone-label {
+    color: #f39c12;
+}
+
+.formation-zone.back .formation-zone-label {
+    color: #3498db;
+}
+
+.formation-zone-count {
+    font-size: 12px;
+    color: #95a5a6;
+}
+
+.formation-members {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.formation-member-card {
+    background: rgba(44, 62, 80, 0.8);
+    padding: 10px;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: move;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+}
+
+.formation-member-card:hover {
+    background: rgba(52, 73, 94, 0.9);
+    border-color: #3498db;
+    transform: translateX(4px);
+}
+
+.formation-member-card.dragging {
+    opacity: 0.5;
+}
+
+.formation-member-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.formation-member-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    background: #34495e;
+}
+
+.formation-member-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.formation-member-name {
+    font-weight: 600;
+    font-size: 13px;
+    color: #ecf0f1;
+}
+
+.formation-member-role {
+    font-size: 11px;
+    color: #95a5a6;
+    text-transform: uppercase;
+}
+
+.formation-preview {
+    background: rgba(44, 62, 80, 0.4);
+    border: 2px solid #34495e;
+    border-radius: 8px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 30px;
+}
+
+.formation-preview-title {
+    font-size: 18px;
+    font-weight: bold;
+    color: #ecf0f1;
+    margin-bottom: 10px;
+}
+
+.formation-preview-grid {
+    display: grid;
+    grid-template-rows: repeat(3, 1fr);
+    gap: 20px;
+    width: 100%;
+    max-width: 500px;
+}
+
+.formation-preview-row {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+}
+
+.formation-preview-slot {
+    width: 80px;
+    height: 80px;
+    background: rgba(52, 73, 94, 0.6);
+    border: 2px solid #7f8c8d;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+}
+
+.formation-preview-slot.filled {
+    background: rgba(52, 152, 219, 0.3);
+    border-color: #3498db;
+}
+
+.formation-preview-slot.tank {
+    border-color: #e74c3c;
+}
+
+.formation-preview-slot.healer {
+    border-color: #2ecc71;
+}
+
+.formation-preview-slot.dps {
+    border-color: #f39c12;
+}
+
+.formation-preview-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: #ecf0f1;
+    text-align: center;
+    margin-top: 4px;
+}
+
+/* ========== Members List ========== */
+.party-members-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.party-member-card {
+    background: rgba(44, 62, 80, 0.6);
+    border: 2px solid #34495e;
+    border-radius: 8px;
+    padding: 20px;
+    transition: all 0.3s;
+}
+
+.party-member-card:hover {
+    border-color: #3498db;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+}
+
+.party-member-header {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.party-member-portrait {
+    width: 60px;
+    height: 60px;
+    background: #34495e;
+    border-radius: 8px;
+    border: 2px solid #7f8c8d;
+}
+
+.party-member-identity {
+    flex: 1;
+}
+
+.party-member-name {
+    font-size: 18px;
+    font-weight: bold;
+    color: #ecf0f1;
+    margin-bottom: 4px;
+}
+
+.party-member-level {
+    font-size: 13px;
+    color: #95a5a6;
+}
+
+.party-member-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.party-member-stat {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+}
+
+.party-member-stat-label {
+    color: #95a5a6;
+}
+
+.party-member-stat-value {
+    color: #ecf0f1;
+    font-weight: 600;
+}
+
+.party-member-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.party-member-btn {
+    flex: 1;
+    padding: 8px;
+    background: rgba(52, 152, 219, 0.2);
+    border: 1px solid #3498db;
+    color: #3498db;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.party-member-btn:hover {
+    background: rgba(52, 152, 219, 0.4);
+}
+
+.party-member-btn.danger {
+    background: rgba(231, 76, 60, 0.2);
+    border-color: #e74c3c;
+    color: #e74c3c;
+}
+
+.party-member-btn.danger:hover {
+    background: rgba(231, 76, 60, 0.4);
+}
+
+/* ========== Shared Inventory ========== */
+.shared-inventory-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #34495e;
+}
+
+.shared-gold-display {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(241, 196, 15, 0.2);
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: 2px solid #f1c40f;
+}
+
+.shared-gold-amount {
+    font-size: 20px;
+    font-weight: bold;
+    color: #f1c40f;
+}
+
+.shared-inventory-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.shared-inventory-btn {
+    padding: 10px 20px;
+    background: rgba(52, 152, 219, 0.2);
+    border: 1px solid #3498db;
+    color: #3498db;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.shared-inventory-btn:hover {
+    background: rgba(52, 152, 219, 0.4);
+}
+
+.shared-items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.shared-item-card {
+    background: rgba(44, 62, 80, 0.6);
+    border: 2px solid #34495e;
+    border-radius: 8px;
+    padding: 15px;
+    transition: all 0.3s;
+    cursor: pointer;
+}
+
+.shared-item-card:hover {
+    border-color: #3498db;
+    transform: translateY(-2px);
+}
+
+.shared-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 10px;
+}
+
+.shared-item-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: #ecf0f1;
+}
+
+.shared-item-quantity {
+    background: rgba(52, 152, 219, 0.3);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    color: #3498db;
+    font-weight: bold;
+}
+
+.shared-item-description {
+    font-size: 12px;
+    color: #95a5a6;
+    margin-bottom: 12px;
+    line-height: 1.4;
+}
+
+.shared-item-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.shared-item-btn {
+    flex: 1;
+    padding: 6px;
+    background: rgba(52, 152, 219, 0.2);
+    border: 1px solid #3498db;
+    color: #3498db;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.shared-item-btn:hover {
+    background: rgba(52, 152, 219, 0.4);
+}
+
+/* ========== Party Buffs ========== */
+.party-buffs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 15px;
+}
+
+.party-buff-card {
+    background: rgba(46, 204, 113, 0.1);
+    border: 2px solid #2ecc71;
+    border-radius: 8px;
+    padding: 15px;
+    transition: all 0.3s;
+}
+
+.party-buff-card:hover {
+    background: rgba(46, 204, 113, 0.2);
+    transform: translateY(-2px);
+}
+
+.party-buff-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 8px;
+}
+
+.party-buff-name {
+    font-weight: bold;
+    font-size: 15px;
+    color: #2ecc71;
+}
+
+.party-buff-type {
+    font-size: 11px;
+    color: #95a5a6;
+    text-transform: uppercase;
+    background: rgba(149, 165, 166, 0.2);
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.party-buff-description {
+    font-size: 13px;
+    color: #bdc3c7;
+    margin-bottom: 10px;
+    line-height: 1.5;
+}
+
+.party-buff-effects {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.party-buff-effect {
+    background: rgba(52, 152, 219, 0.2);
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    color: #3498db;
+    font-weight: 600;
+}
+
+/* ========== Empty States ========== */
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #95a5a6;
+}
+
+.empty-state-icon {
+    font-size: 64px;
+    margin-bottom: 20px;
+    opacity: 0.5;
+}
+
+.empty-state-message {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+.empty-state-hint {
+    font-size: 14px;
+    opacity: 0.7;
+}
+
+/* ========== Animations ========== */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* ========== Rarity Colors ========== */
+.rarity-common {
+    border-color: #95a5a6 !important;
+}
+
+.rarity-uncommon {
+    border-color: #2ecc71 !important;
+}
+
+.rarity-rare {
+    border-color: #3498db !important;
+}
+
+.rarity-epic {
+    border-color: #9b59b6 !important;
+}
+
+.rarity-legendary {
+    border-color: #f39c12 !important;
+}

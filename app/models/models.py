@@ -114,6 +114,11 @@ class Character(db.Model):
         stats: JSON string of base stats (e.g., str, dex, int, wis, mana, hp)
         gear: JSON string list of equipped items
         items: JSON string list of inventory items
+        locked_in_dungeon: True if character died and party hasn't extracted
+        locked_dungeon_id: ID of dungeon instance where character is locked
+        is_dead: True if character died in current dungeon run
+        permadeath: True if character permanently died (left behind on extraction)
+        death_count: Number of times character has died
     """
 
     id = db.Column(db.Integer, primary_key=True)
@@ -124,6 +129,13 @@ class Character(db.Model):
     items = db.Column(db.Text, nullable=True)  # JSON string for items
     xp = db.Column(db.Integer, nullable=False, default=0)
     level = db.Column(db.Integer, nullable=False, default=1)
+    gold = db.Column(db.Integer, nullable=False, default=0)  # Currency for trading
+    # Extraction and permadeath fields
+    locked_in_dungeon = db.Column(db.Boolean, nullable=False, default=False)
+    locked_dungeon_id = db.Column(db.Integer, nullable=True)
+    is_dead = db.Column(db.Boolean, nullable=False, default=False)
+    permadeath = db.Column(db.Boolean, nullable=False, default=False)
+    death_count = db.Column(db.Integer, nullable=False, default=0)
     # Add more fields as needed
 
 
@@ -139,6 +151,7 @@ class Item(db.Model):
         value_copper: Integer value in copper coins
         level: Recommended minimum level (0 for utility / no-scaling)
         rarity: Drop frequency tier (common, uncommon, rare, epic, legendary, mythic)
+        weapon_category_id: Foreign key to weapon_category (nullable, weapons only)
     """
 
     id = db.Column(db.Integer, primary_key=True)
@@ -152,6 +165,8 @@ class Item(db.Model):
     # New: per-item weight used for encumbrance calculations (units = weight points)
     # Light = 0.1-0.5, Medium ~1-5, Heavy 10+, default conservative 1.0
     weight = db.Column(db.Float, nullable=False, default=1.0)
+    # Link to weapon category for damage dice and class restrictions
+    weapon_category_id = db.Column(db.String(40), db.ForeignKey("weapon_category.category_id"), nullable=True)
 
 
 class GameConfig(db.Model):
@@ -388,6 +403,8 @@ class CombatSession(db.Model):
     outcome_json = db.Column(db.Text, nullable=True)
     rewards_json = db.Column(db.Text, nullable=True)  # loot & xp after completion
     version = db.Column(db.Integer, nullable=False, default=1)  # optimistic lock counter
+    # Damage tracking for visual effects (transient - resets each turn)
+    last_damage_json = db.Column(db.Text, nullable=True)  # JSON dict of damage events for current turn
     # Soft delete / archival marker
     archived = db.Column(db.Boolean, nullable=False, default=False, index=True)
 
@@ -422,11 +439,16 @@ class CombatSession(db.Model):
             dungeon_snapshot = json.loads(getattr(self, "dungeon_snapshot_json", None) or "null")
         except Exception:
             dungeon_snapshot = None
+        try:
+            damage_data = json.loads(self.last_damage_json) if self.last_damage_json else {}
+        except Exception:
+            damage_data = {}
         return {
             "id": self.id,
             "status": self.status,
             "monster": self.monster(),
             "monster_hp": self.monster_hp,
+            "monster_max_hp": self.monster().get("hp", 0),
             "combat_turn": self.combat_turn,
             "initiative": initiative,
             "active_index": self.active_index,
@@ -438,4 +460,6 @@ class CombatSession(db.Model):
             "version": self.version,
             "archived": bool(self.archived),
             "dungeon_snapshot": dungeon_snapshot,
+            "last_damage_to_monster": damage_data.get("to_monster"),
+            "last_damage_to_party": damage_data.get("to_party", {}),
         }

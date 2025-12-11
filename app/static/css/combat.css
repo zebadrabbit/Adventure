@@ -1,40 +1,32 @@
-/* Combat page - Glass-morphism theme */
+/* Combat page - Enhanced Glass-morphism theme */
 
-/* Purple gradient background */
-body {
-    background: linear-gradient(135deg, #4c5270 0%, #5a3a52 100%);
-    background-attachment: fixed;
-    min-height: 100vh;
-    color: #fff;
+/* Link colors matching theme */
+a {
+    color: var(--adv-primary);
+    text-decoration: none;
+    transition: color 0.2s ease;
 }
 
+a:hover {
+    color: var(--adv-primary-hover);
+    text-decoration: underline;
+}
+
+/* Ensure combat page uses glass theme consistently */
 .combat-container {
-    max-width: 1400px;
+    max-width: 1600px;
+    padding: 0 1rem;
 }
 
 .combat-layout {
     align-items: flex-start;
 }
 
-#combat-left {
-    position: relative;
-}
+/* ========================================
+   GLASS CARD COMPONENTS
+   ======================================== */
 
-#party-panels {
-    display: flex;
-    flex-direction: column;
-}
-
-#combat-center {
-    position: relative;
-}
-
-#combat-right {
-    position: relative;
-}
-
-/* Glass cards */
-.combat-container .card {
+.card-glass {
     background: rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
@@ -42,67 +34,286 @@ body {
     border-radius: 16px;
     box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
     transition: all 0.3s ease;
-    min-height: 600px;
 }
 
-.combat-container .card:hover {
+.card-glass:hover {
     border-color: rgba(255, 255, 255, 0.3);
     box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.45);
 }
 
-.combat-container .card-header {
-    background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(217, 70, 239, 0.3));
+.card-header-glass {
+    background: linear-gradient(135deg,
+            color-mix(in srgb, var(--adv-primary) 30%, transparent),
+            color-mix(in srgb, var(--adv-secondary) 30%, transparent));
     border-bottom: 1px solid rgba(255, 255, 255, 0.2);
     padding: 1rem 1.25rem;
     border-radius: 16px 16px 0 0;
     color: #fff;
     font-weight: 600;
+    font-size: 1rem;
 }
 
-.combat-container .card-body {
+.card-body-glass {
+    padding: 1.25rem;
     color: rgba(255, 255, 255, 0.9);
 }
 
-/* Party member cards */
+/* Badge glass styling */
+.badge-glass {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.75rem;
+    border-radius: 8px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge-glass-sm {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.7rem;
+    border-radius: 6px;
+    font-weight: 600;
+}
+
+
+/* ========================================
+   PARTY MEMBER CARDS
+   ======================================== */
+
+.party-member-wrapper {
+    animation: slideInLeft 0.3s ease-out;
+}
+
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
 .party-member {
-    min-height: auto !important;
-    margin-bottom: 1rem;
+    transition: all 0.3s ease;
 }
 
-.party-member .card-header {
-    font-size: 0.95rem;
+.party-member.active-turn {
+    border-color: color-mix(in srgb, var(--adv-primary) 80%, transparent) !important;
+    box-shadow: 0 0 20px color-mix(in srgb, var(--adv-primary) 40%, transparent);
 }
 
-.party-member .card-body {
-    padding: 1rem;
+.party-member.border-warning {
+    border-color: rgba(251, 191, 36, 0.6) !important;
+    box-shadow: 0 0 15px rgba(251, 191, 36, 0.4);
 }
 
-/* Monster panel */
-.monster-panel {
-    min-height: auto !important;
+/* Stats bars in party cards */
+.stats-bars {
+    font-size: 0.85rem;
 }
 
-#monster-traits {
-    color: rgba(255, 255, 255, 0.8);
+.stat-bar-group {
+    margin-bottom: 0.5rem;
 }
 
-/* Combat log */
-#combat-center .combat-log-wrapper {
+.stat-bar-group:last-child {
+    margin-bottom: 0;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 500;
+}
+
+.stat-value {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+}
+
+/* ========================================
+   PROGRESS BARS
+   ======================================== */
+
+.progress-glass {
+    height: 18px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-glass-sm {
+    height: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-bar-danger {
+    background: linear-gradient(90deg, #ef4444, #dc2626);
     height: 100%;
+    transition: width 0.4s ease;
+    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+}
+
+.progress-bar-primary {
+    background: linear-gradient(90deg, #3b82f6, #2563eb);
+    height: 100%;
+    transition: width 0.4s ease;
+    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+}
+
+.progress-bar-success {
+    background: linear-gradient(90deg, #10b981, #059669);
+    height: 100%;
+    transition: width 0.4s ease;
+    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2);
+}
+
+/* ========================================
+   COMBAT BUTTONS
+   ======================================== */
+
+.btn-group-combat {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.btn-combat {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.9);
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+}
+
+.btn-combat:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.btn-combat:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.btn-combat:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Combat button variants */
+.btn-combat-attack {
+    border-color: rgba(239, 68, 68, 0.5);
+    color: rgba(248, 113, 113, 1);
+}
+
+.btn-combat-attack:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.7);
+    color: #fff;
+}
+
+.btn-combat-defend {
+    border-color: rgba(251, 191, 36, 0.5);
+    color: rgba(252, 211, 77, 1);
+}
+
+.btn-combat-defend:hover:not(:disabled) {
+    background: rgba(251, 191, 36, 0.2);
+    border-color: rgba(251, 191, 36, 0.7);
+    color: #fff;
+}
+
+.btn-combat-spell {
+    border-color: rgba(139, 92, 246, 0.5);
+    color: rgba(167, 139, 250, 1);
+}
+
+.btn-combat-spell:hover:not(:disabled) {
+    background: rgba(139, 92, 246, 0.2);
+    border-color: rgba(139, 92, 246, 0.7);
+    color: #fff;
+}
+
+.btn-combat-heal {
+    border-color: rgba(34, 197, 94, 0.5);
+    color: rgba(134, 239, 172, 1);
+}
+
+.btn-combat-heal:hover:not(:disabled) {
+    background: rgba(34, 197, 94, 0.2);
+    border-color: rgba(34, 197, 94, 0.7);
+    color: #fff;
+}
+
+.btn-combat-flee {
+    border-color: rgba(156, 163, 175, 0.5);
+    color: rgba(209, 213, 219, 1);
+}
+
+.btn-combat-flee:hover:not(:disabled) {
+    background: rgba(156, 163, 175, 0.2);
+    border-color: rgba(156, 163, 175, 0.7);
+    color: #fff;
+}
+
+/* ========================================
+   COMBAT LOG - Terminal Style
+   ======================================== */
+
+.combat-log-card {
+    min-height: 600px;
+    display: flex;
+    flex-direction: column;
+}
+
+.combat-log-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
 }
 
 #combat-log {
+    flex: 1;
     overflow-y: auto;
-    font-family: 'Courier New', 'Consolas', monospace;
+    font-family: 'Courier New', 'Consolas', 'Monaco', monospace;
     font-size: 0.85rem;
-    line-height: 1.3rem;
-    background: rgba(10, 14, 20, 0.6);
-    color: #33ff33;
+    line-height: 1.4rem;
+    background: rgba(10, 14, 20, 0.8);
+    color: #AAAAAA;
     padding: 1rem;
-    border-radius: 8px;
+    border-radius: 0 0 16px 16px;
     position: relative;
-    text-shadow: 0 0 2px #33ff33;
-    border: 1px solid rgba(51, 255, 51, 0.2);
 }
 
 /* CRT scanline effect */
@@ -156,10 +367,11 @@ body {
     display: inline-block;
     width: 0.6em;
     height: 1em;
-    background-color: #33ff33;
+    background-color: #AAAAAA;
     animation: blink 1s step-end infinite;
     vertical-align: text-bottom;
     margin-left: 2px;
+    margin-top: 0.5em;
 }
 
 @keyframes blink {
@@ -172,7 +384,7 @@ body {
 #combat-log>div {
     position: relative;
     z-index: 3;
-    margin: 2px 0;
+    margin: 2px 0 1em 0;
 }
 
 /* Glass-morphism buttons */
@@ -190,65 +402,7 @@ body {
     transform: translateY(-1px);
 }
 
-.combat-container .btn-outline-danger {
-    border-color: rgba(239, 68, 68, 0.5);
-    color: rgba(248, 113, 113, 1);
-}
-
-.combat-container .btn-outline-danger:hover {
-    background: rgba(239, 68, 68, 0.2);
-    border-color: rgba(239, 68, 68, 0.7);
-}
-
-.combat-container .btn-outline-warning {
-    border-color: rgba(251, 191, 36, 0.5);
-    color: rgba(252, 211, 77, 1);
-}
-
-.combat-container .btn-outline-warning:hover {
-    background: rgba(251, 191, 36, 0.2);
-    border-color: rgba(251, 191, 36, 0.7);
-}
-
-.combat-container .btn-outline-primary {
-    border-color: rgba(139, 92, 246, 0.5);
-    color: rgba(167, 139, 250, 1);
-}
-
-.combat-container .btn-outline-primary:hover {
-    background: rgba(139, 92, 246, 0.2);
-    border-color: rgba(139, 92, 246, 0.7);
-}
-
-.combat-container .btn-outline-success {
-    border-color: rgba(34, 197, 94, 0.5);
-    color: rgba(134, 239, 172, 1);
-}
-
-.combat-container .btn-outline-success:hover {
-    background: rgba(34, 197, 94, 0.2);
-    border-color: rgba(34, 197, 94, 0.7);
-}
-
-.combat-container .btn-outline-secondary {
-    border-color: rgba(156, 163, 175, 0.5);
-    color: rgba(209, 213, 219, 1);
-}
-
-.combat-container .btn-outline-secondary:hover {
-    background: rgba(156, 163, 175, 0.2);
-    border-color: rgba(156, 163, 175, 0.7);
-}
-
-.combat-container .btn-outline-dark {
-    border-color: rgba(255, 255, 255, 0.3);
-    color: rgba(255, 255, 255, 0.8);
-}
-
-.combat-container .btn-outline-dark:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.4);
-}
+/* Legacy button styles removed - using .btn-combat classes instead */
 
 /* Progress bars */
 .combat-container .progress {
@@ -291,111 +445,95 @@ body {
 }
 
 .combat-log .log-damage {
-    color: #ff5555;
-    text-shadow: 0 0 3px #ff5555;
+    color: #FF5555;
+    font-weight: bold;
 }
 
 .combat-log .log-heal {
-    color: #50fa7b;
-    text-shadow: 0 0 3px #50fa7b;
+    color: #55FF55;
+    font-weight: bold;
 }
 
 .combat-log .log-turn {
-    color: #f1fa8c;
+    color: #FFFF55;
     font-weight: 600;
-    text-shadow: 0 0 3px #f1fa8c;
 }
 
 .combat-log .log-system {
-    color: #6272a4;
+    color: #AAAAAA;
     font-style: italic;
 }
 
 .combat-log .log-loot {
-    color: #f1fa8c;
+    color: #FFFF55;
     font-weight: 600;
-    text-shadow: 0 0 4px #f1fa8c;
 }
 
 .combat-log .log-curse {
-    color: #bd93f9;
-    text-shadow: 0 0 3px #bd93f9;
+    color: #AA55FF;
 }
 
 .combat-log .log-poison {
-    color: #50fa7b;
-    text-shadow: 0 0 3px #50fa7b;
+    color: #55FF55;
 }
 
 .combat-log .log-buff {
-    color: #8be9fd;
-    text-shadow: 0 0 3px #8be9fd;
+    color: #55FFFF;
 }
 
 .combat-log .log-debuff {
-    color: #ffb86c;
-    text-shadow: 0 0 3px #ffb86c;
+    color: #FFAA00;
 }
 
 .combat-log .log-crit {
-    color: #ff5555;
+    color: #FF5555;
     font-weight: 700;
-    text-shadow: 0 0 5px #ff5555;
 }
 
 .combat-log .log-miss {
-    color: #6272a4;
+    color: #555555;
     font-style: italic;
 }
 
 .combat-log .log-block {
-    color: #8be9fd;
-    text-shadow: 0 0 3px #8be9fd;
+    color: #55FFFF;
 }
 
 .combat-log .log-dodge {
-    color: #8be9fd;
-    text-shadow: 0 0 3px #8be9fd;
+    color: #55FFFF;
 }
 
 .combat-log .log-shield {
-    color: #bd93f9;
-    text-shadow: 0 0 3px #bd93f9;
+    color: #AA55FF;
 }
 
 .combat-log .log-stun {
-    color: #f1fa8c;
-    text-shadow: 0 0 3px #f1fa8c;
+    color: #FFFF55;
 }
 
 .combat-log .log-bleed {
-    color: #ff5555;
-    text-shadow: 0 0 3px #ff5555;
+    color: #FF5555;
 }
 
 .combat-log .log-burn {
-    color: #ffb86c;
-    text-shadow: 0 0 3px #ffb86c;
+    color: #FFAA00;
 }
 
 .combat-log .log-freeze {
-    color: #8be9fd;
-    text-shadow: 0 0 3px #8be9fd;
+    color: #55FFFF;
 }
 
 .combat-log .log-death {
-    color: #ff5555;
+    color: #FF5555;
     font-weight: 700;
-    text-shadow: 0 0 5px #ff5555;
 }
 
 .combat-log .log-flee {
-    color: #bd93f9;
+    color: #AA55FF;
     font-style: italic;
 }
 
 .combat-log .log-victory {
-    color: #50fa7b;
+    color: #55FF55;
     font-weight: 700;
-    text-shadow: 0 0 5px #50fa7b;
 }

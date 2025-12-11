@@ -1,0 +1,20 @@
+ItemID,Name,Type,BaseRarity,MinLevel,MaxLevel,Effect,Potency,DurationSeconds,CooldownSeconds,MaxStack,FlavorTag,Notes
+cons_heal_small,Lesser Healing Potion,Potion,Common,1,20,RestoreHP,25 + Level*2,0,10,10,Healing,Bread-and-butter sustain item
+cons_heal_standard,Standard Healing Potion,Potion,Uncommon,10,40,RestoreHP,60 + Level*3,0,12,10,Healing,Keeps you on your feet mid-run
+cons_heal_greater,Greater Healing Potion,Potion,Rare,20,50,RestoreHP,120 + Level*4,0,15,5,Healing,Best used in emergencies
+cons_mana_small,Lesser Mana Potion,Potion,Common,1,20,RestoreMana,20 + Level*2,0,10,10,Mana,Basic caster sustain
+cons_mana_standard,Standard Mana Potion,Potion,Uncommon,10,40,RestoreMana,50 + Level*3,0,12,10,Mana,Good for extended fights
+cons_mana_greater,Greater Mana Potion,Potion,Rare,20,50,RestoreMana,100 + Level*4,0,15,5,Mana,Used by archmages and panic casters
+cons_stamina,Stamina Draught,Potion,Uncommon,5,40,RestoreStamina,40 + Level*3,0,12,10,Stamina,Favored by monks and rogues
+cons_antidote,Antidote Vial,Potion,Common,3,50,Cleanse,Poison,0,20,5,Cleanse,Removes poison effects
+cons_firebomb,Alchemical Firebomb,Bomb,Uncommon,5,40,DealFireAOE,40 + Level*3,5,18,5,AOE,Great for clustered enemies
+cons_frostbomb,Frostburst Flask,Bomb,Rare,10,45,DealColdAOE_Slow,30 + Level*2,6,20,5,Control,Slows enemies hit
+cons_smokebomb,Smoke Bomb,Bomb,Uncommon,5,35,CreateSmokeCloud,-,8,25,5,Escape,Blocks vision; breaks enemy targeting
+cons_scroll_tp,Scroll of Town Portal,Scroll,Rare,1,50,OpenPortal,Home,0,60,3,Extraction,Enables early extraction with penalties
+cons_scroll_id,Scroll of Identification,Scroll,Common,1,50,IdentifyItem,-,0,5,20,Utility,Reveals unknown item stats
+cons_scroll_bless,Scroll of Blessing,Scroll,Uncommon,8,40,BuffPartyHit,+5% Hit,60,30,5,Buff,Temporary party combat buff
+cons_scroll_shield,Scroll of Warding,Scroll,Rare,15,50,BuffArmorResist,+10% Armor & Resist,45,35,3,Defensive,Helps for boss attempts
+cons_food_ration,Traveler's Ration,Food,Common,1,30,SmallRegen,HP+10 over time,20,0,20,Rest,Slow HP regeneration out of combat
+cons_food_feast,Hearty Feast,Food,Rare,10,50,BuffMaxHP,+10% MaxHP,900,0,1,Camp,Strong pre-dungeon buff; used at camp only
+cons_key_rusty,Rusty Iron Key,Key,Common,1,50,Unlock,BasicLock,0,0,10,Key,Opens simple locked chests/doors
+cons_key_orb,Runed Vault Orb,Key,Legendary,20,50,Unlock,VaultDoor,0,0,3,Key,Required for high-tier vaults

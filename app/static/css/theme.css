@@ -1,61 +1,721 @@
-/* theme.css: Site-wide Bootstrap color overrides */
+/* ===================================================================
+   ADVENTURE MUD - DARK FANTASY DUNGEON DELVER THEME
+   ===================================================================
+
+   Main application theme inspired by Dark & Darker and Hunt: Showdown
+   Medieval gothic aesthetic with worn textures and candlelit atmosphere
+
+   Color Palette:
+   - Background: Dark browns (#0d0a0a, #1a1512)
+   - Borders: Aged brown (#3d3226)
+   - Accent: Warm amber (#d4a574)
+   - Danger: Dark crimson (#8b2e2e)
+   - Success: Forest green (#4a6741)
+   - Warning: Burnt orange (#c17a3a)
+   - Text: Parchment (#d4c5b0, #8a7d6f)
+
+   Typography:
+   - Headers: Georgia, serif
+   - Body: Georgia, 'Times New Roman', serif
+   - Labels: 'Trebuchet MS', sans-serif
+
+   =================================================================== */
 
 :root {
-    /* Primary palette overrides */
-    --bs-primary: #5a3825;
-    /* warm brown */
-    --bs-secondary: #7c6f57;
-    /* muted khaki */
-    --bs-success: #4d7c3a;
-    /* moss green */
-    --bs-danger: #8c2f2f;
-    /* deep red */
-    --bs-warning: #c4a24c;
-    /* golden */
-    --bs-info: #3d5a7a;
-    /* slate blue */
-    --bs-light: #d9c9a9;
-    /* sand */
-    --bs-dark: #1a1a1a;
-    /* near-black */
-
-    /* Matching RGB values for components that use rgba(var(--bs-*-rgb), ..) */
-    --bs-primary-rgb: 90, 56, 37;
-    --bs-secondary-rgb: 124, 111, 87;
-    --bs-success-rgb: 77, 124, 58;
-    --bs-danger-rgb: 140, 47, 47;
-    --bs-warning-rgb: 196, 162, 76;
-    --bs-info-rgb: 61, 90, 122;
-    --bs-light-rgb: 217, 201, 169;
-    --bs-dark-rgb: 26, 26, 26;
+    --dungeon-bg: #0d0a0a;
+    --dungeon-panel: #1a1512;
+    --dungeon-border: #3d3226;
+    --dungeon-accent: #d4a574;
+    --dungeon-danger: #8b2e2e;
+    --dungeon-success: #4a6741;
+    --dungeon-warn: #c17a3a;
+    --dungeon-text: #d4c5b0;
+    --dungeon-text-dim: #8a7d6f;
+    --parchment-texture: url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E");
 }
 
-/* Optional: Tweak default body background/text to fit the dark theme better */
+/* ========================================
+   DARK DUNGEON BACKGROUND
+   ======================================== */
+
 body {
-    background-color: #0f0f10;
-    color: #e6e1d5;
+    background: var(--dungeon-bg);
+    background-image:
+        linear-gradient(rgba(13, 10, 10, 0.8), rgba(20, 15, 12, 0.9)),
+        radial-gradient(ellipse at 50% 0%, rgba(61, 50, 38, 0.2) 0%, transparent 60%),
+        var(--parchment-texture);
+    background-size: cover, cover, 100px 100px;
+    min-height: 100vh;
+    color: var(--dungeon-text);
+    font-family: Georgia, 'Times New Roman', serif;
 }
 
-/* Ensure navbar and footer align with the dark palette */
-.navbar.bg-dark,
-.navbar-dark {
-    background-color: rgba(var(--bs-dark-rgb), 1) !important;
+/* ========================================
+   LEAFLET MAP OVERRIDES
+   ======================================== */
+
+.leaflet-container {
+    background: var(--dungeon-bg) !important;
+    background-color: #0d0a0a !important;
 }
 
-.navbar .navbar-brand {
-    color: var(--bs-light);
+.leaflet-tile-pane {
+    filter: brightness(0.8) contrast(1.1);
 }
 
-.navbar .nav-link {
-    color: rgba(255, 255, 255, .8);
+/* ========================================
+   DUNGEON DELVER HUD ELEMENTS
+   ======================================== */
+
+.tactical-hud {
+    position: fixed;
+    top: 70px;
+    right: 15px;
+    z-index: 1000;
+    display: flex;
+    gap: 12px;
+    flex-direction: column;
+    align-items: flex-end;
 }
 
-.navbar .nav-link.active,
-.navbar .nav-link:hover {
-    color: #fff;
+.hud-status {
+    background: linear-gradient(135deg, rgba(26, 21, 18, 0.95), rgba(18, 15, 13, 0.98));
+    border: 3px solid var(--dungeon-border);
+    border-right: 4px solid var(--dungeon-accent);
+    padding: 12px 18px;
+    font-family: Georgia, serif;
+    font-size: 0.85rem;
+    box-shadow:
+        0 6px 20px rgba(0, 0, 0, 0.8),
+        inset 0 1px 0 rgba(212, 165, 116, 0.1);
 }
 
-/* Buttons leverage Bootstrap's CSS vars; these ensure consistency if needed */
-.btn-primary {
-    --bs-btn-color: #fff;
+.hud-status .label {
+    color: var(--dungeon-text-dim);
+    font-size: 0.7rem;
+    display: block;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-family: 'Trebuchet MS', sans-serif;
+}
+
+.hud-status .value {
+    color: var(--dungeon-accent);
+    font-size: 1.8rem;
+    font-weight: bold;
+    text-shadow: 0 0 8px rgba(212, 165, 116, 0.4);
+}
+
+.time-widget {
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    background: linear-gradient(135deg, rgba(26, 21, 18, 0.95), rgba(18, 15, 13, 0.98));
+    border: 3px solid var(--dungeon-border);
+    border-left: 4px solid var(--dungeon-accent);
+    padding: 15px 22px;
+    box-shadow:
+        0 6px 20px rgba(0, 0, 0, 0.8),
+        inset 0 1px 0 rgba(212, 165, 116, 0.1);
+    z-index: 1000;
+}
+
+.time-widget h6 {
+    color: var(--dungeon-text-dim);
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    margin: 0 0 6px 0;
+    font-family: 'Trebuchet MS', sans-serif;
+}
+
+.time-widget .fs-3 {
+    font-family: Georgia, serif;
+    color: var(--dungeon-accent);
+    text-shadow: 0 0 12px rgba(212, 165, 116, 0.5);
+}
+
+/* ========================================
+   TAVERN BOARD (MAIN CONTENT AREA)
+   ======================================== */
+
+.mission-briefing {
+    max-width: 1400px;
+    margin: 40px auto 40px;
+    padding: 0 20px;
+}
+
+.briefing-header {
+    background: linear-gradient(to right, rgba(26, 21, 18, 0.9), rgba(26, 21, 18, 0.4));
+    border-left: 5px solid var(--dungeon-accent);
+    padding: 20px 30px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+}
+
+.briefing-header h2 {
+    font-size: 2.2rem;
+    letter-spacing: 1px;
+    margin: 0;
+    color: var(--dungeon-accent);
+    font-weight: 400;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    font-family: Georgia, serif;
+}
+
+.briefing-header .subtitle {
+    color: var(--dungeon-text-dim);
+    font-size: 0.95rem;
+    margin-top: 8px;
+    font-style: italic;
+    letter-spacing: 0.5px;
+}
+
+/* ========================================
+   DUNGEON PANELS (CARDS)
+   ======================================== */
+
+.tactical-panel {
+    background: linear-gradient(135deg, rgba(26, 21, 18, 0.9), rgba(18, 15, 13, 0.95));
+    border: 2px solid var(--dungeon-border);
+    position: relative;
+    overflow: hidden;
+    box-shadow:
+        0 8px 30px rgba(0, 0, 0, 0.7),
+        inset 0 1px 0 rgba(212, 165, 116, 0.05);
+    transition: all 0.3s ease;
+}
+
+.tactical-panel::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(to right, var(--dungeon-accent), transparent);
+}
+
+.tactical-panel:hover {
+    border-color: rgba(212, 165, 116, 0.6);
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.8),
+        0 0 20px rgba(212, 165, 116, 0.15);
+    transform: translateY(-1px);
+}
+
+.panel-header {
+    background: rgba(61, 50, 38, 0.3);
+    border-bottom: 2px solid var(--dungeon-border);
+    padding: 14px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.panel-header h5 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--dungeon-text);
+    font-weight: 500;
+    font-family: Georgia, serif;
+    letter-spacing: 0.5px;
+}
+
+.panel-header .badge {
+    font-family: 'Trebuchet MS', sans-serif;
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    background: rgba(212, 165, 116, 0.15);
+    color: var(--dungeon-accent);
+    border: 1px solid var(--dungeon-accent);
+}
+
+.panel-body {
+    padding: 20px;
+}
+
+/* ========================================
+   ADVENTURER CARDS (CHARACTER CARDS)
+   ======================================== */
+
+.operative-card {
+    background: linear-gradient(135deg, rgba(26, 21, 18, 0.95), rgba(18, 15, 13, 0.98));
+    border: 2px solid var(--dungeon-border);
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.7);
+}
+
+.operative-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 60%;
+    height: 100%;
+    background: radial-gradient(ellipse at top right, rgba(212, 165, 116, 0.03) 0%, transparent 60%);
+    pointer-events: none;
+}
+
+.operative-card.selected {
+    border-color: var(--dungeon-accent);
+    box-shadow:
+        0 8px 35px rgba(0, 0, 0, 0.8),
+        0 0 25px rgba(212, 165, 116, 0.25);
+}
+
+.operative-card.selected::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(to right, var(--dungeon-accent), var(--dungeon-warn));
+    z-index: 1;
+}
+
+.operative-header {
+    background: linear-gradient(135deg, rgba(61, 50, 38, 0.4), rgba(40, 33, 26, 0.5));
+    padding: 14px 18px;
+    border-bottom: 2px solid var(--dungeon-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+}
+
+.operative-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.operative-name .icon-28 {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(212, 165, 116, 0.1);
+    border: 1px solid rgba(212, 165, 116, 0.3);
+}
+
+.operative-name span {
+    font-size: 1.15rem;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    font-family: Georgia, serif;
+}
+
+.operative-meta {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.class-badge {
+    font-size: 0.7rem;
+    padding: 3px 9px;
+    border: 1px solid;
+    font-family: Georgia, serif;
+    letter-spacing: 0.5px;
+}
+
+.fighter-badge {
+    background: rgba(139, 46, 46, 0.25);
+    color: #d87070;
+    border-color: #8b2e2e;
+}
+
+.rogue-badge {
+    background: rgba(93, 63, 106, 0.25);
+    color: #b899c7;
+    border-color: #5d3f6a;
+}
+
+.mage-badge {
+    background: rgba(58, 90, 128, 0.25);
+    color: #7fa8d1;
+    border-color: #3a5a80;
+}
+
+.cleric-badge {
+    background: rgba(193, 122, 58, 0.25);
+    color: #d4a574;
+    border-color: #c17a3a;
+}
+
+.ranger-badge {
+    background: rgba(74, 103, 65, 0.25);
+    color: #99b88f;
+    border-color: #4a6741;
+}
+
+.druid-badge {
+    background: rgba(82, 107, 70, 0.25);
+    color: #a0bf91;
+    border-color: #526b46;
+}
+
+.operative-body {
+    padding: 18px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.stat-block {
+    background: rgba(61, 50, 38, 0.25);
+    border-left: 3px solid var(--dungeon-accent);
+    padding: 12px 14px;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.stat-block h6 {
+    color: var(--dungeon-text-dim);
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+    font-weight: 500;
+    font-family: 'Trebuchet MS', sans-serif;
+}
+
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    font-size: 0.85rem;
+    font-family: Georgia, serif;
+}
+
+.stat-grid div {
+    padding: 6px;
+    background: rgba(13, 10, 10, 0.6);
+    border: 1px solid rgba(61, 50, 38, 0.4);
+    text-align: center;
+}
+
+.stat-grid .fw-bold {
+    color: var(--dungeon-accent);
+    font-size: 0.65rem;
+    display: block;
+    margin-bottom: 3px;
+    letter-spacing: 0.5px;
+}
+
+.resource-bar {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    padding: 10px 0;
+    background: rgba(13, 10, 10, 0.4);
+    border-top: 1px solid var(--dungeon-border);
+    border-bottom: 1px solid var(--dungeon-border);
+}
+
+.coin-gold {
+    color: #d4af37;
+    text-shadow: 0 0 6px rgba(212, 175, 55, 0.4);
+}
+
+.coin-silver {
+    color: #b8b8b8;
+    text-shadow: 0 0 6px rgba(184, 184, 184, 0.3);
+}
+
+.coin-copper {
+    color: #b87333;
+    text-shadow: 0 0 6px rgba(184, 115, 51, 0.3);
+}
+
+.inventory-list {
+    background: rgba(13, 10, 10, 0.6);
+    border: 1px solid var(--dungeon-border);
+    padding: 10px;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.inventory-list ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.inventory-list li {
+    padding: 6px 8px;
+    border-bottom: 1px solid rgba(61, 50, 38, 0.3);
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: Georgia, serif;
+}
+
+.inventory-list li:last-child {
+    border-bottom: none;
+}
+
+.operative-footer {
+    padding: 14px 18px;
+    background: rgba(13, 10, 10, 0.6);
+    border-top: 2px solid var(--dungeon-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.select-operative {
+    position: relative;
+    padding: 8px 18px;
+    background: rgba(212, 165, 116, 0.15);
+    border: 2px solid var(--dungeon-accent);
+    color: var(--dungeon-accent);
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: Georgia, serif;
+    font-weight: 500;
+}
+
+.select-operative:hover {
+    background: rgba(212, 165, 116, 0.25);
+    box-shadow: 0 0 15px rgba(212, 165, 116, 0.2);
+}
+
+.select-operative.selected {
+    background: var(--dungeon-accent);
+    color: #0d0a0a;
+    box-shadow: 0 0 12px rgba(212, 165, 116, 0.4);
+}
+
+/* ========================================
+   CHARACTER CREATION / RECRUITMENT
+   ======================================== */
+
+.loadout-form {
+    background: linear-gradient(135deg, rgba(26, 21, 18, 0.95), rgba(18, 15, 13, 0.98));
+    border: 2px solid var(--dungeon-border);
+    border-left: 4px solid var(--dungeon-accent);
+    padding: 22px;
+    box-shadow: inset 0 1px 0 rgba(212, 165, 116, 0.05);
+}
+
+.loadout-form .form-label {
+    color: var(--dungeon-text-dim);
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    font-weight: 500;
+    font-family: 'Trebuchet MS', sans-serif;
+}
+
+.loadout-form .form-control,
+.loadout-form .form-select {
+    background: rgba(13, 10, 10, 0.8);
+    border: 1px solid var(--dungeon-border);
+    color: var(--dungeon-text);
+    font-family: Georgia, serif;
+    padding: 10px 14px;
+}
+
+.loadout-form .form-control:focus,
+.loadout-form .form-select:focus {
+    background: rgba(13, 10, 10, 0.9);
+    border-color: var(--dungeon-accent);
+    box-shadow: 0 0 0 2px rgba(212, 165, 116, 0.15);
+    color: var(--dungeon-text);
+}
+
+.loadout-form .form-select option {
+    background: var(--dungeon-panel);
+}
+
+.loadout-form .btn {
+    letter-spacing: 0.5px;
+    font-weight: 500;
+    padding: 12px 22px;
+    font-family: Georgia, serif;
+}
+
+/* ========================================
+   PARTY ASSEMBLY (BEGIN ADVENTURE)
+   ======================================== */
+
+.deployment-panel {
+    background: linear-gradient(135deg, rgba(26, 21, 18, 0.95), rgba(18, 15, 13, 0.98));
+    border: 2px solid var(--dungeon-border);
+    border-top: 3px solid var(--dungeon-accent);
+    padding: 22px;
+    box-shadow: inset 0 1px 0 rgba(212, 165, 116, 0.05);
+}
+
+.party-counter {
+    background: rgba(61, 50, 38, 0.3);
+    border: 2px solid var(--dungeon-border);
+    padding: 18px;
+    text-align: center;
+    margin-bottom: 18px;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.party-counter h3 {
+    font-size: 3rem;
+    margin: 0;
+    color: var(--dungeon-accent);
+    font-family: Georgia, serif;
+    text-shadow: 0 0 18px rgba(212, 165, 116, 0.4);
+    font-weight: 400;
+}
+
+.party-counter p {
+    margin: 0;
+    color: var(--dungeon-text-dim);
+    font-size: 0.85rem;
+    font-style: italic;
+    letter-spacing: 0.5px;
+}
+
+.deploy-btn {
+    background: linear-gradient(to bottom, var(--dungeon-accent), var(--dungeon-warn));
+    border: 2px solid rgba(193, 122, 58, 0.5);
+    color: #0d0a0a;
+    font-weight: 600;
+    letter-spacing: 1px;
+    padding: 14px 28px;
+    width: 100%;
+    font-size: 1.05rem;
+    transition: all 0.3s ease;
+    box-shadow:
+        0 4px 15px rgba(212, 165, 116, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    font-family: Georgia, serif;
+}
+
+.deploy-btn:hover:not(:disabled) {
+    box-shadow:
+        0 6px 25px rgba(212, 165, 116, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+    border-color: var(--dungeon-accent);
+}
+
+.deploy-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    filter: grayscale(0.5);
+}
+
+.tactical-btn-secondary {
+    background: rgba(61, 50, 38, 0.4);
+    border: 2px solid var(--dungeon-border);
+    color: var(--dungeon-text);
+    letter-spacing: 0.5px;
+    padding: 11px 20px;
+    transition: all 0.2s ease;
+    font-family: Georgia, serif;
+}
+
+.tactical-btn-secondary:hover {
+    border-color: rgba(212, 165, 116, 0.6);
+    background: rgba(61, 50, 38, 0.6);
+    color: var(--dungeon-accent);
+    box-shadow: 0 0 12px rgba(212, 165, 116, 0.15);
+}
+
+.tactical-btn-danger {
+    background: rgba(139, 46, 46, 0.3);
+    border: 1px solid var(--dungeon-danger);
+    color: #d87070;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+    font-family: Georgia, serif;
+}
+
+.tactical-btn-danger:hover {
+    background: rgba(139, 46, 46, 0.5);
+    box-shadow: 0 0 10px rgba(139, 46, 46, 0.3);
+    border-color: #d87070;
+}
+
+/* ========================================
+   ALERTS & NOTIFICATIONS
+   ======================================== */
+
+.alert-tactical {
+    background: rgba(193, 122, 58, 0.15);
+    border: 2px solid var(--dungeon-warn);
+    border-left: 5px solid var(--dungeon-warn);
+    color: var(--dungeon-text);
+    padding: 18px 20px;
+    margin-bottom: 20px;
+    font-family: Georgia, serif;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.alert-tactical strong {
+    color: var(--dungeon-warn);
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+/* ========================================
+   SCROLLBARS (MEDIEVAL THEME)
+   ======================================== */
+
+.tactical-panel ::-webkit-scrollbar,
+.inventory-list::-webkit-scrollbar {
+    width: 10px;
+}
+
+.tactical-panel ::-webkit-scrollbar-track,
+.inventory-list::-webkit-scrollbar-track {
+    background: rgba(13, 10, 10, 0.7);
+    border: 1px solid var(--dungeon-border);
+}
+
+.tactical-panel ::-webkit-scrollbar-thumb,
+.inventory-list::-webkit-scrollbar-thumb {
+    background: linear-gradient(to bottom, rgba(61, 50, 38, 0.8), rgba(40, 33, 26, 0.9));
+    border: 1px solid var(--dungeon-border);
+}
+
+.tactical-panel ::-webkit-scrollbar-thumb:hover,
+.inventory-list::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(to bottom, var(--dungeon-accent), var(--dungeon-warn));
+    box-shadow: 0 0 8px rgba(212, 165, 116, 0.3);
+}
+
+/* ========================================
+   RESPONSIVE ADJUSTMENTS
+   ======================================== */
+
+@media (max-width: 768px) {
+    .mission-briefing {
+        margin-top: 80px;
+    }
+
+    .tactical-hud {
+        top: 10px;
+        right: 10px;
+    }
+
+    .time-widget {
+        top: 10px;
+        left: 10px;
+    }
+
+    .stat-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }

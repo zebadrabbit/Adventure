@@ -1,0 +1,11 @@
+ItemID,Name,Slot,BaseRarity,MinLevel,MaxLevel,PrimaryStat,SecondaryStat,SocketCount,FlavorTag,Notes
+jw_ring_simple_band,Simple Copper Band,Ring,Common,1,10,+1 any stat,,0,Starter,Common trinket with minimal power
+jw_ring_focus,Ring of Focus,Ring,Uncommon,4,20,+2 INT,+1 WIS,0,Caster,Keeps stray thoughts aligned
+jw_ring_swiftness,Band of Swiftness,Ring,Rare,10,35,+2 DEX,+5% MoveSpeed,1,Speed,Favored by scouts and messengers
+jw_ring_bulwark,Ring of the Bulwark,Ring,Epic,18,50,+3 CON,+5% AllResist,1,Tank,Feels heavier than it looks
+jw_ring_reckless,Reckless Vow,Ring,Legendary,22,50,+4 STR,-5% Armor,+10% Damage,1,RiskReward,Those who wear it rarely die of old age
+jw_amulet_minor,Minor Charm,Amulet,Common,1,10,+1 CHA,,0,Social,Slightly improves first impressions
+jw_amulet_mind,Amulet of the Mind,Amulet,Uncommon,5,25,+2 INT,+2 WIS,0,Caster,"Sometimes warm, sometimes cold, regardless of weather"
+jw_amulet_guardian,Guardian's Sigil,Amulet,Rare,12,40,+2 CON,+5% MaxHP,1,Defensive,Wards off the worst of blows
+jw_amulet_arcane,Arcane Conduit,Amulet,Epic,18,50,+3 INT,+10% Mana,1,Mana,Subtle hum when spellcasting nearby
+jw_amulet_stars,Stars of the Wanderer,Amulet,Mythic,28,50,+3 all mental stats,+5% CDR,+10% XP,2,Endgame,Stories say it once belonged to a planeswalker

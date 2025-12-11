@@ -1,0 +1,435 @@
+{% extends "admin_base_new.html" %}
+
+{% block page_title %}Combat Settings{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card bg-dark text-light border-secondary">
+            <div class="card-body">
+                <h5 class="card-title mb-4">
+                    <i class="bi bi-shield-fill-exclamation me-2"></i>Combat Rules & Balance
+                </h5>
+                <p class="text-muted mb-4">Configure combat mechanics, damage formulas, and turn-based rules.</p>
+
+                <form id="combat-form">
+                    <!-- Combat Mechanics Section -->
+                    <div class="mb-4">
+                        <h6 class="text-info mb-3"><i class="bi bi-gear-fill me-2"></i>Core Mechanics</h6>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">
+                                    Critical Hit Multiplier
+                                    <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                                        title="Damage multiplier for natural 20 rolls (default: 1.5x)"></i>
+                                </label>
+                                <input type="number" class="form-control bg-dark text-light border-secondary"
+                                    name="crit_multiplier" value="{{ config.crit_multiplier }}" step="0.1" min="1.0"
+                                    max="3.0">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">
+                                    Base Evasion
+                                    <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                                        title="Base evasion value (10 + armor/defense)"></i>
+                                </label>
+                                <input type="number" class="form-control bg-dark text-light border-secondary"
+                                    name="base_evasion" value="{{ config.base_evasion }}" min="5" max="20">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">
+                                    Damage Variance (%)
+                                    <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                                        title="Percentage variance for damage rolls (default: 25% = ±attack/4)"></i>
+                                </label>
+                                <input type="number" class="form-control bg-dark text-light border-secondary"
+                                    name="damage_variance_pct" value="{{ config.damage_variance_pct }}" min="0"
+                                    max="50">
+                            </div>
+                        </div>
+                        <div class="row g-3 mt-2">
+                            <div class="col-md-4">
+                                <label class="form-label">
+                                    Minimum Damage
+                                    <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                                        title="Minimum damage dealt on successful hit"></i>
+                                </label>
+                                <input type="number" class="form-control bg-dark text-light border-secondary"
+                                    name="min_damage" value="{{ config.min_damage }}" min="1" max="10">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">
+                                    Defend Damage Reduction (%)
+                                    <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                                        title="Damage reduction when defending (default: 50%)"></i>
+                                </label>
+                                <input type="number" class="form-control bg-dark text-light border-secondary"
+                                    name="defend_reduction_pct" value="{{ config.defend_reduction_pct }}" min="0"
+                                    max="90">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">
+                                    Flee Base Chance (%)
+                                    <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                                        title="Base chance to successfully flee from combat"></i>
+                                </label>
+                                <input type="number" class="form-control bg-dark text-light border-secondary"
+                                    name="flee_base_chance" value="{{ config.flee_base_chance }}" min="10" max="90">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Spell System Section -->
+                    <div class="mb-4">
+                        <h6 class="text-info mb-3"><i class="bi bi-magic me-2"></i>Spell System</h6>
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">
+                                    Firebolt Mana Cost
+                                    <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                                        title="Mana cost for Firebolt spell (2d8 + INT*0.6)"></i>
+                                </label>
+                                <input type="number" class="form-control bg-dark text-light border-secondary"
+                                    name="spell_firebolt_cost" value="{{ config.spell_costs.firebolt }}" min="1"
+                                    max="20">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">
+                                    Ice Shard Mana Cost
+                                    <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                                        title="Mana cost for Ice Shard spell"></i>
+                                </label>
+                                <input type="number" class="form-control bg-dark text-light border-secondary"
+                                    name="spell_ice_shard_cost" value="{{ config.spell_costs.ice_shard }}" min="1"
+                                    max="20">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">
+                                    Lightning Mana Cost
+                                    <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                                        title="Mana cost for Lightning Bolt spell"></i>
+                                </label>
+                                <input type="number" class="form-control bg-dark text-light border-secondary"
+                                    name="spell_lightning_cost" value="{{ config.spell_costs.lightning }}" min="1"
+                                    max="20">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">
+                                    Spell INT Scaling
+                                    <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                                        title="Intelligence stat scaling multiplier for spells (default: 0.6)"></i>
+                                </label>
+                                <input type="number" class="form-control bg-dark text-light border-secondary"
+                                    name="spell_int_scaling" value="{{ config.spell_int_scaling }}" step="0.1" min="0"
+                                    max="2.0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Turn System Section -->
+                    <div class="mb-4">
+                        <h6 class="text-info mb-3"><i class="bi bi-arrow-repeat me-2"></i>Turn System</h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">
+                                    Initiative Roll Bonus
+                                    <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                                        title="Bonus added to initiative rolls (speed + d20 + bonus)"></i>
+                                </label>
+                                <input type="number" class="form-control bg-dark text-light border-secondary"
+                                    name="initiative_bonus" value="{{ config.initiative_bonus }}" min="0" max="10">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">
+                                    Monster Ambush Chance (%)
+                                    <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                                        title="Chance for monster to act before initiative order"></i>
+                                </label>
+                                <input type="number" class="form-control bg-dark text-light border-secondary"
+                                    name="ambush_chance" value="{{ config.ambush_chance }}" min="0" max="50">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Monster AI Section -->
+                    <div class="mb-4">
+                        <h6 class="text-info mb-3"><i class="bi bi-robot me-2"></i>Monster AI</h6>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">
+                                    Monster Spell Chance (%)
+                                    <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                                        title="Chance for monsters to cast spells when available"></i>
+                                </label>
+                                <input type="number" class="form-control bg-dark text-light border-secondary"
+                                    name="monster_spell_chance" value="{{ config.monster_spell_chance }}" min="0"
+                                    max="100">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">
+                                    Monster Flee Threshold (%)
+                                    <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                                        title="HP percentage below which monsters may attempt to flee"></i>
+                                </label>
+                                <input type="number" class="form-control bg-dark text-light border-secondary"
+                                    name="monster_flee_hp_threshold" value="{{ config.monster_flee_hp_threshold }}"
+                                    min="0" max="50">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">
+                                    Monster Call Help Chance (%)
+                                    <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                                        title="Chance for monsters to call for help"></i>
+                                </label>
+                                <input type="number" class="form-control bg-dark text-light border-secondary"
+                                    name="monster_help_chance" value="{{ config.monster_help_chance }}" min="0"
+                                    max="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rewards Section -->
+                    <div class="mb-4">
+                        <h6 class="text-info mb-3"><i class="bi bi-trophy-fill me-2"></i>Combat Rewards</h6>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">
+                                    Victory XP Multiplier
+                                    <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                                        title="XP reward multiplier for combat victories"></i>
+                                </label>
+                                <input type="number" class="form-control bg-dark text-light border-secondary"
+                                    name="victory_xp_mult" value="{{ config.victory_xp_mult }}" step="0.1" min="0.5"
+                                    max="3.0">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">
+                                    Flee XP Penalty (%)
+                                    <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                                        title="XP penalty when fleeing from combat"></i>
+                                </label>
+                                <input type="number" class="form-control bg-dark text-light border-secondary"
+                                    name="flee_xp_penalty_pct" value="{{ config.flee_xp_penalty_pct }}" min="0"
+                                    max="100">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">
+                                    Party XP Split
+                                    <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                                        title="How to split XP among party members"></i>
+                                </label>
+                                <select class="form-select bg-dark text-light border-secondary" name="party_xp_split">
+                                    <option value="equal" {% if config.party_xp_split=='equal' %}selected{% endif %}>
+                                        Equal Split</option>
+                                    <option value="contribution" {% if config.party_xp_split=='contribution'
+                                        %}selected{% endif %}>By Contribution</option>
+                                    <option value="level_scaled" {% if config.party_xp_split=='level_scaled'
+                                        %}selected{% endif %}>Level Scaled</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Advanced Options Section -->
+                    <div class="mb-4">
+                        <h6 class="text-info mb-3"><i class="bi bi-sliders me-2"></i>Advanced Options</h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="allow_friendly_fire" {% if
+                                        config.allow_friendly_fire %}checked{% endif %}>
+                                    <label class="form-check-label">
+                                        Allow Friendly Fire
+                                        <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                                            title="Allow players to accidentally hit party members"></i>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="death_saves" {% if
+                                        config.death_saves %}checked{% endif %}>
+                                    <label class="form-check-label">
+                                        Enable Death Saves
+                                        <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                                            title="Characters make death saves instead of instant death at 0 HP"></i>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="auto_monster_turns" {% if
+                                        config.auto_monster_turns %}checked{% endif %}>
+                                    <label class="form-check-label">
+                                        Auto-Resolve Monster Turns
+                                        <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                                            title="Monsters automatically take their turns (current behavior)"></i>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="resistance_system" {% if
+                                        config.resistance_system %}checked{% endif %}>
+                                    <label class="form-check-label">
+                                        Enable Elemental Resistances
+                                        <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip"
+                                            title="Apply elemental resistance/weakness calculations"></i>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save me-2"></i>Save Settings
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="reset-btn">
+                            <i class="bi bi-arrow-counterclockwise me-2"></i>Reset to Defaults
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuration Preview -->
+    <div class="col-12 mt-3">
+        <div class="card bg-dark text-light border-secondary">
+            <div class="card-body">
+                <h6 class="card-title">
+                    <i class="bi bi-code-square me-2"></i>Configuration Preview
+                </h6>
+                <pre class="bg-black text-light p-3 rounded"
+                    style="max-height: 300px; overflow-y: auto;"><code id="config-preview"></code></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="save-toast" class="toast align-items-center text-bg-success border-0" role="alert">
+        <div class="d-flex">
+            <div class="toast-body">
+                Settings saved successfully!
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+    <div id="error-toast" class="toast align-items-center text-bg-danger border-0" role="alert">
+        <div class="d-flex">
+            <div class="toast-body" id="error-message">
+                An error occurred.
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Initialize tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+    // Get current configuration from form
+    function getCurrentConfig() {
+        const form = document.getElementById('combat-form');
+        const formData = new FormData(form);
+
+        return {
+            crit_multiplier: parseFloat(formData.get('crit_multiplier')),
+            base_evasion: parseInt(formData.get('base_evasion')),
+            damage_variance_pct: parseInt(formData.get('damage_variance_pct')),
+            min_damage: parseInt(formData.get('min_damage')),
+            defend_reduction_pct: parseInt(formData.get('defend_reduction_pct')),
+            flee_base_chance: parseInt(formData.get('flee_base_chance')),
+            spell_costs: {
+                firebolt: parseInt(formData.get('spell_firebolt_cost')),
+                ice_shard: parseInt(formData.get('spell_ice_shard_cost')),
+                lightning: parseInt(formData.get('spell_lightning_cost'))
+            },
+            spell_int_scaling: parseFloat(formData.get('spell_int_scaling')),
+            initiative_bonus: parseInt(formData.get('initiative_bonus')),
+            ambush_chance: parseInt(formData.get('ambush_chance')),
+            monster_spell_chance: parseInt(formData.get('monster_spell_chance')),
+            monster_flee_hp_threshold: parseInt(formData.get('monster_flee_hp_threshold')),
+            monster_help_chance: parseInt(formData.get('monster_help_chance')),
+            victory_xp_mult: parseFloat(formData.get('victory_xp_mult')),
+            flee_xp_penalty_pct: parseInt(formData.get('flee_xp_penalty_pct')),
+            party_xp_split: formData.get('party_xp_split'),
+            allow_friendly_fire: formData.get('allow_friendly_fire') === 'on',
+            death_saves: formData.get('death_saves') === 'on',
+            auto_monster_turns: formData.get('auto_monster_turns') === 'on',
+            resistance_system: formData.get('resistance_system') === 'on'
+        };
+    }
+
+    // Update preview
+    function updatePreview() {
+        const config = getCurrentConfig();
+        document.getElementById('config-preview').textContent = JSON.stringify(config, null, 2);
+    }
+
+    // Update preview on any input change
+    document.getElementById('combat-form').addEventListener('input', updatePreview);
+    document.getElementById('combat-form').addEventListener('change', updatePreview);
+
+    // Initial preview
+    updatePreview();
+
+    // Save settings
+    document.getElementById('combat-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const config = getCurrentConfig();
+
+        try {
+            const response = await fetch('/admin/v2/settings/combat/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                const toast = new bootstrap.Toast(document.getElementById('save-toast'));
+                toast.show();
+            } else {
+                throw new Error(result.error || 'Save failed');
+            }
+        } catch (error) {
+            document.getElementById('error-message').textContent = error.message;
+            const toast = new bootstrap.Toast(document.getElementById('error-toast'));
+            toast.show();
+        }
+    });
+
+    // Reset to defaults
+    document.getElementById('reset-btn').addEventListener('click', async () => {
+        if (!confirm('Reset all combat settings to defaults?')) return;
+
+        try {
+            const response = await fetch('/admin/v2/settings/combat/reset', {
+                method: 'POST'
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                window.location.reload();
+            } else {
+                throw new Error(result.error || 'Reset failed');
+            }
+        } catch (error) {
+            document.getElementById('error-message').textContent = error.message;
+            const toast = new bootstrap.Toast(document.getElementById('error-toast'));
+            toast.show();
+        }
+    });
+</script>
+{% endblock %}

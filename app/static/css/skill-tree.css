@@ -1,0 +1,537 @@
+/* Skill/Talent Tree System Styles */
+
+/* ========== Skill Tree Modal ========== */
+.skill-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 3500;
+    overflow-y: auto;
+    animation: fadeIn 0.2s;
+}
+
+.skill-modal.active {
+    display: block;
+}
+
+.skill-modal-content {
+    position: relative;
+    max-width: 1400px;
+    margin: 20px auto;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border-radius: 15px;
+    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.7);
+    border: 3px solid #4a5568;
+}
+
+.skill-modal-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 25px 35px;
+    border-radius: 12px 12px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 3px solid #2d3748;
+}
+
+.skill-modal-title-group {
+    flex: 1;
+}
+
+.skill-modal-title {
+    font-size: 32px;
+    font-weight: bold;
+    color: #fff;
+    margin: 0 0 10px 0;
+    text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.skill-modal-subtitle {
+    font-size: 15px;
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 500;
+}
+
+.talent-points-display {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 15px 25px;
+    border-radius: 10px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.talent-points-label {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.9);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.talent-points-value {
+    font-size: 28px;
+    font-weight: bold;
+    color: #ffd700;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.skill-close-btn {
+    background: rgba(220, 38, 38, 0.9);
+    border: none;
+    color: white;
+    font-size: 28px;
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 25px;
+}
+
+.skill-close-btn:hover {
+    background: #b91c1c;
+    transform: rotate(90deg) scale(1.1);
+}
+
+/* ========== Tree Selector ========== */
+.tree-selector {
+    display: flex;
+    background: #1a202c;
+    border-bottom: 3px solid #2d3748;
+    padding: 10px 15px;
+    gap: 10px;
+    overflow-x: auto;
+}
+
+.tree-selector-btn {
+    flex: 1;
+    min-width: 200px;
+    padding: 20px;
+    background: rgba(45, 55, 72, 0.6);
+    border: 2px solid #4a5568;
+    border-radius: 10px;
+    color: #cbd5e0;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.tree-selector-btn:hover {
+    background: rgba(66, 153, 225, 0.2);
+    border-color: #4299e1;
+    transform: translateY(-2px);
+}
+
+.tree-selector-btn.active {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.3), rgba(118, 75, 162, 0.3));
+    border-color: #667eea;
+    color: #e2e8f0;
+}
+
+.tree-selector-icon {
+    font-size: 24px;
+}
+
+.tree-selector-name {
+    font-size: 15px;
+}
+
+.tree-selector-class {
+    font-size: 12px;
+    opacity: 0.7;
+    text-transform: uppercase;
+}
+
+/* ========== Skill Tree Canvas ========== */
+.skill-tree-container {
+    padding: 40px;
+    min-height: 600px;
+    background: radial-gradient(circle at center, #1a202c 0%, #0f1419 100%);
+    position: relative;
+    overflow: auto;
+}
+
+.skill-tree-canvas {
+    position: relative;
+    width: 1200px;
+    height: 800px;
+    margin: 0 auto;
+}
+
+/* Connection Lines */
+.skill-connection {
+    position: absolute;
+    height: 3px;
+    background: linear-gradient(90deg, #4a5568 0%, #2d3748 100%);
+    transform-origin: left center;
+    z-index: 1;
+    opacity: 0.5;
+    transition: all 0.3s;
+}
+
+.skill-connection.unlocked {
+    background: linear-gradient(90deg, #48bb78 0%, #38a169 100%);
+    opacity: 1;
+    box-shadow: 0 0 8px rgba(72, 187, 120, 0.6);
+}
+
+/* ========== Skill Nodes ========== */
+.skill-node {
+    position: absolute;
+    width: 120px;
+    height: 140px;
+    cursor: pointer;
+    transition: all 0.3s;
+    z-index: 2;
+}
+
+.skill-node:hover {
+    transform: scale(1.1);
+    z-index: 3;
+}
+
+.skill-node-icon-wrapper {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 8px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+    border: 4px solid #4a5568;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: all 0.3s;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.skill-node:hover .skill-node-icon-wrapper {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+.skill-node-icon {
+    font-size: 36px;
+    filter: grayscale(100%);
+    opacity: 0.4;
+    transition: all 0.3s;
+}
+
+/* Skill States */
+.skill-node.available .skill-node-icon-wrapper {
+    border-color: #4299e1;
+    background: linear-gradient(135deg, #2b6cb0 0%, #2c5282 100%);
+    animation: pulse 2s infinite;
+}
+
+.skill-node.available .skill-node-icon {
+    filter: grayscale(0%);
+    opacity: 1;
+}
+
+.skill-node.unlocked .skill-node-icon-wrapper {
+    border-color: #48bb78;
+    background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+}
+
+.skill-node.unlocked .skill-node-icon {
+    filter: grayscale(0%);
+    opacity: 1;
+    color: #68d391;
+}
+
+.skill-node.locked .skill-node-icon-wrapper {
+    border-color: #4a5568;
+    background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+}
+
+/* Tier Indicator */
+.skill-tier-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ecc94b 0%, #d69e2e 100%);
+    color: #1a202c;
+    font-size: 13px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #1a202c;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Skill Info */
+.skill-node-name {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #e2e8f0;
+    margin-bottom: 4px;
+    line-height: 1.2;
+}
+
+.skill-node.locked .skill-node-name {
+    color: #718096;
+}
+
+.skill-node-cost {
+    text-align: center;
+    font-size: 11px;
+    color: #ffd700;
+    font-weight: bold;
+}
+
+.skill-node.locked .skill-node-cost {
+    color: #4a5568;
+}
+
+/* ========== Skill Tooltip ========== */
+.skill-tooltip {
+    position: absolute;
+    background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+    border: 2px solid #4a5568;
+    border-radius: 10px;
+    padding: 20px;
+    min-width: 320px;
+    max-width: 400px;
+    z-index: 1000;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.8);
+    display: none;
+    pointer-events: none;
+}
+
+.skill-tooltip.active {
+    display: block;
+    animation: tooltipFadeIn 0.2s;
+}
+
+.skill-tooltip-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #4a5568;
+}
+
+.skill-tooltip-name {
+    font-size: 18px;
+    font-weight: bold;
+    color: #e2e8f0;
+}
+
+.skill-tooltip-type {
+    font-size: 11px;
+    text-transform: uppercase;
+    background: rgba(66, 153, 225, 0.3);
+    padding: 4px 10px;
+    border-radius: 12px;
+    color: #4299e1;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.skill-tooltip-description {
+    font-size: 14px;
+    color: #cbd5e0;
+    line-height: 1.6;
+    margin-bottom: 15px;
+}
+
+.skill-tooltip-effects {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.skill-tooltip-effect {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 6px 10px;
+    background: rgba(74, 85, 104, 0.3);
+    border-radius: 6px;
+}
+
+.skill-tooltip-effect-label {
+    color: #a0aec0;
+}
+
+.skill-tooltip-effect-value {
+    color: #48bb78;
+    font-weight: 600;
+}
+
+.skill-tooltip-requirements {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 15px;
+    padding: 10px;
+    background: rgba(74, 85, 104, 0.2);
+    border-radius: 6px;
+}
+
+.skill-tooltip-requirement {
+    font-size: 12px;
+    color: #cbd5e0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.skill-tooltip-requirement.met {
+    color: #48bb78;
+}
+
+.skill-tooltip-requirement.unmet {
+    color: #fc8181;
+}
+
+.skill-tooltip-footer {
+    display: flex;
+    gap: 10px;
+}
+
+.skill-tooltip-unlock-btn {
+    flex: 1;
+    padding: 12px;
+    background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.skill-tooltip-unlock-btn:hover {
+    background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
+}
+
+.skill-tooltip-unlock-btn:disabled {
+    background: #4a5568;
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* ========== Skill Tiers ========== */
+.skill-tree-tiers {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    padding: 20px 0;
+}
+
+.skill-tier-marker {
+    text-align: center;
+    font-size: 14px;
+    font-weight: bold;
+    color: #718096;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* ========== Animations ========== */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(66, 153, 225, 0.7);
+    }
+
+    50% {
+        box-shadow: 0 0 0 15px rgba(66, 153, 225, 0);
+    }
+}
+
+@keyframes tooltipFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ========== Skill Type Colors ========== */
+.skill-type-passive .skill-node-icon-wrapper {
+    border-color: #9f7aea;
+}
+
+.skill-type-active .skill-node-icon-wrapper {
+    border-color: #f56565;
+}
+
+.skill-type-toggle .skill-node-icon-wrapper {
+    border-color: #4299e1;
+}
+
+/* ========== Responsive ========== */
+@media (max-width: 1200px) {
+    .skill-tree-canvas {
+        width: 100%;
+        transform: scale(0.8);
+        transform-origin: top center;
+    }
+}
+
+/* ========== Empty State ========== */
+.skill-tree-empty {
+    text-align: center;
+    padding: 100px 40px;
+    color: #718096;
+}
+
+.skill-tree-empty-icon {
+    font-size: 80px;
+    margin-bottom: 20px;
+    opacity: 0.3;
+}
+
+.skill-tree-empty-message {
+    font-size: 20px;
+    margin-bottom: 10px;
+}
+
+.skill-tree-empty-hint {
+    font-size: 14px;
+    opacity: 0.7;
+}

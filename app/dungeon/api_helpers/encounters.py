@@ -32,9 +32,12 @@ __all__ = ["maybe_spawn_encounter", "run_monster_patrols"]
 def _load_spawn_config():
     """Load encounter spawn pacing config.
 
-    Structure (stored in GameConfig under 'encounter_spawn'):
+    Reads from admin panel setting 'game_rules.encounter_spawn_rate' for base chance.
+    Falls back to legacy 'encounter_spawn' JSON config if present.
+
+    Structure:
       {
-        "base": float   # base per-move spawn probability (default 0.10)
+        "base": float   # base per-move spawn probability (default 0.15, admin-configurable)
         "streak_bonus_max": float  # cap for streak-based bonus added progressively
         "streak_unit": int  # multiplier for miss streak -> bonus scaling
       }
@@ -44,18 +47,28 @@ def _load_spawn_config():
 
     from app.models import GameConfig as _GC
 
-    base_cfg = {"base": 0.10, "streak_bonus_max": 0.035, "streak_unit": 2}
+    base_cfg = {"base": 0.15, "streak_bonus_max": 0.035, "streak_unit": 2}
+
+    # First, try to load from admin panel game_rules.encounter_spawn_rate
+    admin_rate = _GC.get("game_rules.encounter_spawn_rate")
+    if admin_rate:
+        try:
+            base_cfg["base"] = float(_json_cfg.loads(admin_rate) if isinstance(admin_rate, str) else admin_rate)
+        except Exception:
+            pass
+
+    # Legacy support: check for old encounter_spawn JSON config
     raw = _GC.get("encounter_spawn")
-    if not raw:
-        return base_cfg
-    try:
-        parsed = _json_cfg.loads(raw) if isinstance(raw, str) else raw
-        if isinstance(parsed, dict):
-            for k in ["base", "streak_bonus_max", "streak_unit"]:
-                if k in parsed:
-                    base_cfg[k] = parsed[k]
-    except Exception:
-        pass
+    if raw:
+        try:
+            parsed = _json_cfg.loads(raw) if isinstance(raw, str) else raw
+            if isinstance(parsed, dict):
+                for k in ["base", "streak_bonus_max", "streak_unit"]:
+                    if k in parsed:
+                        base_cfg[k] = parsed[k]
+        except Exception:
+            pass
+
     return base_cfg
 
 
@@ -104,7 +117,12 @@ def maybe_spawn_encounter(instance, action_triggered: bool, resp: dict):
             except Exception:
                 pass
         cfg = _load_spawn_config()
-        base_chance = cfg["base"] + min(cfg["streak_bonus_max"], 0.01 * miss_streak * cfg.get("streak_unit", 2))
+        # Only apply streak bonuses if base rate is above 10%, otherwise respect the low spawn rate
+        if cfg["base"] >= 0.10:
+            base_chance = cfg["base"] + min(cfg["streak_bonus_max"], 0.01 * miss_streak * cfg.get("streak_unit", 2))
+        else:
+            # For low spawn rates, use base rate without bonuses to respect admin settings
+            base_chance = cfg["base"]
         roll_val = _r.random()
         force_spawn = base_chance >= 0.9999
         if roll_val < base_chance or force_spawn:
@@ -141,59 +159,77 @@ def maybe_spawn_encounter(instance, action_triggered: bool, resp: dict):
         pass
 
 
-def run_monster_patrols(dungeon, instance, resp: dict, *, tick_amount: int = 1):  # resp unused currently but reserved
-    try:
-        from app.models.entities import DungeonEntity as _DE
-        from app.services.monster_patrol import maybe_patrol as _maybe_patrol
+def run_monster_patrols(dungeon, instance, resp: dict, *, tick_amount: int = 1):
+    """Update monster positions based on game clock using new spawn system.
 
-        if not (hasattr(dungeon, "spawn_manager") and getattr(dungeon.spawn_manager, "monsters", None)):
+    Args:
+        dungeon: Dungeon layout object
+        instance: DungeonInstance context
+        resp: Response dict (reserved for future use)
+        tick_amount: Number of ticks elapsed
+    """
+    try:
+        from app.dungeon.spawn_integration import load_spawns_from_db
+        from app.dungeon.spawn_manager import SpawnManager
+        from app.models.entities import DungeonEntity as _DE
+        from app.models.models import GameClock
+
+        clock = GameClock.get()
+
+        # Load spawn manager for this instance
+        spawn_manager = SpawnManager(dungeon, instance)
+        spawns = load_spawns_from_db(instance, spawn_manager)
+
+        if not spawns:
+            # No spawns loaded, skip patrol
             return
-        changed_positions = []
-        for m in dungeon.spawn_manager.monsters:  # type: ignore[attr-defined]
-            if not isinstance(m, dict) or "x" not in m or "y" not in m:
-                continue
-            if m.get("in_combat"):
-                continue
-            old_x, old_y = m.get("x"), m.get("y")
-            # Allow multiple patrol rolls for larger tick_amount (linear scaling, but cap to avoid runaway)
-            attempts = max(1, min(5, int(tick_amount)))
-            moved_this_monster = False
-            for _ in range(attempts):
-                if _maybe_patrol(m, dungeon):
-                    moved_this_monster = True
-                    # Continue loop to potentially chain additional steps? For now break after first to keep distance bounded per tick.
-                    break
-            if moved_this_monster and m.get("slug") and (m.get("x") != old_x or m.get("y") != old_y):
-                changed_positions.append((m.get("slug"), int(m.get("x")), int(m.get("y"))))
-        if changed_positions:
+
+        # Update spawn positions based on game clock
+        moved_spawns = spawn_manager.update_spawns(clock.tick)
+
+        # Persist changes to database
+        if moved_spawns:
             try:
-                for slug, mx, my in changed_positions:
-                    q = _DE.query.filter_by(instance_id=instance.id, slug=slug, type="monster")
-                    row = q.first()
-                    if row:
-                        row.x, row.y = mx, my
+                # Update entity positions for moved spawns
+                for spawn in moved_spawns:
+                    # Find entity by slug and original position
+                    entity = _DE.query.filter_by(instance_id=instance.id, type="monster", slug=spawn.slug).first()
+
+                    if entity:
+                        entity.x = spawn.x
+                        entity.y = spawn.y
+                        # Update data with movement state
+                        if entity.data:
+                            import json as _json_patrol
+
+                            try:
+                                data = _json_patrol.loads(entity.data)
+                                data["last_move_tick"] = spawn.last_move_tick
+                                data["behavior"] = spawn.behavior.value
+                                entity.data = _json_patrol.dumps(data)
+                            except Exception:
+                                pass
+
                 db.session.commit()
+
+                # Broadcast movement via websocket
+                try:
+                    from app import socketio
+
+                    # Build full monster list for client update
+                    monster_list = []
+                    for spawn in spawn_manager.spawns:
+                        monster_list.append({"slug": spawn.slug, "x": spawn.x, "y": spawn.y, "name": spawn.name})
+
+                    socketio.emit(
+                        "entities_update", {"monsters": monster_list, "instance_id": instance.id}, namespace="/game"
+                    )
+                except Exception:
+                    pass
+
             except Exception:
                 db.session.rollback()
-            try:
-                persist = getattr(dungeon.spawn_manager, "persist", None)
-                if callable(persist):
-                    persist()
-            except Exception:
-                pass
-            try:
-                from app import socketio
 
-                # Emit full monster list (richer payload) so clients can avoid a follow-up fetch
-                full_list = []
-                try:
-                    for mm in dungeon.spawn_manager.monsters:  # type: ignore[attr-defined]
-                        if isinstance(mm, dict) and "x" in mm and "y" in mm:
-                            full_list.append({"slug": mm.get("slug"), "x": int(mm.get("x")), "y": int(mm.get("y"))})
-                except Exception:
-                    full_list = [{"slug": slug, "x": mx, "y": my} for slug, mx, my in changed_positions]
-                socketio.emit("entities_update", {"monsters": full_list, "instance_id": instance.id}, namespace="/game")
-            except Exception:
-                pass
     except Exception:
+        # Swallow exceptions to avoid blocking player actions
         pass

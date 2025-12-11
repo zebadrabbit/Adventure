@@ -6,13 +6,20 @@
   // FOG_FULL_RADIUS: outer limit where fog reaches maximum darkness. Tiles beyond this still rendered
   // but nearly opaque black (kept so map shape perception is limited). Increase for larger explored area preview.
   // Opacity scales from MIN_FOG_OPACITY at inner edge to MAX_FOG_OPACITY at outer edge.
-  // Fog parameters (smooth radial gradient + noise + memory)
-  const INNER_VIS_RADIUS = 8;       // fully visible radius (Euclidean)
-  const FOG_FULL_RADIUS = 26;       // where fog reaches max opacity
-  const MIN_FOG_OPACITY = 0.18;     // minimum fog opacity just outside inner radius
-  const MAX_FOG_OPACITY = 0.82;     // maximum fog opacity at/after full radius
-  const FOG_NOISE_AMPLITUDE = 0.08; // max +/- added to opacity per tile for irregularity
-  const MEMORY_DIM_OPACITY = 0.35;  // opacity for previously seen but currently out-of-range tiles
+
+  // Default fog parameters (can be overridden via admin panel)
+  const DEFAULT_FOG_CONFIG = {
+    innerRadius: 8,       // fully visible radius (Euclidean)
+    fullRadius: 26,       // where fog reaches max opacity
+    minOpacity: 0.18,     // minimum fog opacity just outside inner radius
+    maxOpacity: 0.92,     // maximum fog opacity at/after full radius
+    noise: 0.08,          // max +/- added to opacity per tile for irregularity
+    memoryOpacity: 0.35   // opacity for previously seen but currently out-of-range tiles
+  };
+
+  // Active fog config (mutable)
+  let activeFogConfig = { ...DEFAULT_FOG_CONFIG };
+
   const MEMORY_STROKE = false;      // memory tiles get no stroke edge
   const MEMORY_FILL_COLOR = '#060606'; // dim color base for memory tiles
   // Fog config persistence keys (user tunable in console)
@@ -46,7 +53,19 @@
       } catch (e) { window.partyCharacters = window.partyCharacters || []; }
     })();
     // Initial entities fetch (monsters + revealed treasures) – one time
-    setTimeout(() => { try { refreshEntities(true); } catch (e) { } }, 150);
+    setTimeout(() => {
+      try {
+        refreshEntities(true);
+        refreshDebugLoot(); // Also refresh debug loot markers
+      } catch (e) { }
+    }, 150);
+
+    // Listen for debug mode changes
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'admin_debug_mode_changed') {
+        refreshDebugLoot();
+      }
+    });
 
     // --- WebSocket: subscribe to /game for monster patrol updates ---
     (function initGameSocket() {
@@ -183,25 +202,51 @@
     function saveFogConfig(cfg) {
       try { localStorage.setItem(FOG_CFG_KEY, JSON.stringify(cfg)); } catch (e) { }
     }
-    // Only reading current constants (immutable) – for future dynamic tuning we could reassign globals.
     function currentFogConfig() {
-      return {
-        innerRadius: INNER_VIS_RADIUS,
-        fullRadius: FOG_FULL_RADIUS,
-        minOpacity: MIN_FOG_OPACITY,
-        maxOpacity: MAX_FOG_OPACITY,
-        noise: FOG_NOISE_AMPLITUDE,
-        memoryOpacity: MEMORY_DIM_OPACITY
-      };
+      return { ...activeFogConfig };
     }
-    // If persisted config differs in future when we allow dynamic adjusting, we'd apply here.
+    function applyFogConfig(cfg) {
+      activeFogConfig = {
+        innerRadius: cfg.innerRadius ?? activeFogConfig.innerRadius,
+        fullRadius: cfg.fullRadius ?? activeFogConfig.fullRadius,
+        minOpacity: cfg.minOpacity ?? activeFogConfig.minOpacity,
+        maxOpacity: cfg.maxOpacity ?? activeFogConfig.maxOpacity,
+        noise: cfg.noise ?? activeFogConfig.noise,
+        memoryOpacity: cfg.memoryOpacity ?? activeFogConfig.memoryOpacity
+      };
+      saveFogConfig(activeFogConfig);
+
+      // Update canvas fog settings and trigger redraw
+      if (window.updateCanvasFogConfig) {
+        window.updateCanvasFogConfig(activeFogConfig);
+      }
+    }
+    // Load persisted config on init
     (function initFogConfig() {
       const cfg = loadFogConfig();
       if (cfg) {
-        // Placeholder: accepting persisted values later when we allow overrides.
-        // We intentionally do not mutate constants now to keep code simple.
+        applyFogConfig(cfg);
       }
     })();
+
+    // Expose fog config to console for debugging/inspection
+    window.getFogConfig = currentFogConfig;
+    window.setFogConfig = applyFogConfig;
+    window.resetFogConfig = function () {
+      applyFogConfig(DEFAULT_FOG_CONFIG);
+    };
+    window.showFogSettings = function () {
+      const cfg = currentFogConfig();
+      console.log('Current Fog Settings:');
+      console.log(`  Inner Visibility Radius: ${cfg.innerRadius} tiles`);
+      console.log(`  Full Fog Radius: ${cfg.fullRadius} tiles`);
+      console.log(`  Min Fog Opacity: ${cfg.minOpacity} (${(cfg.minOpacity * 100).toFixed(0)}%)`);
+      console.log(`  Max Fog Opacity: ${cfg.maxOpacity} (${(cfg.maxOpacity * 100).toFixed(0)}%)`);
+      console.log(`  Fog Noise: ${cfg.noise}`);
+      console.log(`  Memory Dimming: ${cfg.memoryOpacity} (${(cfg.memoryOpacity * 100).toFixed(0)}%)`);
+      return cfg;
+    };
+
     // Position element removed per design update (compass + log only)
     // Legacy exits button container removed
     const moveNorthBtn = document.getElementById('btn-move-n');
@@ -259,22 +304,35 @@
       executeMove(next);
     }
 
-    // ---------------- Monster Entity Icon Layer -----------------
-    let monsterLayerGroup = null;
-    let treasureLayerGroup = null;
-    function ensureMonsterLayer() {
-      if (!window.dungeonMap) return null;
-      if (!monsterLayerGroup) {
-        monsterLayerGroup = L.layerGroup().addTo(window.dungeonMap);
-      }
-      return monsterLayerGroup;
+    // ---------------- Canvas-based Entity Rendering -----------------
+    // (Leaflet layer functions removed - entities now rendered via DungeonCanvas)
+
+    function renderDebugLoot(lootLocations) {
+      // Canvas version - stub for now (debug loot rendering not yet implemented in Canvas)
+      // TODO: Implement debug loot markers in DungeonCanvas if needed
+      if (!window.dungeonCanvas) return;
+      console.debug('[Canvas] Debug loot rendering not yet implemented', lootLocations);
     }
-    function ensureTreasureLayer() {
-      if (!window.dungeonMap) return null;
-      if (!treasureLayerGroup) {
-        treasureLayerGroup = L.layerGroup().addTo(window.dungeonMap);
+
+    function refreshDebugLoot() {
+      // Check if debug mode is enabled
+      const debugMode = sessionStorage.getItem('admin_debug_mode') === 'true';
+      if (!debugMode) {
+        // Canvas version - nothing to clear
+        return;
       }
-      return treasureLayerGroup;
+
+      // Fetch all loot locations from server
+      fetch('/api/dungeon/debug/loot-locations')
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data && data.debug_mode && Array.isArray(data.loot_locations)) {
+            renderDebugLoot(data.loot_locations);
+          }
+        })
+        .catch(err => {
+          console.debug('[debug] loot fetch failed:', err);
+        });
     }
 
     function iconForMonster(mon) {
@@ -285,26 +343,43 @@
     }
 
     function renderMonsters(monsters) {
-      const layer = ensureMonsterLayer();
-      if (!layer) return;
-      layer.clearLayers();
-      if (!Array.isArray(monsters)) return;
-      monsters.forEach(mon => {
-        const x = mon.x, y = mon.y;
-        if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-        try {
-          const lat = (y + 0.5) * TILE_SIZE;
-          const lng = (x + 0.5) * TILE_SIZE;
-          const iconUrl = iconForMonster(mon);
-          const title = mon.name || mon.slug || 'Monster';
-          // Include an onerror handler that swaps to a default inline SVG if the specific asset is missing.
-          const fallbackSVG = encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32" fill="#ff3fa4"><circle cx="12" cy="12" r="10" fill="#222" stroke="#ff3fa4" stroke-width="2"/><path d="M8 10h2v2H8zm6 0h2v2h-2zM9 15c1 .8 2.1 1.2 3 1.2s2-.4 3-1.2" stroke="#ff3fa4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>');
-          const html = `<div class="monster-icon" title="${title}"><img src="${iconUrl}" alt="${title}" class="monster-img" onerror="this.onerror=null;this.src='data:image/svg+xml,${fallbackSVG}';" /></div>`;
-          const divIcon = L.divIcon({ html, className: 'monster-icon-wrapper', iconSize: [32, 32] });
-          const marker = L.marker([lat, lng], { icon: divIcon, interactive: false, keyboard: false });
-          layer.addLayer(marker);
-        } catch (e) { /* ignore per-monster failures */ }
-      });
+      // Canvas version - pass monster entities to DungeonCanvas
+      if (!window.dungeonCanvas) return;
+      if (!Array.isArray(monsters)) {
+        window.dungeonCanvas.setEntities([]);
+        return;
+      }
+
+      // Store monsters temporarily for when treasures are rendered
+      window._currentMonsters = monsters.map(mon => ({
+        x: mon.x,
+        y: mon.y,
+        type: 'monster',
+        name: mon.name || mon.slug || 'Monster',
+        icon: iconForMonster(mon)
+      })).filter(e => Number.isFinite(e.x) && Number.isFinite(e.y));
+
+      // Combine with any existing treasures
+      const treasures = window._currentTreasures || [];
+      window.dungeonCanvas.setEntities([...window._currentMonsters, ...treasures]);
+    }
+
+    function renderTreasures(treasures) {
+      // Canvas version - treasures are rendered as entities
+      if (!window.dungeonCanvas) return;
+      if (!Array.isArray(treasures)) return;
+
+      window._currentTreasures = treasures.map(t => ({
+        x: t.x,
+        y: t.y,
+        type: 'treasure',
+        name: t.name || 'Treasure',
+        icon: '/static/iconography/locked-chest.svg'
+      })).filter(e => Number.isFinite(e.x) && Number.isFinite(e.y));
+
+      // Combine with any existing monsters
+      const monsters = window._currentMonsters || [];
+      window.dungeonCanvas.setEntities([...monsters, ...window._currentTreasures]);
     }
 
     function refreshEntities(force = false) {
@@ -347,36 +422,35 @@
 
     // ------------------------------------------------------------
     // Notice markers (spots with recalled / potential loot/search)
-    // Lightweight recreation after refactor that removed originals.
+    // Canvas version - delegates to DungeonCanvas.setNotices()
     // ------------------------------------------------------------
     const noticeMarkers = window.noticeMarkers || (window.noticeMarkers = {});
     function keyFor(x, y) { return x + ',' + y; }
     function addNoticeMarker(x, y) {
       try {
-        if (!window.dungeonMap) return;
         const k = keyFor(x, y);
         if (noticeMarkers[k]) return; // already present
-        const lat = (y + 0.5) * TILE_SIZE;
-        const lng = (x + 0.5) * TILE_SIZE;
-        const marker = L.circleMarker([lat, lng], {
-          radius: 6,
-          color: '#ffc107',
-          weight: 2,
-          fillColor: '#ffc107',
-          fillOpacity: 0.9
-        }).addTo(window.dungeonMap);
-        noticeMarkers[k] = { marker, x, y };
+        noticeMarkers[k] = { x, y };
+        updateCanvasNotices();
       } catch (e) { /* noop */ }
     }
     function removeNoticeMarker(x, y) {
       try {
         const k = keyFor(x, y);
-        const entry = noticeMarkers[k];
-        if (entry) {
-          try { window.dungeonMap && window.dungeonMap.removeLayer(entry.marker); } catch (e) { }
+        if (noticeMarkers[k]) {
           delete noticeMarkers[k];
+          updateCanvasNotices();
         }
       } catch (e) { /* noop */ }
+    }
+    function updateCanvasNotices() {
+      if (!window.dungeonCanvas) return;
+      const notices = Object.values(noticeMarkers).map(n => ({
+        x: n.x,
+        y: n.y,
+        type: 'notice'
+      }));
+      window.dungeonCanvas.setNotices(notices);
     }
     function refreshNoticeMarkers() {
       // Optional server-driven refresh; if endpoint missing, fails silently.
@@ -484,6 +558,16 @@
             try { updateLastRollUI(data.last_roll); } catch (e) { }
           }
         }
+
+        // Handle revealed tiles (fog of war updates)
+        if (data && Array.isArray(data.revealed_tiles) && data.revealed_tiles.length > 0) {
+          try {
+            renderRevealedTiles(data.revealed_tiles);
+          } catch (e) {
+            console.error('[dungeon] Error rendering revealed tiles:', e);
+          }
+        }
+
         let combatId = null;
         if (data) {
           if (data.encounter && data.encounter.combat_id) combatId = data.encounter.combat_id;
@@ -495,18 +579,13 @@
           return true; // indicates early exit
         }
         if (data && data.pos) {
-          const pxY = (data.pos[1] + 0.5) * TILE_SIZE;
-          const pxX = (data.pos[0] + 0.5) * TILE_SIZE;
-          if (window.dungeonPlayerMarker && window.dungeonMap && Number.isFinite(pxY) && Number.isFinite(pxX)) {
-            window.dungeonPlayerMarker.setLatLng([pxY, pxX]);
-            window.dungeonMap.panTo([pxY, pxX], { animate: true });
+          // Canvas version - update player position
+          if (window.dungeonCanvas && Array.isArray(data.pos)) {
             window.currentPos = data.pos;
-            if (Array.isArray(data.pos)) {
-              try { updateDungeonVisibility(data.pos[0], data.pos[1]); } catch (e) { }
-            }
+            window.dungeonCanvas.updatePlayerPosition(data.pos[0], data.pos[1]);
+
             if (data.noticed_loot) {
               addNoticeMarker(data.pos[0], data.pos[1]);
-              try { showSearchPromptBanner(); } catch (e) { }
             }
             updateInlineSearchButtons();
             refreshEntities();
@@ -804,121 +883,25 @@
 
     // Initial exits fetched after map load (see loadDungeonMap)
 
+    // Function to render newly revealed tiles dynamically
+    // Canvas version - adds new tiles to the grid and re-renders
+    function renderRevealedTiles(tiles) {
+      if (!window.dungeonCanvas || !tiles || tiles.length === 0) return;
+      window.dungeonCanvas.addRevealedTiles(tiles);
+    }
+
     // Applies visibility rules to all stored tile layers based on player (px,py).
+    // Canvas version - delegates to DungeonCanvas.updatePlayerPosition()
     function updateDungeonVisibility(px, py) {
-      if (!window.dungeonTileLayers) return;
-      if (!window.dungeonSeenTiles) window.dungeonSeenTiles = new Set();
-      if (!window.dungeonTileRenderState) window.dungeonTileRenderState = {}; // per-tile cached style classification
-      const seen = window.dungeonSeenTiles;
-      const renderState = window.dungeonTileRenderState;
-      const layers = window.dungeonTileLayers;
-      let seenChanged = false;
-      for (const key in layers) {
-        const layer = layers[key];
-        if (!layer || !layer._dungeon) continue;
-        const dx = layer._dungeon.x - px;
-        const dy = layer._dungeon.y - py;
-        const dist = Math.sqrt(dx * dx + dy * dy); // Euclidean for circular falloff
-
-        if (dist <= INNER_VIS_RADIUS) {
-          // Mark as seen
-          if (!seen.has(key)) { seen.add(key); seenChanged = true; }
-          const prev = renderState[key];
-          if (!prev || prev.mode !== 'visible') {
-            layer.setStyle({
-              fillOpacity: 0.72,
-              weight: 1,
-              color: '#2e2e2e',
-              stroke: true,
-              fillColor: layer._dungeon.color
-            });
-            renderState[key] = { mode: 'visible' };
-          }
-          if (layer._dungeon.tooltip && !layer._dungeon.tooltipBound) {
-            layer.bindTooltip(layer._dungeon.tooltip, { permanent: false, direction: 'top', offset: [0, -8] });
-            layer._dungeon.tooltipBound = true;
-          }
-          continue;
-        }
-
-        const span = FOG_FULL_RADIUS - INNER_VIS_RADIUS;
-        if (dist <= FOG_FULL_RADIUS) {
-          const rel = span > 0 ? (dist - INNER_VIS_RADIUS) / span : 1;
-          let fogOpacity = MIN_FOG_OPACITY + (MAX_FOG_OPACITY - MIN_FOG_OPACITY) * rel;
-          // Noise (deterministic) per tile + mild radial attenuation (less noise near center)
-          const ix = layer._dungeon.x;
-          const iy = layer._dungeon.y;
-          let h = (ix * 73856093) ^ (iy * 19349663) ^ (FOG_FULL_RADIUS * 83492791);
-          h = (h >>> 0) % 104729;
-          const noise = ((h / 104729) - 0.5) * 2; // [-1,1]
-          const attenuation = 1 - Math.max(0, (INNER_VIS_RADIUS - dist) / INNER_VIS_RADIUS);
-          fogOpacity += noise * FOG_NOISE_AMPLITUDE * attenuation;
-          if (fogOpacity < MIN_FOG_OPACITY) fogOpacity = MIN_FOG_OPACITY;
-          else if (fogOpacity > MAX_FOG_OPACITY) fogOpacity = MAX_FOG_OPACITY;
-          // If previously seen, blend toward memory dim color slightly
-          const wasSeen = seen.has(key);
-          if (wasSeen) {
-            fogOpacity = Math.min(fogOpacity, MEMORY_DIM_OPACITY + 0.15); // memory slightly lighter than fresh fog
-          }
-          const roundedOpacity = Math.round(fogOpacity * 100) / 100; // reduce churn from tiny float deltas
-          const prev = renderState[key];
-          if (!prev || prev.mode !== 'fog' || prev.o !== roundedOpacity) {
-            layer.setStyle({
-              fillOpacity: fogOpacity,
-              weight: 0,
-              stroke: false,
-              fillColor: '#000000',
-              color: '#000000'
-            });
-            renderState[key] = { mode: 'fog', o: roundedOpacity };
-          }
-          if (layer._dungeon.tooltipBound) {
-            try { layer.unbindTooltip(); } catch (e) { }
-            layer._dungeon.tooltipBound = false;
-          }
-          // Mark tiles moderately close (inside fog region) as seen so they persist when you move away
-          if (dist <= INNER_VIS_RADIUS + 2 && !seen.has(key)) { seen.add(key); seenChanged = true; }
-          continue;
-        }
-
-        // Outside fog full radius. If seen before, render memory; else dark.
-        const wasSeen = seen.has(key);
-        if (wasSeen) {
-          const prev = renderState[key];
-          if (!prev || prev.mode !== 'memory') {
-            layer.setStyle({
-              fillOpacity: MEMORY_DIM_OPACITY,
-              weight: MEMORY_STROKE ? 0.3 : 0,
-              stroke: MEMORY_STROKE,
-              color: '#0a0a0a',
-              fillColor: MEMORY_FILL_COLOR
-            });
-            renderState[key] = { mode: 'memory' };
-          }
-        } else {
-          const prev = renderState[key];
-          if (!prev || prev.mode !== 'dark') {
-            layer.setStyle({
-              fillOpacity: 0.94,
-              weight: 0,
-              stroke: false,
-              fillColor: '#000000',
-              color: '#000000'
-            });
-            renderState[key] = { mode: 'dark' };
-          }
-        }
-        if (layer._dungeon.tooltipBound) {
-          try { layer.unbindTooltip(); } catch (e) { }
-          layer._dungeon.tooltipBound = false;
-        }
+      if (window.dungeonCanvas) {
+        window.dungeonCanvas.updatePlayerPosition(px, py);
       }
-      if (seenChanged) saveSeenTilesThrottled(seen);
     }
 
     function loadDungeonMap() {
-      const mapDiv = document.getElementById('dungeon-map');
-      if (!mapDiv) return;
+      const canvas = document.getElementById('dungeon-map');
+      if (!canvas) return;
+
       fetch('/api/dungeon/map')
         .then(r => r.json())
         .then(data => {
@@ -926,194 +909,55 @@
             const badge = document.getElementById('dungeon-seed-badge');
             if (badge) badge.textContent = 'seed: ' + data.seed;
             window.currentDungeonSeed = data.seed;
-            // Load persisted seen tiles now that seed known
-            window.dungeonSeenTiles = loadSeenTilesFromStorage();
-          }
-          const grid = data.grid; // row-major: grid[y][x]
-          const height = data.height;
-          const width = data.width;
-          const validHeight = Number.isFinite(height) && height > 0;
-          const validWidth = Number.isFinite(width) && width > 0;
-          if (window.dungeonMap) {
-            window.dungeonMap.remove();
-          }
-          const map = L.map('dungeon-map', {
-            crs: L.CRS.Simple,
-            // Reduced zoom span: drop extreme most-zoomed-out (-2) and most-zoomed-in (+2) levels.
-            // New allowed discrete zoom levels: -1, 0, 1
-            minZoom: -1,
-            maxZoom: 1,
-            zoomSnap: 1,
-            zoomDelta: 1,
-            zoomControl: true,
-            attributionControl: false
-          });
-          window.dungeonMap = map;
-
-          let playerPos = null;
-          if (Array.isArray(data.player_pos) && data.player_pos.length >= 2 &&
-            Number.isFinite(data.player_pos[0]) && Number.isFinite(data.player_pos[1])) {
-            playerPos = data.player_pos;
           }
 
-          if (playerPos) {
-            const centerY = (playerPos[1] + 0.5) * TILE_SIZE; // y first
-            const centerX = (playerPos[0] + 0.5) * TILE_SIZE; // x second
-            if (Number.isFinite(centerY) && Number.isFinite(centerX)) {
-              map.setView([centerY, centerX], 0);
-            } else if (validHeight && validWidth) {
-              map.setView([(height * TILE_SIZE) / 2, (width * TILE_SIZE) / 2], 0);
-            } else {
-              map.setView([0, 0], 0);
-            }
-          } else if (validHeight && validWidth) {
-            map.setView([(height * TILE_SIZE) / 2, (width * TILE_SIZE) / 2], 0);
+          // Initialize Canvas-based dungeon renderer
+          if (window.dungeonCanvas) {
+            // Already exists, reload map data
+            window.dungeonCanvas.loadMap(data);
           } else {
-            map.setView([0, 0], 0);
-          }
-
-          if (validHeight && validWidth) {
-            map.setMaxBounds([[0, 0], [height * TILE_SIZE, width * TILE_SIZE]]);
+            window.dungeonCanvas = new DungeonCanvas('dungeon-map', {
+              tileSize: TILE_SIZE,
+              innerVisRadius: activeFogConfig.innerRadius,
+              outerVisRadius: activeFogConfig.fullRadius
+            });
+            window.dungeonCanvas.loadMap(data);
           }
 
           // Load persisted notices and render markers
           refreshNoticeMarkers();
 
-          // Render monster entities (patrolling / ambient) if provided
-          // Monster render handled separately via refreshEntities path; keep minimal here
-
-          for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-              const cell = grid[y][x]; // y row, x column
-              let tooltip = `(${x + 1},${y + 1}): `;
-              if (typeof cell === 'object' && cell !== null && cell.cell_type) {
-                tooltip += cell.cell_type;
-                if (cell.features && cell.features.length > 0) {
-                  tooltip += ' [' + cell.features.join(', ') + ']';
-                }
-              } else {
-                tooltip += cell;
-              }
-              // Dark mode palette
-              // Original colors replaced with deeper, desaturated tones for reduced glare
-              // Brighter & slightly more saturated palette (v2)
-              const color = (typeof cell === 'object' && cell !== null && cell.cell_type) ?
-                (cell.cell_type === 'room' ? '#256535' :          // brighter moss green
-                  cell.cell_type === 'tunnel' ? '#155067' :        // richer teal/blue
-                    cell.cell_type === 'wall' ? '#523727' :          // warmer brown
-                      cell.cell_type === 'door' ? '#551455' :          // more vivid purple
-                        cell.cell_type === 'cave' ? '#121212' : '#232323') :
-                (cell === 'room' ? '#256535' :
-                  cell === 'tunnel' ? '#155067' :
-                    cell === 'wall' ? '#523727' :
-                      cell === 'door' ? '#551455' :
-                        cell === 'cave' ? '#121212' : '#232323');
-              const rect = L.rectangle(
-                [[y * TILE_SIZE, x * TILE_SIZE], [(y + 1) * TILE_SIZE, (x + 1) * TILE_SIZE]],
-                { color: '#303030', weight: 1, fillColor: color, fillOpacity: 0.85, interactive: true }
-              ).addTo(map);
-              rect.setStyle({ pane: 'tilePane', stroke: true, weight: 1, fillOpacity: 0.7 });
-              rect._path.setAttribute('width', TILE_SIZE);
-              rect._path.setAttribute('height', TILE_SIZE);
-              // Store tile layer reference for fog-of-war updates
-              if (!window.dungeonTileLayers) window.dungeonTileLayers = {};
-              rect._dungeon = { x, y, color, tooltip, tooltipBound: false };
-              window.dungeonTileLayers[`${x},${y}`] = rect;
-            }
-          }
-
-          // After all tiles added, apply initial visibility based on player position
-          if (playerPos) {
-            try { updateDungeonVisibility(playerPos[0], playerPos[1]); } catch (e) { /* noop */ }
-          }
-
-          // Legacy merge of server-side seen tiles removed - fog-of-war now client only.
-
-          // --------------------------------------------------------
           // Developer console helpers (namespaced under window.dungeonDev)
-          // --------------------------------------------------------
           if (!window.dungeonDev) window.dungeonDev = {};
           window.dungeonDev.coverage = function () {
-            if (!window.dungeonTileLayers || !window.dungeonSeenTiles) return 0;
-            const total = Object.keys(window.dungeonTileLayers).length;
-            const seen = window.dungeonSeenTiles.size;
-            const pct = total ? (seen / total * 100) : 0;
-            console.log(`[dungeonDev] Seen tiles: ${seen}/${total} (${pct.toFixed(2)}%)`);
-            return { seen, total, pct };
+            if (!window.dungeonCanvas) return 0;
+            const stats = window.dungeonCanvas.getCoverage();
+            console.log(`[dungeonDev] Seen tiles: ${stats.seen}/${stats.total} (${stats.percent.toFixed(2)}%)`);
+            return stats;
           };
           window.dungeonDev.clearSeen = function () {
-            if (window.dungeonSeenTiles) {
-              window.dungeonSeenTiles.clear();
-              saveSeenTiles(window.dungeonSeenTiles);
-              updateDungeonVisibility(playerPos ? playerPos[0] : 0, playerPos ? playerPos[1] : 0);
+            if (window.dungeonCanvas) {
+              window.dungeonCanvas.clearSeenTiles();
               console.log('[dungeonDev] Cleared seen tiles');
             }
           };
           window.dungeonDev.getFogConfig = function () {
-            const cfg = currentFogConfig();
-            console.log('[dungeonDev] Fog config', cfg);
-            return cfg;
+            return currentFogConfig();
           };
-          window.dungeonDev.saveFogConfig = function (partial) {
-            if (!partial || typeof partial !== 'object') { console.warn('[dungeonDev] supply an object with fog keys'); return; }
-            const merged = { ...currentFogConfig(), ...partial };
-            saveFogConfig(merged);
-            console.log('[dungeonDev] Persisted fog config (note: runtime constants not hot-applied yet).', merged);
-            return merged;
+          window.dungeonDev.setFogConfig = function (cfg) {
+            applyFogConfig(cfg);
+            console.log('[dungeonDev] Applied fog config:', currentFogConfig());
+          };
+          window.dungeonDev.resetFogConfig = function () {
+            applyFogConfig(DEFAULT_FOG_CONFIG);
+            console.log('[dungeonDev] Reset fog config to defaults:', currentFogConfig());
           };
           window.dungeonDev.dump = function () {
             return {
               coverage: window.dungeonDev.coverage(),
-              fog: currentFogConfig(),
               seed: window.currentDungeonSeed
             };
           };
-          // Removed server sync of seen tiles (deprecated /api/dungeon/seen endpoints).
-
-          if (playerPos) {
-            if (window.dungeonPlayerMarker) {
-              window.dungeonMap.removeLayer(window.dungeonPlayerMarker);
-            }
-            // Use original sword/shield icon again; scale with zoom via CSS transform.
-            const baseSize = 40; // px at zoom 0 (matches CSS width/height)
-            const wrapper = document.createElement('div');
-            wrapper.className = 'player-marker-wrapper';
-            wrapper.innerHTML = `<img src="/static/iconography/axe-sword.svg" alt="Player" class="player-marker-img" />`;
-            const playerDivIcon = L.divIcon({
-              html: wrapper,
-              className: 'player-marker-div', // keep Leaflet from adding default img styles
-              iconSize: [baseSize, baseSize],
-              iconAnchor: [baseSize / 2, baseSize / 2]
-            });
-            window.dungeonPlayerMarker = L.marker([
-              (playerPos[1] + 0.5) * TILE_SIZE, // y
-              (playerPos[0] + 0.5) * TILE_SIZE  // x
-            ], { icon: playerDivIcon, interactive: false }).addTo(map);
-
-            function scalePlayerMarker() {
-              const z = map.getZoom(); // expected integer in [-1,1]
-              // Exponential scaling feels more natural than linear at extremes.
-              // scale = 1.2^z, clamped to [0.45, 2.0]
-              let scale = Math.pow(1.2, z);
-              if (scale < 0.45) scale = 0.45; else if (scale > 2.0) scale = 2.0;
-              const imgEl = wrapper.querySelector('.player-marker-img');
-              if (imgEl) {
-                imgEl.style.transform = `translate(-50%, -50%) scale(${scale})`;
-              }
-            }
-            map.on('zoomend', scalePlayerMarker);
-            // initial
-            setTimeout(scalePlayerMarker, 0);
-          }
-
-          // Defer invalidateSize to allow layout (fluid width) to settle
-          setTimeout(() => { try { map.invalidateSize(false); } catch (e) { } }, 50);
-          // Recalculate on window resize for responsive horizontal expansion
-          window.addEventListener('resize', () => {
-            if (window.dungeonMap) {
-              try { window.dungeonMap.invalidateSize(false); } catch (e) { }
-            }
-          }, { passive: true });
 
           // After map fully initialized, fetch current cell description & exits via state endpoint
           fetch('/api/dungeon/state')
@@ -1128,10 +972,6 @@
               if (data && Array.isArray(data.exits)) {
                 availableExits = data.exits.map(e => e.toLowerCase());
                 renderExitButtons();
-              }
-              // If position returned differs (e.g., server corrected), update fog
-              if (data && Array.isArray(data.pos) && data.pos.length >= 2) {
-                try { updateDungeonVisibility(data.pos[0], data.pos[1]); } catch (e) { }
               }
             })
             .catch(err => console.error('[dungeon] state error', err));
@@ -1163,5 +1003,103 @@
     // Seed controls removed from adventure page; centralized on dashboard.
 
     loadDungeonMap();
+
+    // Wire up Canvas zoom controls
+    (function setupZoomControls() {
+      const btnZoomIn = document.getElementById('btn-zoom-in');
+      const btnZoomOut = document.getElementById('btn-zoom-out');
+      const btnZoomReset = document.getElementById('btn-zoom-reset');
+
+      if (btnZoomIn) {
+        btnZoomIn.addEventListener('click', () => {
+          if (window.dungeonCanvas) {
+            window.dungeonCanvas.zoomIn();
+          }
+        });
+      }
+
+      if (btnZoomOut) {
+        btnZoomOut.addEventListener('click', () => {
+          if (window.dungeonCanvas) {
+            window.dungeonCanvas.zoomOut();
+          }
+        });
+      }
+
+      if (btnZoomReset) {
+        btnZoomReset.addEventListener('click', () => {
+          if (window.dungeonCanvas) {
+            window.dungeonCanvas.centerOnPlayer();
+          }
+        });
+      }
+    })();
   });
+
+  // Expose search functions globally for static Search button
+  window.canSearchHere = function () {
+    if (!window.currentPos) return false;
+    if (!window.noticeMarkers) return false;
+    const k = window.currentPos[0] + ',' + window.currentPos[1];
+    return !!window.noticeMarkers[k];
+  };
+
+  window.doSearchTile = function (invokingBtn) {
+    console.debug('[search] global doSearchTile called');
+    if (!window.canSearchHere()) {
+      console.debug('[search] blocked: no notice marker at current pos');
+      if (invokingBtn) {
+        invokingBtn.disabled = true;
+        setTimeout(() => { invokingBtn.disabled = false; }, 1000);
+      }
+      return;
+    }
+    if (invokingBtn) invokingBtn.disabled = true;
+
+    fetch('/api/dungeon/search_tile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    })
+      .then(r => r.json())
+      .then(data => {
+        console.debug('[search] response', data);
+        if (data && typeof data.revealed_caches === 'number' && data.revealed_caches > 0) {
+          if (typeof window.refreshEntities === 'function') {
+            window.refreshEntities();
+          }
+        }
+        if (data && typeof data.game_tick === 'number' && window.__updateGameTickHUD) {
+          window.__updateGameTickHUD(data.game_tick);
+        }
+      })
+      .catch(e => console.error('[search] error', e))
+      .finally(() => {
+        if (invokingBtn) invokingBtn.disabled = false;
+      });
+  };
+
+  // Debug helper: Clear perception markers (call from browser console)
+  window.clearPerceptionMarkers = function () {
+    return fetch('/api/test/clear_perception_markers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    })
+      .then(r => r.json())
+      .then(data => {
+        console.log('[Perception] Markers cleared:', data);
+        // Refresh map to update markers
+        if (typeof loadDungeonMap === 'function') {
+          loadDungeonMap();
+        }
+        // Refresh entities to remove old treasure markers
+        if (typeof refreshEntities === 'function') {
+          refreshEntities();
+        }
+        return data;
+      })
+      .catch(err => {
+        console.error('[Perception] Failed to clear markers:', err);
+        throw err;
+      });
+  };
 })();

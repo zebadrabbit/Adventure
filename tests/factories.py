@@ -45,10 +45,34 @@ BASE_STATS = {
         "mana": 12,
         "class": "mage",
     },
+    "barbarian": {
+        "str": 16,
+        "dex": 10,
+        "int": 6,
+        "wis": 8,
+        "con": 14,
+        "cha": 6,
+        "hp": 18,
+        "mana": 0,
+        "class": "barbarian",
+    },
+    "paladin": {
+        "str": 14,
+        "dex": 8,
+        "int": 8,
+        "wis": 10,
+        "con": 12,
+        "cha": 12,
+        "hp": 14,
+        "mana": 8,
+        "class": "paladin",
+    },
 }
 STARTER_ITEMS = {
     "fighter": ["short-sword", "wooden-shield"],
     "mage": ["oak-staff", "potion-mana"],
+    "barbarian": ["iron-axe", "potion-healing"],
+    "paladin": ["short-sword", "wooden-shield"],
 }
 
 

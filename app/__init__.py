@@ -126,17 +126,24 @@ from app.services import rate_limiter as _rl  # noqa: E402
 # Blueprint imports intentionally placed after app/db initialization (runtime dependency ordering).
 from app.routes import auth, main  # noqa: E402  # isort: skip
 from app.routes.admin import bp_admin  # noqa: E402  # isort: skip
+from app.routes.admin_new import bp_admin_new  # noqa: E402  # isort: skip
 from app.routes.combat_api import bp_combat  # new combat blueprint  # noqa: E402  # isort: skip
 from app.routes.config_api import bp_config  # noqa: E402  # isort: skip
 from app.routes.dashboard import bp_dashboard  # noqa: E402  # isort: skip
 from app.routes.dungeon_api import bp_dungeon  # noqa: E402  # isort: skip
 from app.routes.inventory_api import bp_inventory  # noqa: E402  # isort: skip
 from app.routes.loot_api import bp_loot  # noqa: E402  # isort: skip
+from app.routes.quest_api import bp_quest  # noqa: E402  # isort: skip
+from app.routes.trading_api import bp_trading  # noqa: E402  # isort: skip
+from app.routes.party_api import bp_party  # noqa: E402  # isort: skip
+from app.routes.skill_api import bp_skill  # noqa: E402  # isort: skip
+from app.routes.achievement_api import bp_achievement  # noqa: E402  # isort: skip
 from app.routes.seed_api import bp_seed  # noqa: E402  # isort: skip
 from app.routes.user_prefs import bp_user_prefs  # noqa: E402  # isort: skip
 from app.routes.client_log_api import bp_client_log  # noqa: E402  # isort: skip
 from app.routes.account import bp_account  # noqa: E402  # isort: skip
 from app.routes.theme_api import bp_theme  # noqa: E402  # isort: skip
+from app.routes.extraction_api import bp_extraction  # noqa: E402  # isort: skip
 
 app.register_blueprint(auth.bp)
 app.register_blueprint(main.bp)
@@ -145,13 +152,20 @@ app.register_blueprint(bp_dungeon)
 app.register_blueprint(bp_seed)
 app.register_blueprint(bp_config)
 app.register_blueprint(bp_loot)
+app.register_blueprint(bp_quest)
+app.register_blueprint(bp_trading)
+app.register_blueprint(bp_party)
+app.register_blueprint(bp_skill)
+app.register_blueprint(bp_achievement)
 app.register_blueprint(bp_inventory)
 app.register_blueprint(bp_user_prefs)
 app.register_blueprint(bp_admin)
+app.register_blueprint(bp_admin_new)  # New modular admin panel
 app.register_blueprint(bp_combat)
 app.register_blueprint(bp_client_log)
 app.register_blueprint(bp_account)
 app.register_blueprint(bp_theme)
+app.register_blueprint(bp_extraction)
 
 _DEFAULT_LIMIT = 120  # requests
 _DEFAULT_WINDOW = 60  # seconds
@@ -215,21 +229,14 @@ def _apply_rate_limit():  # pragma: no cover - integration side-effect
 
 
 # Import websocket handlers so their event decorators register with Socket.IO (side-effect)
+# Cache-busting asset helper: generates a url_for static path with ?v=<mtime>
+from flask import url_for  # noqa: E402
+
 from app.websockets import (
     combat as _ws_combat,  # noqa: F401,E402  # registers /adventure namespace
 )
 from app.websockets import game as _ws_game  # noqa: F401,E402
 from app.websockets import lobby as _ws_lobby  # noqa: F401,E402
-
-# Route map debug output (development aid). Suppress by either:
-#   1. Setting env var ADVENTURE_SUPPRESS_ROUTE_MAP=1
-#   2. Setting app.config['SUPPRESS_ROUTE_MAP']=True (e.g., in tests or after create_app())
-if not (os.getenv("ADVENTURE_SUPPRESS_ROUTE_MAP") in ("1", "true", "yes") or app.config.get("SUPPRESS_ROUTE_MAP")):
-    print("Registered routes:")
-    print(app.url_map)
-
-# Cache-busting asset helper: generates a url_for static path with ?v=<mtime>
-from flask import url_for  # noqa: E402
 
 
 def asset_url(filename: str) -> str:

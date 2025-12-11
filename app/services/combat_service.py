@@ -77,11 +77,23 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
     DEX = int(base.get("dex", base.get("DEX", 10)) or 10)
     INT = int(base.get("int", base.get("INT", 10)) or 10)
     CON = int(base.get("con", base.get("CON", STR)) or STR)
+    WIS = int(base.get("wis", base.get("WIS", 10)) or 10)
+    CHA = int(base.get("cha", base.get("CHA", 10)) or 10)
     max_hp = 50 + CON * 2 + level * 5
     attack = 8 + STR // 2 + level
     defense = 5 + DEX // 3 + level // 2
     speed = 8 + DEX // 2
     mana_max = 20 + INT * 2
+
+    # Read persisted current HP, fallback to max HP (e.g., new characters)
+    hp_source = base.get("hp", max_hp)
+    try:
+        hp = int(hp_source)
+    except Exception as e:
+        logger.warning("Failed to parse hp value", char_id=char.id, hp_source=hp_source, exc_info=e)
+        hp = max_hp
+    hp = max(0, min(hp, max_hp))  # Clamp to valid range
+
     # Prefer persisted current_mana, fallback to legacy 'mana', else full
     mana_source = base.get("current_mana", base.get("mana", mana_max))
     try:
@@ -90,12 +102,43 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
         logger.warning("Failed to parse mana value", char_id=char.id, mana_source=mana_source, exc_info=e)
         mana = mana_max
     mana = max(0, min(mana, mana_max))
+
+    # Extract or infer class from stats
+    char_class = base.get("class", None)
+    if not char_class:
+        # Infer class from stat distribution (same logic as dashboard_helpers)
+        if STR >= 16 and CON >= 14 and INT <= 8:
+            char_class = "barbarian"
+        elif STR >= 14 and CHA >= 12:
+            char_class = "paladin"
+        elif DEX >= 14 and WIS >= 12:
+            char_class = "monk"
+        elif CHA >= 14 and DEX >= 12:
+            char_class = "bard"
+        elif CHA >= 14 and INT <= 12:
+            char_class = "sorcerer"
+        elif CHA >= 14 and INT >= 11:
+            char_class = "warlock"
+        elif INT >= STR and INT >= DEX and INT >= WIS:
+            char_class = "mage"
+        elif WIS >= STR and WIS >= DEX and WIS >= INT and INT >= 11:
+            char_class = "druid"
+        elif DEX >= STR and WIS >= INT:
+            char_class = "ranger"
+        elif DEX >= STR and DEX >= INT and DEX >= WIS and CHA < 14:
+            char_class = "rogue"
+        elif STR >= DEX and STR >= INT and STR >= WIS:
+            char_class = "fighter"
+        else:
+            char_class = "cleric"  # Default fallback
+
     return {
         # Controller user id retained separately from participant (character) id.
         "controller_id": char.user_id,
         "char_id": char.id,
         "name": char.name,
-        "hp": max_hp,
+        "char_class": char_class,
+        "hp": hp,
         "max_hp": max_hp,
         "attack": attack,
         "defense": defense,
@@ -103,6 +146,8 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
         "mana": mana,
         "mana_max": mana_max,
         "int_stat": INT,
+        "str_stat": STR,
+        "dex_stat": DEX,
         "resistances": {},
         "defending": False,
         "buffs": [],
@@ -117,6 +162,7 @@ def _base_player_snapshot(user_id: int) -> Dict[str, Any]:
             "controller_id": user_id,
             "char_id": -1,
             "name": f"Hero{user_id}",
+            "char_class": "fighter",
             "hp": 100,
             "max_hp": 100,
             "attack": 12,
@@ -125,6 +171,8 @@ def _base_player_snapshot(user_id: int) -> Dict[str, Any]:
             "mana": 30,
             "mana_max": 30,
             "int_stat": 10,
+            "str_stat": 10,
+            "dex_stat": 10,
             "resistances": {},
             "defending": False,
             "buffs": [],
@@ -458,6 +506,39 @@ def _check_end(session: CombatSession):
         rewards = roll_loot(monster) if monster else {}
         session.status = "complete"
         _append_log(session, f"{monster.get('name')} defeated! Loot: {rewards}", code=COMBAT_COMPLETE)
+
+        # Track boss kills and progress
+        try:
+            from app.models.dungeon_instance import DungeonInstance
+            from app.services import boss_abilities
+
+            instance_snapshot = session.dungeon_snapshot or {}
+            instance_id = instance_snapshot.get("instance_id")
+
+            if instance_id and monster:
+                instance = db.session.get(DungeonInstance, instance_id)
+                if instance:
+                    # Track based on archetype
+                    archetype = monster.get("archetype", "")
+
+                    if boss_abilities.is_boss(monster):
+                        instance.bosses_defeated += 1
+                        _append_log(session, f"Boss defeated! ({instance.bosses_defeated}/{instance.bosses_total})")
+
+                        # Check if all bosses defeated
+                        if instance.bosses_defeated >= instance.bosses_total:
+                            instance.extraction_available = True
+                            _append_log(session, "🎉 All bosses defeated! Extraction portal is now available!")
+                    elif archetype == "Elite":
+                        instance.elites_defeated += 1
+                    else:
+                        instance.monsters_defeated += 1
+
+                    db.session.add(instance)
+        except Exception as e:
+            # Log but don't fail combat completion
+            logger.warning("boss_kill_tracking_failed", error=str(e))
+
         try:
             party = json.loads(session.party_snapshot_json or "{}") or {}
             char_rows = {c.id: c for c in Character.query.filter_by(user_id=session.user_id).all()}
@@ -465,10 +546,26 @@ def _check_end(session: CombatSession):
             members = party.get("members", [])
             share = int(xp_total / len(members)) if members else xp_total
             xp_map = {}
+
+            # Helper function to calculate required XP for a level
+            def xp_for_level(level):
+                return int((level - 1) ** 2 * 100)
+
             for m in members:
                 row = char_rows.get(m.get("char_id") or m.get("id"))
                 if row:
+                    old_level = row.level or 1
                     row.xp += share
+
+                    # Check for level-up
+                    new_level = old_level
+                    while row.xp >= xp_for_level(new_level + 1):
+                        new_level += 1
+
+                    if new_level > old_level:
+                        row.level = new_level
+                        # Note: Stat point allocation happens via /api/characters/<id>/level-up endpoint
+
                     db.session.add(row)
                     try:
                         xp_map[str(m.get("char_id") or m.get("id"))] = share
@@ -651,10 +748,20 @@ def player_attack(combat_id: int, user_id: int, version: int, actor_id: Optional
         actor_id = actor.get("id")
     if actor.get("controller_id") != user_id or actor.get("id") != actor_id:
         return {"error": "not_your_turn", "state": session.to_dict()}
-    # Improved damage model with accuracy/evasion & crits (placeholder formulas)
-    monster = session.monster()
+    # Check if character is alive (dead characters cannot act)
     party = json.loads(session.party_snapshot_json or "{}") or {}
     attacker = _player_ref(party, actor_id)
+    if attacker and attacker.get("hp", 0) <= 0:
+        _append_log(session, f"{attacker.get('name', 'Character')} is unconscious and cannot act!")
+        _advance_turn(session)
+        _check_end(session)
+        db.session.commit()
+        _emit_session("combat_update", session)
+        _emit_if_completed(session)
+        session = _auto_progress_monster_after_player(session)
+        return {"ok": True, "state": session.to_dict(), "skipped": True}
+    # Improved damage model with accuracy/evasion & crits (placeholder formulas)
+    monster = session.monster()
     atk = attacker.get("attack", 12) if attacker else 12
     acc_roll = random.randint(1, 20)
     accuracy = atk + acc_roll
@@ -667,6 +774,8 @@ def player_attack(combat_id: int, user_id: int, version: int, actor_id: Optional
         hit = accuracy >= evasion
     if not hit:
         _append_log(session, f"Player misses {monster.get('name')} (roll {acc_roll})", code=PLAYER_ATTACK_MISS)
+        # Track miss for visual effects
+        session.last_damage_json = json.dumps({"to_monster": {"amount": 0, "is_miss": True, "is_critical": False}})
         _advance_turn(session)
         _check_end(session)
         db.session.commit()
@@ -686,6 +795,8 @@ def player_attack(combat_id: int, user_id: int, version: int, actor_id: Optional
         f"Player hits {monster.get('name')} for {dmg}{' (CRIT)' if crit else ''} damage (HP {session.monster_hp})",
         code=PLAYER_ATTACK_HIT,
     )
+    # Track damage for visual effects
+    session.last_damage_json = json.dumps({"to_monster": {"amount": dmg, "is_miss": False, "is_critical": crit}})
     # After action resolution move to end phase (skipping remaining intermediate phases for now)
     session.phase = "end"
     _progress_phase(session)  # this will advance turn because phase becomes end -> progress -> next
@@ -834,6 +945,69 @@ def monster_auto_turn(session: CombatSession):
         _emit_session("combat_update", session)
         _emit_if_completed(session)
         return
+    # Boss ability system - check if boss should use special ability
+    boss_action = None
+    try:
+        from app.services import boss_abilities
+
+        if boss_abilities.is_boss(monster):
+            boss_action = boss_abilities.select_boss_ability(monster, party, session.combat_turn)
+    except Exception:
+        pass
+
+    # If boss uses ability, execute it
+    if boss_action:
+        try:
+            from app.services import boss_abilities
+
+            if boss_action.get("type") == "boss_aoe":
+                logs, party = boss_abilities.execute_boss_aoe(monster, party, session)
+                for log in logs:
+                    _append_log(session, log)
+                session.party_snapshot_json = json.dumps(party)
+                session.monster_json = json.dumps(monster)
+                _advance_turn(session)
+                _check_end(session)
+                db.session.commit()
+                _emit_session("combat_update", session)
+                _emit_if_completed(session)
+                return
+            elif boss_action.get("type") == "boss_buff":
+                logs = boss_abilities.execute_boss_buff(monster)
+                for log in logs:
+                    _append_log(session, log)
+                session.monster_json = json.dumps(monster)
+                _advance_turn(session)
+                _check_end(session)
+                db.session.commit()
+                _emit_session("combat_update", session)
+                _emit_if_completed(session)
+                return
+            elif boss_action.get("type") == "boss_heal":
+                logs = boss_abilities.execute_boss_heal(monster)
+                for log in logs:
+                    _append_log(session, log)
+                session.monster_json = json.dumps(monster)
+                _advance_turn(session)
+                _check_end(session)
+                db.session.commit()
+                _emit_session("combat_update", session)
+                _emit_if_completed(session)
+                return
+            elif boss_action.get("type") == "boss_summon":
+                logs = boss_abilities.execute_boss_summon(monster, session)
+                for log in logs:
+                    _append_log(session, log)
+                session.monster_json = json.dumps(monster)
+                _advance_turn(session)
+                _check_end(session)
+                db.session.commit()
+                _emit_session("combat_update", session)
+                _emit_if_completed(session)
+                return
+        except Exception:
+            pass  # Fall through to normal AI
+
     # AI delegation (still only basic attack). If monster has flag ai_enabled use selector.
     action = {"type": "attack", "target_index": 0}
     try:
@@ -899,16 +1073,30 @@ def monster_auto_turn(session: CombatSession):
         # For now just a log entry; future: spawn ally or buff
         _append_log(session, f"{monster.get('name')} calls for help!", code=MONSTER_CALL_HELP)
     elif action.get("type") == "attack":
-        idx = int(action.get("target_index", 0))
-        if idx < 0 or idx >= len(members):
-            idx = 0
-        target = members[idx]
+        # Smart targeting: pick alive character with highest threat/lowest HP
+        alive_members = [(i, m) for i, m in enumerate(members) if m.get("hp", 0) > 0]
+        if not alive_members:
+            # No targets available, skip turn
+            _advance_turn(session)
+            _check_end(session)
+            db.session.commit()
+            _emit_session("combat_update", session)
+            _emit_if_completed(session)
+            return
+
+        # Prioritize low HP targets (more likely to finish them off)
+        alive_members.sort(key=lambda x: (x[1].get("hp", 100), x[0]))
+        idx, target = alive_members[0]
+
         m_base = monster.get("damage", 8)
         acc_roll = random.randint(1, 20)
         accuracy = m_base + acc_roll
         defender_evasion = target.get("defense", 5) + 10
         if acc_roll == 1:
             _append_log(session, f"{monster.get('name')} misses {target['name']} (roll 1)", code=MONSTER_ATTACK_MISS)
+            # Track miss for visual effects
+            damage_track = {"to_party": {target.get("char_id"): {"amount": 0, "is_miss": True, "is_critical": False}}}
+            session.last_damage_json = json.dumps(damage_track)
             try:
                 monster_data = session.monster() or {}
                 monster_data["last_turn"] = session.combat_turn
@@ -926,6 +1114,9 @@ def monster_auto_turn(session: CombatSession):
             _append_log(
                 session, f"{monster.get('name')} misses {target['name']} (roll {acc_roll})", code=MONSTER_ATTACK_MISS
             )
+            # Track miss for visual effects
+            damage_track = {"to_party": {target.get("char_id"): {"amount": 0, "is_miss": True, "is_critical": False}}}
+            session.last_damage_json = json.dumps(damage_track)
             try:
                 monster_data = session.monster() or {}
                 monster_data["last_turn"] = session.combat_turn
@@ -940,7 +1131,8 @@ def monster_auto_turn(session: CombatSession):
             return
         variance = random.randint(-m_base // 4, m_base // 4)
         dmg = max(1, m_base + variance)
-        if acc_roll == 20:
+        is_crit = acc_roll == 20
+        if is_crit:
             dmg = int(dmg * 1.5)
         resistances = target.get("resistances", {})
         dmg = int(apply_resistances(dmg, ["physical"], resistances))
@@ -950,6 +1142,9 @@ def monster_auto_turn(session: CombatSession):
         target["hp"] = max(0, target.get("hp", 0) - dmg)
         party["members"][idx] = target
         session.party_snapshot_json = json.dumps(party)
+        # Track damage for visual effects
+        damage_track = {"to_party": {target.get("char_id"): {"amount": dmg, "is_miss": False, "is_critical": is_crit}}}
+        session.last_damage_json = json.dumps(damage_track)
         _append_log(
             session,
             f"{monster.get('name')} hits {target['name']} for {dmg} damage (HP {target['hp']})",
@@ -1134,7 +1329,7 @@ def player_use_item(
 def player_cast_spell(
     combat_id: int, user_id: int, version: int, spell: str, actor_id: Optional[int] = None
 ) -> Dict[str, Any]:
-    """Cast a supported spell (Firebolt) reducing mana and dealing damage.
+    """Cast a supported spell (Firebolt, Ice Shard, Lightning) reducing mana and dealing damage.
 
     Provides miss / crit semantics parallel to physical attacks; applies
     monster resistances. Unsupported spells return ``{"error":"bad_spell"}``.
@@ -1154,13 +1349,24 @@ def player_cast_spell(
         actor_id = actor.get("id")
     if actor.get("controller_id") != user_id or actor.get("id") != actor_id:
         return {"error": "not_your_turn", "state": session.to_dict()}
-    if spell not in ("firebolt",):
+
+    # Spell configuration
+    spell_config = {
+        "firebolt": {"cost": 5, "damage_dice": (1, 8, 2), "element": "fire", "name": "Firebolt"},
+        "ice_shard": {"cost": 6, "damage_dice": (2, 6, 1), "element": "ice", "name": "Ice Shard"},
+        "lightning": {"cost": 8, "damage_dice": (1, 10, 2), "element": "lightning", "name": "Lightning Bolt"},
+    }
+
+    if spell not in spell_config:
         return {"error": "bad_spell"}
+
+    config = spell_config[spell]
     party = json.loads(session.party_snapshot_json or "{}") or {}
     caster = _player_ref(party, actor_id)
     if not caster:
         return {"error": "no_caster"}
-    cost = 5
+
+    cost = config["cost"]
     mana_available = caster.get("mana") if "mana" in caster else caster.get("current_mana", 0)
     if mana_available < cost:
         return {"error": "no_mana", "mana": mana_available}
@@ -1174,7 +1380,9 @@ def player_cast_spell(
     evasion = session.monster().get("armor", 0) + 10
     # Basic hit logic parallel to weapon attacks
     if acc_roll == 1:
-        _append_log(session, "Player's Firebolt fizzles (natural 1).", code=PLAYER_SPELL_FIZZLE)
+        _append_log(session, f"Player's {config['name']} fizzles (natural 1).", code=PLAYER_SPELL_FIZZLE)
+        # Track miss for visual effects
+        session.last_damage_json = json.dumps({"to_monster": {"amount": 0, "is_miss": True, "is_critical": False}})
         _advance_turn(session)
         _check_end(session)
         db.session.commit()
@@ -1188,7 +1396,9 @@ def player_cast_spell(
     attack_total = int_stat + acc_roll
     hit = True if crit else attack_total >= evasion
     if not hit:
-        _append_log(session, f"Player's Firebolt misses (roll {acc_roll}).", code=PLAYER_SPELL_MISS)
+        _append_log(session, f"Player's {config['name']} misses (roll {acc_roll}).", code=PLAYER_SPELL_MISS)
+        # Track miss for visual effects
+        session.last_damage_json = json.dumps({"to_monster": {"amount": 0, "is_miss": True, "is_critical": False}})
         _advance_turn(session)
         _check_end(session)
         db.session.commit()
@@ -1197,21 +1407,26 @@ def player_cast_spell(
             _emit_session("combat_end", session)
         session = _auto_progress_monster_after_player(session)
         return {"ok": True, "state": session.to_dict(), "spell": spell, "miss": True}
-    roll = random.randint(1, 8) + random.randint(1, 8)
+
+    # Calculate damage based on spell configuration
+    num_dice, die_size, num_rolls = config["damage_dice"]
+    roll = sum(random.randint(1, die_size) for _ in range(num_dice * num_rolls))
     dmg = int(roll + int_stat * 0.6)
     if crit:
         dmg = int(dmg * 1.5)
-    # Apply monster resistances if any (treat firebolt as 'fire')
+    # Apply monster resistances if any
     resistances = session.monster().get("resistances", {}) or {}
     try:
-        dmg = int(apply_resistances(dmg, ["fire"], resistances))
+        dmg = int(apply_resistances(dmg, [config["element"]], resistances))
     except Exception:
         pass
     session.monster_hp = max(0, (session.monster_hp or 0) - dmg)
     session.party_snapshot_json = json.dumps(party)
+    # Track damage for visual effects
+    session.last_damage_json = json.dumps({"to_monster": {"amount": dmg, "is_miss": False, "is_critical": crit}})
     _append_log(
         session,
-        f"Player casts Firebolt for {dmg}{' (CRIT)' if crit else ''} damage (HP {session.monster_hp})",
+        f"Player casts {config['name']} for {dmg}{' (CRIT)' if crit else ''} damage (HP {session.monster_hp})",
         code=PLAYER_SPELL_HIT,
     )
     session.phase = "end"

@@ -1,0 +1,116 @@
+{% extends "admin_base_new.html" %}
+
+{% block page_title %}Server Status{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <!-- Server Info Card -->
+    <div class="col-md-6">
+        <div class="card bg-dark text-light border-secondary h-100">
+            <div class="card-body">
+                <h5 class="card-title mb-3"><i class="bi bi-server me-2"></i>Server Information</h5>
+                <table class="table table-sm table-dark">
+                    <tbody>
+                        <tr>
+                            <td class="text-muted">Python Version</td>
+                            <td class="text-end" id="python-version">Loading...</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Flask Version</td>
+                            <td class="text-end" id="flask-version">Loading...</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Uptime</td>
+                            <td class="text-end" id="server-uptime">Loading...</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Environment</td>
+                            <td class="text-end"><span class="badge bg-warning">DEBUG</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Database Info Card -->
+    <div class="col-md-6">
+        <div class="card bg-dark text-light border-secondary h-100">
+            <div class="card-body">
+                <h5 class="card-title mb-3"><i class="bi bi-database me-2"></i>Database</h5>
+                <table class="table table-sm table-dark">
+                    <tbody>
+                        <tr>
+                            <td class="text-muted">Status</td>
+                            <td class="text-end"><span class="badge bg-success" id="db-status">Connected</span></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Total Users</td>
+                            <td class="text-end" id="total-users">{{ stats.total_users }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Total Characters</td>
+                            <td class="text-end" id="total-characters">{{ stats.total_characters }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Active Sessions</td>
+                            <td class="text-end" id="active-sessions">{{ stats.active_sessions }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Stats Card -->
+    <div class="col-12">
+        <div class="card bg-dark text-light border-secondary">
+            <div class="card-body">
+                <h5 class="card-title mb-3"><i class="bi bi-graph-up me-2"></i>Game Statistics</h5>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <div class="text-center p-3 border border-secondary rounded">
+                            <div class="display-6 text-primary">{{ stats.total_combats }}</div>
+                            <div class="text-muted small">Total Combats</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 border border-secondary rounded">
+                            <div class="display-6 text-success">{{ stats.total_items }}</div>
+                            <div class="text-muted small">Items in Catalog</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 border border-secondary rounded">
+                            <div class="display-6 text-warning">{{ stats.total_monsters }}</div>
+                            <div class="text-muted small">Monster Types</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 border border-secondary rounded">
+                            <div class="display-6 text-danger">{{ stats.dungeons_explored }}</div>
+                            <div class="text-muted small">Dungeons Explored</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Get Python and Flask versions
+        fetch('/admin/v2/api/server-info')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('python-version').textContent = data.python_version;
+                    document.getElementById('flask-version').textContent = data.flask_version;
+                    document.getElementById('server-uptime').textContent = data.uptime;
+                }
+            })
+            .catch(err => console.error('Failed to load server info:', err));
+    });
+</script>
+{% endblock %}

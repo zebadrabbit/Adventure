@@ -270,6 +270,63 @@ def list_characters_state():
     return jsonify({"characters": out, "slots": list(_SLOTS)})
 
 
+@bp_inventory.route("/api/characters/<int:cid>", methods=["GET"])
+@login_required
+def get_character_state(cid: int):
+    """Return state for a single character including equipment and bag items."""
+    ch = _char_owned(cid)
+    if not ch:
+        return jsonify({"error": "not found"}), 404
+
+    # Load inventory and gear
+    inv_objs = load_inventory(ch.items)
+    gear = _normalize_gear(_safe_json_load(ch.gear, {}))
+
+    # Gather all slugs for item lookup
+    slugs_needed = set()
+    for obj in inv_objs:
+        slugs_needed.add(obj["slug"])
+    slugs_needed.update([s for s in gear.values() if s])
+
+    items_map = {it.slug: it for it in Item.query.filter(Item.slug.in_(slugs_needed)).all()} if slugs_needed else {}
+
+    # Load and compute stats
+    base_stats = _safe_json_load(ch.stats, {})
+    str_score = int(base_stats.get("str", 10)) if isinstance(base_stats, dict) else 10
+    enc_state = encumbrance_state(str_score, inv_objs)
+    penalized_base = apply_encumbrance_penalty(base_stats, enc_state)
+    computed = _computed_stats(penalized_base, gear, items_map)
+
+    # Build bag payload
+    bag_payload = []
+    for obj in inv_objs:
+        slug = obj["slug"]
+        it = items_map.get(slug)
+        if not it:
+            continue
+        ser = _serialize_item(it)
+        ser["qty"] = obj.get("qty", 1)
+        bag_payload.append(ser)
+
+    # Build gear payload
+    gear_payload = {
+        slot: (_serialize_item(items_map[slug]) if slug in items_map else None) for slot, slug in (gear or {}).items()
+    }
+
+    return jsonify(
+        {
+            "id": ch.id,
+            "name": ch.name,
+            "level": ch.level,
+            "xp": ch.xp or 0,
+            "stats": {"base": penalized_base, "computed": computed},
+            "gear": gear_payload,
+            "bag": bag_payload,
+            "encumbrance": enc_state,
+        }
+    )
+
+
 @bp_inventory.route("/api/characters/<int:cid>/equip", methods=["POST"])
 @login_required
 def equip_item(cid: int):
@@ -392,3 +449,36 @@ def consume_item(cid: int):
     except Exception:
         pass
     return jsonify({"ok": True, "consumed": slug, "effects": {"hp": heal, "mana": mana}})
+
+
+@bp_inventory.route("/api/characters/<int:cid>/level-up", methods=["POST"])
+@login_required
+def level_up_character(cid: int):
+    """Confirm level-up and apply stat point allocations."""
+    ch = _char_owned(cid)
+    if not ch:
+        return jsonify({"error": "not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    allocations = data.get("stat_allocations", {})
+
+    # Load current stats
+    stats = _safe_json_load(ch.stats, {})
+
+    # Apply stat allocations
+    for stat_key, points in allocations.items():
+        if stat_key in ("str", "dex", "int", "con", "wis", "cha"):
+            current = stats.get(stat_key, 10)
+            stats[stat_key] = current + int(points)
+
+    # Update HP/Mana based on level (simple formula)
+    level = ch.level or 1
+    stats["max_hp"] = 20 + (level * 10)
+    stats["max_mana"] = 10 + (level * 5)
+    stats["hp"] = stats["max_hp"]  # Heal to full on level up
+    stats["mana"] = stats["max_mana"]
+
+    ch.stats = _safe_json_dump(stats)
+    db.session.commit()
+
+    return jsonify({"ok": True, "level": ch.level, "stats": stats})

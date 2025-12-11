@@ -5,10 +5,9 @@
    PURPLE GRADIENT BACKGROUNDS
    ======================================== */
 
+/* Background applied by theme system */
 .theme-purple-gradient body,
 body.purple-gradient {
-    background: linear-gradient(135deg, #4c5270 0%, #5a3a52 100%);
-    background-attachment: fixed;
     min-height: 100vh;
     color: #fff;
 }
@@ -34,7 +33,7 @@ body.purple-gradient {
 }
 
 .card-header-glass {
-    background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(217, 70, 239, 0.3));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--adv-primary) 30%, transparent), color-mix(in srgb, var(--adv-secondary) 30%, transparent));
     border-bottom: 1px solid rgba(255, 255, 255, 0.2);
     padding: 1rem 1.5rem;
     border-radius: 16px 16px 0 0;
@@ -108,13 +107,13 @@ body.purple-gradient {
     padding: 0.75rem 1.5rem;
     border-radius: 8px;
     transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+    box-shadow: 0 4px 15px color-mix(in srgb, var(--adv-primary) 40%, transparent);
 }
 
 .btn-glass:hover {
-    background: linear-gradient(135deg, #7c3aed, #c026d3);
+    background: linear-gradient(135deg, var(--adv-primary-hover), var(--adv-secondary));
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(139, 92, 246, 0.6);
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--adv-primary) 60%, transparent);
     color: #fff;
 }
 
@@ -200,12 +199,12 @@ body.purple-gradient {
 
 .character-card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 12px 40px rgba(139, 92, 246, 0.4);
-    border-color: rgba(167, 139, 250, 0.5);
+    box-shadow: 0 12px 40px color-mix(in srgb, var(--adv-primary) 40%, transparent);
+    border-color: color-mix(in srgb, var(--adv-primary) 50%, transparent);
 }
 
 .character-card .card-header {
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(139, 92, 246, 0.3));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--adv-primary) 30%, transparent), color-mix(in srgb, var(--adv-secondary) 30%, transparent));
     border-bottom: 1px solid rgba(255, 255, 255, 0.2);
     color: #fff;
     padding: 1rem;
@@ -236,8 +235,8 @@ body.purple-gradient {
 
 .character-item:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.3);
-    border-color: rgba(167, 139, 250, 0.4);
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--adv-primary) 30%, transparent);
+    border-color: color-mix(in srgb, var(--adv-primary) 40%, transparent);
 }
 
 /* ========================================
@@ -245,7 +244,7 @@ body.purple-gradient {
    ======================================== */
 
 .class-badge {
-    background: linear-gradient(135deg, rgba(139, 92, 246, 0.6), rgba(217, 70, 239, 0.6));
+    /* Base styling - specific class colors defined below */
     border: 1px solid rgba(255, 255, 255, 0.3);
     padding: 0.35rem 0.75rem;
     font-weight: 600;
@@ -255,29 +254,40 @@ body.purple-gradient {
     letter-spacing: 0.5px;
 }
 
+/* Fighter - Brown */
 .fighter-badge {
-    background: linear-gradient(135deg, rgba(239, 68, 68, 0.6), rgba(220, 38, 38, 0.6));
+    background: linear-gradient(135deg, rgba(120, 80, 40, 0.8), rgba(90, 60, 30, 0.8)) !important;
+    color: #fff !important;
 }
 
+/* Mage - Blue */
 .mage-badge {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.6), rgba(37, 99, 235, 0.6));
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.8), rgba(37, 99, 235, 0.8)) !important;
+    color: #fff !important;
 }
 
+/* Rogue - Yellow */
 .rogue-badge {
-    background: linear-gradient(135deg, rgba(234, 179, 8, 0.6), rgba(202, 138, 4, 0.6));
+    background: linear-gradient(135deg, rgba(234, 179, 8, 0.8), rgba(202, 138, 4, 0.8)) !important;
+    color: #1f2937 !important;
 }
 
+/* Cleric - White */
 .cleric-badge {
-    background: linear-gradient(135deg, rgba(236, 252, 203, 0.6), rgba(190, 242, 100, 0.6));
-    color: #1f2937;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(229, 231, 235, 0.9)) !important;
+    color: #1f2937 !important;
 }
 
+/* Ranger - Green */
 .ranger-badge {
-    background: linear-gradient(135deg, rgba(34, 197, 94, 0.6), rgba(22, 163, 74, 0.6));
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.8), rgba(22, 163, 74, 0.8)) !important;
+    color: #fff !important;
 }
 
+/* Druid - Orange */
 .druid-badge {
-    background: linear-gradient(135deg, rgba(132, 204, 22, 0.6), rgba(101, 163, 13, 0.6));
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.8), rgba(234, 88, 12, 0.8)) !important;
+    color: #fff !important;
 }
 
 /* ========================================
@@ -300,7 +310,7 @@ body.purple-gradient {
 
 .stat-grid>div:hover {
     background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(167, 139, 250, 0.3);
+    border-color: color-mix(in srgb, var(--adv-primary) 30%, transparent);
 }
 
 .stat-card {
@@ -316,7 +326,7 @@ body.purple-gradient {
 
 .stat-card:hover {
     background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(167, 139, 250, 0.3);
+    border-color: color-mix(in srgb, var(--adv-primary) 30%, transparent);
     transform: translateY(-2px);
 }
 
@@ -370,7 +380,7 @@ body.purple-gradient {
    ======================================== */
 
 .party-counter {
-    background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(217, 70, 239, 0.4));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--adv-primary) 40%, transparent), color-mix(in srgb, var(--adv-secondary) 40%, transparent));
     padding: 1rem 1.5rem;
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.3);
@@ -410,7 +420,7 @@ body.purple-gradient {
 
 #party-table .party-member-row:hover {
     background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(167, 139, 250, 0.4);
+    border-color: color-mix(in srgb, var(--adv-primary) 40%, transparent);
 }
 
 /* ========================================
@@ -443,7 +453,7 @@ body.purple-gradient {
 }
 
 .time-widget {
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(139, 92, 246, 0.3));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--adv-primary) 30%, transparent), color-mix(in srgb, var(--adv-secondary) 30%, transparent));
     border: 1px solid rgba(255, 255, 255, 0.2);
     padding: 1rem;
     border-radius: 12px;
@@ -513,11 +523,11 @@ body.purple-gradient {
 
 .list-reset li:hover {
     background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(167, 139, 250, 0.3);
+    border-color: color-mix(in srgb, var(--adv-primary) 30%, transparent);
 }
 
 .icon-glow {
-    filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.6));
+    filter: drop-shadow(0 0 4px color-mix(in srgb, var(--adv-primary) 60%, transparent));
 }
 
 /* ========================================
@@ -602,7 +612,7 @@ body.purple-gradient {
     color: #fff;
     margin-bottom: 1.5rem;
     padding-bottom: 1rem;
-    border-bottom: 2px solid rgba(139, 92, 246, 0.3);
+    border-bottom: 2px solid color-mix(in srgb, var(--adv-primary) 30%, transparent);
 }
 
 /* ========================================
@@ -684,9 +694,9 @@ hr {
 }
 
 .content-card:hover {
-    border-color: rgba(167, 139, 250, 0.4);
+    border-color: color-mix(in srgb, var(--adv-primary) 40%, transparent);
     transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(139, 92, 246, 0.3);
+    box-shadow: 0 8px 20px color-mix(in srgb, var(--adv-primary) 30%, transparent);
 }
 
 .content-icon {
@@ -722,7 +732,7 @@ hr {
 
 .user-item:hover {
     background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(167, 139, 250, 0.3);
+    border-color: color-mix(in srgb, var(--adv-primary) 30%, transparent);
 }
 
 .user-name {
@@ -785,7 +795,7 @@ hr {
 }
 
 .dropdown-item:hover {
-    background: rgba(167, 139, 250, 0.3);
+    background: color-mix(in srgb, var(--adv-primary) 30%, transparent);
     color: #fff;
 }
 
@@ -868,7 +878,7 @@ hr {
 }
 
 .footer-social a:hover {
-    background: rgba(167, 139, 250, 0.3);
-    border-color: rgba(167, 139, 250, 0.5);
+    background: color-mix(in srgb, var(--adv-primary) 30%, transparent);
+    border-color: color-mix(in srgb, var(--adv-primary) 50%, transparent);
     transform: translateY(-2px);
 }

@@ -1,64 +1,63 @@
-<h5 class="mb-3"><i class="bi bi-cloud-fog2 me-2"></i>Fog & Visibility Management</h5>
-<p class="text-muted mb-3">View and manage persisted explored tiles (server + localStorage). Use with caution.</p>
-
-<div class="row g-3 mb-3">
-    <div class="col-md-6">
-        <div class="d-flex flex-wrap gap-2">
-            <button id="fog-admin-dump" class="btn btn-sm btn-outline-info">
-                <i class="bi bi-terminal me-1"></i>Dump Coverage
-            </button>
-            <button id="fog-admin-force-sync" class="btn btn-sm btn-outline-primary">
-                <i class="bi bi-arrow-repeat me-1"></i>Force Sync
-            </button>
-            <button id="fog-admin-clear-local" class="btn btn-sm btn-outline-warning">
-                <i class="bi bi-trash me-1"></i>Clear Local
-            </button>
-            <button id="fog-admin-clear-server" class="btn btn-sm btn-outline-danger">
-                <i class="bi bi-trash3 me-1"></i>Clear Server
-            </button>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="fog-stats">
-            <div class="mb-2">
-                <span class="text-muted">Server Tiles:</span>
-                <strong id="fog-admin-server-count" class="ms-2">-</strong>
-            </div>
-            <div>
-                <span class="text-muted">Local Tiles:</span>
-                <strong id="fog-admin-local-count" class="ms-2">-</strong>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="mb-3">
-    <h6 class="mb-2">Per-Seed Metrics</h6>
-    <div class="table-responsive">
-        <table class="table table-sm table-dark align-middle" id="fog-admin-metrics-table">
-            <thead>
-                <tr>
-                    <th>Seed</th>
-                    <th>Tiles</th>
-                    <th>Saved %</th>
-                    <th>Raw Size</th>
-                    <th>Stored</th>
-                    <th>Updated</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td colspan="7" class="text-muted text-center">(loading)</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-    <div class="text-muted small" id="fog-admin-metrics-totals"></div>
-</div>
+<h5 class="mb-3"><i class="bi bi-cloud-fog2 me-2"></i>Fog & Visibility Settings</h5>
+<p class="text-muted mb-3">Configure fog-of-war rendering parameters.</p>
 
 <div class="mb-3">
     <h6 class="mb-2">Fog Configuration</h6>
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label class="form-label small">Inner Visibility Radius (tiles)</label>
+            <input type="number" id="fog-inner-radius" class="form-control form-control-sm" min="1" max="20" step="1"
+                value="8">
+            <small class="text-muted">Fully visible area around player</small>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label small">Full Fog Radius (tiles)</label>
+            <input type="number" id="fog-full-radius" class="form-control form-control-sm" min="10" max="50" step="1"
+                value="26">
+            <small class="text-muted">Where fog reaches maximum darkness</small>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label small">Min Fog Opacity</label>
+            <input type="number" id="fog-min-opacity" class="form-control form-control-sm" min="0" max="1" step="0.01"
+                value="0.18">
+            <small class="text-muted">Fog darkness at inner edge (0.0 - 1.0)</small>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label small">Max Fog Opacity</label>
+            <input type="number" id="fog-max-opacity" class="form-control form-control-sm" min="0" max="1" step="0.01"
+                value="0.92">
+            <small class="text-muted">Fog darkness at outer edge (0.0 - 1.0)</small>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label small">Fog Noise</label>
+            <input type="number" id="fog-noise" class="form-control form-control-sm" min="0" max="0.2" step="0.01"
+                value="0.08">
+            <small class="text-muted">Randomness in fog (0.0 - 0.2)</small>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label small">Memory Dimming</label>
+            <input type="number" id="fog-memory-opacity" class="form-control form-control-sm" min="0" max="1"
+                step="0.05" value="0.35">
+            <small class="text-muted">Opacity for previously seen tiles (0.0 - 1.0)</small>
+        </div>
+    </div>
+    <div class="mt-3 d-flex gap-2">
+        <button id="fog-apply-config" class="btn btn-sm btn-primary">
+            <i class="bi bi-check-circle me-1"></i>Apply Settings
+        </button>
+        <button id="fog-reset-config" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to Defaults
+        </button>
+    </div>
+    <div class="mt-2">
+        <small class="text-muted">
+            <i class="bi bi-info-circle me-1"></i>Changes apply immediately and are saved to localStorage
+        </small>
+    </div>
+</div>
+
+<div class="mb-3">
+    <h6 class="mb-2">Current Configuration (JSON)</h6>
     <pre class="fog-config-display" id="fog-admin-config">(loading...)</pre>
 </div>
 

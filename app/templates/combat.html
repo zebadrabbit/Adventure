@@ -1,36 +1,90 @@
 {% extends 'base.html' %}
 {% block title %}Combat{% endblock %}
 {% block content %}
-<div class="container mt-3 combat-container" id="combat-root" data-combat-id="{{ combat_id }}">
-    <div class="row combat-layout">
-        <!-- Left: Party panels / actions -->
-        <div class="col-xl-4 col-lg-4 col-md-4 col-sm-12" id="combat-left" role="group" aria-label="Party members">
+<div class="container-fluid combat-container mission-briefing" id="combat-root" data-combat-id="{{ combat_id }}">
+    <div class="row combat-layout g-3"> <!-- Left: Party panels / actions -->
+        <div class="col-xl-4 col-lg-4 col-md-12" id="combat-left" role="group" aria-label="Party members">
             <div id="party-panels" role="list"><!-- Party member panels injected here --></div>
+            <!-- Centralized action panel -->
+            <div id="combat-action-panel" class="tactical-panel mt-3" style="display:none;">
+                <div class="panel-header">
+                    <h5 class="mb-0">Actions</h5>
+                    <span class="small ms-2" id="active-char-name"></span>
+                </div>
+                <div class="panel-body p-2">
+                    <div class="d-grid gap-2">
+                        <div class="btn-group-combat">
+                            <button type="button" class="btn-combat btn-combat-attack" data-action="attack">
+                                <i class="bi bi-sword"></i> Attack
+                            </button>
+                            <button type="button" class="btn-combat btn-combat-defend" data-action="defend">
+                                <i class="bi bi-shield-fill"></i> Defend
+                            </button>
+                        </div>
+                        <div class="btn-group-combat">
+                            <button type="button" class="btn-combat btn-combat-spell" data-action="cast_firebolt"
+                                data-mana-cost="5">
+                                <i class="bi bi-fire"></i> Firebolt
+                            </button>
+                            <button type="button" class="btn-combat btn-combat-spell" data-action="cast_ice_shard"
+                                data-mana-cost="6">
+                                <i class="bi bi-snow"></i> Ice Shard
+                            </button>
+                        </div>
+                        <div class="btn-group-combat">
+                            <button type="button" class="btn-combat btn-combat-spell" data-action="cast_lightning"
+                                data-mana-cost="8">
+                                <i class="bi bi-lightning-charge-fill"></i> Lightning
+                            </button>
+                            <button type="button" class="btn-combat btn-combat-heal" data-action="use_potion"
+                                data-needs-potion="true">
+                                <i class="bi bi-heart-pulse-fill"></i> Potion
+                            </button>
+                        </div>
+                        <button type="button" class="btn-combat btn-combat-flee" data-action="flee">
+                            <i class="bi bi-door-open"></i> Flee
+                        </button>
+                    </div>
+                </div>
+            </div>
             <div id="combat-rewards-anchor"></div>
         </div>
         <!-- Center: Combat log -->
-        <div class="col-xl-5 col-lg-5 col-md-5 col-sm-12" id="combat-center">
-            <div class="card d-flex flex-column" aria-label="Combat log and turn feed">
-                <div class="card-header">Combat Log</div>
-                <div class="card-body p-2 d-flex flex-column combat-log-wrapper">
-                    <div id="combat-log" class="flex-grow-1 combat-log" role="log" aria-live="polite"
-                        aria-relevant="additions"></div>
+        <div class="col-xl-5 col-lg-5 col-md-12" id="combat-center">
+            <div class="tactical-panel combat-log-card" aria-label="Combat log and turn feed">
+                <div class="panel-header d-flex align-items-center gap-2">
+                    <i class="bi bi-terminal-fill"></i>
+                    <h5 class="mb-0">Combat Log</h5>
+                    <span class="badge ms-auto">LIVE</span>
+                </div>
+                <div class="panel-body p-0 combat-log-wrapper">
+                    <div id="combat-log" class="combat-log" role="log" aria-live="polite" aria-relevant="additions">
+                    </div>
                 </div>
             </div>
         </div>
         <!-- Right: Monster panel -->
-        <div class="col-xl-3 col-lg-3 col-md-3 col-sm-12" id="combat-right">
-            <div class="card monster-panel" id="monster-panel" role="group" aria-label="Monster status">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span id="monster-name">Monster</span>
-                    <span class="badge bg-secondary" id="monster-level"></span>
-                </div>
-                <div class="card-body d-flex flex-column">
-                    <div class="progress mb-2" style="height:20px;">
-                        <div class="progress-bar bg-danger" id="monster-hp-bar" role="progressbar" style="width:0%">0 /
-                            0</div>
+        <div class="col-xl-3 col-lg-3 col-md-12" id="combat-right">
+            <div class="tactical-panel monster-panel" id="monster-panel" role="group" aria-label="Monster status">
+                <div class="panel-header d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-bug-fill text-danger"></i>
+                        <h5 class="mb-0" id="monster-name">Monster</h5>
                     </div>
-                    <div id="monster-traits" class="small text-muted flex-grow-1"></div>
+                    <span class="badge" id="monster-level"></span>
+                </div>
+                <div class="panel-body d-flex flex-column gap-3">
+                    <div class="monster-hp-section">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="small"><i class="bi bi-heart-fill text-danger me-1"></i>Health</span>
+                            <span class="small fw-semibold" id="monster-hp-text">0 / 0</span>
+                        </div>
+                        <div class="progress-glass-sm">
+                            <div class="progress-bar-danger" id="monster-hp-bar" role="progressbar" style="width:0%">
+                            </div>
+                        </div>
+                    </div>
+                    <div id="monster-traits" class="monster-traits flex-grow-1"></div>
                 </div>
             </div>
         </div>
@@ -40,25 +94,35 @@
 
 {# Template for party member cards #}
 <template id="party-member-template">
-    <div class="mb-3">
-        <div class="card h-100 party-member" role="listitem">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span data-field="name">Hero</span>
-                <span class="small text-muted">
-                    HP <span data-field="hp">0</span>/<span data-field="max_hp">0</span> |
-                    MP <span data-field="mana">0</span>/<span data-field="mana_max">0</span>
-                </span>
-            </div>
-            <div class="card-body p-2">
-                <div class="d-flex flex-wrap gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-danger" data-action="attack">Attack</button>
-                    <button type="button" class="btn btn-sm btn-outline-warning" data-action="defend">Defend</button>
-                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="cast_firebolt"
-                        data-mana-cost="5">Firebolt</button>
-                    <button type="button" class="btn btn-sm btn-outline-success" data-action="use_potion"
-                        data-needs-potion="true">Potion</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="flee">Flee</button>
-                    <button type="button" class="btn btn-sm btn-outline-dark" data-action="end_turn">End Turn</button>
+    <div class="party-member-wrapper mb-3">
+        <div class="tactical-panel party-member" role="listitem" data-char-id="">
+            <div class="panel-header">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="fw-bold" data-field="name">Hero</span>
+                        <span class="badge class-badge" data-field="class-badge">Fighter</span>
+                    </div>
+                    <span class="badge badge-glass-sm" data-field="level">Lv 1</span>
+                </div>
+                <div class="stats-bars">
+                    <div class="stat-bar-group mb-1">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="stat-label"><i class="bi bi-heart-fill text-danger"></i> HP</span>
+                            <span class="stat-value" data-field="hp-text">0/0</span>
+                        </div>
+                        <div class="progress-glass-sm">
+                            <div class="progress-bar-danger" data-field="hp-bar" style="width:0%"></div>
+                        </div>
+                    </div>
+                    <div class="stat-bar-group">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="stat-label"><i class="bi bi-lightning-charge-fill text-primary"></i> MP</span>
+                            <span class="stat-value" data-field="mana-text">0/0</span>
+                        </div>
+                        <div class="progress-glass-sm">
+                            <div class="progress-bar-primary" data-field="mana-bar" style="width:0%"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -66,7 +130,15 @@
 </template>
 
 {% endblock %}
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="{{ asset_url('css/glass-theme.css') }}">
+<link rel="stylesheet" href="{{ asset_url('css/combat-effects.css') }}">
+<link rel="stylesheet" href="{{ asset_url('css/loot-distribution.css') }}">
+{% endblock %}
 {% block scripts %}
 <link rel="stylesheet" href="{{ asset_url('css/combat.css') }}">
+<script src="{{ asset_url('js/combat-effects.js') }}"></script>
 <script src="{{ asset_url('js/combat.js') }}"></script>
+<script src="{{ asset_url('js/loot-distribution.js') }}"></script>
 {% endblock %}

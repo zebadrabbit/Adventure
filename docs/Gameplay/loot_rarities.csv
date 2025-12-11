@@ -1,0 +1,7 @@
+Rarity,Color,DropWeight,MinAffixes,MaxAffixes,ValueMultiplier,LevelRequirementOffset,UpgradeChance,Notes
+Common,#bfbfbf,600,0,1,1.0,0,0.0,Baseline gear; mostly stat sticks
+Uncommon,#1eff00,300,1,2,1.5,0,0.05,Slightly better stats; intro to affixes
+Rare,#0070dd,120,2,3,2.5,2,0.08,Core progression items; multiple affixes
+Epic,#a335ee,40,3,4,4.0,4,0.1,Big power spikes; build-defining mods begin
+Legendary,#ff8000,10,3,5,7.0,6,0.12,Unique effects; enable specific playstyles
+Mythic,#e6cc80,2,4,6,12.0,8,0.15,Extremely rare; late-game chase items

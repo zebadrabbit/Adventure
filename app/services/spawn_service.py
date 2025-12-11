@@ -3,6 +3,8 @@
 Provides utilities to select an appropriate monster from `monster_catalog` for a
 given dungeon level and party size. Rarity weighting controls relative frequency.
 
+Integrates with enemy archetype system for template-based scaling and dungeon modifiers.
+
 This is intentionally stateless; future caching or region-specific weighting can
 layer on top of these primitives.
 """
@@ -144,3 +146,93 @@ def sample_distribution(level: int, samples: int = 200) -> dict:
         slug = inst["slug"]
         freq[slug] = freq.get(slug, 0) + 1
     return freq
+
+
+def choose_archetype_monster(
+    level: int,
+    archetype_name: str = None,
+    tier: int = 1,
+    affix_ids: List[str] = None,
+    party_size: int = 1,
+    rng: Optional[random.Random] = None,
+):
+    """Choose a monster using enemy archetype system with tier and affix modifiers.
+
+    Args:
+        level: Base dungeon level
+        archetype_name: Specific archetype (Trash, Elite, Boss, etc.) or None for random weighted
+        tier: Dungeon tier (1-7) - adds monster_level_modifier
+        affix_ids: List of affix_id strings to apply (e.g., ["frenzied", "volcanic"])
+        party_size: Party size for additional scaling
+        rng: Random number generator (defaults to module random)
+
+    Returns:
+        Monster dict with archetype-scaled stats and applied affixes
+    """
+    from app.models.dungeon_tier import DungeonAffix, DungeonTier
+    from app.models.enemy_archetype import EnemyArchetype
+
+    rng = rng or random
+
+    # Load tier modifiers
+    tier_row = DungeonTier.query.filter_by(tier=tier).first()
+    if not tier_row:
+        tier_row = DungeonTier.query.filter_by(tier=1).first()  # Fallback to T1
+
+    modified_level = level + (tier_row.monster_level_modifier if tier_row else 0)
+
+    # Choose archetype
+    if archetype_name:
+        archetype = EnemyArchetype.query.filter_by(archetype=archetype_name).first()
+        if not archetype:
+            raise ValueError(f"Archetype '{archetype_name}' not found")
+    else:
+        # Weighted random selection based on spawn_weight
+        archetypes = EnemyArchetype.query.all()
+        if not archetypes:
+            raise ValueError("No archetypes available in database")
+
+        weights = [a.spawn_weight for a in archetypes]
+        total_weight = sum(weights)
+        pivot = rng.random() * total_weight
+        acc = 0.0
+        archetype = archetypes[-1]  # Fallback
+        for a, w in zip(archetypes, weights):
+            acc += w
+            if pivot <= acc:
+                archetype = a
+                break
+
+    # Scale to level
+    stats = archetype.scale_to_level(modified_level)
+
+    # Apply party size scaling (simple multiplicative for now)
+    if party_size > 1:
+        stats["hp"] = int(stats["hp"] * (1 + (party_size - 1) * 0.5))
+        stats["damage"] = int(stats["damage"] * (1 + (party_size - 1) * 0.3))
+
+    # Apply affixes
+    if affix_ids:
+        for affix_id in affix_ids:
+            affix = DungeonAffix.query.filter_by(affix_id=affix_id).first()
+            if affix:
+                stats = affix.apply_to_monster_stats(stats)
+
+    # Add tier multipliers
+    if tier_row:
+        stats["xp"] = int(stats["xp"] * tier_row.xp_multiplier)
+        stats["loot_multiplier"] = stats.get("loot_multiplier", 1.0) * (1.0 + tier_row.loot_quality_bonus)
+
+    # Format as expected monster dict
+    return {
+        "slug": archetype.archetype.lower().replace(" ", "-"),
+        "name": f"{archetype.archetype} (L{modified_level})",
+        "hp": stats["hp"],
+        "damage": stats["damage"],
+        "armor_class": stats["armor_class"],
+        "xp": stats["xp"],
+        "level": modified_level,
+        "rank": archetype.rank,
+        "loot_multiplier": stats.get("loot_multiplier", 1.0),
+        "archetype": archetype.archetype,
+    }

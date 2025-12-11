@@ -121,27 +121,69 @@ def roll_perception_for_user():
 
 
 def maybe_perceive_and_mark_loot(instance, x: int, y: int) -> Tuple[bool, str, dict | None]:
+    from app.logging_utils import get_logger
+
+    logger = get_logger(__name__)
+
     seed = instance.seed
     rows = _loot_rows_at(seed, x, y)
     if not rows:
         return False, "", None
+
+    logger.info(event="perception_check", x=x, y=y, loot_count=len(rows))
+
     key = _session_noticed_key(seed)
     noticed_map = session.get(key) or {}
     ck = _coord_key(x, y)
-    if noticed_map.get(ck):
+
+    # Check if already processed (either noticed or failed)
+    status = noticed_map.get(ck)
+    if status == "noticed":
+        # Re-verify loot still exists before claiming it's been noticed
+        # (loot may have been deleted by failed perception or claimed)
+        if not rows:
+            # Clean up stale notice marker
+            noticed_map.pop(ck, None)
+            session[key] = noticed_map
+            try:
+                session.modified = True
+            except Exception:
+                pass
+            logger.info(event="perception_stale_notice_cleared", x=x, y=y)
+            return False, "", None
+        logger.info(event="perception_already_noticed", x=x, y=y)
         return True, "You recall a suspicious spot here.", None
+    elif status == "failed":
+        # Already failed perception here, don't allow retries
+        logger.info(event="perception_already_failed", x=x, y=y)
+        return False, "", None
+
+    # Single perception check based on party's highest Wisdom + buffs
     roll_info = roll_perception_for_user()
     total = roll_info["total"]
     DC = 13
+    logger.info(event="perception_roll", x=x, y=y, roll=roll_info["roll"], mod=roll_info["mod"], total=total, dc=DC)
+
     if total >= DC:
-        noticed_map[ck] = True
+        # Success - mark as noticed
+        noticed_map[ck] = "noticed"
         session[key] = noticed_map
         try:
             session.modified = True
         except Exception:
             pass
+        logger.info(event="perception_success", x=x, y=y)
         return True, "You notice a glint of something hidden. You can Search this area.", roll_info
-    # Failure path: remove scattered loot (non-container)
+
+    # Failed perception check - mark as failed and delete non-container loot immediately
+    logger.info(event="perception_failed", x=x, y=y, action="deleting_non_containers")
+    noticed_map[ck] = "failed"
+    session[key] = noticed_map
+    try:
+        session.modified = True
+    except Exception:
+        pass
+
     removed = 0
     for r in list(rows):
         item = db.session.get(Item, r.item_id)
@@ -156,6 +198,7 @@ def maybe_perceive_and_mark_loot(instance, x: int, y: int) -> Tuple[bool, str, d
             db.session.commit()
         except Exception:
             db.session.rollback()
+
     return False, "You find nothing of interest. Whatever was here is lost to the dark.", roll_info
 
 
@@ -187,6 +230,13 @@ def search_current_tile(instance):
         return False, {"found": False, "message": "You see nothing here to search."}, 403
     rows = _loot_rows_at(instance.seed, x, y)
     if not rows:
+        # Clean up stale notice marker
+        noticed_map.pop(ck, None)
+        session[key] = noticed_map
+        try:
+            session.modified = True
+        except Exception:
+            pass
         return False, {"found": False, "message": "There is nothing here."}, 404
     items = []
     for r in rows:

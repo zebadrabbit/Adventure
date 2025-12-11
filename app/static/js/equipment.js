@@ -195,7 +195,12 @@
       if (btn.__equipWired) return; btn.__equipWired = true;
       btn.addEventListener('click', async () => {
         const cid = parseInt(btn.getAttribute('data-char-id'), 10);
-        openForChar(cid);
+        // Use enhanced equipment manager if available
+        if (window.equipmentManager && btn.classList.contains('btn-equip-panel')) {
+          window.equipmentManager.openForCharacter(cid);
+        } else {
+          openForChar(cid);
+        }
       });
     });
   }

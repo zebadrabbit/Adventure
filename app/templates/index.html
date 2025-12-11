@@ -17,8 +17,22 @@
         display: block !important;
     }
 
-    header {
+    header,
+    header *,
+    .navbar,
+    .navbar-dark,
+    .bg-dark,
+    nav,
+    main,
+    footer,
+    .footer-dark {
         display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        max-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
     }
 
     .hero-section {
@@ -42,7 +56,12 @@
     }
 </style>
 {% endblock %}
+
 {% block content %}
+<!-- Content block intentionally empty - hero section renders outside main wrapper -->
+{% endblock %}
+
+{% block after_main %}
 <div class="hero-section">
     <div class="hero-gradient"></div>
     <div class="hero-grid"></div>

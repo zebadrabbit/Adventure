@@ -1,0 +1,242 @@
+{% extends "admin_base_new.html" %}
+
+{% block title %}Fog & Visibility Settings{% endblock %}
+{% block page_title %}Fog & Visibility Settings{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="config-card">
+            <h6>
+                <i class="bi bi-cloud-fog2"></i>
+                Fog-of-War Configuration
+            </h6>
+            <p class="text-muted mb-4">
+                Control how the dungeon map fog-of-war system renders. These settings affect all players globally.
+            </p>
+
+            <form id="fog-settings-form">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="inner_radius" class="form-label">
+                            Inner Visibility Radius
+                            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                                title="Tiles within this distance are fully visible (no fog)"></i>
+                        </label>
+                        <input type="number" class="form-control" id="inner_radius" name="inner_radius" min="1" max="20"
+                            step="1" value="{{ fog_config.inner_radius }}" required>
+                        <small class="text-muted">Fully visible area around player (in tiles)</small>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="full_radius" class="form-label">
+                            Full Fog Radius
+                            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                                title="Distance where fog reaches maximum darkness"></i>
+                        </label>
+                        <input type="number" class="form-control" id="full_radius" name="full_radius" min="10" max="50"
+                            step="1" value="{{ fog_config.full_radius }}" required>
+                        <small class="text-muted">Where fog reaches maximum darkness (in tiles)</small>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="min_opacity" class="form-label">
+                            Minimum Fog Opacity
+                            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                                title="Fog darkness at the inner edge (0.0 = transparent, 1.0 = opaque)"></i>
+                        </label>
+                        <input type="number" class="form-control" id="min_opacity" name="min_opacity" min="0" max="1"
+                            step="0.01" value="{{ fog_config.min_opacity }}" required>
+                        <small class="text-muted">Fog darkness at inner edge (0.0 - 1.0)</small>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="max_opacity" class="form-label">
+                            Maximum Fog Opacity
+                            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                                title="Fog darkness at the outer edge (0.0 = transparent, 1.0 = opaque)"></i>
+                        </label>
+                        <input type="number" class="form-control" id="max_opacity" name="max_opacity" min="0" max="1"
+                            step="0.01" value="{{ fog_config.max_opacity }}" required>
+                        <small class="text-muted">Fog darkness at outer edge (0.0 - 1.0)</small>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="noise" class="form-label">
+                            Fog Noise
+                            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                                title="Adds randomness/irregularity to fog rendering"></i>
+                        </label>
+                        <input type="number" class="form-control" id="noise" name="noise" min="0" max="0.2" step="0.01"
+                            value="{{ fog_config.noise }}" required>
+                        <small class="text-muted">Randomness in fog appearance (0.0 - 0.2)</small>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="memory_opacity" class="form-label">
+                            Memory Dimming
+                            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                                title="Opacity for previously explored but currently out-of-sight tiles"></i>
+                        </label>
+                        <input type="number" class="form-control" id="memory_opacity" name="memory_opacity" min="0"
+                            max="1" step="0.05" value="{{ fog_config.memory_opacity }}" required>
+                        <small class="text-muted">Dimming for explored tiles (0.0 - 1.0)</small>
+                    </div>
+                </div>
+
+                <div class="mt-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle me-1"></i> Save Settings
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="reset-defaults">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> Reset to Defaults
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="config-card">
+            <h6>
+                <i class="bi bi-code-square"></i>
+                Current Configuration
+            </h6>
+            <pre id="fog-config-preview">{{ fog_config | tojson(indent=2) }}</pre>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Initialize tooltips
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+
+        const form = document.getElementById('fog-settings-form');
+        const resetBtn = document.getElementById('reset-defaults');
+        const preview = document.getElementById('fog-config-preview');
+
+        // Update preview when inputs change
+        function updatePreview() {
+            const config = {
+                innerRadius: parseFloat(document.getElementById('inner_radius').value),
+                fullRadius: parseFloat(document.getElementById('full_radius').value),
+                minOpacity: parseFloat(document.getElementById('min_opacity').value),
+                maxOpacity: parseFloat(document.getElementById('max_opacity').value),
+                noise: parseFloat(document.getElementById('noise').value),
+                memoryOpacity: parseFloat(document.getElementById('memory_opacity').value)
+            };
+            preview.textContent = JSON.stringify(config, null, 2);
+        }
+
+        form.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', updatePreview);
+        });
+
+        // Save settings
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData);
+
+            // Convert to proper types
+            for (let key in data) {
+                data[key] = parseFloat(data[key]);
+            }
+
+            try {
+                const response = await fetch('{{ url_for("admin_new.save_fog_settings") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showToast('Fog settings saved successfully', 'success');
+
+                    // Update global fog config if available
+                    if (window.globalFogConfig) {
+                        window.globalFogConfig.set(data);
+                    }
+                } else {
+                    showToast(result.error || 'Failed to save settings', 'danger');
+                }
+            } catch (error) {
+                console.error('Save error:', error);
+                showToast('Failed to save settings', 'danger');
+            }
+        });
+
+        // Reset to defaults
+        resetBtn.addEventListener('click', async function () {
+            if (!confirm('Reset all fog settings to default values?')) return;
+
+            try {
+                const response = await fetch('{{ url_for("admin_new.reset_fog_settings") }}', {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Update form with defaults
+                    for (let key in result.config) {
+                        const input = document.querySelector(`[name="${key}"]`);
+                        if (input) input.value = result.config[key];
+                    }
+                    updatePreview();
+                    showToast('Fog settings reset to defaults', 'info');
+
+                    // Update global fog config if available
+                    if (window.globalFogConfig) {
+                        window.globalFogConfig.reset();
+                    }
+                } else {
+                    showToast(result.error || 'Failed to reset settings', 'danger');
+                }
+            } catch (error) {
+                console.error('Reset error:', error);
+                showToast('Failed to reset settings', 'danger');
+            }
+        });
+
+        // Toast notification helper
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast align-items-center text-bg-${type} border-0`;
+            toast.setAttribute('role', 'alert');
+            toast.setAttribute('aria-live', 'assertive');
+            toast.setAttribute('aria-atomic', 'true');
+
+            toast.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">${message}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        `;
+
+            let container = document.querySelector('.toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.className = 'toast-container position-fixed top-0 end-0 p-3';
+                container.style.zIndex = '9999';
+                document.body.appendChild(container);
+            }
+
+            container.appendChild(toast);
+            const bsToast = new bootstrap.Toast(toast, { autohide: true, delay: 3000 });
+            bsToast.show();
+
+            toast.addEventListener('hidden.bs.toast', () => toast.remove());
+        }
+    });
+</script>
+{% endblock %}

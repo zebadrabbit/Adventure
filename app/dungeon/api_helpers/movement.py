@@ -13,7 +13,6 @@ from __future__ import annotations
 from typing import List
 
 from app import db
-from app.dungeon import DOOR, ROOM, TUNNEL
 from app.models.dungeon_instance import DungeonInstance
 
 WALKABLE_EXTRA = {"P"}  # Teleport placeholder char
@@ -33,10 +32,10 @@ def normalize_position(dungeon, instance: DungeonInstance, map_size: int) -> tup
         except Exception:
             entrance = None
 
-    walkable_chars = {ROOM, TUNNEL, DOOR, getattr(dungeon, "TELEPORT", "P"), *WALKABLE_EXTRA}
+    unlocked_doors = instance.get_unlocked_doors()
 
     def _is_walkable(px, py):
-        return 0 <= px < map_size and 0 <= py < map_size and dungeon.grid[px][py] in walkable_chars
+        return dungeon.is_walkable(px, py, unlocked_doors)
 
     if entrance and (not _is_walkable(x, y) or (x, y, z) == (0, 0, 0)):
         x, y, z = entrance
@@ -51,14 +50,14 @@ def normalize_position(dungeon, instance: DungeonInstance, map_size: int) -> tup
 
 def attempt_move(dungeon, instance: DungeonInstance, direction: str, map_size: int) -> tuple[int, int, bool]:
     """Attempt to move in direction; returns (x,y,moved). Handles teleport pads."""
-    walkable_chars = {ROOM, TUNNEL, DOOR, getattr(dungeon, "TELEPORT", "P"), *WALKABLE_EXTRA}
+    unlocked_doors = instance.get_unlocked_doors()
     deltas = {"n": (0, 1), "s": (0, -1), "e": (1, 0), "w": (-1, 0)}
     x, y = instance.pos_x, instance.pos_y
     moved = False
     if direction in deltas:
         dx, dy = deltas[direction]
         nx, ny = x + dx, y + dy
-        if 0 <= nx < map_size and 0 <= ny < map_size and dungeon.grid[nx][ny] in walkable_chars:
+        if dungeon.is_walkable(nx, ny, unlocked_doors):
             instance.pos_x, instance.pos_y = nx, ny
             try:
                 db.session.commit()
@@ -81,9 +80,9 @@ def attempt_move(dungeon, instance: DungeonInstance, direction: str, map_size: i
     return x, y, moved
 
 
-def describe_cell_and_exits(dungeon, x: int, y: int, map_size: int) -> tuple[str, List[str]]:
+def describe_cell_and_exits(dungeon, instance: DungeonInstance, x: int, y: int, map_size: int) -> tuple[str, List[str]]:
     """Return (description, exits_list) for current coordinates."""
-    walkable_chars = {ROOM, TUNNEL, DOOR, getattr(dungeon, "TELEPORT", "P"), *WALKABLE_EXTRA}
+    unlocked_doors = instance.get_unlocked_doors()
     tile_char = dungeon.grid[x][y]
     from app.dungeon.api_helpers.tiles import char_to_type
 
@@ -92,7 +91,7 @@ def describe_cell_and_exits(dungeon, x: int, y: int, map_size: int) -> tuple[str
     exits_map: List[str] = []
     for d, (dx, dy) in deltas.items():
         nx, ny = x + dx, y + dy
-        if 0 <= nx < map_size and 0 <= ny < map_size and dungeon.grid[nx][ny] in walkable_chars:
+        if dungeon.is_walkable(nx, ny, unlocked_doors):
             exits_map.append(d)
     if exits_map:
         cardinal_full = {"n": "north", "s": "south", "e": "east", "w": "west"}

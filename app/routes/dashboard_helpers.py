@@ -45,19 +45,27 @@ def serialize_character_list(user_id: int) -> list[dict[str, Any]]:
     """
     characters = Character.query.filter_by(user_id=user_id).all()
     class_map = {
+        "barbarian": lambda s: s.get("str", 0) >= 16 and s.get("con", 0) >= 14 and s.get("int", 0) <= 8,
+        "paladin": lambda s: s.get("str", 0) >= 14 and s.get("cha", 0) >= 12,
         "fighter": lambda s: s.get("str", 0) >= s.get("dex", 0)
         and s.get("str", 0) >= s.get("int", 0)
         and s.get("str", 0) >= s.get("wis", 0),
+        "monk": lambda s: s.get("dex", 0) >= 14 and s.get("wis", 0) >= 12,
+        "rogue": lambda s: s.get("dex", 0) >= s.get("str", 0)
+        and s.get("dex", 0) >= s.get("int", 0)
+        and s.get("dex", 0) >= s.get("wis", 0)
+        and s.get("cha", 0) < 14,
+        "bard": lambda s: s.get("cha", 0) >= 14 and s.get("dex", 0) >= 12,
+        "sorcerer": lambda s: s.get("cha", 0) >= 14 and s.get("int", 0) <= 12,
+        "warlock": lambda s: s.get("cha", 0) >= 14 and s.get("int", 0) >= 11,
         "mage": lambda s: s.get("int", 0) >= s.get("str", 0)
         and s.get("int", 0) >= s.get("dex", 0)
         and s.get("int", 0) >= s.get("wis", 0),
         "druid": lambda s: s.get("wis", 0) >= s.get("str", 0)
         and s.get("wis", 0) >= s.get("dex", 0)
-        and s.get("wis", 0) >= s.get("int", 0),
+        and s.get("wis", 0) >= s.get("int", 0)
+        and s.get("int", 0) >= 11,
         "ranger": lambda s: s.get("dex", 0) >= s.get("str", 0) and s.get("wis", 0) >= s.get("int", 0),
-        "rogue": lambda s: s.get("dex", 0) >= s.get("str", 0)
-        and s.get("dex", 0) >= s.get("int", 0)
-        and s.get("dex", 0) >= s.get("wis", 0),
         "cleric": lambda s: True,
     }
     out: list[dict[str, Any]] = []
@@ -68,7 +76,7 @@ def serialize_character_list(user_id: int) -> list[dict[str, Any]]:
         stats = json.loads(c.stats)
         for key in ("str", "dex", "int", "wis", "con", "cha", "hp", "mana"):
             stats.setdefault(key, 0)
-        stats_class = stats.pop("class", None)
+        stats_class = stats.get("class", None)
         coins = {k: stats.pop(k, 0) for k in ("gold", "silver", "copper")}
         try:
             raw_items = json.loads(c.items) if c.items else []
@@ -192,13 +200,32 @@ def build_party_payload(chars: Sequence[Character]):
             s = json.loads(c.stats)
         except Exception:
             s = {}
+
+        # Calculate max HP and mana based on character stats and level
+        level = getattr(c, "level", 1) or 1
+        # Try lowercase first, then uppercase for stats (handle both formats)
+        con = int(s.get("con", s.get("CON", 10)))
+        intelligence = int(s.get("int", s.get("INT", 10)))
+
+        # Max HP: base 50 + CON*2 + level*5 (matches combat_service.py)
+        hp_max = 50 + con * 2 + level * 5
+        # Max Mana: base 20 + INT*2 (matches combat_service.py)
+        mana_max = 20 + intelligence * 2
+
+        # Read actual current HP/MP from stats (persistent values)
+        hp = int(s.get("hp", hp_max))  # Default to full if not set
+        mana = int(s.get("current_mana", s.get("mana", mana_max)))  # Check both keys
+
         party.append(
             {
                 "id": c.id,
                 "name": c.name,
                 "class": (s.get("class") or "unknown").capitalize(),
-                "hp": s.get("hp", 0),
-                "mana": s.get("mana", 0),
+                "level": level,
+                "hp": hp,
+                "hp_max": hp_max,
+                "mana": mana,
+                "mana_max": mana_max,
             }
         )
     return party
