@@ -16,7 +16,15 @@ def _load_seed_sql():
         sql = f.read()
     conn = db.engine.raw_connection()
     try:
-        conn.executescript(sql)
+        # sqlite3 exposes executescript(); psycopg2 runs multi-statement strings via execute().
+        if hasattr(conn, "executescript"):
+            conn.executescript(sql)
+        else:
+            cur = conn.cursor()
+            try:
+                cur.execute(sql)
+            finally:
+                cur.close()
         conn.commit()
     finally:
         conn.close()
