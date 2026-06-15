@@ -107,6 +107,13 @@ def execute_sql_file(path: Path) -> None:
     semicolon-delimited statements.
     """
     raw = path.read_text(encoding="utf-8")
+    # Normalize SQLite-only DDL syntax for PostgreSQL compatibility.
+    # AUTOINCREMENT is SQLite-specific; Postgres uses implicit sequences on
+    # INTEGER PRIMARY KEY so simply dropping the keyword is correct.
+    if db.engine.dialect.name != "sqlite":
+        import re
+
+        raw = re.sub(r"\bAUTOINCREMENT\b", "", raw, flags=re.IGNORECASE)
     # Remove the malformed early single-row INSERT residue if present.
     cleaned_lines = []
     pending_insert_header = None
