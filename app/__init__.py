@@ -316,11 +316,17 @@ try:  # pragma: no cover - defensive import-time safeguard
         try:
             apply_migrations()
         except Exception:
-            pass
+            db.session.rollback()
         seed_items()
         _seed_game_config()
 except Exception:
-    pass
+    # A failed import-time bootstrap must not leave db.session in an aborted
+    # transaction; that would poison every later DB user (the cause of the
+    # widespread "current transaction is aborted" test errors).
+    try:
+        db.session.rollback()
+    except Exception:
+        pass
 
 # Direct fallback to guarantee monster_catalog optional columns even if the import above
 # failed due to circular imports early in initialization.
@@ -420,7 +426,10 @@ if os.getenv("PYTEST_CURRENT_TEST"):
             seed_items()
             _seed_game_config()
     except Exception:
-        pass
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
 
 
 def create_app():
@@ -442,11 +451,14 @@ def create_app():
             try:
                 apply_migrations()
             except Exception:
-                pass
+                db.session.rollback()
             seed_items()
             _seed_game_config()
     except Exception:  # swallow; normal startup path will also attempt
-        pass
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
     return app
 
 
