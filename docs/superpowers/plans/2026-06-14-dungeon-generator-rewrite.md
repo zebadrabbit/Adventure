@@ -1091,3 +1091,27 @@ defined in `rooms.py`. Tile constants from `tiles.py`. ✓
 
 **Out of scope (own future plans):** Phase 2 loop integration, Phase 3 cleanup/docs (incl. deleting
 `tunnels.py`, rewriting `DUNGEON_GENERATION.md`).
+
+---
+
+## Execution Status (2026-06-15)
+
+**Phases 0 & 1 complete.** Carve-floor-first generator shipped; connectivity guaranteed
+by construction (no teleports), determinism + invariants covered by tests. Full dungeon
+test suite green.
+
+**Bonus — DB test infrastructure rescued.** Root-caused the 122 baseline errors to a
+PostgreSQL reserved-word bug (`SELECT id FROM user` unquoted in a `before_insert` hook)
+plus SQLite-only `executescript`/integer-boolean seed SQL. Fixed all of these.
+
+**Suite movement:** baseline `91 passed / 39 failed / 122 errors` → now
+`251 passed / 11 failed / 0 errors` (2 skipped, 1 xpassed).
+
+**Remaining 11 failures — deferred to Phase 2/3 (not dungeon-related):**
+- `test_autofill_characters` (2), `test_autofill_gear` (1): autofill response shape (`KeyError 'total'`).
+- `test_combat_actions` (2): combat balance assertions.
+- `test_entity_seeding::test_treasure_claim_endpoint`: perception RNG threshold.
+- `scripts/test_hp_mp_persistence`: HP/MP flow.
+- `test_server_extended::test_run_migrations_idempotent`: migration idempotency on Postgres.
+- `test_encounter_config` (2), `test_time_and_encounters` (1): pass in isolation, fail in
+  full run — order-dependent shared-DB-state flakiness in `conftest` (test-infra, Phase 0/2).
