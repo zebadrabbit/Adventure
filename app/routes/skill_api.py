@@ -39,7 +39,7 @@ def get_skill_trees():
 @bp_skill.route("/api/skill-trees/<int:tree_id>/skills", methods=["GET"])
 def get_tree_skills(tree_id):
     """Get all skills in a specific tree."""
-    tree = SkillTree.query.get(tree_id)
+    tree = db.session.get(SkillTree, tree_id)
     if not tree:
         return jsonify({"error": "Skill tree not found"}), 404
 
@@ -71,7 +71,7 @@ def get_tree_skills(tree_id):
 @bp_skill.route("/api/characters/<int:character_id>/talent-points", methods=["GET"])
 def get_talent_points(character_id):
     """Get character's talent points."""
-    character = Character.query.get(character_id)
+    character = db.session.get(Character, character_id)
     if not character:
         return jsonify({"error": "Character not found"}), 404
 
@@ -100,7 +100,7 @@ def get_talent_points(character_id):
 @bp_skill.route("/api/characters/<int:character_id>/skills", methods=["GET"])
 def get_character_skills(character_id):
     """Get all skills learned by a character."""
-    character = Character.query.get(character_id)
+    character = db.session.get(Character, character_id)
     if not character:
         return jsonify({"error": "Character not found"}), 404
 
@@ -137,11 +137,11 @@ def unlock_skill(character_id):
     if not skill_id:
         return jsonify({"error": "Missing skill_id"}), 400
 
-    character = Character.query.get(character_id)
+    character = db.session.get(Character, character_id)
     if not character:
         return jsonify({"error": "Character not found"}), 404
 
-    skill = Skill.query.get(skill_id)
+    skill = db.session.get(Skill, skill_id)
     if not skill:
         return jsonify({"error": "Skill not found"}), 404
 
@@ -162,7 +162,7 @@ def unlock_skill(character_id):
         ).first()
 
         if not prerequisite:
-            prereq_skill = Skill.query.get(skill.required_skill_id)
+            prereq_skill = db.session.get(Skill, skill.required_skill_id)
             return jsonify({"error": f'Requires skill: {prereq_skill.name if prereq_skill else "Unknown"}'}), 400
 
     # Check talent points
@@ -248,7 +248,7 @@ def grant_talent_points(character_id):
     if points < 1:
         return jsonify({"error": "Invalid point amount"}), 400
 
-    character = Character.query.get(character_id)
+    character = db.session.get(Character, character_id)
     if not character:
         return jsonify({"error": "Character not found"}), 404
 
@@ -279,7 +279,7 @@ def grant_talent_points(character_id):
 @bp_skill.route("/api/characters/<int:character_id>/skills/reset", methods=["POST"])
 def reset_skills(character_id):
     """Reset all skills and refund talent points (respec)."""
-    character = Character.query.get(character_id)
+    character = db.session.get(Character, character_id)
     if not character:
         return jsonify({"error": "Character not found"}), 404
 
@@ -313,7 +313,7 @@ def reset_skills(character_id):
 @bp_skill.route("/api/skills/<int:skill_id>", methods=["GET"])
 def get_skill_details(skill_id):
     """Get detailed information about a specific skill."""
-    skill = Skill.query.get(skill_id)
+    skill = db.session.get(Skill, skill_id)
     if not skill:
         return jsonify({"error": "Skill not found"}), 404
 
@@ -322,7 +322,7 @@ def get_skill_details(skill_id):
     # Get prerequisite skill if exists
     prereq = None
     if skill.required_skill_id:
-        prereq_skill = Skill.query.get(skill.required_skill_id)
+        prereq_skill = db.session.get(Skill, skill.required_skill_id)
         if prereq_skill:
             prereq = {"id": prereq_skill.id, "name": prereq_skill.name}
 

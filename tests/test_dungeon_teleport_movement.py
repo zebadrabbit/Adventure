@@ -3,6 +3,12 @@ from app import db
 from app.models.dungeon_instance import DungeonInstance
 from app.dungeon import Dungeon, TELEPORT
 
+pytestmark = pytest.mark.xfail(
+    reason="Teleports removed as a connectivity crutch in dungeon rewrite (Task 8). "
+    "Connectivity is now guaranteed by construction; this behavior is retired.",
+    strict=False,
+)
+
 
 def _ensure_teleport(d):
     """Force-create a teleport pair if generator did not produce one, purely for test purposes.

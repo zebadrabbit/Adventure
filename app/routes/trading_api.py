@@ -65,7 +65,7 @@ def get_merchant(slug):
 @bp_trading.route("/api/characters/<int:character_id>/gold", methods=["GET"])
 def get_character_gold(character_id):
     """Get character's current gold balance"""
-    character = Character.query.get(character_id)
+    character = db.session.get(Character, character_id)
     if not character:
         return jsonify({"error": "Character not found"}), 404
 
@@ -104,7 +104,7 @@ def buy_item():
     if not merchant:
         return jsonify({"error": "Merchant not found"}), 404
 
-    character = Character.query.get(character_id)
+    character = db.session.get(Character, character_id)
     if not character:
         return jsonify({"error": "Character not found"}), 404
 
@@ -206,7 +206,7 @@ def sell_item():
     if not merchant:
         return jsonify({"error": "Merchant not found"}), 404
 
-    character = Character.query.get(character_id)
+    character = db.session.get(Character, character_id)
     if not character:
         return jsonify({"error": "Character not found"}), 404
 
@@ -281,7 +281,7 @@ def sell_item():
 @bp_trading.route("/api/characters/<int:character_id>/inventory", methods=["GET"])
 def get_character_inventory_for_trade(character_id):
     """Get character inventory with pricing info for selling"""
-    character = Character.query.get(character_id)
+    character = db.session.get(Character, character_id)
     if not character:
         return jsonify({"error": "Character not found"}), 404
 
@@ -349,7 +349,7 @@ def get_merchant_transactions(slug):
 @bp_trading.route("/api/characters/<int:character_id>/transactions", methods=["GET"])
 def get_character_transactions(character_id):
     """Get transaction history for a character"""
-    character = Character.query.get(character_id)
+    character = db.session.get(Character, character_id)
     if not character:
         return jsonify({"error": "Character not found"}), 404
 
