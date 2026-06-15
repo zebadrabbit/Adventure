@@ -72,7 +72,7 @@ def get_character_achievements(character_id):
 
     Returns all achievements with progress and unlock status.
     """
-    character = Character.query.get_or_404(character_id)
+    Character.query.get_or_404(character_id)
 
     # Get all achievements
     achievements = Achievement.query.filter_by(is_active=True).all()
@@ -118,7 +118,7 @@ def get_character_achievements(character_id):
 @bp_achievement.route("/api/characters/<int:character_id>/achievements/stats", methods=["GET"])
 def get_achievement_stats(character_id):
     """Get character's achievement statistics."""
-    character = Character.query.get_or_404(character_id)
+    Character.query.get_or_404(character_id)
 
     total_achievements = Achievement.query.filter_by(is_active=True).count()
     unlocked = CharacterAchievement.query.filter_by(character_id=character_id, unlocked=True).count()
@@ -126,7 +126,7 @@ def get_achievement_stats(character_id):
     total_points = (
         db.session.query(db.func.sum(Achievement.points))
         .join(CharacterAchievement, CharacterAchievement.achievement_id == Achievement.id)
-        .filter(CharacterAchievement.character_id == character_id, CharacterAchievement.unlocked == True)
+        .filter(CharacterAchievement.character_id == character_id, CharacterAchievement.unlocked.is_(True))
         .scalar()
         or 0
     )
@@ -351,8 +351,8 @@ def get_recent_achievements():
 
     result = []
     for ca in recent:
-        achievement = Achievement.query.get(ca.achievement_id)
-        character = Character.query.get(ca.character_id)
+        achievement = db.session.get(Achievement, ca.achievement_id)
+        character = db.session.get(Character, ca.character_id)
 
         result.append(
             {

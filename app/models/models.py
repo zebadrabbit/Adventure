@@ -84,15 +84,18 @@ try:  # pragma: no cover - SQLAlchemy event wiring
         if not uname:
             return
         # Direct SQL check for existing username to avoid ORM session state issues.
+        # NOTE: "user" is a reserved keyword in PostgreSQL and MUST be quoted; an
+        # unquoted reference fails and aborts the transaction, which previously caused
+        # widespread "current transaction is aborted" errors under Postgres.
         try:
-            res = connection.execute(db.text("SELECT id FROM user WHERE username = :u"), {"u": uname}).fetchone()
+            res = connection.execute(db.text('SELECT id FROM "user" WHERE username = :u'), {"u": uname}).fetchone()
             if res:
                 base = uname
                 n = 2
                 while True:
                     cand = f"{base}-{n}"
                     res2 = connection.execute(
-                        db.text("SELECT id FROM user WHERE username = :u"), {"u": cand}
+                        db.text('SELECT id FROM "user" WHERE username = :u'), {"u": cand}
                     ).fetchone()
                     if not res2:
                         target.username = cand  # type: ignore

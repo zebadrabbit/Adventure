@@ -9,7 +9,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 from app import db
-from app.inventory.utils import add_item, load_inventory, remove_one
+from app.inventory.utils import add_item, remove_one
 from app.models.models import Character
 from app.models.party import Party, PartyBuff, PartyMember, PartySharedInventory
 
@@ -19,7 +19,7 @@ bp_party = Blueprint("party", __name__)
 @bp_party.route("/api/party/<int:party_id>", methods=["GET"])
 def get_party(party_id):
     """Get complete party data with members, formation, and stats."""
-    party = Party.query.get(party_id)
+    party = db.session.get(Party, party_id)
     if not party:
         return jsonify({"error": "Party not found"}), 404
 
@@ -115,7 +115,7 @@ def remove_party_member(party_id, member_id):
 @bp_party.route("/api/party/<int:party_id>/inventory", methods=["GET"])
 def get_shared_inventory(party_id):
     """Get party's shared inventory with item details."""
-    party = Party.query.get(party_id)
+    party = db.session.get(Party, party_id)
     if not party:
         return jsonify({"error": "Party not found"}), 404
 
@@ -155,12 +155,11 @@ def contribute_to_shared_inventory(party_id):
     if not party_member:
         return jsonify({"error": "Character not in party"}), 403
 
-    character = Character.query.get(character_id)
+    character = db.session.get(Character, character_id)
     if not character:
         return jsonify({"error": "Character not found"}), 404
 
     # Remove item from character's inventory
-    inventory = load_inventory(character)
     if not remove_one(character, item_slug, quantity):
         return jsonify({"error": "Item not found in inventory"}), 400
 
@@ -204,7 +203,7 @@ def take_from_shared_inventory(party_id):
         return jsonify({"error": "Insufficient quantity in shared inventory"}), 400
 
     # Add to character inventory
-    character = Character.query.get(character_id)
+    character = db.session.get(Character, character_id)
     if not character:
         return jsonify({"error": "Character not found"}), 404
 
@@ -249,7 +248,7 @@ def use_shared_item(party_id):
 @bp_party.route("/api/party/<int:party_id>/buffs", methods=["GET"])
 def get_party_buffs(party_id):
     """Get all active party buffs."""
-    party = Party.query.get(party_id)
+    party = db.session.get(Party, party_id)
     if not party:
         return jsonify({"error": "Party not found"}), 404
 
@@ -286,7 +285,7 @@ def add_party_buff(party_id):
     """Add a new buff to the party."""
     data = request.get_json()
 
-    party = Party.query.get(party_id)
+    party = db.session.get(Party, party_id)
     if not party:
         return jsonify({"error": "Party not found"}), 404
 
@@ -328,8 +327,8 @@ def contribute_gold(party_id):
     if not party_member:
         return jsonify({"error": "Character not in party"}), 403
 
-    character = Character.query.get(character_id)
-    party = Party.query.get(party_id)
+    character = db.session.get(Character, character_id)
+    party = db.session.get(Party, party_id)
 
     if character.gold < amount:
         return jsonify({"error": "Insufficient gold"}), 400
@@ -361,7 +360,7 @@ def withdraw_gold(party_id):
         return jsonify({"error": "Invalid amount"}), 400
 
     # Verify party membership and leader status
-    party = Party.query.get(party_id)
+    party = db.session.get(Party, party_id)
     if not party:
         return jsonify({"error": "Party not found"}), 404
 
@@ -372,7 +371,7 @@ def withdraw_gold(party_id):
     if party.shared_gold < amount:
         return jsonify({"error": "Insufficient party gold"}), 400
 
-    character = Character.query.get(character_id)
+    character = db.session.get(Character, character_id)
 
     # Transfer gold
     party.shared_gold -= amount

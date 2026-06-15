@@ -11,6 +11,7 @@ class DungeonConfig:
     min_size: int = 5
     max_size: int = 12
     irregular_chance: float = 0.25
+    blob_room_chance: float = 0.20
     seed: Optional[int] = None
     extra_connection_chance: float = 0.15
 

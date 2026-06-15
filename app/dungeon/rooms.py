@@ -44,18 +44,21 @@ def place_rooms(grid, config: DungeonConfig, rng=None):
         new_room = Room(x, y, w, h)
         if _room_overlaps(new_room, rooms):
             continue
-        if rng.random() < config.irregular_chance:
-            _perturb_room(new_room, grid, rng)
-        # carve interior
-        for ix, iy in new_room.cells():
-            grid[ix][iy] = ROOM
+        # carve interior (rectangular, perturbed, or organic blob)
+        if rng.random() < config.blob_room_chance:
+            _carve_blob(new_room, grid, rng)
+        else:
+            for ix, iy in new_room.cells():
+                grid[ix][iy] = ROOM
+            if rng.random() < config.irregular_chance:
+                _perturb_room(new_room, grid, rng)
         rooms.append(new_room)
         placed += 1
     return rooms, target, placed
 
 
 def _room_overlaps(room: Room, existing: List[Room]) -> bool:
-    pad = 2  # ensure space for wall ring (1) and a gap
+    pad = 3  # >=3 cave cells between room edges so corridors get a tunnel between doors
     for r in existing:
         if (
             room.x - pad < r.x + r.w
@@ -88,3 +91,32 @@ def _perturb_room(room: Room, grid, rng):
     for i in range(remove_count):
         rx, ry = removable[i]
         grid[rx][ry] = CAVE
+
+
+def _carve_blob(room: Room, grid, rng):
+    """Carve an organic ROOM shape via 3 cellular-automata smoothing passes
+    inside the room's bounding box. The center is kept solid so it can serve as
+    the corridor anchor."""
+    w = len(grid)
+    h = len(grid[0])
+    cells = [(ix, iy) for ix, iy in room.cells()]
+    fill = {c: (rng.random() < 0.55) for c in cells}
+    cx, cy = room.center
+    fill[(cx, cy)] = True
+    for _ in range(3):
+        nxt = {}
+        for ix, iy in cells:
+            n = 0
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    if dx == 0 and dy == 0:
+                        continue
+                    if fill.get((ix + dx, iy + dy), False):
+                        n += 1
+            nxt[(ix, iy)] = n >= 4 or (ix, iy) == (cx, cy)
+        fill = nxt
+    for ix, iy in cells:
+        if fill[(ix, iy)] and 0 <= ix < w and 0 <= iy < h:
+            grid[ix][iy] = ROOM
+    # guarantee the center is ROOM (used as corridor anchor)
+    grid[cx][cy] = ROOM

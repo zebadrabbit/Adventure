@@ -60,7 +60,7 @@ def test_secret_door_reveal_changes_tile():
     assert not d.reveal_secret_door(x, y)
 
 
-def test_locked_doors_walkable():
+def test_locked_doors_walkable_only_when_unlocked():
     d = Dungeon(DungeonConfig(seed=9876))
     w, h = d.config.width, d.config.height
     locked_positions = [(x, y) for x in range(w) for y in range(h) if d.grid[x][y] == LOCKED_DOOR]
@@ -80,4 +80,6 @@ def test_locked_doors_walkable():
                 break
     assert locked_positions, "Expected at least one locked door after injection"
     for x, y in locked_positions:
-        assert d.is_walkable(x, y), "Locked door should be walkable"
+        # New contract: a locked door is impassable until its key unlocks it.
+        assert not d.is_walkable(x, y), "Locked door must be impassable without a key"
+        assert d.is_walkable(x, y, unlocked_doors={(x, y)}), "Locked door must open when unlocked"

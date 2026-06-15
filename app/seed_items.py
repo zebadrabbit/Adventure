@@ -174,10 +174,19 @@ def execute_sql_file(path: Path) -> None:
             in_item_insert = False
 
     sql_text = "\n".join(transformed)
-    # Use underlying sqlite3 executescript for multi-statement execution.
+    # Multi-statement execution that works on both SQLite and PostgreSQL.
+    # sqlite3 connections expose executescript(); psycopg2 cursors accept a
+    # multi-statement string directly in execute().
     raw_conn = db.engine.raw_connection()  # type: ignore[attr-defined]
     try:
-        raw_conn.executescript(sql_text)
+        if hasattr(raw_conn, "executescript"):
+            raw_conn.executescript(sql_text)
+        else:
+            cur = raw_conn.cursor()
+            try:
+                cur.execute(sql_text)
+            finally:
+                cur.close()
         raw_conn.commit()
     finally:  # pragma: no cover - safety cleanup
         raw_conn.close()
