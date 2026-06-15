@@ -109,7 +109,7 @@ STARTER_ITEMS = {
     "druid": ["oak-staff", "herbal-pouch", "potion-healing", "potion-mana"],
     "barbarian": ["iron-axe", "potion-healing", "potion-healing"],
     "bard": ["dagger", "potion-healing", "potion-mana"],
-    "monk": ["potion-healing", "potion-mana"],
+    "monk": ["club", "potion-healing", "potion-mana"],
     "paladin": ["short-sword", "wooden-shield", "potion-healing"],
     "sorcerer": ["oak-staff", "potion-mana", "potion-mana"],
     "warlock": ["oak-staff", "potion-mana", "potion-healing"],

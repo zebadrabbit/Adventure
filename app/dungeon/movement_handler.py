@@ -260,8 +260,10 @@ def process_movement(instance: DungeonInstance, direction: str) -> Tuple[bool, D
         except Exception as e:
             logger.error(event="visibility_update_error", error=str(e))
 
-    # Advance game time if no combat
-    if not combat_started:
+    # Advance game time for any world-advancing action (a move is a turn, whether
+    # or not it triggered combat). The clock should never stall on the move that
+    # happens to bump into a monster.
+    if moved or not noop:
         try:
             from app.routes.dungeon_api import advance_non_combat_time
 

@@ -132,7 +132,6 @@ def test_hp_mp_flow():
                 pos_y=37,
                 pos_z=0,
                 tier=1,
-                explored_tiles_json="[]",
             )
             db.session.add(instance)
             db.session.commit()

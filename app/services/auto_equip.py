@@ -15,8 +15,14 @@ AUTO_EQUIP_PREFS: Dict[str, Dict[str, List[str]]] = {
     "mage": {"weapon": ["oak-staff", "wand"], "armor": []},
     # Put 'oak-staff' first because current cleric STARTER_ITEMS gives them one.
     "cleric": {"weapon": ["oak-staff", "mace", "club"], "armor": ["leather-armor"]},
-    "ranger": {"weapon": ["hunting-bow", "short-sword"], "armor": ["leather-armor"]},
+    "ranger": {"weapon": ["hunting-bow", "short-sword", "dagger"], "armor": ["leather-armor"]},
     "druid": {"weapon": ["oak-staff", "club"], "armor": ["leather-armor"]},
+    "barbarian": {"weapon": ["iron-axe", "club"], "armor": ["leather-armor"]},
+    "bard": {"weapon": ["dagger", "short-sword"], "armor": ["leather-armor"]},
+    "monk": {"weapon": ["club", "oak-staff"], "armor": []},
+    "paladin": {"weapon": ["short-sword", "mace"], "armor": ["leather-armor"]},
+    "sorcerer": {"weapon": ["oak-staff", "wand"], "armor": []},
+    "warlock": {"weapon": ["oak-staff", "wand"], "armor": []},
 }
 
 
@@ -57,6 +63,11 @@ def auto_equip_for(char_class: str, starter_items: Iterable) -> Dict[str, str]:
 
     gear: Dict[str, str] = {}
     w = pick(weapon_pref)
+    # Guarantee every class wields something: if none of the starter items match a
+    # preferred weapon, fall back to the class's first preference so a character is
+    # never left bare-handed.
+    if not w and weapon_pref:
+        w = weapon_pref[0]
     if w:
         gear["weapon"] = w
     a = pick(armor_pref)
