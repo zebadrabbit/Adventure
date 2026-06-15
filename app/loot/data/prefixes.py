@@ -148,6 +148,37 @@ PREFIXES = [
         "slots": ["weapon"],
         "categories": None,
     },
+    # optional extra flavors
+    {
+        "name": "Heavy",
+        "stat": "armor",
+        "min": 3,
+        "max": 7,
+        "scale": 0.4,
+        "weight": 50,
+        "slots": ["offhand", "head", "chest", "hands", "feet"],
+        "categories": None,
+    },
+    {
+        "name": "Honed",
+        "stat": "crit",
+        "min": 1,
+        "max": 5,
+        "scale": 0.2,
+        "weight": 45,
+        "slots": ["weapon", "ring", "amulet"],
+        "categories": None,
+    },
+    {
+        "name": "Swift",
+        "stat": "speed",
+        "min": 2,
+        "max": 4,
+        "scale": 0.15,
+        "weight": 50,
+        "slots": ["weapon", "feet"],
+        "categories": None,
+    },
 ]
 
 
