@@ -8,12 +8,10 @@ Invariants covered:
 2. Every door has at least one ROOM neighbor and one walkable (ROOM/TUNNEL/DOOR/LOCKED_DOOR) neighbor.
 3. Start room (room_types[0] == 'start') exists and its interior center is walkable.
 4. (Soft) All non-start rooms are either reachable or explicitly counted in metrics['unreachable_rooms'].
-5. Secret doors are not walkable until revealed; locked doors are treated as walkable.
+5. Secret doors are not walkable until revealed; locked doors are not walkable until unlocked.
 """
 
 from __future__ import annotations
-
-import pytest
 
 from app.dungeon.dungeon import Dungeon, SECRET_DOOR, LOCKED_DOOR, DOOR, ROOM, TUNNEL
 
@@ -57,11 +55,6 @@ def test_start_room_center_walkable():
     assert d.is_walkable(cx, cy), "Start room center not walkable"
 
 
-@pytest.mark.xfail(
-    reason="Invariant being resolved in dungeon rewrite Task 9: locked doors are "
-    "non-walkable until unlocked. This test asserts the old contract; updated there.",
-    strict=False,
-)
 def test_secret_and_locked_door_behavior():
     # Sample a modest seed window; door variants are probabilistic and may be absent in small grids.
     seeds = range(400, 415)
@@ -76,7 +69,9 @@ def test_secret_and_locked_door_behavior():
                     assert not d.is_walkable(x, y), "Secret door unexpectedly walkable"
                 elif d.grid[x][y] == LOCKED_DOOR:
                     saw_any = True
-                    assert d.is_walkable(x, y), "Locked door should be walkable"
+                    # New contract: locked doors are NOT walkable until unlocked.
+                    assert not d.is_walkable(x, y), "Locked door walkable without unlock key"
+                    assert d.is_walkable(x, y, unlocked_doors={(x, y)}), "Locked door not walkable when unlocked"
         if saw_any:
             break
     if not saw_any:
@@ -110,7 +105,10 @@ def test_secret_and_locked_door_behavior():
                 if d.grid[x][y] == SECRET_DOOR:
                     assert not d.is_walkable(x, y), "Injected secret door unexpectedly walkable"
                 elif d.grid[x][y] == LOCKED_DOOR:
-                    assert d.is_walkable(x, y), "Injected locked door not walkable"
+                    assert not d.is_walkable(x, y), "Injected locked door walkable without key"
+                    assert d.is_walkable(
+                        x, y, unlocked_doors={(x, y)}
+                    ), "Injected locked door not walkable when unlocked"
 
 
 def test_unreachable_room_metric_consistency():
