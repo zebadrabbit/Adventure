@@ -79,11 +79,33 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
     CON = int(base.get("con", base.get("CON", STR)) or STR)
     WIS = int(base.get("wis", base.get("WIS", 10)) or 10)
     CHA = int(base.get("cha", base.get("CHA", 10)) or 10)
+
+    # Fold equipped gear affixes into attributes + derived stats.
+    from app.loot.equip import gear_bonuses
+
+    try:
+        _gear = json.loads(char.gear) if getattr(char, "gear", None) else {}
+    except Exception:
+        _gear = {}
+    _gb = gear_bonuses(_gear)
+    STR += int(_gb.get("str", 0))
+    DEX += int(_gb.get("dex", 0))
+    INT += int(_gb.get("int", 0))
+    CON += int(_gb.get("con", 0))
+    WIS += int(_gb.get("wis", 0))
+    CHA += int(_gb.get("cha", 0))
+
     max_hp = 50 + CON * 2 + level * 5
     attack = 8 + STR // 2 + level
     defense = 5 + DEX // 3 + level // 2
     speed = 8 + DEX // 2
     mana_max = 20 + INT * 2
+
+    max_hp += int(_gb.get("max_hp", 0))
+    attack += int(_gb.get("damage", 0))
+    defense += int(_gb.get("armor", 0))
+    speed += int(_gb.get("speed", 0))
+    mana_max += int(_gb.get("mana", 0))
 
     # Read persisted current HP, fallback to max HP (e.g., new characters)
     hp_source = base.get("hp", max_hp)
