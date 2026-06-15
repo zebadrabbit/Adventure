@@ -53,6 +53,29 @@ ENEMY_SCALING_FILES = [
 ]
 
 
+def _augment_item_level_default(line: str, has_level: bool) -> str:
+    """Ensure an item VALUES tuple carries (level, rarity, weight).
+
+    If the insert header already includes level/rarity/weight (`has_level`),
+    return the line unchanged. Otherwise append `, 0, 'common', 1.0` before the
+    closing paren, preserving any trailing comma/semicolon and indentation.
+    """
+    if has_level:
+        return line
+    stripped = line.strip()
+    if not stripped.startswith("("):
+        return line
+    closing = stripped[-1]
+    trailer = closing if closing in {",", ";"} else ""
+    inner = stripped[:-1] if trailer else stripped
+    idx = inner.rfind(")")
+    if idx == -1:
+        return line
+    inner = inner[:idx] + ", 0, 'common', 1.0" + inner[idx:]
+    prefix_ws = line[: len(line) - len(line.lstrip(" "))]
+    return prefix_ws + inner + trailer
+
+
 def _existing_sql_files(files: Iterable[str]):
     for name in files:
         p = SQL_DIR / name
@@ -119,57 +142,37 @@ def execute_sql_file(path: Path) -> None:
         else:
             cleaned_lines.append(line)
     # Line-wise augmentation of old seed format lacking level/rarity/weight
-    import re
-
     transformed: list[str] = []
     in_item_insert = False
+    insert_has_level = False
     for line in cleaned_lines:
         raw_line = line
         stripped = raw_line.strip()
         upper = stripped.upper()
         if upper.startswith("INSERT INTO ITEM"):
-            if "(slug, name, type, description, value_copper, level, rarity, weight)" in upper:
+            if "(SLUG, NAME, TYPE, DESCRIPTION, VALUE_COPPER, LEVEL, RARITY, WEIGHT)" in upper:
                 in_item_insert = True
+                insert_has_level = True
                 transformed.append(raw_line)
                 continue
             if "(SLUG, NAME, TYPE, DESCRIPTION, VALUE_COPPER)" in upper:
-                # extend header
+                # extend header to include level/rarity/weight
                 raw_line = raw_line.replace(
                     "(slug, name, type, description, value_copper)",
                     "(slug, name, type, description, value_copper, level, rarity, weight)",
                 )
                 in_item_insert = True
+                insert_has_level = False
                 transformed.append(raw_line)
                 continue
         if in_item_insert and stripped.startswith("(") and ",'common'," not in stripped:
-            # Only augment tuple lines that haven't already been extended
-            m = re.match(r"\('(.*?)'", stripped)
-            level = 0
-            if m:
-                slug = m.group(1)
-                lvl_match = re.search(r"_l(\d+)$", slug)
-                if lvl_match:
-                    level = int(lvl_match.group(1))
-            # Insert before final ')' (keeping trailing comma or semicolon)
-            closing = stripped[-1]
-            trailer = ""
-            if closing in {",", ";"}:
-                trailer = closing
-                inner = stripped[:-1]
-            else:
-                inner = stripped
-            # find last ')'
-            idx = inner.rfind(")")
-            if idx != -1:
-                inner = inner[:idx] + f", {level}, 'common', 1.0" + inner[idx:]
-            new_line = inner + trailer
-            # preserve original indentation
-            prefix_ws = raw_line[: len(raw_line) - len(raw_line.lstrip(" "))]
-            transformed.append(prefix_ws + new_line)
+            # Delegate to helper; has_level=False means we need to augment
+            transformed.append(_augment_item_level_default(raw_line, has_level=insert_has_level))
         else:
             transformed.append(raw_line)
         if stripped.endswith(";"):
             in_item_insert = False
+            insert_has_level = False
 
     sql_text = "\n".join(transformed)
     # Multi-statement execution that works on both SQLite and PostgreSQL.
@@ -284,4 +287,5 @@ def reseed_items(clear_first: bool = False, verbose: bool = True) -> None:
 __all__ = [
     "reseed_items",
     "clear_item_categories",
+    "_augment_item_level_default",
 ]

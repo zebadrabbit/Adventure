@@ -782,7 +782,7 @@ def run_seed(seed_type):
     try:
         # Map seed type to SQL file
         sql_files = {
-            "items": ["items_weapons.sql", "items_armor.sql", "items_potions.sql", "items_misc.sql"],
+            "items": ["items_potions.sql", "items_misc.sql"],
             "monsters": ["monsters_seed.sql"],
         }
 
