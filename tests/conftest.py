@@ -178,9 +178,11 @@ def auth_client(test_app, client):
             import json as _json
 
             stats_obj = _json.loads(new_char.stats) if new_char.stats else {}
-            # Reset hp so combat sessions re-derive consistent max and tests controlling snapshot succeed
-            if "hp" in stats_obj:
-                stats_obj["hp"] = int(stats_obj.get("hp", 0))  # keep existing numeric form
+            # Drop any persisted current-hp so combat sessions re-derive a full,
+            # consistent max each test. Leaving a stale hp (e.g. 0 from a prior
+            # combat death) leaks across the shared session DB and breaks tests
+            # that expect a healthy party member.
+            stats_obj.pop("hp", None)
             # Ensure current_mana key mirrors mana baseline if absent
             if "current_mana" in stats_obj:
                 stats_obj["current_mana"] = int(stats_obj.get("current_mana", stats_obj.get("mana", 30)))
@@ -219,6 +221,51 @@ def _clear_websocket_state():
     except Exception:
         pass
     yield
+
+
+@pytest.fixture(autouse=True)
+def _reset_volatile_game_config(test_app):
+    """Clear tunable GameConfig keys that individual tests mutate.
+
+    Several tests call GameConfig.set(...) to force encounter rates, rarity
+    weights, or monster AI behavior. Because the test suite shares one session
+    DB, those rows otherwise leak into later tests (e.g. an encounter rate of
+    1.0 forcing combat where none is expected). All affected readers fall back
+    to sane defaults when the key is absent, so deleting them between tests
+    restores baseline behavior without needing a full DB rebuild.
+    """
+    VOLATILE_KEYS = (
+        "encounter_spawn",
+        "rarity_weights",
+        "game_rules.encounter_spawn_rate",
+        "monster_ai",
+        "debug_encounters",
+    )
+
+    def _purge():
+        try:
+            from app import db
+            from app.models import GameConfig, GameClock
+
+            GameConfig.query.filter(GameConfig.key.in_(VOLATILE_KEYS)).delete(synchronize_session=False)
+            # Clear a combat-paused clock left behind by a test whose combat
+            # never completed; otherwise non-combat actions stop advancing time.
+            clock = db.session.get(GameClock, 1)
+            if clock is not None and clock.combat:
+                clock.combat = False
+                db.session.add(clock)
+            db.session.commit()
+        except Exception:
+            try:
+                from app import db as _db
+
+                _db.session.rollback()
+            except Exception:
+                pass
+
+    _purge()
+    yield
+    _purge()
 
 
 @pytest.fixture(autouse=True)

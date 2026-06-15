@@ -304,13 +304,21 @@ def autofill_characters():
     session["party"] = party
     session["last_party_ids"] = [p["id"] for p in party]
 
-    # Minimal payload for client (only what it needs to reflect party state)
+    # Full roster (stats/coins/inventory) for clients that render the dashboard
+    # character list directly from the autofill response.
+    from app.routes.dashboard_helpers import serialize_character_list
+
+    roster = serialize_character_list(uid)
+
+    # Payload for client (party state + full roster).
     payload = {
         "created": created_count,
         "party_size": len(party),
         "party": [
             {"id": p["id"], "name": p["name"], "class": p["class"], "hp": p["hp"], "mana": p["mana"]} for p in party
         ],
+        "characters": roster,
+        "total": len(chars),
         "total_characters": len(chars),
     }
     return jsonify(payload), (201 if created_count > 0 else 200)

@@ -37,14 +37,26 @@ def test_treasure_claim_endpoint(auth_client):
         pytest.skip("No treasure entities seeded for this seed; sampling heuristic produced zero")
     target = treasures[0]
     cid = target["id"]
-    # Ensure proximity: move player adjacent/same tile by patching instance directly
+    # Ensure proximity: move player onto the treasure tile by patching THIS
+    # client's instance directly. Resolve it via the session id rather than
+    # DungeonInstance.query.first(), which returns a stale row from another
+    # test in the shared session DB and leaves the real instance far away.
     from app import db
     from app.models.dungeon_instance import DungeonInstance
 
-    inst = DungeonInstance.query.first()
+    with auth_client.session_transaction() as _s:
+        inst_id = _s.get("dungeon_instance_id")
+    inst = db.session.get(DungeonInstance, inst_id)
     inst.pos_x, inst.pos_y = target["x"], target["y"]  # same tile to satisfy dist<=1
     db.session.commit()
-    claim = auth_client.post(f"/api/dungeon/treasure/claim/{cid}")
+    # Hidden treasures gate the claim behind a re-rollable perception check.
+    # Retry a bounded number of times (each attempt re-rolls and does not
+    # consume the treasure) so the test is robust to RNG.
+    claim = None
+    for _ in range(40):
+        claim = auth_client.post(f"/api/dungeon/treasure/claim/{cid}")
+        if claim.status_code != 400 or claim.get_json().get("error") != "perception_failed":
+            break
     assert claim.status_code == 200, claim.get_json()
     payload = claim.get_json()
     assert payload.get("claimed") is True

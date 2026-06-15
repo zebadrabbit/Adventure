@@ -39,9 +39,12 @@ def test_run_migrations_idempotent():
         server.db.create_all()
         server._run_migrations()
         server._run_migrations()
-        # Ensure expected columns exist (role & email on user; xp on character)
-        res = db.session.execute(db.text("PRAGMA table_info('user')"))
-        cols = {r[1] for r in res}
+        # Ensure expected columns exist (role & email on user). Use SQLAlchemy's
+        # dialect-agnostic inspector so this passes on both SQLite and PostgreSQL.
+        from sqlalchemy import inspect as _sa_inspect
+
+        inspector = _sa_inspect(db.engine)
+        cols = {c["name"] for c in inspector.get_columns("user")}
         assert "email" in cols and "role" in cols
 
 

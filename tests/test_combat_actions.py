@@ -87,6 +87,10 @@ def _start(user_id, monkeypatch, seq=None, rand_vals=None):
                 raw = _json.loads(c.stats) if c.stats else {}
             except Exception:
                 raw = {}
+            # Drop persisted current-hp so each combat session re-derives full
+            # max HP. Without this a prior test that left the character at 0 HP
+            # (combat death) leaks through the shared session DB.
+            raw.pop("hp", None)
             # If base mana specified, restore current_mana to at least that value and not above computed max.
             base_mana = raw.get("mana")
             # Remove depleted current_mana so _derive_stats recalculates from base mana for isolation.

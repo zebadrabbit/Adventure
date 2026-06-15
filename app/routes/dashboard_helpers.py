@@ -147,6 +147,12 @@ def serialize_character_list(user_id: int) -> list[dict[str, Any]]:
             new_stats["class"] = class_name.lower()
             c.stats = json.dumps(new_stats)
             backfilled = True
+        try:
+            gear = json.loads(c.gear) if c.gear else {}
+            if not isinstance(gear, dict):
+                gear = {}
+        except Exception:
+            gear = {}
         out.append(
             {
                 "id": c.id,
@@ -154,6 +160,7 @@ def serialize_character_list(user_id: int) -> list[dict[str, Any]]:
                 "stats": stats,
                 "coins": coins,
                 "inventory": inventory,
+                "gear": gear,
                 "class_name": class_name,
                 "xp": getattr(c, "xp", 0),
                 "level": getattr(c, "level", 1),

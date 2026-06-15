@@ -37,17 +37,31 @@
         }
     };
 
-    // Tile color palette (dark mode optimized)
+    // Tile color palette (dark mode optimized). `base` is the flat colour used
+    // for the minimap and as a fallback; the richer per-tile art in paintTile()
+    // layers floor texture, beveled walls and wooden doors on top.
     const TILE_COLORS = {
-        room: '#256535',
-        tunnel: '#155067',
-        wall: '#523727',
-        door: '#551455',
-        secret_door: '#3d2a1f',
-        locked_door: '#664466',
-        cave: '#121212',
+        room: '#2d3340',
+        tunnel: '#242a36',
+        wall: '#39414f',
+        door: '#9a6b35',
+        secret_door: '#39414f',
+        locked_door: '#964a4a',
+        cave: '#0a0b0f',
         teleporter: '#6B46C1',
-        default: '#232323'
+        default: '#1a1d24'
+    };
+
+    // Extended style table for textured tile rendering.
+    const TILE_STYLE = {
+        cave: { kind: 'void', base: '#0a0b0f' },
+        room: { kind: 'floor', base: '#2d3340', alt: '#333a48', edge: 'rgba(0,0,0,0.28)' },
+        tunnel: { kind: 'floor', base: '#242a36', alt: '#282f3c', edge: 'rgba(0,0,0,0.32)' },
+        wall: { kind: 'wall', base: '#39414f', hi: '#515b6e', lo: '#232932' },
+        secret_door: { kind: 'wall', base: '#39414f', hi: '#515b6e', lo: '#232932' },
+        door: { kind: 'door', floor: '#2d3340', wood: '#9a6b35', plank: '#6f4a22' },
+        locked_door: { kind: 'door', floor: '#2d3340', wood: '#964a4a', plank: '#602a2a' },
+        default: { kind: 'void', base: '#1a1d24' }
     };
 
     class DungeonCanvas {
@@ -516,6 +530,60 @@
             return TILE_COLORS[cell] || TILE_COLORS.default;
         }
 
+        getTileName(cell) {
+            if (typeof cell === 'object' && cell !== null && cell.cell_type) {
+                return cell.cell_type;
+            }
+            return cell;
+        }
+
+        // Paint a single tile with light texture/depth so the map reads as a
+        // stone dungeon rather than flat coloured squares: flagstone floors,
+        // beveled wall blocks and planked wooden doors.
+        paintTile(cell, tileX, tileY, px, py) {
+            const ctx = this.ctx;
+            const s = TILE_STYLE[this.getTileName(cell)] || TILE_STYLE.default;
+            const S = TILE_SIZE;
+
+            if (s.kind === 'floor') {
+                ctx.fillStyle = ((tileX + tileY) & 1) ? s.alt : s.base;
+                ctx.fillRect(px, py, S, S);
+                // Subtle inset rim to suggest individual flagstones.
+                ctx.strokeStyle = s.edge;
+                ctx.lineWidth = 1;
+                ctx.strokeRect(px + 0.5, py + 0.5, S - 1, S - 1);
+            } else if (s.kind === 'wall') {
+                ctx.fillStyle = s.base;
+                ctx.fillRect(px, py, S, S);
+                // Top/left highlight + bottom/right shadow => raised block.
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = s.hi;
+                ctx.beginPath();
+                ctx.moveTo(px + 0.5, py + S - 1); ctx.lineTo(px + 0.5, py + 0.5); ctx.lineTo(px + S - 1, py + 0.5);
+                ctx.stroke();
+                ctx.strokeStyle = s.lo;
+                ctx.beginPath();
+                ctx.moveTo(px + S - 0.5, py + 0.5); ctx.lineTo(px + S - 0.5, py + S - 0.5); ctx.lineTo(px + 0.5, py + S - 0.5);
+                ctx.stroke();
+            } else if (s.kind === 'door') {
+                ctx.fillStyle = s.floor;
+                ctx.fillRect(px, py, S, S);
+                const m = Math.max(2, Math.round(S * 0.18));
+                ctx.fillStyle = s.wood;
+                ctx.fillRect(px + m, py + m, S - 2 * m, S - 2 * m);
+                ctx.strokeStyle = s.plank;
+                ctx.lineWidth = 1;
+                ctx.strokeRect(px + m + 0.5, py + m + 0.5, S - 2 * m - 1, S - 2 * m - 1);
+                // Central plank seam.
+                ctx.beginPath();
+                ctx.moveTo(px + S / 2, py + m); ctx.lineTo(px + S / 2, py + S - m);
+                ctx.stroke();
+            } else {
+                ctx.fillStyle = s.base;
+                ctx.fillRect(px, py, S, S);
+            }
+        }
+
         render() {
             if (!this.grid) return;
 
@@ -550,12 +618,10 @@
                     // Calculate distance to player
                     const dist = this.playerPos ? Math.hypot(x - this.playerPos.x, y - this.playerPos.y) : Infinity;
 
-                    // Base tile color
-                    const baseColor = this.getTileColor(cell);
-                    this.ctx.fillStyle = baseColor;
                     // Flip Y axis: game Y increases north, canvas Y increases south
                     const canvasY = (this.height - 1 - y) * TILE_SIZE;
-                    this.ctx.fillRect(x * TILE_SIZE, canvasY, TILE_SIZE, TILE_SIZE);
+                    // Textured tile (flagstone floor / beveled wall / wooden door)
+                    this.paintTile(cell, x, y, x * TILE_SIZE, canvasY);
 
                     // Special rendering for teleporter
                     if (cell === 'teleporter' && dist <= OUTER_VIS_RADIUS) {
@@ -627,10 +693,6 @@
                         }
                     }
 
-                    // Draw grid lines (subtle)
-                    this.ctx.strokeStyle = 'rgba(48, 48, 48, 0.3)';
-                    this.ctx.lineWidth = 0.5;
-                    this.ctx.strokeRect(x * TILE_SIZE, canvasY, TILE_SIZE, TILE_SIZE);
                 }
             }
 
