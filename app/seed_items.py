@@ -34,8 +34,6 @@ from app import db
 SQL_DIR = Path(__file__).resolve().parent.parent / "sql"
 
 ITEM_FILES_ORDER = [
-    "items_weapons.sql",
-    "items_armor.sql",
     "items_potions.sql",
     "items_misc.sql",
 ]
