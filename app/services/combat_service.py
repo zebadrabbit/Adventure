@@ -23,6 +23,8 @@ import structlog
 
 from app import db, socketio
 from app.models.models import Character, CombatSession
+from app.models.dungeon_instance import DungeonInstance
+from app.services import extraction_service
 
 from .combat_constants import (
     ACTOR_START_ACTION,
@@ -664,6 +666,7 @@ def _check_end(session: CombatSession):
                 session.party_snapshot_json = json.dumps(party)
         except Exception:
             pass
+        sync_member_death_states(session)
         _persist_party_resources(session)
         set_combat_state(False)
         return
@@ -674,8 +677,72 @@ def _check_end(session: CombatSession):
         session.status = "complete"
         session.rewards_json = json.dumps({})
         _append_log(session, "Party defeated.", code=COMBAT_COMPLETE)
+        resolve_party_defeat_if_any(session)
         _persist_party_resources(session)
         set_combat_state(False)
+
+
+def _current_instance_for_user(user_id: int):
+    """Resolve the user's active dungeon instance (most recent), or None."""
+    return DungeonInstance.query.filter_by(user_id=user_id).order_by(DungeonInstance.id.desc()).first()
+
+
+def sync_member_death_states(session) -> None:
+    """Persist per-member downed state to Character rows after a resolution.
+
+    Any member at hp<=0 becomes is_dead + locked to the current instance (downed,
+    recoverable). Does NOT set permadeath here — that is decided at extraction or
+    on a wipe.
+    """
+    party = json.loads(session.party_snapshot_json or "{}") or {}
+    members = party.get("members", [])
+    if not members:
+        return
+    instance = _current_instance_for_user(session.user_id)
+    char_rows = {c.id: c for c in Character.query.filter_by(user_id=session.user_id).all()}
+    changed = False
+    for m in members:
+        cid = m.get("char_id") or m.get("id")
+        char = char_rows.get(cid)
+        if not char:
+            continue
+        if m.get("hp", 0) <= 0 and not char.is_dead:
+            if instance is not None:
+                extraction_service.handle_character_death(char, instance)
+            else:
+                char.is_dead = True
+                char.death_count = (char.death_count or 0) + 1
+            changed = True
+    if changed:
+        db.session.commit()
+
+
+def resolve_party_defeat_if_any(session) -> bool:
+    """If every party member is at 0 HP, permadeath the run.
+
+    Marks each member's Character dead + permadeath (a wipe loses the run: the haul
+    is simply never pooled into the hoard). Returns True if a wipe occurred.
+    """
+    party = json.loads(session.party_snapshot_json or "{}") or {}
+    members = party.get("members", [])
+    alive = [m for m in members if m.get("hp", 0) > 0]
+    if members and not alive:
+        instance = _current_instance_for_user(session.user_id)
+        char_rows = {c.id: c for c in Character.query.filter_by(user_id=session.user_id).all()}
+        for m in members:
+            cid = m.get("char_id") or m.get("id")
+            char = char_rows.get(cid)
+            if not char:
+                continue
+            if instance is not None:
+                extraction_service.handle_character_death(char, instance)
+            else:
+                char.is_dead = True
+                char.death_count = (char.death_count or 0) + 1
+            char.permadeath = True
+        db.session.commit()
+        return True
+    return False
 
 
 def _emit_session(event: str, session: CombatSession):  # safe emit wrapper
