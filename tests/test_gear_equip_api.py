@@ -28,7 +28,11 @@ def _login(client, app):
                 items=json.dumps([inst]),
             )
             db.session.add(c)
-            db.session.commit()
+        else:
+            # Reset to known state so test is idempotent
+            c.gear = "{}"
+            c.items = json.dumps([inst])
+        db.session.commit()
         cid = c.id
         uid = u.id
     with client.session_transaction() as s:
