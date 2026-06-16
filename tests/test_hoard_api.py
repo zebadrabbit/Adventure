@@ -40,3 +40,43 @@ def test_withdraw_instance_to_character(client):
     assert resp.status_code == 200, resp.get_json()
     db.session.refresh(char)
     assert any(i.get("uid") == "wx" for i in json.loads(char.items))
+
+
+def test_loot_body_transfers_bag_to_survivor(client):
+    import uuid
+
+    from tests.factories import create_character, create_user
+
+    user = create_user("loot_a_" + uuid.uuid4().hex[:8])
+    downed = create_character(user, name="Fallen", items=[{"slug": "potion_heal_l1", "qty": 2}])
+    downed.is_dead = True
+    survivor = create_character(user, name="Living", items=[])
+    db.session.commit()
+    _login(client, user)
+
+    resp = client.post(
+        "/api/dungeon/loot-body",
+        json={"downed_id": downed.id, "survivor_id": survivor.id},
+    )
+    assert resp.status_code == 200, resp.get_json()
+    db.session.refresh(survivor)
+    db.session.refresh(downed)
+    assert any(i.get("slug") == "potion_heal_l1" for i in json.loads(survivor.items))
+    assert json.loads(downed.items) == []
+
+
+def test_loot_body_requires_downed_character(client):
+    import uuid
+
+    from tests.factories import create_character, create_user
+
+    user = create_user("loot_b_" + uuid.uuid4().hex[:8])
+    alive = create_character(user, name="Healthy", items=[{"slug": "potion_heal_l1", "qty": 1}])
+    survivor = create_character(user, name="Other", items=[])
+    db.session.commit()
+    _login(client, user)
+    resp = client.post(
+        "/api/dungeon/loot-body",
+        json={"downed_id": alive.id, "survivor_id": survivor.id},
+    )
+    assert resp.status_code == 400

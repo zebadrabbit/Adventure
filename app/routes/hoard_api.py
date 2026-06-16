@@ -8,6 +8,7 @@ from flask_login import current_user, login_required
 from app import db
 from app.economy import hoard_service
 from app.economy.currency import format_copper
+from app.inventory.utils import load_inventory
 from app.models.hoard import Hoard
 from app.models.models import Character
 
@@ -46,5 +47,36 @@ def withdraw():
     ok = hoard_service.withdraw_to_character(hoard, char, slug=slug, uid=uid)
     if not ok:
         return jsonify({"error": "Item not in hoard"}), 400
+    db.session.commit()
+    return jsonify({"success": True})
+
+
+@bp_hoard.route("/api/dungeon/loot-body", methods=["POST"])
+@login_required
+def loot_body():
+    """Transfer a downed ally's bag onto a surviving character.
+
+    The downed character keeps is_dead; once looted they are typically left behind
+    (permadeath happens at extraction). Only the owner's characters are eligible.
+    """
+    data = request.get_json() or {}
+    downed_id = data.get("downed_id")
+    survivor_id = data.get("survivor_id")
+    if not downed_id or not survivor_id:
+        return jsonify({"error": "Missing required fields"}), 400
+
+    downed = db.session.get(Character, downed_id)
+    survivor = db.session.get(Character, survivor_id)
+    if not downed or not survivor or downed.user_id != current_user.id or survivor.user_id != current_user.id:
+        return jsonify({"error": "Character not found"}), 404
+    if not downed.is_dead:
+        return jsonify({"error": "Character is not downed"}), 400
+
+    bag = load_inventory(downed.items)
+    survivor_bag = load_inventory(survivor.items)
+    for entry in bag:
+        survivor_bag.append(entry)
+    survivor.items = json.dumps(survivor_bag)
+    downed.items = "[]"
     db.session.commit()
     return jsonify({"success": True})
