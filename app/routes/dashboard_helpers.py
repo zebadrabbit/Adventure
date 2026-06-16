@@ -219,6 +219,16 @@ def build_party_payload(chars: Sequence[Character]):
         # Max Mana: base 20 + INT*2 (matches combat_service.py)
         mana_max = 20 + intelligence * 2
 
+        from app.loot.equip import gear_bonuses
+
+        try:
+            gear = json.loads(c.gear) if getattr(c, "gear", None) else {}
+        except Exception:
+            gear = {}
+        gb = gear_bonuses(gear)
+        hp_max += int(gb.get("max_hp", 0)) + int(gb.get("con", 0)) * 2
+        mana_max += int(gb.get("mana", 0)) + int(gb.get("int", 0)) * 2
+
         # Read actual current HP/MP from stats (persistent values)
         hp = int(s.get("hp", hp_max))  # Default to full if not set
         mana = int(s.get("current_mana", s.get("mana", mana_max)))  # Check both keys

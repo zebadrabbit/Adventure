@@ -149,7 +149,22 @@ def roll_loot(monster: Dict[str, Any], rng: random.Random | None = None) -> Dict
     qty_map: Dict[str, int] = {}
     for slug in drops:
         qty_map[slug] = qty_map.get(slug, 0) + 1
-    return {"items": qty_map, "items_list": drops, "rolls": rolls_meta}
+
+    # Procedural gear drops (instances with affixes).
+    from app.loot.generator import generate_item
+
+    level = int(monster.get("level", 1) or 1)
+    n_gear = 1
+    rarity_hint = None
+    # Use a proper random.Random for generate_item (which needs .choice); fall back to
+    # a fresh instance if the caller passed a limited mock rng.
+    gear_rng = rng if isinstance(rng, random.Random) else random.Random()
+    if is_boss:
+        n_gear = 2
+        rarity_hint = gear_rng.choice(["rare", "epic", "legendary"])
+    gear_drops = [generate_item(level=level, rarity=rarity_hint, rng=gear_rng) for _ in range(n_gear)]
+
+    return {"items": qty_map, "items_list": drops, "gear": gear_drops, "rolls": rolls_meta}
 
 
 __all__ = ["roll_loot"]

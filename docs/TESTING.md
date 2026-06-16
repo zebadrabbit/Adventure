@@ -28,3 +28,26 @@ Dungeon generation is pure Python and can run without a database:
     .venv/bin/python -m pytest tests/test_dungeon_basic.py \
       tests/test_dungeon_carve_floor.py tests/test_dungeon_golden_seeds.py \
       tests/test_room_connectivity.py -q
+
+## Postgres bootstrap
+
+Start a local Postgres 15 container (skip if one is already running):
+
+    docker run -d --rm --name adv_pg \
+      -e POSTGRES_DB=adventure \
+      -e POSTGRES_USER=adventure \
+      -e POSTGRES_PASSWORD=changeme \
+      -p 5434:5432 \
+      postgres:15-alpine
+
+Create the target database inside the container (if it does not exist yet):
+
+    docker exec adv_pg psql -U adventure -d adventure -c "CREATE DATABASE adventure;" 2>/dev/null || true
+
+Bootstrap schema + seed data with one command:
+
+    DATABASE_URL=postgresql://adventure:changeme@localhost:5434/adventure ./scripts/bootstrap_db.sh
+
+This creates all tables, runs any additive migrations, seeds game config, and
+loads item/affix/weapon/enemy catalog data. The script is idempotent: re-running
+it clears and reloads the catalog rows without touching player data.

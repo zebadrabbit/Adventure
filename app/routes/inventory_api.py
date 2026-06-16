@@ -38,6 +38,10 @@ _SLOTS = (
     "ring1",
     "ring2",
     "amulet",
+    # canonical 8-slot gear slots (procedural items)
+    "hands",
+    "feet",
+    "ring",
 )
 
 
@@ -178,6 +182,32 @@ def _serialize_item(item: Item) -> dict:
     }
 
 
+def _gear_instances_from_items(raw_json: str | None) -> list[dict]:
+    """Extract procedural gear instances (dicts with uid) from the raw items JSON.
+
+    These are skipped by load_inventory (which only handles slug/qty dicts) but
+    must be included in the bag payload so the UI can render and equip them.
+    """
+    if not raw_json:
+        return []
+    try:
+        data = json.loads(raw_json)
+    except Exception:
+        return []
+    if not isinstance(data, list):
+        return []
+    return [item for item in data if isinstance(item, dict) and item.get("uid")]
+
+
+def _serialize_gear_slot(slot_value, items_map: dict) -> dict | None:
+    """Serialize a gear slot value — either a legacy slug string or a gear instance dict."""
+    if isinstance(slot_value, dict) and slot_value.get("uid"):
+        return slot_value  # already a serializable instance
+    if isinstance(slot_value, str) and slot_value in items_map:
+        return _serialize_item(items_map[slot_value])
+    return None
+
+
 # ----------------------- Endpoints -----------------------
 
 
@@ -211,13 +241,14 @@ def list_characters_state():
         for obj in inv_objs:
             slugs_needed.add(obj["slug"])
         gear = _normalize_gear(_safe_json_load(ch.gear, {}))
-        slugs_needed.update([s for s in gear.values() if s])
+        slugs_needed.update([s for s in gear.values() if isinstance(s, str) and s])
     items_map = {it.slug: it for it in Item.query.filter(Item.slug.in_(slugs_needed)).all()} if slugs_needed else {}
     for ch in chars:
         try:
             base_stats = _safe_json_load(ch.stats, {})
             gear = _normalize_gear(_safe_json_load(ch.gear, {}))
             inv_objs = load_inventory(ch.items)
+            gear_instances = _gear_instances_from_items(ch.items)
             # Compute encumbrance BEFORE penalty application (but penalty affects exposed computed base dex)
             str_score = int(base_stats.get("str", 10)) if isinstance(base_stats, dict) else 10
             enc_state = encumbrance_state(str_score, inv_objs)
@@ -232,16 +263,15 @@ def list_characters_state():
                 ser = _serialize_item(it)
                 ser["qty"] = obj.get("qty", 1)
                 bag_payload.append(ser)
+            # Append procedural gear instances after legacy consumables
+            bag_payload.extend(gear_instances)
             out.append(
                 {
                     "id": ch.id,
                     "name": ch.name,
                     "level": ch.level,
                     "stats": {"base": penalized_base, "computed": computed},
-                    "gear": {
-                        slot: (_serialize_item(items_map[slug]) if slug in items_map else None)
-                        for slot, slug in (gear or {}).items()
-                    },
+                    "gear": {slot: _serialize_gear_slot(val, items_map) for slot, val in (gear or {}).items()},
                     "bag": bag_payload,
                     "encumbrance": enc_state,
                 }
@@ -280,13 +310,14 @@ def get_character_state(cid: int):
 
     # Load inventory and gear
     inv_objs = load_inventory(ch.items)
+    gear_instances = _gear_instances_from_items(ch.items)
     gear = _normalize_gear(_safe_json_load(ch.gear, {}))
 
-    # Gather all slugs for item lookup
+    # Gather all slugs for item lookup (skip instance dicts in gear values)
     slugs_needed = set()
     for obj in inv_objs:
         slugs_needed.add(obj["slug"])
-    slugs_needed.update([s for s in gear.values() if s])
+    slugs_needed.update([s for s in gear.values() if isinstance(s, str) and s])
 
     items_map = {it.slug: it for it in Item.query.filter(Item.slug.in_(slugs_needed)).all()} if slugs_needed else {}
 
@@ -297,7 +328,7 @@ def get_character_state(cid: int):
     penalized_base = apply_encumbrance_penalty(base_stats, enc_state)
     computed = _computed_stats(penalized_base, gear, items_map)
 
-    # Build bag payload
+    # Build bag payload: legacy consumables first, then gear instances
     bag_payload = []
     for obj in inv_objs:
         slug = obj["slug"]
@@ -307,11 +338,10 @@ def get_character_state(cid: int):
         ser = _serialize_item(it)
         ser["qty"] = obj.get("qty", 1)
         bag_payload.append(ser)
+    bag_payload.extend(gear_instances)
 
-    # Build gear payload
-    gear_payload = {
-        slot: (_serialize_item(items_map[slug]) if slug in items_map else None) for slot, slug in (gear or {}).items()
-    }
+    # Build gear payload — handles both legacy slugs and instance dicts
+    gear_payload = {slot: _serialize_gear_slot(val, items_map) for slot, val in (gear or {}).items()}
 
     return jsonify(
         {
@@ -334,6 +364,35 @@ def equip_item(cid: int):
     if not ch:
         return jsonify({"error": "not found"}), 404
     data = request.get_json(silent=True) or {}
+
+    # --- Gear-instance path: uid-based equip for procedural items ---
+    uid = (data.get("uid") or "").strip()
+    if uid:
+        from app.loot.data.archetypes import SLOTS as GEAR_SLOTS
+
+        items_raw = json.loads(ch.items) if ch.items else []
+        if not isinstance(items_raw, list):
+            items_raw = []
+        gear_raw = json.loads(ch.gear) if ch.gear else {}
+        if not isinstance(gear_raw, dict):
+            gear_raw = {}
+        inst = next((i for i in items_raw if isinstance(i, dict) and i.get("uid") == uid), None)
+        if not inst:
+            return jsonify({"error": "not_in_inventory"}), 400
+        slot = inst.get("slot")
+        if slot not in GEAR_SLOTS:
+            return jsonify({"error": "bad_slot"}), 400
+        # Swap any currently-equipped item in that slot back into items
+        if gear_raw.get(slot):
+            items_raw.append(gear_raw[slot])
+        gear_raw[slot] = inst
+        items_raw = [i for i in items_raw if not (isinstance(i, dict) and i.get("uid") == uid)]
+        ch.gear = json.dumps(gear_raw)
+        ch.items = json.dumps(items_raw)
+        db.session.commit()
+        return jsonify({"ok": True, "slot": slot, "gear": gear_raw})
+
+    # --- Legacy slug-based equip path ---
     slug = (data.get("slug") or "").strip()
     if not slug:
         return jsonify({"error": "missing slug"}), 400
@@ -386,10 +445,24 @@ def unequip_item(cid: int):
     if slot not in _SLOTS:
         return jsonify({"error": "invalid slot"}), 400
     gear = _normalize_gear(_safe_json_load(ch.gear, {}))
-    _ = _safe_json_load(ch.items, [])  # noqa: F841 (loaded for potential future validation)
-    slug = gear.get(slot)
-    if not slug:
+    equipped = gear.get(slot)
+    if not equipped:
         return jsonify({"error": "empty slot"}), 400
+
+    # Gear-instance path: equipped value is a dict with uid
+    if isinstance(equipped, dict) and equipped.get("uid"):
+        items_raw = json.loads(ch.items) if ch.items else []
+        if not isinstance(items_raw, list):
+            items_raw = []
+        items_raw.append(equipped)
+        del gear[slot]
+        ch.gear = json.dumps(gear)
+        ch.items = json.dumps(items_raw)
+        db.session.commit()
+        return jsonify({"ok": True, "gear": gear})
+
+    # Legacy slug-based path
+    slug = equipped
     inv = load_inventory(ch.items)
     from app.inventory.utils import add_item
 

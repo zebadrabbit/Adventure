@@ -8,8 +8,6 @@ from flask_login import current_user, login_required
 
 from app import db
 from app.inventory.utils import add_item, can_add_item, dump_inventory, load_inventory
-from app.loot.affix_generator import generate_item_name, get_affix_stats
-from app.models.affix import ItemAffix
 from app.models.dungeon_instance import DungeonInstance
 from app.models.loot import DungeonLoot
 from app.models.models import Character, CombatSession, Item
@@ -44,13 +42,6 @@ def list_loot():
         if not item:
             continue
 
-        # Get affixes for this loot placement
-        affixes = ItemAffix.query.filter_by(dungeon_seed=inst.seed, x=r.x, y=r.y, z=r.z).all()
-
-        # Generate procedural name and stats
-        item_name = generate_item_name(item, affixes) if affixes else item.name
-        affix_stats = get_affix_stats(affixes) if affixes else {}
-
         loot.append(
             {
                 "id": r.id,
@@ -58,19 +49,12 @@ def list_loot():
                 "y": r.y,
                 "z": r.z,
                 "slug": item.slug,
-                "name": item_name,
+                "name": item.name,
                 "base_name": item.name,
                 "rarity": getattr(item, "rarity", "common"),
                 "level": getattr(item, "level", 0),
-                "affixes": [
-                    {
-                        "name": a.affix.name,
-                        "stat": a.affix.affected_stat,
-                        "value": round(a.rolled_value, 1),
-                    }
-                    for a in affixes
-                ],
-                "stats": affix_stats,
+                "affixes": [],
+                "stats": {},
             }
         )
     return jsonify({"loot": loot})

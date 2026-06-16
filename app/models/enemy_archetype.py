@@ -41,7 +41,7 @@ class EnemyArchetype(db.Model):
     xp_base = db.Column(db.Integer, nullable=False, default=15)
     xp_per_level = db.Column(db.Float, nullable=False, default=5.0)
     loot_multiplier = db.Column(db.Float, nullable=False, default=1.0)
-    spawn_weight = db.Column(db.Integer, nullable=False, default=10)
+    spawn_weight = db.Column(db.Integer, nullable=False, default=10, server_default="10")
     description = db.Column(db.Text, nullable=True)
     notes = db.Column(db.Text, nullable=True)
 

@@ -3,16 +3,19 @@
 Generates level-appropriate loot drops for a dungeon seed using item level
 and rarity weighting. Designed to be idempotent: calling generate_loot_for_seed
 multiple times will not duplicate existing placements at the same coordinates.
+
+Also provides `generate_item`: procedural item generator that produces
+self-contained item instances from archetype + rarity + affix rolls.
 """
 
 from __future__ import annotations
 
 import random
+import uuid
 from dataclasses import dataclass
 from typing import List, Sequence
 
 from app import db
-from app.loot.affix_generator import apply_procedural_affixes
 from app.models.loot import DungeonLoot
 from app.models.models import Item
 
@@ -139,26 +142,137 @@ def generate_loot_for_seed(cfg: LootConfig, walkable_tiles: Sequence[tuple[int, 
         if DungeonLoot.query.filter_by(seed=cfg.seed, x=x, y=y, z=z).first():
             continue
 
-        # Calculate item level (dungeon level ± random variance)
-        item_level = max(1, cfg.avg_party_level + rng.randint(-2, 2))
-
-        # Apply procedural affixes based on item rarity
-        affixes = apply_procedural_affixes(
-            item=item,
-            item_level=item_level,
-            dungeon_seed=cfg.seed,
-            coords=(x, y, z),
-            rng=rng,
-        )
-
         # Create loot placement
         db.session.add(DungeonLoot(seed=cfg.seed, x=x, y=y, z=z, item_id=item.id))
-
-        # Save affixes for this item instance
-        for affix in affixes:
-            db.session.add(affix)
 
         created += 1
     if created:
         db.session.commit()
     return created
+
+
+# ---------------------------------------------------------------------------
+# Procedural item instance generator (archetype + rarity + prefix/suffix)
+# ---------------------------------------------------------------------------
+
+from app.loot.data.archetypes import ARCHETYPES, SLOTS, archetypes_for_slot  # noqa: E402
+from app.loot.data.prefixes import prefixes_for  # noqa: E402
+from app.loot.data.suffixes import suffixes_for  # noqa: E402
+from app.loot.data.rarities import RARITIES, RARITY_ORDER, rarity_affix_range  # noqa: E402
+from app.loot.naming import compose_name  # noqa: E402
+
+# default rarity weighting when none requested
+_DEFAULT_RARITY_WEIGHTS = {
+    "common": 600,
+    "uncommon": 250,
+    "rare": 100,
+    "epic": 35,
+    "legendary": 13,
+    "mythic": 2,
+}
+
+
+def _weighted_choice(rng: random.Random, items: list, weight_key):
+    total = sum(weight_key(i) for i in items)
+    if total <= 0:
+        return rng.choice(items)
+    pivot = rng.random() * total
+    acc = 0.0
+    for i in items:
+        acc += weight_key(i)
+        if pivot <= acc:
+            return i
+    return items[-1]
+
+
+def _roll_rarity(rng: random.Random) -> str:
+    pairs = [(r, _DEFAULT_RARITY_WEIGHTS[r]) for r in RARITY_ORDER]
+    return _weighted_choice(rng, pairs, lambda p: p[1])[0]
+
+
+def _base_stat_block(arch: dict, level: int, rng: random.Random) -> list[dict]:
+    """Innate stat from the archetype (weapon damage / armor)."""
+    out = []
+    if "damage" in arch:
+        lo, hi = arch["damage"]
+        out.append({"stat": "damage", "val": rng.randint(lo, hi) + level // 3})
+    if "armor" in arch and arch["armor"][1] > 0:
+        lo, hi = arch["armor"]
+        out.append({"stat": "armor", "val": rng.randint(lo, hi) + level // 4})
+    return out
+
+
+def _roll_prefix(arch: dict, level: int, rng: random.Random):
+    pool = prefixes_for(arch["slot"], arch["category"])
+    if not pool:
+        return None, None
+    p = _weighted_choice(rng, pool, lambda x: x["weight"])
+    val = rng.randint(p["min"], p["max"]) + int(p["scale"] * max(0, level - 1))
+    return p["name"], {"stat": p["stat"], "val": max(1, int(val))}
+
+
+def _roll_suffix(arch: dict, level: int, rng: random.Random):
+    pool = suffixes_for(arch.get("affinity", []))
+    if not pool:
+        return None, []
+    s = _weighted_choice(rng, pool, lambda x: x["weight"])
+    # Budget scales with level; split across the theme's stats by weight.
+    budget = 3 + level // 2
+    wsum = sum(s["stats"].values())
+    affixes = []
+    for stat, w in s["stats"].items():
+        val = max(1, round(budget * w / wsum))
+        affixes.append({"stat": stat, "val": val})
+    return s["name"], affixes
+
+
+def generate_item(
+    level: int,
+    rarity: str | None = None,
+    slot: str | None = None,
+    rng: random.Random | None = None,
+) -> dict:
+    rng = rng or random.Random()
+    rarity = rarity if rarity in RARITIES else _roll_rarity(rng)
+    slot = slot if slot in SLOTS else rng.choice(SLOTS)
+    arch_key = rng.choice(archetypes_for_slot(slot))
+    arch = ARCHETYPES[arch_key]
+
+    affixes = _base_stat_block(arch, level, rng)
+    n_affixes = rng.randint(*rarity_affix_range(rarity))
+
+    prefix_name = suffix_name = None
+    remaining = n_affixes
+    # Alternate: try a suffix (theme) then a prefix, up to remaining budget.
+    if remaining > 0:
+        suffix_name, suffix_affixes = _roll_suffix(arch, level, rng)
+        if suffix_name:
+            affixes.extend(suffix_affixes)
+            remaining -= 1
+    if remaining > 0:
+        prefix_name, prefix_affix = _roll_prefix(arch, level, rng)
+        if prefix_affix:
+            affixes.append(prefix_affix)
+            remaining -= 1
+    # Any further affixes become extra prefixes (single-stat).
+    while remaining > 0:
+        _, extra = _roll_prefix(arch, level, rng)
+        if not extra:
+            break
+        affixes.append(extra)
+        remaining -= 1
+
+    name = compose_name(prefix_name, arch["base_name"], suffix_name)
+    base_value = 8 + level * 4
+    value = int((base_value + sum(a["val"] for a in affixes) * 3) * RARITIES[rarity]["value_mult"])
+
+    return {
+        "uid": uuid.uuid4().hex[:12],
+        "base": arch_key,
+        "slot": slot,
+        "name": name,
+        "rarity": rarity,
+        "ilvl": level,
+        "affixes": affixes,
+        "value": value,
+    }
