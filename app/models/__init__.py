@@ -1,5 +1,4 @@
 # Model package init
-from .affix import ItemAffix, ProceduralAffix  # noqa: F401 re-export
 from .dungeon_instance import DungeonInstance  # noqa: F401 re-export
 from .dungeon_tier import DungeonAffix, DungeonTier  # noqa: F401 re-export
 from .enemy_archetype import EnemyArchetype  # noqa: F401 re-export
@@ -17,8 +16,6 @@ __all__ = [
     "MonsterCatalog",
     "DungeonEntity",
     "Theme",
-    "ProceduralAffix",
-    "ItemAffix",
     "WeaponCategory",
     "EnemyArchetype",
     "DungeonTier",

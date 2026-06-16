@@ -16,7 +16,6 @@ from dataclasses import dataclass
 from typing import List, Sequence
 
 from app import db
-from app.loot.affix_generator import apply_procedural_affixes
 from app.models.loot import DungeonLoot
 from app.models.models import Item
 
@@ -143,24 +142,8 @@ def generate_loot_for_seed(cfg: LootConfig, walkable_tiles: Sequence[tuple[int, 
         if DungeonLoot.query.filter_by(seed=cfg.seed, x=x, y=y, z=z).first():
             continue
 
-        # Calculate item level (dungeon level ± random variance)
-        item_level = max(1, cfg.avg_party_level + rng.randint(-2, 2))
-
-        # Apply procedural affixes based on item rarity
-        affixes = apply_procedural_affixes(
-            item=item,
-            item_level=item_level,
-            dungeon_seed=cfg.seed,
-            coords=(x, y, z),
-            rng=rng,
-        )
-
         # Create loot placement
         db.session.add(DungeonLoot(seed=cfg.seed, x=x, y=y, z=z, item_id=item.id))
-
-        # Save affixes for this item instance
-        for affix in affixes:
-            db.session.add(affix)
 
         created += 1
     if created:

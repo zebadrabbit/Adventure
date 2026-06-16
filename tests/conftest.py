@@ -129,7 +129,17 @@ def _conditional_db_isolation(request, test_app):
     """
     if "db_isolation" in request.keywords:
         with test_app.app_context():
-            db.drop_all()
+            # Use reflected metadata so unknown/orphan tables (e.g. from removed
+            # models) are also dropped cleanly on Postgres.
+            from sqlalchemy import MetaData
+
+            try:
+                with db.engine.begin() as conn:
+                    reflected = MetaData()
+                    reflected.reflect(conn)
+                    reflected.drop_all(conn)
+            except Exception:
+                db.drop_all()
             db.create_all()
             try:
                 from app.server import _run_migrations, _seed_game_config, seed_items
