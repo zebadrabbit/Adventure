@@ -10,6 +10,7 @@ self-contained item instances from archetype + rarity + affix rolls.
 
 from __future__ import annotations
 
+import json
 import random
 import uuid
 from dataclasses import dataclass
@@ -17,7 +18,7 @@ from typing import List, Sequence
 
 from app import db
 from app.models.loot import DungeonLoot
-from app.models.models import Item
+from app.models.models import GameConfig, Item
 
 # Rarity weight configuration (higher = more common)
 RARITY_WEIGHTS = {
@@ -65,12 +66,49 @@ def _level_window(avg_level: int) -> tuple[int, int]:
     return lo, hi
 
 
+_DEFAULT_FLOOR_LOOT = {
+    "procedural_gear_chance": 0.25,
+    "rarity_weights": {"common": 60, "uncommon": 25, "rare": 10, "epic": 4, "legendary": 1},
+}
+
+
+def _floor_loot_config() -> dict:
+    """Read floor-loot tuning from GameConfig['floor_loot'] with safe fallback."""
+    raw = GameConfig.get("floor_loot")
+    if not raw:
+        return dict(_DEFAULT_FLOOR_LOOT)
+    try:
+        cfg = json.loads(raw)
+    except Exception:
+        return dict(_DEFAULT_FLOOR_LOOT)
+    merged = dict(_DEFAULT_FLOOR_LOOT)
+    merged.update(cfg or {})
+    return merged
+
+
+def _roll_floor_rarity(rng: random.Random, weights: dict) -> str:
+    pairs = [(r, int(w)) for r, w in (weights or {}).items() if r in RARITIES and int(w) > 0]
+    if not pairs:
+        return "common"
+    total = sum(w for _, w in pairs)
+    roll = rng.randint(1, total)
+    upto = 0
+    for r, w in pairs:
+        upto += w
+        if roll <= upto:
+            return r
+    return pairs[-1][0]
+
+
 def generate_loot_for_seed(cfg: LootConfig, walkable_tiles: Sequence[tuple[int, int]]):
     """Generate loot placements for the given seed if not already present.
 
     walkable_tiles: list of (x,y) coordinates that are valid placement points.
     """
     rng = random.Random(cfg.seed ^ 0xA5F00D)
+    floor_cfg = _floor_loot_config()
+    gear_chance = float(floor_cfg.get("procedural_gear_chance", 0.0) or 0.0)
+    rarity_weights = floor_cfg.get("rarity_weights", {})
     # Query existing placements for this seed
     existing_coords = {
         (loot_row.x, loot_row.y, loot_row.z) for loot_row in DungeonLoot.query.filter_by(seed=cfg.seed).all()
@@ -142,8 +180,13 @@ def generate_loot_for_seed(cfg: LootConfig, walkable_tiles: Sequence[tuple[int, 
         if DungeonLoot.query.filter_by(seed=cfg.seed, x=x, y=y, z=z).first():
             continue
 
-        # Create loot placement
-        db.session.add(DungeonLoot(seed=cfg.seed, x=x, y=y, z=z, item_id=item.id))
+        if rng.random() < gear_chance:
+            rarity = _roll_floor_rarity(rng, rarity_weights)
+            level = rng.randint(lo, hi)
+            inst = generate_item(level, rarity=rarity, rng=rng)
+            db.session.add(DungeonLoot(seed=cfg.seed, x=x, y=y, z=z, item_id=None, instance_json=json.dumps(inst)))
+        else:
+            db.session.add(DungeonLoot(seed=cfg.seed, x=x, y=y, z=z, item_id=item.id))
 
         created += 1
     if created:
@@ -267,7 +310,7 @@ def generate_item(
     value = int((base_value + sum(a["val"] for a in affixes) * 3) * RARITIES[rarity]["value_mult"])
 
     return {
-        "uid": uuid.uuid4().hex[:12],
+        "uid": uuid.UUID(int=rng.getrandbits(128), version=4).hex[:12],
         "base": arch_key,
         "slot": slot,
         "name": name,
