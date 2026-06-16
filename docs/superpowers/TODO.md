@@ -35,9 +35,12 @@ spec → write an implementation plan (TDD, small tasks) → implement → verif
       unlock/use/grant/reset). This session **secured them**: unlock/use/reset are now
       `@login_required` + owner-checked; `grant_talent_points` is admin-only (was an
       unlimited-point cheat). Tests: `tests/test_skill_unlock.py`. Still TODO:
-      - [ ] Seed starter `SkillTree`/`Skill` rows (idempotent seeder + `run.py` command).
+      - [x] Seed starter `SkillTree`/`Skill` rows ✅ — `app/seed_skills.py` +
+            `python run.py seed-skills` (2 trees, 5 skills w/ prereqs); e2e seed→unlock
+            test. **Run `seed-skills` on deploy.**
       - [ ] Apply passive `effect_json` to derived combat stats (fold into
             `app/loot/equip.py` aggregation); wire active skills as combat actions.
+            (Main remaining 5b work — data + unlock path are ready.)
 - [ ] **5c Progression UI:** character sheet (level/XP bar, stat allocation, skill tree).
 
 ## Known issues / cleanup (not blockers)
