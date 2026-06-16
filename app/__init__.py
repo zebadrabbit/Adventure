@@ -418,6 +418,7 @@ if os.getenv("PYTEST_CURRENT_TEST"):
     try:  # pragma: no cover - defensive init hook
         # Ensure model metadata is loaded
         from app.models import models as _models  # noqa: F401
+        from app.models.hoard import Hoard  # noqa: E402,F401  # ensure table is registered
         from app.server import _run_migrations, _seed_game_config, seed_items
 
         with app.app_context():
