@@ -158,6 +158,53 @@ def claim_loot(loot_id: int):
 
     # Mark claimed & assign
     row.mark_claimed()
+    # Procedural gear instance node: append the instance dict to the bag.
+    if row.instance_json:
+        import json as _json
+
+        from app.inventory.utils import encumbrance_state
+
+        instance = _json.loads(row.instance_json)
+        enc_state = None
+        if target_char:
+            inv = load_inventory(target_char.items)
+            base_stats = {}
+            try:
+                base_stats = _json.loads(target_char.stats or "{}")
+            except Exception:
+                base_stats = {}
+            str_score = int(base_stats.get("str", 10))
+            prospective_inv = inv + [instance]
+            enc_state = encumbrance_state(str_score, prospective_inv)
+            if enc_state.get("status") == "blocked":
+                row.claimed = False
+                db.session.flush()
+                return (
+                    jsonify(
+                        {
+                            "error": "encumbered",
+                            "message": "Cannot carry more; over hard capacity limit",
+                            "encumbrance": enc_state,
+                        }
+                    ),
+                    400,
+                )
+            inv.append(instance)
+            target_char.items = dump_inventory(inv)
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            return jsonify({"error": "db error"}), 500
+        return jsonify(
+            {
+                "claimed": True,
+                "item": {"uid": instance.get("uid"), "name": instance.get("name"), "rarity": instance.get("rarity")},
+                "character_id": (target_char.id if target_char else None),
+                "encumbrance": enc_state,
+            }
+        )
+
     item = db.session.get(Item, row.item_id)
     enc_state = None
     if target_char and item:

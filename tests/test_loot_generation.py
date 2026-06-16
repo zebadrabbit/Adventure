@@ -2,7 +2,7 @@ from app import app, db
 from app.loot.generator import LootConfig, generate_loot_for_seed
 from app.models.dungeon_instance import DungeonInstance
 from app.models.loot import DungeonLoot
-from app.models.models import Item, User
+from app.models.models import GameConfig, Item, User
 from app.server import _run_migrations
 
 
@@ -65,6 +65,8 @@ def test_loot_api_list(client):
     # Generate some loot manually
     walkables = [(x, y) for x in range(1, 10) for y in range(1, 10)]
     with app.app_context():
+        # Force catalog (non-procedural) drops so the list endpoint returns slugs.
+        GameConfig.set("floor_loot", '{"procedural_gear_chance": 0.0}')
         cfg = LootConfig(avg_party_level=1, width=10, height=10, seed=inst.seed)
         generate_loot_for_seed(cfg, walkables)
 
@@ -101,6 +103,8 @@ def test_loot_claim_with_character_assignment(client):
     # Generate loot
     walkables = [(x, y) for x in range(1, 8) for y in range(1, 8)]
     with app.app_context():
+        # Force catalog (non-procedural) drops so loot_row has a catalog item_id.
+        GameConfig.set("floor_loot", '{"procedural_gear_chance": 0.0}')
         cfg = LootConfig(avg_party_level=1, width=7, height=7, seed=inst.seed)
         generate_loot_for_seed(cfg, walkables)
         loot_row = DungeonLoot.query.filter_by(seed=inst.seed, claimed=False).first()
