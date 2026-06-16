@@ -14,7 +14,14 @@ import json
 from flask import Blueprint, jsonify, request
 
 from app import db
-from app.inventory.utils import add_item, load_inventory, remove_one
+from app.economy.currency import format_copper
+from app.inventory.utils import (
+    add_item,
+    find_instance,
+    load_inventory,
+    remove_instance,
+    remove_one,
+)
 from app.models.merchant import Merchant, MerchantStock, TradeTransaction
 from app.models.models import Character
 
@@ -69,7 +76,15 @@ def get_character_gold(character_id):
     if not character:
         return jsonify({"error": "Character not found"}), 404
 
-    return jsonify({"character_id": character.id, "name": character.name, "gold": character.gold or 0})
+    gold = character.gold or 0
+    return jsonify(
+        {
+            "character_id": character.id,
+            "name": character.name,
+            "gold": gold,
+            "gold_display": format_copper(gold),
+        }
+    )
 
 
 @bp_trading.route("/api/trade/buy", methods=["POST"])
@@ -164,7 +179,9 @@ def buy_item():
                 "item": item_slug,
                 "quantity": quantity,
                 "total_cost": total_cost,
+                "total_cost_display": format_copper(total_cost),
                 "new_gold": character.gold,
+                "new_gold_display": format_copper(character.gold),
             }
         )
 
@@ -192,10 +209,11 @@ def sell_item():
     character_id = data.get("character_id")
     merchant_slug = data.get("merchant_slug")
     item_slug = data.get("item_slug")
+    uid = data.get("uid")
     quantity = data.get("quantity", 1)
 
-    # Validate inputs
-    if not all([character_id, merchant_slug, item_slug]):
+    # Validate inputs: need either a catalog slug or a gear instance uid
+    if not all([character_id, merchant_slug]) or not (item_slug or uid):
         return jsonify({"error": "Missing required fields"}), 400
 
     if quantity < 1:
@@ -210,51 +228,63 @@ def sell_item():
     if not character:
         return jsonify({"error": "Character not found"}), 404
 
-    # Get item details from database
     from app.models.models import Item
 
-    item = Item.query.filter_by(slug=item_slug).first()
-    if not item:
-        return jsonify({"error": "Item not found"}), 404
+    inventory = load_inventory(character.items)
 
-    # Check if character has this item
-    # (This would require inventory query - simplified for now)
-
-    # Calculate sell price
-    base_value = item.value_copper or 0
-    sell_price = int(base_value * merchant.sell_price_modifier)
-    total_value = sell_price * quantity
-
-    # Execute transaction
     try:
-        # Load inventory
-        inventory = load_inventory(character.items)
-
-        # Remove items from inventory
-        for _ in range(quantity):
-            if not remove_one(inventory, item_slug):
+        if uid:
+            # Procedural gear instance: priced by its own value, sold one at a time.
+            instance = find_instance(inventory, uid)
+            if not instance:
                 db.session.rollback()
                 return jsonify({"error": "Item not in inventory"}), 400
+
+            base_value = int(instance.get("value", 0) or 0)
+            sell_price = int(base_value * merchant.sell_price_modifier)
+            total_value = sell_price  # instances are unique; quantity ignored
+            sold_ref = instance.get("name", uid)
+
+            remove_instance(inventory, uid)
+            record_slug = instance.get("base") or instance.get("slot") or "gear"
+            record_qty = 1
+        else:
+            # Catalog item: priced from the Item table, sold in stacks.
+            item = Item.query.filter_by(slug=item_slug).first()
+            if not item:
+                return jsonify({"error": "Item not found"}), 404
+
+            base_value = item.value_copper or 0
+            sell_price = int(base_value * merchant.sell_price_modifier)
+            total_value = sell_price * quantity
+            sold_ref = item_slug
+
+            for _ in range(quantity):
+                if not remove_one(inventory, item_slug):
+                    db.session.rollback()
+                    return jsonify({"error": "Item not in inventory"}), 400
+            record_slug = item_slug
+            record_qty = quantity
 
         # Save updated inventory
         character.items = json.dumps(inventory)
 
-        # Add gold
+        # Add proceeds (copper)
         character.gold += total_value
 
-        # Update stock if merchant tracks it
-        stock_entry = MerchantStock.query.filter_by(merchant_id=merchant.id, item_slug=item_slug).first()
-
-        if stock_entry:
-            stock_entry.current_stock += quantity
+        # Update stock if merchant tracks it (catalog items only)
+        if not uid:
+            stock_entry = MerchantStock.query.filter_by(merchant_id=merchant.id, item_slug=item_slug).first()
+            if stock_entry:
+                stock_entry.current_stock += quantity
 
         # Record transaction
         transaction = TradeTransaction(
             character_id=character.id,
             merchant_id=merchant.id,
             transaction_type="sell",
-            item_slug=item_slug,
-            quantity=quantity,
+            item_slug=record_slug,
+            quantity=record_qty,
             price_per_item=sell_price,
             total_gold=total_value,
         )
@@ -265,10 +295,12 @@ def sell_item():
         return jsonify(
             {
                 "success": True,
-                "item": item_slug,
-                "quantity": quantity,
+                "item": sold_ref,
+                "quantity": record_qty,
                 "total_value": total_value,
+                "total_value_display": format_copper(total_value),
                 "new_gold": character.gold,
+                "new_gold_display": format_copper(character.gold),
             }
         )
 
@@ -294,17 +326,36 @@ def get_character_inventory_for_trade(character_id):
     enriched_items = []
 
     for inv_item in inventory:
+        # Procedural gear instance: sellable by uid, priced by its own value.
+        if inv_item.get("uid"):
+            value = int(inv_item.get("value", 0) or 0)
+            enriched_items.append(
+                {
+                    "uid": inv_item["uid"],
+                    "name": inv_item.get("name", "Unknown Gear"),
+                    "type": inv_item.get("slot", "gear"),
+                    "rarity": inv_item.get("rarity"),
+                    "base_price": value,
+                    "base_price_display": format_copper(value),
+                    "quantity": 1,
+                    "equipped": inv_item.get("equipped", False),
+                }
+            )
+            continue
+
         item_slug = inv_item.get("slug")
         item = Item.query.filter_by(slug=item_slug).first()
 
         if item:
+            base_price = item.value_copper or 0
             enriched_items.append(
                 {
                     "slug": item.slug,
                     "name": item.name,
                     "type": item.type,
-                    "base_price": item.value_copper or 0,
-                    "quantity": inv_item.get("quantity", 1),
+                    "base_price": base_price,
+                    "base_price_display": format_copper(base_price),
+                    "quantity": inv_item.get("qty", 1),
                     "equipped": inv_item.get("equipped", False),
                 }
             )
@@ -321,7 +372,7 @@ def get_merchant_transactions(slug):
 
     transactions = (
         TradeTransaction.query.filter_by(merchant_id=merchant.id)
-        .order_by(TradeTransaction.timestamp.desc())
+        .order_by(TradeTransaction.created_at.desc())
         .limit(50)
         .all()
     )
@@ -338,7 +389,7 @@ def get_merchant_transactions(slug):
                     "quantity": t.quantity,
                     "price_per_item": t.price_per_item,
                     "total": t.total_gold,
-                    "timestamp": t.timestamp.isoformat(),
+                    "timestamp": t.created_at.isoformat(),
                 }
                 for t in transactions
             ],
@@ -355,7 +406,7 @@ def get_character_transactions(character_id):
 
     transactions = (
         TradeTransaction.query.filter_by(character_id=character.id)
-        .order_by(TradeTransaction.timestamp.desc())
+        .order_by(TradeTransaction.created_at.desc())
         .limit(50)
         .all()
     )
@@ -372,7 +423,7 @@ def get_character_transactions(character_id):
                     "quantity": t.quantity,
                     "price_per_item": t.price_per_item,
                     "total": t.total_gold,
-                    "timestamp": t.timestamp.isoformat(),
+                    "timestamp": t.created_at.isoformat(),
                 }
                 for t in transactions
             ],
