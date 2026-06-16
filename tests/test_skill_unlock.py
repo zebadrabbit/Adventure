@@ -72,3 +72,22 @@ def test_unlock_rejects_insufficient_points(client):
     _login(client, user)
     resp = client.post(f"/api/characters/{char.id}/skills", json={"skill_id": skill.id})
     assert resp.status_code == 400
+
+
+def test_grant_talent_points_forbidden_for_non_admin(client):
+    user, char = _char_with_points(0)
+    db.session.commit()
+    _login(client, user)
+    resp = client.post(f"/api/characters/{char.id}/talent-points/grant", json={"points": 99})
+    assert resp.status_code == 403, resp.get_json()
+    tp = CharacterTalentPoints.query.filter_by(character_id=char.id).first()
+    assert tp.available == 0  # unchanged
+
+
+def test_reset_skills_rejects_other_users_character(client):
+    user, char = _char_with_points(1)
+    attacker = create_user("atk2_" + uuid.uuid4().hex[:8])
+    db.session.commit()
+    _login(client, attacker)
+    resp = client.post(f"/api/characters/{char.id}/skills/reset")
+    assert resp.status_code in (403, 404)
