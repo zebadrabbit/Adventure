@@ -110,6 +110,14 @@ def extract_party(
             except Exception:
                 pass
 
+        # Award extraction XP (scaled by the same early-extraction multiplier),
+        # applying any resulting level-ups + talent points.
+        from app.services import progression
+
+        extraction_xp = int(progression.progression_config().get("extraction_xp", 0))
+        if extraction_xp > 0:
+            progression.grant_xp(char, int(extraction_xp * penalties["xp_multiplier"]))
+
         # Pool this character's run haul (bag + run-purse) into the hoard
         hoard_service.pool_run_haul(hoard, char)
 

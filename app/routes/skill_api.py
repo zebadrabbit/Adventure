@@ -7,6 +7,7 @@ import json
 from datetime import datetime
 
 from flask import Blueprint, jsonify, request
+from flask_login import current_user, login_required
 
 from app import db
 from app.models.models import Character
@@ -129,8 +130,9 @@ def get_character_skills(character_id):
 
 
 @bp_skill.route("/api/characters/<int:character_id>/skills", methods=["POST"])
+@login_required
 def unlock_skill(character_id):
-    """Unlock a skill for a character."""
+    """Unlock a skill for a character (owner only)."""
     data = request.get_json()
     skill_id = data.get("skill_id")
 
@@ -138,7 +140,7 @@ def unlock_skill(character_id):
         return jsonify({"error": "Missing skill_id"}), 400
 
     character = db.session.get(Character, character_id)
-    if not character:
+    if not character or character.user_id != current_user.id:
         return jsonify({"error": "Character not found"}), 404
 
     skill = db.session.get(Skill, skill_id)
@@ -201,8 +203,13 @@ def unlock_skill(character_id):
 
 
 @bp_skill.route("/api/characters/<int:character_id>/skills/<int:skill_id>/use", methods=["POST"])
+@login_required
 def use_skill(character_id, skill_id):
-    """Use an active skill (track usage)."""
+    """Use an active skill (track usage). Owner only."""
+    character = db.session.get(Character, character_id)
+    if not character or character.user_id != current_user.id:
+        return jsonify({"error": "Character not found"}), 404
+
     character_skill = CharacterSkill.query.filter_by(character_id=character_id, skill_id=skill_id).first()
 
     if not character_skill:
@@ -240,8 +247,18 @@ def use_skill(character_id, skill_id):
 
 
 @bp_skill.route("/api/characters/<int:character_id>/talent-points/grant", methods=["POST"])
+@login_required
 def grant_talent_points(character_id):
-    """Grant talent points to a character (typically on level up)."""
+    """Admin-only manual talent-point grant.
+
+    Normal talent points are awarded automatically on level-up via
+    app/services/progression.grant_xp. This endpoint is a privileged override
+    (debug/admin); it is NOT a player action — otherwise it is an unlimited
+    point cheat.
+    """
+    if getattr(current_user, "role", None) != "admin":
+        return jsonify({"error": "Forbidden"}), 403
+
     data = request.get_json()
     points = data.get("points", 1)
 
@@ -277,10 +294,11 @@ def grant_talent_points(character_id):
 
 
 @bp_skill.route("/api/characters/<int:character_id>/skills/reset", methods=["POST"])
+@login_required
 def reset_skills(character_id):
-    """Reset all skills and refund talent points (respec)."""
+    """Reset all skills and refund talent points (respec). Owner only."""
     character = db.session.get(Character, character_id)
-    if not character:
+    if not character or character.user_id != current_user.id:
         return jsonify({"error": "Character not found"}), 404
 
     # Get all character skills

@@ -147,6 +147,10 @@ def test_extract_with_left_behind(test_app, test_user, test_dungeon, test_charac
 
 def test_extract_with_xp_penalty(test_app, test_user, test_dungeon, test_characters):
     """Test XP penalty applied on early extraction."""
+    from app.models.models import GameConfig
+
+    # Isolate the penalty mechanic from the Spec-5 extraction XP bonus.
+    GameConfig.set("progression", '{"extraction_xp": 0}')
     original_xp = test_characters[0].xp
 
     success, message, result = extraction_service.extract_party(test_dungeon, [test_characters[0].id], test_user.id)
@@ -161,6 +165,10 @@ def test_extract_with_xp_penalty(test_app, test_user, test_dungeon, test_charact
 
 def test_extract_no_penalty_when_bosses_defeated(test_app, test_user, test_dungeon, test_characters):
     """Test no XP penalty when all bosses defeated."""
+    from app.models.models import GameConfig
+
+    # Isolate the penalty mechanic from the Spec-5 extraction XP bonus.
+    GameConfig.set("progression", '{"extraction_xp": 0}')
     test_dungeon.extraction_available = True
     db.session.commit()
 

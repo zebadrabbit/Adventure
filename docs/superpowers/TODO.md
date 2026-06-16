@@ -25,12 +25,19 @@ spec → write an implementation plan (TDD, small tasks) → implement → verif
       companion; verify via the `run`/`verify` skills.
 
 ### Spec 5 — Character progression  (`specs/2026-06-16-progression-design.md`)
-- [ ] **5a XP + levels:** award XP on monster defeat + extraction; detect pending levels
-      via `xp_for_level`; grant stat + talent points; gate `level_up_character` to earned
-      levels.
-- [ ] **5b Skills/spells:** seed starter `SkillTree`/`Skill` rows (idempotent seeder +
-      `run.py` command); `POST /api/skills/unlock` (spend talent points, validate
-      prereqs/auth); apply passive effects to derived stats and actives as combat actions.
+- [x] **5a XP + levels** ✅ (this session): `app/services/progression.py`
+      (`level_for_xp`, `grant_xp` → levels + talent points, canonical xp curve). Combat
+      kills and extraction now award XP through it; combat's old divergent quadratic curve
+      removed. Tests: `tests/test_progression.py`.
+      - [ ] Still TODO: gate `inventory_api.level_up_character` to *earned* levels (needs a
+            stat-point ledger — currently allocations aren't bounded by earned points).
+- [~] **5b Skills/spells:** the endpoints already existed (`app/routes/skill_api.py`:
+      unlock/use/grant/reset). This session **secured them**: unlock/use/reset are now
+      `@login_required` + owner-checked; `grant_talent_points` is admin-only (was an
+      unlimited-point cheat). Tests: `tests/test_skill_unlock.py`. Still TODO:
+      - [ ] Seed starter `SkillTree`/`Skill` rows (idempotent seeder + `run.py` command).
+      - [ ] Apply passive `effect_json` to derived combat stats (fold into
+            `app/loot/equip.py` aggregation); wire active skills as combat actions.
 - [ ] **5c Progression UI:** character sheet (level/XP bar, stat allocation, skill tree).
 
 ## Known issues / cleanup (not blockers)
