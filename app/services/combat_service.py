@@ -619,6 +619,15 @@ def _check_end(session: CombatSession):
                         inv_items.append(slug)
                 first.items = json.dumps(inv_items)
                 db.session.add(first)
+            if rewards.get("gear"):
+                try:
+                    from app.loot.inventory import add_gear_to_character
+
+                    first = next(iter(char_rows.values()))
+                    add_gear_to_character(first, rewards["gear"])
+                    db.session.add(first)
+                except Exception:
+                    pass
             try:
                 rewards["xp"] = {"total": xp_total, "per_member": xp_map}
             except Exception:
