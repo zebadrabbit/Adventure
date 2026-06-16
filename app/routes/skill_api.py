@@ -7,6 +7,7 @@ import json
 from datetime import datetime
 
 from flask import Blueprint, jsonify, request
+from flask_login import current_user, login_required
 
 from app import db
 from app.models.models import Character
@@ -129,8 +130,9 @@ def get_character_skills(character_id):
 
 
 @bp_skill.route("/api/characters/<int:character_id>/skills", methods=["POST"])
+@login_required
 def unlock_skill(character_id):
-    """Unlock a skill for a character."""
+    """Unlock a skill for a character (owner only)."""
     data = request.get_json()
     skill_id = data.get("skill_id")
 
@@ -138,7 +140,7 @@ def unlock_skill(character_id):
         return jsonify({"error": "Missing skill_id"}), 400
 
     character = db.session.get(Character, character_id)
-    if not character:
+    if not character or character.user_id != current_user.id:
         return jsonify({"error": "Character not found"}), 404
 
     skill = db.session.get(Skill, skill_id)
