@@ -12,6 +12,7 @@ Handles:
 import json
 
 from flask import Blueprint, jsonify, request
+from flask_login import current_user, login_required
 
 from app import db
 from app.economy import hoard_service
@@ -89,6 +90,7 @@ def get_character_gold(character_id):
 
 
 @bp_trading.route("/api/trade/buy", methods=["POST"])
+@login_required
 def buy_item():
     """
     Purchase item from merchant
@@ -121,7 +123,7 @@ def buy_item():
         return jsonify({"error": "Merchant not found"}), 404
 
     character = db.session.get(Character, character_id)
-    if not character:
+    if not character or character.user_id != current_user.id:
         return jsonify({"error": "Character not found"}), 404
 
     # Town trades draw from the per-user Hoard, not the at-risk run-purse.
@@ -192,6 +194,7 @@ def buy_item():
 
 
 @bp_trading.route("/api/trade/sell", methods=["POST"])
+@login_required
 def sell_item():
     """
     Sell item to merchant
@@ -225,7 +228,7 @@ def sell_item():
         return jsonify({"error": "Merchant not found"}), 404
 
     character = db.session.get(Character, character_id)
-    if not character:
+    if not character or character.user_id != current_user.id:
         return jsonify({"error": "Character not found"}), 404
 
     from app.models.models import Item

@@ -39,7 +39,7 @@ def merchant(test_app):
 
 
 @pytest.fixture
-def hero(test_app):
+def hero(test_app, client):
     from app.economy import hoard_service
     from app.models.hoard import Hoard
 
@@ -48,6 +48,10 @@ def hero(test_app):
     hoard = Hoard.get_or_create(user.id)
     hoard_service.deposit_copper(hoard, 1000)
     db.session.commit()
+    # Trading endpoints are @login_required and verify ownership; authenticate.
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(user.id)
+        sess["user_id"] = user.id
     return char
 
 
@@ -151,3 +155,17 @@ def test_seed_merchants_idempotent(test_app):
 
     for entry in inv:
         assert Item.query.filter_by(slug=entry["slug"]).first() is not None
+
+
+def test_buy_rejects_other_users_character(client, merchant, hero):
+    """A logged-in user cannot spend another user's hoard via their character."""
+    attacker = create_user("attacker_" + uuid.uuid4().hex[:8])
+    db.session.commit()
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(attacker.id)
+        sess["user_id"] = attacker.id
+    resp = client.post(
+        "/api/trade/buy",
+        json={"character_id": hero.id, "merchant_slug": "test-shop", "item_slug": "potion_heal_l1", "quantity": 1},
+    )
+    assert resp.status_code == 404, resp.get_json()
