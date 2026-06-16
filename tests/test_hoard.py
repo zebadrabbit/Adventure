@@ -1,4 +1,5 @@
 import json
+import uuid
 
 from app import db
 from app.economy import hoard_service
@@ -7,8 +8,14 @@ from app.models.models import Character  # noqa: F401
 from tests.factories import create_character, create_user
 
 
+def _uname(prefix):
+    # Unique per run: the session test DB is not reset for unmarked tests and
+    # create_user is idempotent, so fixed names would collide across runs/files.
+    return f"{prefix}_{uuid.uuid4().hex[:8]}"
+
+
 def test_get_or_create_is_idempotent():
-    user = create_user("hoarder_a")
+    user = create_user(_uname("hoarder_a"))
     h1 = Hoard.get_or_create(user.id)
     db.session.commit()
     h2 = Hoard.get_or_create(user.id)
@@ -18,7 +25,7 @@ def test_get_or_create_is_idempotent():
 
 
 def test_hoard_one_row_per_user():
-    user = create_user("hoarder_b")
+    user = create_user(_uname("hoarder_b"))
     Hoard.get_or_create(user.id)
     db.session.commit()
     Hoard.get_or_create(user.id)
@@ -27,7 +34,7 @@ def test_hoard_one_row_per_user():
 
 
 def test_deposit_items_merges_stacks_and_appends_instances():
-    user = create_user("hoarder_c")
+    user = create_user(_uname("hoarder_c"))
     hoard = Hoard.get_or_create(user.id)
     hoard_service.deposit_items(hoard, [{"slug": "potion_heal_l1", "qty": 2}])
     hoard_service.deposit_items(hoard, [{"slug": "potion_heal_l1", "qty": 3}])
@@ -39,7 +46,7 @@ def test_deposit_items_merges_stacks_and_appends_instances():
 
 
 def test_deposit_copper():
-    user = create_user("hoarder_d")
+    user = create_user(_uname("hoarder_d"))
     hoard = Hoard.get_or_create(user.id)
     hoard_service.deposit_copper(hoard, 250)
     hoard_service.deposit_copper(hoard, 50)
@@ -47,7 +54,7 @@ def test_deposit_copper():
 
 
 def test_withdraw_instance_to_character():
-    user = create_user("hoarder_e")
+    user = create_user(_uname("hoarder_e"))
     char = create_character(user, name="Mule", items=[])
     hoard = Hoard.get_or_create(user.id)
     hoard_service.deposit_items(hoard, [{"uid": "g9", "name": "Axe", "value": 200}])
@@ -58,7 +65,7 @@ def test_withdraw_instance_to_character():
 
 
 def test_pool_run_haul_moves_bag_and_purse_then_zeroes():
-    user = create_user("hoarder_f")
+    user = create_user(_uname("hoarder_f"))
     char = create_character(user, name="Runner", items=[{"slug": "potion_heal_l1", "qty": 1}])
     char.gold = 500  # run-purse (copper)
     hoard = Hoard.get_or_create(user.id)
