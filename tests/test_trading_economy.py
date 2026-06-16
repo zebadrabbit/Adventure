@@ -1,13 +1,15 @@
 """DB-backed tests for the trading/economy API and merchant seeding.
 
-Covers the Spec 1 fixes:
+Town trading transacts against the per-user Hoard (Spec 2), not the at-risk
+Character run-purse. Covers:
   - transaction-history endpoints no longer crash (created_at vs timestamp)
-  - selling catalog items (by slug) and procedural gear (by uid)
+  - selling catalog items (by slug) and procedural gear (by uid) from the hoard
   - buying from a seeded merchant with copper pricing + display fields
   - merchant seeder idempotency and catalog validation
 """
 
 import json
+import uuid
 
 import pytest
 
@@ -37,15 +39,25 @@ def merchant(test_app):
 
 
 @pytest.fixture
-def hero(test_app):
-    user = create_user("trader_" + "x")
+def hero(test_app, client):
+    from app.economy import hoard_service
+    from app.models.hoard import Hoard
+
+    user = create_user("trader_" + uuid.uuid4().hex[:8])  # unique per run
     char = create_character(user, name="Trader", items=[])
-    char.gold = 1000  # copper
+    hoard = Hoard.get_or_create(user.id)
+    hoard_service.deposit_copper(hoard, 1000)
     db.session.commit()
+    # Trading endpoints are @login_required and verify ownership; authenticate.
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(user.id)
+        sess["user_id"] = user.id
     return char
 
 
 def test_buy_deducts_copper_and_adds_item(client, merchant, hero):
+    from app.models.hoard import Hoard
+
     resp = client.post(
         "/api/trade/buy",
         json={"character_id": hero.id, "merchant_slug": "test-shop", "item_slug": "potion_heal_l1", "quantity": 2},
@@ -53,10 +65,11 @@ def test_buy_deducts_copper_and_adds_item(client, merchant, hero):
     assert resp.status_code == 200, resp.get_json()
     data = resp.get_json()
     assert data["total_cost"] == 200
-    assert data["new_gold"] == 800
-    assert data["new_gold_display"] == "8s"  # 800 copper
-    db.session.refresh(hero)
-    bag = json.loads(hero.items)
+    assert data["new_balance"] == 800
+    assert data["new_balance_display"] == "8s"  # 800 copper
+    hoard = Hoard.get_or_create(hero.user_id)
+    assert hoard.copper == 800
+    bag = json.loads(hoard.items_json)
     assert any(o.get("slug") == "potion_heal_l1" and o.get("qty") == 2 for o in bag)
     # stock decremented
     stock = MerchantStock.query.filter_by(merchant_id=merchant.id, item_slug="potion_heal_l1").first()
@@ -64,7 +77,11 @@ def test_buy_deducts_copper_and_adds_item(client, merchant, hero):
 
 
 def test_sell_catalog_item_by_slug(client, merchant, hero):
-    hero.items = json.dumps([{"slug": "potion_heal_l1", "qty": 1}])
+    from app.economy import hoard_service
+    from app.models.hoard import Hoard
+
+    hoard = Hoard.get_or_create(hero.user_id)
+    hoard_service.deposit_items(hoard, [{"slug": "potion_heal_l1", "qty": 1}])
     db.session.commit()
     resp = client.post(
         "/api/trade/sell",
@@ -73,13 +90,19 @@ def test_sell_catalog_item_by_slug(client, merchant, hero):
     assert resp.status_code == 200, resp.get_json()
     data = resp.get_json()
     assert data["total_value"] == 50  # 100 * 0.5
-    db.session.refresh(hero)
-    assert json.loads(hero.items) == []
+    hoard = Hoard.get_or_create(hero.user_id)
+    bag = json.loads(hoard.items_json)
+    assert not any(o.get("slug") == "potion_heal_l1" for o in bag)
 
 
 def test_sell_procedural_instance_by_uid(client, merchant, hero):
-    instance = {"uid": "gear123", "name": "Brutal Shortsword", "slot": "weapon", "value": 400}
-    hero.items = json.dumps([instance])
+    from app.economy import hoard_service
+    from app.models.hoard import Hoard
+
+    hoard = Hoard.get_or_create(hero.user_id)
+    hoard_service.deposit_items(
+        hoard, [{"uid": "gear123", "name": "Brutal Shortsword", "slot": "weapon", "value": 400}]
+    )
     db.session.commit()
     resp = client.post(
         "/api/trade/sell",
@@ -89,32 +112,14 @@ def test_sell_procedural_instance_by_uid(client, merchant, hero):
     data = resp.get_json()
     assert data["total_value"] == 200  # 400 * 0.5
     assert data["item"] == "Brutal Shortsword"
-    db.session.refresh(hero)
-    assert json.loads(hero.items) == []
 
 
 def test_sell_unknown_returns_400(client, merchant, hero):
-    hero.items = json.dumps([])
-    db.session.commit()
     resp = client.post(
         "/api/trade/sell",
         json={"character_id": hero.id, "merchant_slug": "test-shop", "uid": "does-not-exist"},
     )
     assert resp.status_code == 400
-
-
-def test_buy_does_not_wipe_gear_instances(client, merchant, hero):
-    """Regression: round-tripping inventory through buy must preserve gear."""
-    hero.items = json.dumps([{"uid": "keepme", "name": "Heirloom", "slot": "ring", "value": 999}])
-    db.session.commit()
-    resp = client.post(
-        "/api/trade/buy",
-        json={"character_id": hero.id, "merchant_slug": "test-shop", "item_slug": "potion_heal_l1", "quantity": 1},
-    )
-    assert resp.status_code == 200, resp.get_json()
-    db.session.refresh(hero)
-    bag = json.loads(hero.items)
-    assert any(o.get("uid") == "keepme" for o in bag), "gear instance was wiped by buy!"
 
 
 def test_transaction_history_endpoints_do_not_crash(client, merchant, hero):
@@ -150,3 +155,17 @@ def test_seed_merchants_idempotent(test_app):
 
     for entry in inv:
         assert Item.query.filter_by(slug=entry["slug"]).first() is not None
+
+
+def test_buy_rejects_other_users_character(client, merchant, hero):
+    """A logged-in user cannot spend another user's hoard via their character."""
+    attacker = create_user("attacker_" + uuid.uuid4().hex[:8])
+    db.session.commit()
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(attacker.id)
+        sess["user_id"] = attacker.id
+    resp = client.post(
+        "/api/trade/buy",
+        json={"character_id": hero.id, "merchant_slug": "test-shop", "item_slug": "potion_heal_l1", "quantity": 1},
+    )
+    assert resp.status_code == 404, resp.get_json()

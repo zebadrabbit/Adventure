@@ -9,7 +9,9 @@ import json
 from typing import Dict, List, Tuple
 
 from app import db
+from app.economy import hoard_service
 from app.models.dungeon_instance import DungeonInstance
+from app.models.hoard import Hoard
 from app.models.models import Character
 
 
@@ -83,6 +85,8 @@ def extract_party(
     if not extracting_chars:
         return False, "Must select at least one character to extract", {}
 
+    hoard = Hoard.get_or_create(user_id)
+
     # Apply penalties to extracting characters
     for char in extracting_chars:
         # Apply XP penalty
@@ -105,6 +109,9 @@ def extract_party(
                 char.stats = json.dumps(stats)
             except Exception:
                 pass
+
+        # Pool this character's run haul (bag + run-purse) into the hoard
+        hoard_service.pool_run_haul(hoard, char)
 
     # Mark left behind characters as permadeath
     for char in left_behind_chars:
