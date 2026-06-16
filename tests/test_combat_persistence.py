@@ -1,15 +1,36 @@
 import json
+import uuid
+
+from werkzeug.security import generate_password_hash
 
 from app import db
 from app.models.models import Character, CombatSession, User
 from app.services import combat_service
 
-# Reuse auth_client fixture to ensure a logged in user & at least one character.
-
 
 def _ensure_primary_user_and_char():
-    user = User.query.filter_by(username="tester").first()
-    char = Character.query.filter_by(user_id=user.id).first()
+    """Create an isolated user with exactly one character.
+
+    These tests assert that combat persistence writes back to the acting
+    character. The shared "tester" user accumulates extra characters from other
+    test modules (e.g. autofill), and party building orders by Character.id.asc()
+    while the old helper used an unordered .first(); with >1 character the actor
+    and the asserted character could diverge nondeterministically. A dedicated
+    single-character user makes the actor unambiguous.
+    """
+    uname = "combat_persist_" + uuid.uuid4().hex[:10]
+    user = User(username=uname, password=generate_password_hash("pass"))
+    db.session.add(user)
+    db.session.commit()
+    char = Character(
+        user_id=user.id,
+        name="Hero",
+        stats='{"str":12, "dex":11, "int":10, "con":10, "mana":30}',
+        gear="{}",
+        items="[]",
+    )
+    db.session.add(char)
+    db.session.commit()
     return user, char
 
 
