@@ -213,6 +213,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     seed_merchants_parser.set_defaults(command="seed-merchants")
 
+    # seed-skills subcommand
+    seed_skills_parser = subparsers.add_parser(
+        "seed-skills",
+        help="Create/update starter skill trees and skills (idempotent)",
+        formatter_class=argparse.RawTextHelpFormatter,
+        description="Seed starter skill trees/skills via the ORM. Safe to run repeatedly.",
+    )
+    seed_skills_parser.set_defaults(command="seed-skills")
+
     # import-items-csv
     import_items_parser = subparsers.add_parser(
         "import-items-csv",
@@ -376,6 +385,12 @@ def main(argv: list[str]) -> int:
         from app.seed_merchants import seed_merchants
 
         seed_merchants(verbose=True)
+        return 0
+
+    elif mode == "seed-skills":
+        from app.seed_skills import seed_skills
+
+        seed_skills(verbose=True)
         return 0
 
     elif mode == "import-items-csv":
