@@ -124,7 +124,7 @@ class EquipmentManager {
     }
 
     renderEquipmentSlots() {
-        const slots = ['weapon', 'offhand', 'head', 'chest', 'legs', 'boots', 'gloves', 'ring1', 'ring2', 'amulet'];
+        const slots = ['weapon', 'offhand', 'head', 'chest', 'hands', 'feet', 'ring', 'amulet'];
         const gear = this.character.gear || {};
 
         const html = slots.map(slot => this.createSlotHTML(slot, gear[slot])).join('');
@@ -211,18 +211,23 @@ class EquipmentManager {
 
     createBagItemHTML(item, index) {
         const rarityClass = `rarity-${item.rarity || 'common'}`;
-        const icon = this.getItemIcon(item.type);
-        const stats = this.getItemStats(item);
+        // Procedural gear instances expose `slot`/`affixes` instead of a catalog
+        // `type`/`slug`; fall back gracefully so they render in the bag too.
+        const typeLabel = item.type || item.slot || 'gear';
+        const icon = this.getItemIcon(typeLabel);
+        const stats = Array.isArray(item.affixes) && item.affixes.length
+            ? item.affixes.map(a => `+${a.val} ${String(a.stat).toUpperCase()}`).join(', ')
+            : this.getItemStats(item);
 
         return `
-<div class="bag-item ${rarityClass}" draggable="true" data-item-index="${index}" data-item-slug="${this.escapeHTML(item.slug)}">
+<div class="bag-item ${rarityClass}" draggable="true" data-item-index="${index}" data-item-slug="${this.escapeHTML(item.slug || '')}" data-item-uid="${this.escapeHTML(item.uid || '')}">
     <div class="item-icon" style="color: currentColor;">
         ${icon}
     </div>
     <div class="item-details">
         <div>
             <span class="item-name">${this.escapeHTML(item.name)}</span>
-            <span class="item-type-badge">${this.escapeHTML(item.type)}</span>
+            <span class="item-type-badge">${this.escapeHTML(typeLabel)}</span>
         </div>
         <div class="item-stats-preview">${stats}</div>
     </div>
@@ -301,14 +306,21 @@ class EquipmentManager {
         if (!this.draggedItem) return;
 
         const targetSlot = e.currentTarget.dataset.slot;
-        await this.equipItem(this.draggedItem.slug, targetSlot);
+        await this.equipItem(this.draggedItem, targetSlot);
     }
 
-    async equipItem(itemSlug, slot) {
+    async equipItem(item, slot) {
+        // Procedural gear instances carry a `uid` and self-describe their slot;
+        // equip them by uid. Legacy catalog items equip by slug + target slot.
+        // `item` may also be a bare slug string for backward compatibility.
+        const isInstance = item && typeof item === 'object' && item.uid;
+        const body = isInstance
+            ? { uid: item.uid }
+            : { item_slug: (typeof item === 'object' ? item.slug : item), slot: slot };
         const response = await fetch(`/api/characters/${this.character.id}/equip`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ item_slug: itemSlug, slot: slot })
+            body: JSON.stringify(body)
         });
 
         if (response.ok) {
@@ -375,6 +387,11 @@ class EquipmentManager {
                 <div class="tooltip-comparison-label">vs. Equipped</div>
                 ${this.renderComparisonHTML(itemStats, equippedStats)}
             </div>`;
+        }
+
+        if (Array.isArray(item.affixes) && item.affixes.length) {
+            const aff = item.affixes.map(a => `+${a.val} ${String(a.stat).toUpperCase()}`).join(', ');
+            html += `<div class="tooltip-affixes ${rarityClass}">${this.escapeHTML(aff)}</div>`;
         }
 
         if (item.description) {

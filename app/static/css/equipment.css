@@ -117,29 +117,29 @@
     opacity: 1;
 }
 
-/* Rarity Colors */
+/* Rarity Colors — must match app/loot/data/rarities.py */
 .rarity-common {
-    color: #9ca3af;
+    color: #9d9d9d;
 }
 
 .rarity-uncommon {
-    color: #4ade80;
+    color: #1eff00;
 }
 
 .rarity-rare {
-    color: #60a5fa;
+    color: #0070dd;
 }
 
 .rarity-epic {
-    color: #a78bfa;
+    color: #a335ee;
 }
 
 .rarity-legendary {
-    color: #fb923c;
+    color: #ff8000;
 }
 
 .rarity-mythic {
-    color: #f472b6;
+    color: #e6cc80;
 }
 
 /* Character Paper Doll */
@@ -212,28 +212,18 @@
     left: 150px;
 }
 
-.doll-slot[data-slot="gloves"] {
-    top: 150px;
+.doll-slot[data-slot="hands"] {
+    top: 160px;
     left: 30px;
 }
 
-.doll-slot[data-slot="ring1"] {
-    top: 150px;
+.doll-slot[data-slot="ring"] {
+    top: 160px;
     left: 130px;
 }
 
-.doll-slot[data-slot="ring2"] {
-    top: 190px;
-    left: 130px;
-}
-
-.doll-slot[data-slot="legs"] {
-    top: 185px;
-    left: 80px;
-}
-
-.doll-slot[data-slot="boots"] {
-    top: 270px;
+.doll-slot[data-slot="feet"] {
+    top: 240px;
     left: 80px;
 }
 
