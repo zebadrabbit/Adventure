@@ -144,6 +144,7 @@ from app.routes.client_log_api import bp_client_log  # noqa: E402  # isort: skip
 from app.routes.account import bp_account  # noqa: E402  # isort: skip
 from app.routes.theme_api import bp_theme  # noqa: E402  # isort: skip
 from app.routes.extraction_api import bp_extraction  # noqa: E402  # isort: skip
+from app.routes.hoard_api import bp_hoard  # noqa: E402  # isort: skip
 
 app.register_blueprint(auth.bp)
 app.register_blueprint(main.bp)
@@ -166,6 +167,7 @@ app.register_blueprint(bp_client_log)
 app.register_blueprint(bp_account)
 app.register_blueprint(bp_theme)
 app.register_blueprint(bp_extraction)
+app.register_blueprint(bp_hoard)
 
 _DEFAULT_LIMIT = 120  # requests
 _DEFAULT_WINDOW = 60  # seconds
