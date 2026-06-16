@@ -14,14 +14,15 @@ import json
 from flask import Blueprint, jsonify, request
 
 from app import db
+from app.economy import hoard_service
 from app.economy.currency import format_copper
 from app.inventory.utils import (
-    add_item,
     find_instance,
     load_inventory,
     remove_instance,
     remove_one,
 )
+from app.models.hoard import Hoard
 from app.models.merchant import Merchant, MerchantStock, TradeTransaction
 from app.models.models import Character
 
@@ -123,6 +124,9 @@ def buy_item():
     if not character:
         return jsonify({"error": "Character not found"}), 404
 
+    # Town trades draw from the per-user Hoard, not the at-risk run-purse.
+    hoard = Hoard.get_or_create(character.user_id)
+
     # Check if merchant has this item
     inventory_data = json.loads(merchant.inventory_json or "[]")
     item_data = next((item for item in inventory_data if item.get("slug") == item_slug), None)
@@ -135,9 +139,9 @@ def buy_item():
     buy_price = int(base_price * merchant.buy_price_modifier)
     total_cost = buy_price * quantity
 
-    # Check if character can afford
-    if character.gold < total_cost:
-        return jsonify({"error": "Insufficient gold"}), 400
+    # Check if the hoard can afford
+    if (hoard.copper or 0) < total_cost:
+        return jsonify({"error": "Insufficient funds"}), 400
 
     # Check stock if limited
     stock_entry = MerchantStock.query.filter_by(merchant_id=merchant.id, item_slug=item_slug).first()
@@ -147,13 +151,9 @@ def buy_item():
 
     # Execute transaction
     try:
-        # Deduct gold
-        character.gold -= total_cost
-
-        # Add items to inventory
-        inventory = load_inventory(character.items)
-        add_item(inventory, item_slug, quantity)
-        character.items = json.dumps(inventory)
+        # Debit hoard copper and deposit the purchased items into the hoard
+        hoard.copper -= total_cost
+        hoard_service.deposit_items(hoard, [{"slug": item_slug, "qty": quantity}])
 
         # Update stock if tracked
         if stock_entry:
@@ -180,8 +180,8 @@ def buy_item():
                 "quantity": quantity,
                 "total_cost": total_cost,
                 "total_cost_display": format_copper(total_cost),
-                "new_gold": character.gold,
-                "new_gold_display": format_copper(character.gold),
+                "new_balance": hoard.copper,
+                "new_balance_display": format_copper(hoard.copper),
             }
         )
 
@@ -230,7 +230,9 @@ def sell_item():
 
     from app.models.models import Item
 
-    inventory = load_inventory(character.items)
+    # Town trades operate on the per-user Hoard, not the at-risk run-purse.
+    hoard = Hoard.get_or_create(character.user_id)
+    inventory = load_inventory(hoard.items_json)
 
     try:
         if uid:
@@ -266,11 +268,11 @@ def sell_item():
             record_slug = item_slug
             record_qty = quantity
 
-        # Save updated inventory
-        character.items = json.dumps(inventory)
+        # Save updated inventory back to the hoard
+        hoard.items_json = json.dumps(inventory)
 
-        # Add proceeds (copper)
-        character.gold += total_value
+        # Credit proceeds (copper) to the hoard
+        hoard.copper += total_value
 
         # Update stock if merchant tracks it (catalog items only)
         if not uid:
@@ -299,8 +301,8 @@ def sell_item():
                 "quantity": record_qty,
                 "total_value": total_value,
                 "total_value_display": format_copper(total_value),
-                "new_gold": character.gold,
-                "new_gold_display": format_copper(character.gold),
+                "new_balance": hoard.copper,
+                "new_balance_display": format_copper(hoard.copper),
             }
         )
 

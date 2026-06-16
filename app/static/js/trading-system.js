@@ -408,7 +408,7 @@ class TradingSystem {
             const result = await response.json();
 
             // Update gold
-            this.characterGold = result.new_gold;
+            this.characterGold = result.new_balance;
             document.getElementById('character-gold-amount').textContent = this.characterGold.toLocaleString();
 
             // Show success
