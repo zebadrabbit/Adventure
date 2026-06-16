@@ -571,25 +571,14 @@ def _check_end(session: CombatSession):
             share = int(xp_total / len(members)) if members else xp_total
             xp_map = {}
 
-            # Helper function to calculate required XP for a level
-            def xp_for_level(level):
-                return int((level - 1) ** 2 * 100)
+            from app.services import progression
 
             for m in members:
                 row = char_rows.get(m.get("char_id") or m.get("id"))
                 if row:
-                    old_level = row.level or 1
-                    row.xp += share
-
-                    # Check for level-up
-                    new_level = old_level
-                    while row.xp >= xp_for_level(new_level + 1):
-                        new_level += 1
-
-                    if new_level > old_level:
-                        row.level = new_level
-                        # Note: Stat point allocation happens via /api/characters/<id>/level-up endpoint
-
+                    # Unified progression: grant_xp uses the canonical XP table
+                    # (app/models/xp.py) and applies level-ups + talent points.
+                    progression.grant_xp(row, share)
                     db.session.add(row)
                     try:
                         xp_map[str(m.get("char_id") or m.get("id"))] = share
