@@ -334,6 +334,35 @@ def equip_item(cid: int):
     if not ch:
         return jsonify({"error": "not found"}), 404
     data = request.get_json(silent=True) or {}
+
+    # --- Gear-instance path: uid-based equip for procedural items ---
+    uid = (data.get("uid") or "").strip()
+    if uid:
+        from app.loot.data.archetypes import SLOTS as GEAR_SLOTS
+
+        items_raw = json.loads(ch.items) if ch.items else []
+        if not isinstance(items_raw, list):
+            items_raw = []
+        gear_raw = json.loads(ch.gear) if ch.gear else {}
+        if not isinstance(gear_raw, dict):
+            gear_raw = {}
+        inst = next((i for i in items_raw if isinstance(i, dict) and i.get("uid") == uid), None)
+        if not inst:
+            return jsonify({"error": "not_in_inventory"}), 400
+        slot = inst.get("slot")
+        if slot not in GEAR_SLOTS:
+            return jsonify({"error": "bad_slot"}), 400
+        # Swap any currently-equipped item in that slot back into items
+        if gear_raw.get(slot):
+            items_raw.append(gear_raw[slot])
+        gear_raw[slot] = inst
+        items_raw = [i for i in items_raw if not (isinstance(i, dict) and i.get("uid") == uid)]
+        ch.gear = json.dumps(gear_raw)
+        ch.items = json.dumps(items_raw)
+        db.session.commit()
+        return jsonify({"ok": True, "slot": slot, "gear": gear_raw})
+
+    # --- Legacy slug-based equip path ---
     slug = (data.get("slug") or "").strip()
     if not slug:
         return jsonify({"error": "missing slug"}), 400
