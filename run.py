@@ -204,6 +204,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     seed_parser.set_defaults(command="reseed-items")
 
+    # seed-merchants subcommand
+    seed_merchants_parser = subparsers.add_parser(
+        "seed-merchants",
+        help="Create/update town merchants and their stock (idempotent)",
+        formatter_class=argparse.RawTextHelpFormatter,
+        description="Seed town merchants via the ORM. Safe to run repeatedly.",
+    )
+    seed_merchants_parser.set_defaults(command="seed-merchants")
+
     # import-items-csv
     import_items_parser = subparsers.add_parser(
         "import-items-csv",
@@ -363,6 +372,12 @@ def main(argv: list[str]) -> int:
         clear = not getattr(args, "no_clear", False)
         reseed_items(clear_first=clear, verbose=True)
         return 0
+    elif mode == "seed-merchants":
+        from app.seed_merchants import seed_merchants
+
+        seed_merchants(verbose=True)
+        return 0
+
     elif mode == "import-items-csv":
         from app import db
         from app.models.models import Item

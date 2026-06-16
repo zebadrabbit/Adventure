@@ -57,11 +57,17 @@ def load_inventory(raw_json: str | None) -> List[Dict[str, Any]]:
                 continue
             agg[slug] = agg.get(slug, 0) + 1
         return [{"slug": s, "qty": q} for s, q in agg.items()]
-    # Already canonical? Validate shape
+    # Already canonical? Validate shape. Two entry kinds coexist in the list:
+    #   - stack entries: {"slug": str, "qty": int}
+    #   - procedural gear instances: dicts carrying a "uid" (no slug stack)
+    # Instances are preserved verbatim so buy/sell round-trips never drop gear.
     out = []
     if isinstance(data, list):
         for obj in data:
             if not isinstance(obj, dict):
+                continue
+            if obj.get("uid"):
+                out.append(obj)
                 continue
             slug = obj.get("slug")
             qty = obj.get("qty", 1)
@@ -88,7 +94,7 @@ def add_item(inv: List[Dict[str, Any]], slug: str, qty: int = 1) -> List[Dict[st
     if qty <= 0:
         return inv
     for obj in inv:
-        if obj["slug"] == slug:
+        if obj.get("slug") == slug:
             obj["qty"] += qty
             break
     else:  # not found
@@ -99,10 +105,27 @@ def add_item(inv: List[Dict[str, Any]], slug: str, qty: int = 1) -> List[Dict[st
 def remove_one(inv: List[Dict[str, Any]], slug: str) -> bool:
     """Remove a single instance of slug if present; return True if removed."""
     for obj in inv:
-        if obj["slug"] == slug:
+        if obj.get("slug") == slug:
             obj["qty"] -= 1
             if obj["qty"] <= 0:
                 inv.remove(obj)
+            return True
+    return False
+
+
+def find_instance(inv: List[Dict[str, Any]], uid: str) -> Dict[str, Any] | None:
+    """Return the procedural gear instance with the given uid, or None."""
+    for obj in inv:
+        if obj.get("uid") == uid:
+            return obj
+    return None
+
+
+def remove_instance(inv: List[Dict[str, Any]], uid: str) -> bool:
+    """Remove a procedural gear instance by uid; return True if removed."""
+    for obj in inv:
+        if obj.get("uid") == uid:
+            inv.remove(obj)
             return True
     return False
 
@@ -139,12 +162,16 @@ def compute_capacity(str_score: int, cfg: dict) -> int:
 def compute_weight(inv: List[Dict[str, Any]]) -> float:
     if not inv:
         return 0.0
-    slugs = [o["slug"] for o in inv]
-    items = Item.query.filter(Item.slug.in_(slugs)).all()
+    slugs = [o["slug"] for o in inv if o.get("slug")]
+    items = Item.query.filter(Item.slug.in_(slugs)).all() if slugs else []
     weight_by_slug = {i.slug: (getattr(i, "weight", 1.0) or 1.0) for i in items}
     total = 0.0
     for obj in inv:
-        total += weight_by_slug.get(obj["slug"], 1.0) * obj.get("qty", 1)
+        if obj.get("uid"):
+            # Procedural gear instance: use its own weight if present, else 1.0
+            total += float(obj.get("weight", 1.0) or 1.0)
+        else:
+            total += weight_by_slug.get(obj.get("slug"), 1.0) * obj.get("qty", 1)
     return float(total)
 
 
