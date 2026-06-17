@@ -77,6 +77,9 @@ class TradingSystem {
                 <div class="shop-tab" data-tab="sell" onclick="tradingSystem.switchTab('sell')">
                     <i class="bi bi-cash-coin me-2"></i>Sell
                 </div>
+                <div class="shop-tab" data-tab="repair" onclick="tradingSystem.switchTab('repair')">
+                    <i class="bi bi-hammer me-2"></i>Repair
+                </div>
             </div>
 
             <div class="shop-inventory">
@@ -203,6 +206,8 @@ class TradingSystem {
             this.renderBuyTab();
         } else if (tab === 'sell') {
             this.renderSellTab();
+        } else if (tab === 'repair') {
+            this.renderRepairTab();
         }
     }
 
@@ -300,6 +305,96 @@ class TradingSystem {
         <span class="price-amount">${sellPrice.toLocaleString()}</span>
     </div>
 </div>`;
+    }
+
+    async renderRepairTab() {
+        const grid = document.getElementById('shop-items-grid');
+        grid.innerHTML = '<div class="text-center text-muted py-5">Loading...</div>';
+
+        await this.refreshHoard();
+
+        let charStates = [];
+        try {
+            const stateResponse = await fetch('/api/characters/state');
+            if (stateResponse.ok) {
+                const stateData = await stateResponse.json();
+                charStates = stateData.characters || [];
+            }
+        } catch (err) {
+            console.error('[trading] Failed to load character state:', err);
+        }
+
+        const repairable = [];
+        this.hoardItems.forEach(item => {
+            if (item.uid && item.durability != null && item.max_durability
+                && item.durability < item.max_durability) {
+                repairable.push({ instance: item, source: 'In Hoard' });
+            }
+        });
+        charStates.forEach(ch => {
+            Object.entries(ch.gear || {}).forEach(([slot, inst]) => {
+                if (inst && typeof inst === 'object' && inst.uid && inst.durability != null
+                    && inst.max_durability && inst.durability < inst.max_durability) {
+                    repairable.push({ instance: inst, source: `Equipped — ${ch.name} (${slot})` });
+                }
+            });
+        });
+
+        if (repairable.length === 0) {
+            grid.innerHTML = '<div class="text-center text-muted py-5">Nothing needs repair.</div>';
+            return;
+        }
+
+        grid.innerHTML = repairable.map(({ instance, source }) => this.renderRepairCard(instance, source)).join('');
+    }
+
+    renderRepairCard(instance, source) {
+        const rarity = window.MUDTooltips ? window.MUDTooltips.rarityClass(instance.rarity) : 'rarity-common';
+        return `
+<div class="shop-item-card repair-item-card" id="repair-card-${instance.uid}">
+    <div class="shop-item-icon-wrapper">
+        ${this.getItemIcon(instance.type)}
+    </div>
+    <div class="shop-item-name ${rarity}">${instance.name || instance.slug}</div>
+    <div class="repair-item-source small text-muted">${source}</div>
+    ${this.durabilityBarHtml(instance)}
+    <button type="button" class="trade-btn trade-btn-confirm repair-btn" onclick="tradingSystem.repairItem('${instance.uid}')">
+        Repair
+    </button>
+</div>`;
+    }
+
+    async repairItem(uid) {
+        try {
+            const response = await fetch('/api/trade/repair', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                this.showToast('Repair Failed', result.error || 'Could not repair item', 'error');
+                return;
+            }
+
+            this.hoardCopper = result.new_balance;
+            this.hoardCopperDisplay = result.new_balance_display || `${this.hoardCopper}c`;
+            document.getElementById('hoard-copper-amount').textContent = this.hoardCopperDisplay;
+
+            this.showToast('Repaired!', `Restored to full durability for ${result.cost_display || result.cost + 'c'}`, 'success');
+
+            document.dispatchEvent(new CustomEvent('repair-complete', {
+                detail: { uid, new_balance: this.hoardCopper }
+            }));
+
+            this.renderRepairTab();
+
+        } catch (err) {
+            console.error('[trading] Repair failed:', err);
+            this.showToast('Error', 'Repair failed', 'error');
+        }
     }
 
     durabilityBarHtml(item) {
