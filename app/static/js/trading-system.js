@@ -2,8 +2,8 @@
  * Trading & Economy System
  *
  * Features:
- * - Merchant shop UI with buy/sell tabs
- * - Gold currency management
+ * - Merchant shop UI with buy/sell/repair tabs
+ * - Hoard (per-user) copper currency management
  * - Item pricing with buy/sell modifiers
  * - Stock management for limited inventory
  * - Trade confirmations with quantity selector
@@ -12,13 +12,14 @@
  *
  * API Endpoints:
  * - GET  /api/merchants/{slug} - Get merchant details and inventory
- * - POST /api/trade/buy - Purchase items from merchant
- * - POST /api/trade/sell - Sell items to merchant
- * - GET  /api/characters/{id}/gold - Get character gold balance
+ * - GET  /api/hoard - Get the current user's hoard (copper + items)
+ * - POST /api/trade/buy - Purchase items from merchant (debits the hoard)
+ * - POST /api/trade/sell - Sell items to merchant (credits the hoard)
+ * - POST /api/trade/repair - Repair a gear instance (debits the hoard)
  *
  * Events:
- * - 'trade-complete' - Fired when transaction completes
- * - 'gold-changed' - Fired when gold amount changes
+ * - 'trade-complete' - Fired when a buy/sell transaction completes
+ * - 'repair-complete' - Fired when a repair completes
  */
 
 class TradingSystem {
@@ -27,7 +28,9 @@ class TradingSystem {
         this.confirmDialog = null;
         this.currentMerchant = null;
         this.currentCharacter = null;
-        this.characterGold = 0;
+        this.hoardCopper = 0;
+        this.hoardCopperDisplay = '0c';
+        this.hoardItems = [];
         this.currentTab = 'buy';
         this.pendingTrade = null;
 
@@ -62,8 +65,8 @@ class TradingSystem {
                 <div class="character-gold">
                     <i class="bi bi-coin gold-icon"></i>
                     <div>
-                        <div class="gold-amount" id="character-gold-amount">0</div>
-                        <div class="gold-label">Gold</div>
+                        <div class="gold-amount" id="hoard-copper-amount">0c</div>
+                        <div class="gold-label">Hoard</div>
                     </div>
                 </div>
             </div>
@@ -74,6 +77,9 @@ class TradingSystem {
                 </div>
                 <div class="shop-tab" data-tab="sell" onclick="tradingSystem.switchTab('sell')">
                     <i class="bi bi-cash-coin me-2"></i>Sell
+                </div>
+                <div class="shop-tab" data-tab="repair" onclick="tradingSystem.switchTab('repair')">
+                    <i class="bi bi-hammer me-2"></i>Repair
                 </div>
             </div>
 
@@ -158,12 +164,7 @@ class TradingSystem {
 
             this.currentMerchant = await merchantResponse.json();
 
-            // Load character gold
-            const goldResponse = await fetch(`/api/characters/${characterId}/gold`);
-            if (goldResponse.ok) {
-                const goldData = await goldResponse.json();
-                this.characterGold = goldData.gold || 0;
-            }
+            await this.refreshHoard();
 
             this.renderMerchantShop();
             this.shopModal.show();
@@ -174,12 +175,22 @@ class TradingSystem {
         }
     }
 
+    async refreshHoard() {
+        const hoardResponse = await fetch('/api/hoard');
+        if (hoardResponse.ok) {
+            const hoardData = await hoardResponse.json();
+            this.hoardCopper = hoardData.copper || 0;
+            this.hoardCopperDisplay = hoardData.copper_display || `${this.hoardCopper}c`;
+            this.hoardItems = hoardData.items || [];
+        }
+    }
+
     renderMerchantShop() {
         // Set merchant info
         document.getElementById('merchant-name').textContent = this.currentMerchant.name;
         document.getElementById('merchant-type').textContent = this.currentMerchant.type || 'General Merchant';
         document.getElementById('merchant-portrait').innerHTML = this.currentMerchant.icon || '<i class="bi bi-shop"></i>';
-        document.getElementById('character-gold-amount').textContent = this.characterGold.toLocaleString();
+        document.getElementById('hoard-copper-amount').textContent = this.hoardCopperDisplay;
 
         this.switchTab(this.currentTab);
     }
@@ -196,6 +207,8 @@ class TradingSystem {
             this.renderBuyTab();
         } else if (tab === 'sell') {
             this.renderSellTab();
+        } else if (tab === 'repair') {
+            this.renderRepairTab();
         }
     }
 
@@ -209,7 +222,7 @@ class TradingSystem {
 
         const html = this.currentMerchant.inventory.map(item => {
             const buyPrice = Math.floor(item.base_price * this.currentMerchant.buy_modifier);
-            const canAfford = this.characterGold >= buyPrice;
+            const canAfford = this.hoardCopper >= buyPrice;
             const inStock = item.stock === null || item.stock > 0;
 
             return `
@@ -225,7 +238,7 @@ class TradingSystem {
         <span class="price-amount">${buyPrice.toLocaleString()}</span>
     </div>
     ${!inStock ? '<div class="text-danger text-center mt-2 small">Out of Stock</div>' : ''}
-    ${!canAfford && inStock ? '<div class="text-warning text-center mt-2 small">Not enough gold</div>' : ''}
+    ${!canAfford && inStock ? '<div class="text-warning text-center mt-2 small">Not enough copper</div>' : ''}
 </div>`;
         }).join('');
 
@@ -235,45 +248,161 @@ class TradingSystem {
     async renderSellTab() {
         const grid = document.getElementById('shop-items-grid');
 
-        try {
-            // Get character inventory
-            const response = await fetch(`/api/characters/${this.currentCharacter}/inventory`);
-            if (!response.ok) {
-                grid.innerHTML = '<div class="text-center text-muted py-5">Failed to load inventory</div>';
-                return;
+        await this.refreshHoard();
+
+        // Stackables are priced via the merchant's own catalog (Item.value_copper isn't
+        // exposed to the frontend), so only stackables this merchant actually deals in are
+        // sellable here. Gear instances are always sellable (priced by their own `value`).
+        const catalogBySlug = {};
+        (this.currentMerchant.inventory || []).forEach(i => { catalogBySlug[i.slug] = i; });
+
+        const sellable = this.hoardItems.filter(item => item.uid || catalogBySlug[item.slug]);
+
+        if (sellable.length === 0) {
+            grid.innerHTML = '<div class="text-center text-muted py-5">No items to sell</div>';
+            return;
+        }
+
+        const html = sellable.map(item => {
+            if (item.uid) {
+                return this.renderSellInstanceCard(item);
             }
+            return this.renderSellStackableCard(item, catalogBySlug[item.slug]);
+        }).join('');
 
-            const data = await response.json();
-            const inventory = data.items || [];
+        grid.innerHTML = html;
+    }
 
-            if (inventory.length === 0) {
-                grid.innerHTML = '<div class="text-center text-muted py-5">No items to sell</div>';
-                return;
-            }
-
-            const html = inventory.map(item => {
-                const sellPrice = Math.floor(item.base_price * this.currentMerchant.sell_modifier);
-
-                return `
-<div class="shop-item-card sell-item-card" onclick="tradingSystem.startSell('${item.slug}')">
+    renderSellStackableCard(item, catalogEntry) {
+        const sellPrice = Math.floor((catalogEntry.base_price || 0) * this.currentMerchant.sell_modifier);
+        const safeName = (catalogEntry.name || item.slug).replace(/'/g, "\\'");
+        return `
+<div class="shop-item-card sell-item-card" onclick="tradingSystem.startSell({slug: '${item.slug}', name: '${safeName}', type: '${catalogEntry.type}', basePrice: ${catalogEntry.base_price || 0}, qty: ${item.qty || 1}})">
     <div class="shop-item-icon-wrapper">
-        ${this.getItemIcon(item.type)}
-        ${item.quantity > 1 ? `<div class="item-quantity-badge">×${item.quantity}</div>` : ''}
+        ${this.getItemIcon(catalogEntry.type)}
+        ${item.qty > 1 ? `<div class="item-quantity-badge">×${item.qty}</div>` : ''}
     </div>
-    <div class="shop-item-name">${item.name}</div>
+    <div class="shop-item-name">${catalogEntry.name}</div>
     <div class="shop-item-price sell-price-display">
         <i class="bi bi-coin price-icon"></i>
         <span class="price-amount">${sellPrice.toLocaleString()}</span>
     </div>
 </div>`;
-            }).join('');
+    }
 
-            grid.innerHTML = html;
+    renderSellInstanceCard(item) {
+        const sellPrice = Math.floor((item.value || 0) * this.currentMerchant.sell_modifier);
+        const rarity = window.MUDTooltips ? window.MUDTooltips.rarityClass(item.rarity) : 'rarity-common';
+        const safeName = (item.name || item.slug || 'Item').replace(/'/g, "\\'");
+        return `
+<div class="shop-item-card sell-item-card" onclick="tradingSystem.startSell({uid: '${item.uid}', name: '${safeName}', value: ${item.value || 0}})">
+    <div class="shop-item-icon-wrapper">
+        ${this.getItemIcon(item.type)}
+    </div>
+    <div class="shop-item-name ${rarity}">${item.name || item.slug}</div>
+    ${this.durabilityBarHtml(item)}
+    <div class="shop-item-price sell-price-display">
+        <i class="bi bi-coin price-icon"></i>
+        <span class="price-amount">${sellPrice.toLocaleString()}</span>
+    </div>
+</div>`;
+    }
+
+    async renderRepairTab() {
+        const grid = document.getElementById('shop-items-grid');
+        grid.innerHTML = '<div class="text-center text-muted py-5">Loading...</div>';
+
+        await this.refreshHoard();
+
+        let charStates = [];
+        try {
+            const stateResponse = await fetch('/api/characters/state');
+            if (stateResponse.ok) {
+                const stateData = await stateResponse.json();
+                charStates = stateData.characters || [];
+            }
+        } catch (err) {
+            console.error('[trading] Failed to load character state:', err);
+        }
+
+        const repairable = [];
+        this.hoardItems.forEach(item => {
+            if (item.uid && item.durability != null && item.max_durability
+                && item.durability < item.max_durability) {
+                repairable.push({ instance: item, source: 'In Hoard' });
+            }
+        });
+        charStates.forEach(ch => {
+            Object.entries(ch.gear || {}).forEach(([slot, inst]) => {
+                if (inst && typeof inst === 'object' && inst.uid && inst.durability != null
+                    && inst.max_durability && inst.durability < inst.max_durability) {
+                    repairable.push({ instance: inst, source: `Equipped — ${ch.name} (${slot})` });
+                }
+            });
+        });
+
+        if (repairable.length === 0) {
+            grid.innerHTML = '<div class="text-center text-muted py-5">Nothing needs repair.</div>';
+            return;
+        }
+
+        grid.innerHTML = repairable.map(({ instance, source }) => this.renderRepairCard(instance, source)).join('');
+    }
+
+    renderRepairCard(instance, source) {
+        const rarity = window.MUDTooltips ? window.MUDTooltips.rarityClass(instance.rarity) : 'rarity-common';
+        return `
+<div class="shop-item-card repair-item-card" id="repair-card-${instance.uid}">
+    <div class="shop-item-icon-wrapper">
+        ${this.getItemIcon(instance.type)}
+    </div>
+    <div class="shop-item-name ${rarity}">${instance.name || instance.slug}</div>
+    <div class="repair-item-source small text-muted">${source}</div>
+    ${this.durabilityBarHtml(instance)}
+    <button type="button" class="trade-btn trade-btn-confirm repair-btn" onclick="tradingSystem.repairItem('${instance.uid}')">
+        Repair
+    </button>
+</div>`;
+    }
+
+    async repairItem(uid) {
+        try {
+            const response = await fetch('/api/trade/repair', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                this.showToast('Repair Failed', result.error || 'Could not repair item', 'error');
+                return;
+            }
+
+            this.hoardCopper = result.new_balance;
+            this.hoardCopperDisplay = result.new_balance_display || `${this.hoardCopper}c`;
+            document.getElementById('hoard-copper-amount').textContent = this.hoardCopperDisplay;
+
+            this.showToast('Repaired!', `Restored to full durability for ${result.cost_display || result.cost + 'c'}`, 'success');
+
+            document.dispatchEvent(new CustomEvent('repair-complete', {
+                detail: { uid, new_balance: this.hoardCopper }
+            }));
+
+            this.renderRepairTab();
 
         } catch (err) {
-            console.error('[trading] Failed to load inventory:', err);
-            grid.innerHTML = '<div class="text-center text-muted py-5">Failed to load inventory</div>';
+            console.error('[trading] Repair failed:', err);
+            this.showToast('Error', 'Repair failed', 'error');
         }
+    }
+
+    durabilityBarHtml(item) {
+        if (item.durability == null || !item.max_durability) return '';
+        const pct = Math.max(0, Math.min(100, (item.durability / item.max_durability) * 100));
+        const tier = pct > 60 ? 'high' : pct > 25 ? 'medium' : 'low';
+        return `<div class="durability-bar"><div class="durability-fill ${tier}" style="width: ${pct}%"></div></div>`;
     }
 
     startBuy(itemSlug) {
@@ -281,14 +410,14 @@ class TradingSystem {
         if (!item) return;
 
         const buyPrice = Math.floor(item.base_price * this.currentMerchant.buy_modifier);
-        const maxQty = item.stock !== null ? item.stock : Math.floor(this.characterGold / buyPrice);
+        const maxQty = item.stock !== null ? item.stock : Math.floor(this.hoardCopper / buyPrice);
 
         if (item.stock !== null && item.stock === 0) {
             this.showToast('Out of Stock', 'This item is currently unavailable', 'error');
             return;
         }
 
-        if (buyPrice > this.characterGold) {
+        if (buyPrice > this.hoardCopper) {
             this.showToast('Insufficient Gold', 'You cannot afford this item', 'error');
             return;
         }
@@ -304,16 +433,32 @@ class TradingSystem {
         this.showTradeConfirm();
     }
 
-    startSell(itemSlug) {
-        // Would need to get item details from inventory
-        this.pendingTrade = {
-            type: 'sell',
-            itemSlug: itemSlug,
-            quantity: 1
-        };
+    startSell(opts) {
+        if (opts.uid) {
+            const sellPrice = Math.floor((opts.value || 0) * this.currentMerchant.sell_modifier);
+            this.pendingTrade = {
+                type: 'sell',
+                kind: 'instance',
+                uid: opts.uid,
+                item: { name: opts.name, type: 'gear' },
+                unitPrice: sellPrice,
+                quantity: 1,
+                maxQuantity: 1
+            };
+        } else {
+            const sellPrice = Math.floor((opts.basePrice || 0) * this.currentMerchant.sell_modifier);
+            this.pendingTrade = {
+                type: 'sell',
+                kind: 'stackable',
+                slug: opts.slug,
+                item: { name: opts.name, type: opts.type },
+                unitPrice: sellPrice,
+                quantity: 1,
+                maxQuantity: opts.qty || 1
+            };
+        }
 
-        // For now, confirm directly
-        this.executeTrade();
+        this.showTradeConfirm();
     }
 
     showTradeConfirm() {
@@ -345,7 +490,7 @@ class TradingSystem {
 
         // Update quantity buttons
         document.getElementById('qty-decrease').disabled = quantity <= 1;
-        document.getElementById('qty-increase').disabled = quantity >= maxQuantity || (type === 'buy' && (unitPrice * (quantity + 1)) > this.characterGold);
+        document.getElementById('qty-increase').disabled = quantity >= maxQuantity || (type === 'buy' && (unitPrice * (quantity + 1)) > this.hoardCopper);
 
         document.getElementById('trade-confirm-overlay').style.display = 'flex';
     }
@@ -361,7 +506,7 @@ class TradingSystem {
         // Check if can afford
         if (this.pendingTrade.type === 'buy') {
             const totalCost = this.pendingTrade.unitPrice * newQty;
-            if (totalCost > this.characterGold) return;
+            if (totalCost > this.hoardCopper) return;
         }
 
         this.pendingTrade.quantity = newQty;
@@ -382,20 +527,27 @@ class TradingSystem {
     async executeTrade() {
         if (!this.pendingTrade) return;
 
-        const { type, item, itemSlug, quantity, unitPrice } = this.pendingTrade;
-        const slug = item ? item.slug : itemSlug;
+        const { type, item, slug, uid, kind, quantity, unitPrice } = this.pendingTrade;
 
         try {
             const endpoint = type === 'buy' ? '/api/trade/buy' : '/api/trade/sell';
+            const body = {
+                character_id: this.currentCharacter,
+                merchant_slug: this.currentMerchant.slug,
+                quantity: quantity
+            };
+            if (type === 'buy') {
+                body.item_slug = item.slug;
+            } else if (kind === 'instance') {
+                body.uid = uid;
+            } else {
+                body.item_slug = slug;
+            }
+
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    character_id: this.currentCharacter,
-                    merchant_slug: this.currentMerchant.slug,
-                    item_slug: slug,
-                    quantity: quantity
-                })
+                body: JSON.stringify(body)
             });
 
             if (!response.ok) {
@@ -407,21 +559,22 @@ class TradingSystem {
 
             const result = await response.json();
 
-            // Update gold
-            this.characterGold = result.new_balance;
-            document.getElementById('character-gold-amount').textContent = this.characterGold.toLocaleString();
+            // Update hoard copper
+            this.hoardCopper = result.new_balance;
+            this.hoardCopperDisplay = result.new_balance_display || `${this.hoardCopper}c`;
+            document.getElementById('hoard-copper-amount').textContent = this.hoardCopperDisplay;
 
             // Show success
-            const itemName = item ? item.name : slug;
+            const itemName = item ? item.name : (slug || uid);
             if (type === 'buy') {
-                this.showToast('Purchase Complete!', `Bought ${quantity}x ${itemName} for ${unitPrice * quantity} gold`, 'success');
+                this.showToast('Purchase Complete!', `Bought ${quantity}x ${itemName} for ${unitPrice * quantity} copper`, 'success');
             } else {
-                this.showToast('Sale Complete!', `Sold ${quantity}x ${itemName} for ${unitPrice * quantity} gold`, 'success');
+                this.showToast('Sale Complete!', `Sold ${quantity}x ${itemName} for ${unitPrice * quantity} copper`, 'success');
             }
 
             // Fire event
             document.dispatchEvent(new CustomEvent('trade-complete', {
-                detail: { type, item: slug, quantity, gold: this.characterGold }
+                detail: { type, item: slug, quantity, copper: this.hoardCopper }
             }));
 
             // Refresh display
