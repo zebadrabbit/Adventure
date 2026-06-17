@@ -52,10 +52,17 @@ spec → write an implementation plan (TDD, small tasks) → implement → verif
       - [x] Apply passive `effect_json` to derived combat stats ✅ —
             `app/services/skill_effects.py::passive_bonuses`, folded into
             `combat_service._derive_stats`. Tests: `tests/test_skill_effects.py`.
-      - [ ] Wire **active** skills as real combat actions (a "cast skill" turn that
-            applies the skill's `effect_json` damage/heal). `use_skill` endpoint exists
-            but isn't integrated into the combat turn loop yet. (Touches the combat
-            action handlers — do with combat tests in view.)
+      - [ ] Wire **active** skills as real combat actions. NOTE: combat already has a
+            *separate, hardcoded* spell system — `combat_service.player_cast_spell`
+            (firebolt/ice_shard/lightning) + `POST /api/combat/<id>/cast`. Unlocked
+            active `CharacterSkill`s (e.g. seeded "Power Strike", "Second Wind") are NOT
+            usable there. Add a "cast skill" action that: validates the actor's turn +
+            version (mirror player_cast_spell lines ~1436-1450), checks the character has
+            the skill unlocked + it's `skill_type=="active"` + off cooldown (CharacterSkill
+            cooldown logic exists in skill_api.use_skill), then applies `effect_json`
+            (damage → monster, heal → caster) reusing the existing damage/resist helpers.
+            Do this with combat tests in view (initiative is rolled in start_session —
+            patch random BEFORE it, see test_combat_persistence for the pattern).
       - [x] Fold passives into the dashboard HP/mana display ✅
             (`dashboard_helpers.py`, matches combat).
 - [ ] **5c Progression UI:** character sheet (level/XP bar, stat allocation, skill tree).
