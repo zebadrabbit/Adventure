@@ -242,45 +242,71 @@ class TradingSystem {
     async renderSellTab() {
         const grid = document.getElementById('shop-items-grid');
 
-        try {
-            // Get character inventory
-            const response = await fetch(`/api/characters/${this.currentCharacter}/inventory`);
-            if (!response.ok) {
-                grid.innerHTML = '<div class="text-center text-muted py-5">Failed to load inventory</div>';
-                return;
+        await this.refreshHoard();
+
+        // Stackables are priced via the merchant's own catalog (Item.value_copper isn't
+        // exposed to the frontend), so only stackables this merchant actually deals in are
+        // sellable here. Gear instances are always sellable (priced by their own `value`).
+        const catalogBySlug = {};
+        (this.currentMerchant.inventory || []).forEach(i => { catalogBySlug[i.slug] = i; });
+
+        const sellable = this.hoardItems.filter(item => item.uid || catalogBySlug[item.slug]);
+
+        if (sellable.length === 0) {
+            grid.innerHTML = '<div class="text-center text-muted py-5">No items to sell</div>';
+            return;
+        }
+
+        const html = sellable.map(item => {
+            if (item.uid) {
+                return this.renderSellInstanceCard(item);
             }
+            return this.renderSellStackableCard(item, catalogBySlug[item.slug]);
+        }).join('');
 
-            const data = await response.json();
-            const inventory = data.items || [];
+        grid.innerHTML = html;
+    }
 
-            if (inventory.length === 0) {
-                grid.innerHTML = '<div class="text-center text-muted py-5">No items to sell</div>';
-                return;
-            }
-
-            const html = inventory.map(item => {
-                const sellPrice = Math.floor(item.base_price * this.currentMerchant.sell_modifier);
-
-                return `
-<div class="shop-item-card sell-item-card" onclick="tradingSystem.startSell('${item.slug}')">
+    renderSellStackableCard(item, catalogEntry) {
+        const sellPrice = Math.floor((catalogEntry.base_price || 0) * this.currentMerchant.sell_modifier);
+        const safeName = (catalogEntry.name || item.slug).replace(/'/g, "\\'");
+        return `
+<div class="shop-item-card sell-item-card" onclick="tradingSystem.startSell({slug: '${item.slug}', name: '${safeName}', type: '${catalogEntry.type}', basePrice: ${catalogEntry.base_price || 0}, qty: ${item.qty || 1}})">
     <div class="shop-item-icon-wrapper">
-        ${this.getItemIcon(item.type)}
-        ${item.quantity > 1 ? `<div class="item-quantity-badge">×${item.quantity}</div>` : ''}
+        ${this.getItemIcon(catalogEntry.type)}
+        ${item.qty > 1 ? `<div class="item-quantity-badge">×${item.qty}</div>` : ''}
     </div>
-    <div class="shop-item-name">${item.name}</div>
+    <div class="shop-item-name">${catalogEntry.name}</div>
     <div class="shop-item-price sell-price-display">
         <i class="bi bi-coin price-icon"></i>
         <span class="price-amount">${sellPrice.toLocaleString()}</span>
     </div>
 </div>`;
-            }).join('');
+    }
 
-            grid.innerHTML = html;
+    renderSellInstanceCard(item) {
+        const sellPrice = Math.floor((item.value || 0) * this.currentMerchant.sell_modifier);
+        const rarity = window.MUDTooltips ? window.MUDTooltips.rarityClass(item.rarity) : 'rarity-common';
+        const safeName = (item.name || item.slug || 'Item').replace(/'/g, "\\'");
+        return `
+<div class="shop-item-card sell-item-card" onclick="tradingSystem.startSell({uid: '${item.uid}', name: '${safeName}', value: ${item.value || 0}})">
+    <div class="shop-item-icon-wrapper">
+        ${this.getItemIcon(item.type)}
+    </div>
+    <div class="shop-item-name ${rarity}">${item.name || item.slug}</div>
+    ${this.durabilityBarHtml(item)}
+    <div class="shop-item-price sell-price-display">
+        <i class="bi bi-coin price-icon"></i>
+        <span class="price-amount">${sellPrice.toLocaleString()}</span>
+    </div>
+</div>`;
+    }
 
-        } catch (err) {
-            console.error('[trading] Failed to load inventory:', err);
-            grid.innerHTML = '<div class="text-center text-muted py-5">Failed to load inventory</div>';
-        }
+    durabilityBarHtml(item) {
+        if (item.durability == null || !item.max_durability) return '';
+        const pct = Math.max(0, Math.min(100, (item.durability / item.max_durability) * 100));
+        const tier = pct > 60 ? 'high' : pct > 25 ? 'medium' : 'low';
+        return `<div class="durability-bar"><div class="durability-fill ${tier}" style="width: ${pct}%"></div></div>`;
     }
 
     startBuy(itemSlug) {
@@ -311,16 +337,32 @@ class TradingSystem {
         this.showTradeConfirm();
     }
 
-    startSell(itemSlug) {
-        // Would need to get item details from inventory
-        this.pendingTrade = {
-            type: 'sell',
-            itemSlug: itemSlug,
-            quantity: 1
-        };
+    startSell(opts) {
+        if (opts.uid) {
+            const sellPrice = Math.floor((opts.value || 0) * this.currentMerchant.sell_modifier);
+            this.pendingTrade = {
+                type: 'sell',
+                kind: 'instance',
+                uid: opts.uid,
+                item: { name: opts.name, type: 'gear' },
+                unitPrice: sellPrice,
+                quantity: 1,
+                maxQuantity: 1
+            };
+        } else {
+            const sellPrice = Math.floor((opts.basePrice || 0) * this.currentMerchant.sell_modifier);
+            this.pendingTrade = {
+                type: 'sell',
+                kind: 'stackable',
+                slug: opts.slug,
+                item: { name: opts.name, type: opts.type },
+                unitPrice: sellPrice,
+                quantity: 1,
+                maxQuantity: opts.qty || 1
+            };
+        }
 
-        // For now, confirm directly
-        this.executeTrade();
+        this.showTradeConfirm();
     }
 
     showTradeConfirm() {
@@ -389,20 +431,27 @@ class TradingSystem {
     async executeTrade() {
         if (!this.pendingTrade) return;
 
-        const { type, item, itemSlug, quantity, unitPrice } = this.pendingTrade;
-        const slug = item ? item.slug : itemSlug;
+        const { type, item, slug, uid, kind, quantity, unitPrice } = this.pendingTrade;
 
         try {
             const endpoint = type === 'buy' ? '/api/trade/buy' : '/api/trade/sell';
+            const body = {
+                character_id: this.currentCharacter,
+                merchant_slug: this.currentMerchant.slug,
+                quantity: quantity
+            };
+            if (type === 'buy') {
+                body.item_slug = item.slug;
+            } else if (kind === 'instance') {
+                body.uid = uid;
+            } else {
+                body.item_slug = slug;
+            }
+
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    character_id: this.currentCharacter,
-                    merchant_slug: this.currentMerchant.slug,
-                    item_slug: slug,
-                    quantity: quantity
-                })
+                body: JSON.stringify(body)
             });
 
             if (!response.ok) {
@@ -420,7 +469,7 @@ class TradingSystem {
             document.getElementById('hoard-copper-amount').textContent = this.hoardCopperDisplay;
 
             // Show success
-            const itemName = item ? item.name : slug;
+            const itemName = item ? item.name : (slug || uid);
             if (type === 'buy') {
                 this.showToast('Purchase Complete!', `Bought ${quantity}x ${itemName} for ${unitPrice * quantity} gold`, 'success');
             } else {

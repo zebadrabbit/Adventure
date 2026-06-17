@@ -206,7 +206,7 @@
     return toggleBtn;
   }
   // Public API
-  window.MUDTooltips = { attrForItem, apply, itemHtml, getMode, setMode, cycleMode };
+  window.MUDTooltips = { attrForItem, apply, itemHtml, getMode, setMode, cycleMode, rarityClass };
   // Initial setup after DOM
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => { ensureToggle(); bootstrapServerMode(); delayedBootstrapApply(); });
