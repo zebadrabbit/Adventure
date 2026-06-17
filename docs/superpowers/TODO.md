@@ -40,8 +40,9 @@ spec → write an implementation plan (TDD, small tasks) → implement → verif
       (`level_for_xp`, `grant_xp` → levels + talent points, canonical xp curve). Combat
       kills and extraction now award XP through it; combat's old divergent quadratic curve
       removed. Tests: `tests/test_progression.py`.
-      - [ ] Still TODO: gate `inventory_api.level_up_character` to *earned* levels (needs a
-            stat-point ledger — currently allocations aren't bounded by earned points).
+      - [x] Gate `level_up_character` to earned stat points ✅ — `Character.stat_points`
+            ledger (+ migration); `grant_xp` awards `stat_points_per_level`; the endpoint
+            rejects over-spend + negatives. Tests: `tests/test_levelup_gating.py`.
 - [~] **5b Skills/spells:** the endpoints already existed (`app/routes/skill_api.py`:
       unlock/use/grant/reset). This session **secured them**: unlock/use/reset are now
       `@login_required` + owner-checked; `grant_talent_points` is admin-only (was an
