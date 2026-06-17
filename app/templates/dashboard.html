@@ -157,6 +157,16 @@
                                 </div>
                             </div>
 
+                            <!-- Hoard -->
+                            <div class="mt-4">
+                                <div class="subtitle mb-3">{{ svg_icon('locked-chest', 16, 'me-2') }}HOARD</div>
+                                <div class="d-flex flex-column gap-2">
+                                    <button type="button" class="tactical-btn-secondary btn-hoard-open">
+                                        <i class="bi bi-bank2 me-2"></i> View Hoard
+                                    </button>
+                                </div>
+                            </div>
+
                             <!-- Party Management -->
                             <div class="mt-4">
                                 <div class="subtitle mb-3">{{ svg_icon('people-fill', 16, 'me-2') }}PARTY</div>
@@ -384,6 +394,7 @@
 <script src="{{ asset_url('js/loot-distribution.js') }}"></script>
 <script src="{{ asset_url('js/quest-system.js') }}"></script>
 <script src="{{ asset_url('js/trading-system.js') }}"></script>
+<script src="{{ asset_url('js/hoard.js') }}"></script>
 <script src="{{ asset_url('js/seed-widget.js') }}"></script>
 <script src="{{ asset_url('js/dashboard-autofill.js') }}"></script>
 <script src="{{ asset_url('js/character.js') }}"></script>
