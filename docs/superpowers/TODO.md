@@ -68,8 +68,9 @@ spec → write an implementation plan (TDD, small tasks) → implement → verif
 - [ ] **Flaky tests (pre-existing, not from Path A):**
       - `tests/test_combat_persistence.py` — ~50% failure even alone; a race in the combat
         engine's background turn advancement. Needs a combat-scheduler fix.
-      - `tests/test_encounter_config.py` — fails only under shared-session DB contamination
-        (passes alone). Symptom of the suite lacking per-test DB isolation.
+      - `tests/test_encounter_config.py` — FIXED ✅: an autouse fixture now seeds a
+        boss+common monster spanning the band and clears the spawn cache. Full suite is
+        green except the combat-persistence race below.
 - [ ] **Test isolation generally:** the suite reuses one session DB (only
       `@pytest.mark.db_isolation` tests reset). New tests should use unique usernames
       (uuid) and unique seeds to avoid accumulation. A global per-test rollback/reset would
