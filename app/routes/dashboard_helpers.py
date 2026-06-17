@@ -226,6 +226,14 @@ def build_party_payload(chars: Sequence[Character]):
         except Exception:
             gear = {}
         gb = gear_bonuses(gear)
+        # Fold unlocked passive skill effects in alongside gear (matches combat).
+        try:
+            from app.services.skill_effects import passive_bonuses
+
+            for _k, _v in passive_bonuses(c.id).items():
+                gb[_k] = gb.get(_k, 0) + _v
+        except Exception:
+            pass
         hp_max += int(gb.get("max_hp", 0)) + int(gb.get("con", 0)) * 2
         mana_max += int(gb.get("mana", 0)) + int(gb.get("int", 0)) * 2
 
