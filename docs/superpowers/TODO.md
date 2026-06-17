@@ -49,9 +49,15 @@ spec → write an implementation plan (TDD, small tasks) → implement → verif
       - [x] Seed starter `SkillTree`/`Skill` rows ✅ — `app/seed_skills.py` +
             `python run.py seed-skills` (2 trees, 5 skills w/ prereqs); e2e seed→unlock
             test. **Run `seed-skills` on deploy.**
-      - [ ] Apply passive `effect_json` to derived combat stats (fold into
-            `app/loot/equip.py` aggregation); wire active skills as combat actions.
-            (Main remaining 5b work — data + unlock path are ready.)
+      - [x] Apply passive `effect_json` to derived combat stats ✅ —
+            `app/services/skill_effects.py::passive_bonuses`, folded into
+            `combat_service._derive_stats`. Tests: `tests/test_skill_effects.py`.
+      - [ ] Wire **active** skills as real combat actions (a "cast skill" turn that
+            applies the skill's `effect_json` damage/heal). `use_skill` endpoint exists
+            but isn't integrated into the combat turn loop yet. (Touches the combat
+            action handlers — do with combat tests in view.)
+      - [ ] (polish) Fold passives into the dashboard stat display too
+            (`dashboard_helpers.py` currently shows gear bonuses only).
 - [ ] **5c Progression UI:** character sheet (level/XP bar, stat allocation, skill tree).
 
 ## Known issues / cleanup (not blockers)
