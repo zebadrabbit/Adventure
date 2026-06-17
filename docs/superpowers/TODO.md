@@ -63,10 +63,10 @@ spec → write an implementation plan (TDD, small tasks) → implement → verif
 - [ ] **5c Progression UI:** character sheet (level/XP bar, stat allocation, skill tree).
 
 ## Known issues / cleanup (not blockers)
-- [ ] **Test-DB targeting quirk:** `tests/conftest.py` imports `app` before setting
-      `DATABASE_URL`, so pytest can hit the **dev** DB. Until fixed, always run with BOTH:
-      `DATABASE_URL=...adventure_test TEST_DATABASE_URL=...adventure_test .venv/bin/pytest`.
-      Proper fix: set `os.environ["DATABASE_URL"]` before `from app import ...` in conftest.
+- [x] **Test-DB targeting quirk — FIXED ✅:** `conftest.py` now sets `DATABASE_URL`
+      from `TEST_DATABASE_URL` *before* importing `app`, so `pytest` with only
+      `TEST_DATABASE_URL` set targets the test DB (no more dev-DB risk; both-vars no
+      longer required). Verified: full suite green with `DATABASE_URL` unset.
 - [x] **Flaky tests — FIXED ✅. The full suite is now green (355 passed, no deselects).**
       - `tests/test_combat_persistence.py` — was ~50% flaky; root cause was the tests
         patching `random` AFTER `start_session` (where initiative is rolled), so the

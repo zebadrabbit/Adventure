@@ -10,6 +10,14 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
+# Point the app at the TEST database BEFORE importing it: app/__init__ binds
+# SQLALCHEMY_DATABASE_URI from DATABASE_URL at import time, so setting it here
+# (preferring TEST_DATABASE_URL) means `pytest` with only TEST_DATABASE_URL set
+# won't accidentally run against the dev database.
+_test_db_url = os.getenv("TEST_DATABASE_URL") or os.getenv("DATABASE_URL")
+if _test_db_url:
+    os.environ["DATABASE_URL"] = _test_db_url
+
 from app import create_app, db  # noqa: E402
 from app.dungeon import SECRET_DOOR  # noqa: E402
 from app.models.dungeon_instance import DungeonInstance  # noqa: E402
