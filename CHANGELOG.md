@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Looter-extract economy & progression (Path A, Specs 1–5)
+- **Currency**: copper-internal with 3-tier (g/s/c) display (`app/economy/currency.py`).
+- **Hoard**: per-user persistent vault of gear + copper (`app/models/hoard.py`,
+  `app/economy/hoard_service.py`, `app/routes/hoard_api.py`). Run-purse (`Character.gold`)
+  is at-risk; extraction pools the haul into the Hoard; party wipe loses it.
+- **Trading** repointed to the Hoard; `seed-merchants` CLI; `POST /api/trade/repair`.
+- **Procedural floor loot**: `DungeonLoot` can hold generated gear instances; config-driven
+  drop chance + rarity weights (deterministic per seed).
+- **Durability & repair**: gentle, config-driven gear wear; broken = reduced bonuses.
+- **Progression**: XP→levels→talent+stat points (`app/services/progression.py`); awarded on
+  kills and extraction; gated `level-up` allocation.
+- **Skills**: starter seeder (`seed-skills`); passive effects feed combat/dashboard stats;
+  active skills as combat actions (`POST /api/combat/<id>/cast_skill`).
+- New docs: `docs/ECONOMY_PROGRESSION.md`.
+
+### Fixed
+- Skill/trade/level-up endpoints hardened (auth + ownership; admin-gated talent grant).
+- Test suite fully green: fixed `combat_persistence` (initiative determinism) and
+  `encounter_config` (monster seed) flakiness; `conftest` binds the test DB before import;
+  untracked stale `.pyc` files; `manage.sh` uses `.venv` + Alembic and seeds merchants/skills.
+
 ## [0.7.0] - 2025-12-02
 
 ### Added
