@@ -32,7 +32,8 @@
     const value = it.value_copper != null ? it.value_copper : 0;
     const type = it.type || 'item';
     const desc = (it.description || '').trim();
-    return `${it.name} | ${type} | L${level} | ${rarity} | ${weight} wt | ${value}c${desc ? ' | ' + desc : ''}`;
+    const dura = (it.durability != null && it.max_durability) ? ` | ${it.durability <= 0 ? 'BROKEN' : 'dur ' + it.durability + '/' + it.max_durability}` : '';
+    return `${it.name} | ${type} | L${level} | ${rarity} | ${weight} wt | ${value}c${dura}${desc ? ' | ' + desc : ''}`;
   }
   function itemHtml(it) {
     if (getMode() === 'plain') {
@@ -47,12 +48,22 @@
     let desc = esc((it.description || '').trim());
     if (desc.length > 260) desc = desc.slice(0, 257) + '…';
     const effectsLine = effectsText(it);
+    const dura = durabilityHtml(it);
     return `<div class='mud-item-tip ${rarityClass(rarity)}'>` +
       `<div class='mud-item-name ${rarityClass(rarity)} fw-semibold'>${name}</div>` +
       `<div class='mud-item-meta small text-muted'>${type} • L${level} • ${rarity} • ${weight} wt • ${value}c</div>` +
       (effectsLine ? `<div class='mud-item-effects small text-info mt-1'>${esc(effectsLine)}</div>` : '') +
+      (dura ? `<div class='mud-item-durability small mt-1'>${dura}</div>` : '') +
       (desc ? `<div class='mud-item-desc small mt-1'>${desc}</div>` : '') +
       `</div>`;
+  }
+  function durabilityHtml(it) {
+    // Only procedural gear instances carry durability/max_durability.
+    if (!it || it.durability == null || !it.max_durability) return '';
+    const cur = it.durability, max = it.max_durability;
+    if (cur <= 0) return `<span class='text-danger'>Broken</span> <span class='text-muted'>(0/${max})</span>`;
+    const cls = cur <= max * 0.25 ? 'text-warning' : 'text-muted';
+    return `<span class='${cls}'>Durability: ${cur}/${max}</span>`;
   }
   function attrForItem(it) {
     if (getMode() === 'off') return '';

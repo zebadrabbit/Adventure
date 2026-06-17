@@ -19,10 +19,21 @@ spec → write an implementation plan (TDD, small tasks) → implement → verif
 - [ ] **4a Durability (backend):** add `durability`/`max_durability` to generated gear;
       gentle config-driven loss per fight; broken = reduced (not destroyed) bonuses;
       `POST /api/trade/repair` paid from the hoard. Tests.
-- [ ] **4b UI:** inventory/equipment panel (affixes, durability bar, encumbrance bar),
-      hoard/stash screen, vendor screen (buy/sell/repair, 3-tier currency), run/extraction
-      surface (floor-loot pickup, extraction, loot-body). Brainstorm 4b with the visual
-      companion; verify via the `run`/`verify` skills.
+- [~] **4b UI:** durability now shows in item tooltips (`app/static/js/tooltips.js`,
+      flows automatically from the instance JSON). **Remaining (needs a live browser —
+      do interactively with the `run`/`verify` skills + visual companion):**
+      - [ ] **Repoint trading UI to the hoard.** `app/static/js/trading-system.js` still
+            reads `/api/characters/<id>/gold` (now the at-risk run-purse) and
+            `/api/characters/<id>/inventory` for selling. Backend buy/sell now use the
+            **hoard** (`GET /api/hoard`, hoard copper, `new_balance` in responses). Update
+            the JS to read/display hoard copper (via `format_copper` `*_display`) and sell
+            from hoard items.
+      - [ ] **Repair button** in the vendor UI calling `POST /api/trade/repair {uid}`
+            for gear with durability < max (backend done + tested).
+      - [ ] **Hoard/stash screen** (`GET /api/hoard`, `POST /api/hoard/withdraw`).
+      - [ ] **Run/extraction surface:** floor-loot pickup (claim returns gear instances),
+            extraction (`/api/dungeon/extraction/*`), loot-body (`/api/dungeon/loot-body`).
+      - [ ] Encumbrance bar + affix breakdown in the equipment panel (`equipment.js`).
 
 ### Spec 5 — Character progression  (`specs/2026-06-16-progression-design.md`)
 - [x] **5a XP + levels** ✅ (this session): `app/services/progression.py`
