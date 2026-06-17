@@ -1,7 +1,45 @@
 import json
 
+import pytest
+
 from app.services import spawn_service
 from app.services.loot_service import roll_loot
+
+
+@pytest.fixture(autouse=True)
+def _seed_monsters_for_band():
+    """These tests assume a seeded monster catalog covering level 5.
+
+    A bare create_all leaves MonsterCatalog empty (it's normally a CSV import),
+    so seed a boss + a common monster spanning the band and clear the spawn
+    eligibility cache (which may hold a stale empty result).
+    """
+    from app import db
+    from app.models.models import MonsterCatalog
+
+    def _ensure(slug, boss):
+        if MonsterCatalog.query.filter_by(slug=slug).first():
+            return
+        db.session.add(
+            MonsterCatalog(
+                slug=slug,
+                name=slug.replace("-", " ").title(),
+                level_min=1,
+                level_max=10,
+                base_hp=20,
+                base_damage=3,
+                family="test",
+                rarity="boss" if boss else "common",
+                boss=boss,
+                xp_base=10,
+            )
+        )
+
+    _ensure("test-grunt", False)
+    _ensure("test-overlord", True)
+    db.session.commit()
+    spawn_service._ELIGIBLE_CACHE.clear()
+    yield
 
 
 def test_rarity_weight_override(auth_client, monkeypatch):
