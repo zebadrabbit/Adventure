@@ -6,7 +6,7 @@ _Formerly: Adventure MUD (Multi-User Dungeon)_
 
 A modern web-based multiplayer dungeon adventure game built with Python (Flask, Flask-SocketIO), PostgreSQL, and Bootstrap.
 
-> Quick Links: [Dungeon Generation](docs/DUNGEON_GENERATION.md) · [Teleports](docs/TELEPORTS.md) · [Development Workflow](docs/DEVELOPMENT.md) · [Architecture](docs/architecture.md) · [Combat System](#combat-system)
+> Quick Links: [Economy & Progression](docs/ECONOMY_PROGRESSION.md) · [Dungeon Generation](docs/DUNGEON_GENERATION.md) · [Teleports](docs/TELEPORTS.md) · [Development Workflow](docs/DEVELOPMENT.md) · [Architecture](docs/architecture.md) · [Combat System](#combat-system)
 
 ## Prerequisites
 
@@ -31,7 +31,13 @@ pip install -r requirements.txt
 # 4. Run migrations
 alembic upgrade head
 
-# 5. Start the server
+# 5. Seed catalog + economy data (items, vendors, skills) — idempotent
+python run.py reseed-items
+python run.py seed-merchants
+python run.py seed-skills
+# (or all three at once: ./manage.sh db seed)
+
+# 6. Start the server
 python run.py server  # visit http://localhost:5000
 
 # Run tests / lint / format

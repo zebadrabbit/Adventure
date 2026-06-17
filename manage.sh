@@ -4,7 +4,7 @@
 
 set -e
 
-VENV_DIR="venv"
+VENV_DIR=".venv"
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="$PROJECT_DIR/logs"
 PID_FILE="$PROJECT_DIR/adventure.pid"
@@ -218,20 +218,25 @@ cmd_db() {
     activate_venv
     case "$2" in
         migrate)
-            log_info "Creating migration..."
-            flask db migrate -m "${3:-Auto migration}"
+            # NOTE: this project uses Alembic directly (Flask-Migrate is not registered).
+            # Autogenerate can misfire against a create_all DB; review the generated file
+            # and prefer hand-authoring for simple column/table adds (see migrations/versions).
+            log_info "Creating migration (alembic autogenerate)..."
+            alembic revision --autogenerate -m "${3:-Auto migration}"
             ;;
         upgrade)
-            log_info "Upgrading database..."
-            flask db upgrade
+            log_info "Upgrading database (alembic upgrade head)..."
+            alembic upgrade head
             ;;
         downgrade)
-            log_info "Downgrading database..."
-            flask db downgrade
+            log_info "Downgrading database (alembic downgrade -1)..."
+            alembic downgrade -1
             ;;
         seed)
-            log_info "Seeding database..."
-            python3 -c "from app.seed_items import seed_all; seed_all()"
+            log_info "Seeding database (items, merchants, skills)..."
+            python run.py reseed-items
+            python run.py seed-merchants
+            python run.py seed-skills
             ;;
         *)
             echo "Usage: ./manage.sh db [migrate|upgrade|downgrade|seed]"
