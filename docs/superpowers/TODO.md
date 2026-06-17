@@ -65,18 +65,19 @@ spec → write an implementation plan (TDD, small tasks) → implement → verif
       `DATABASE_URL`, so pytest can hit the **dev** DB. Until fixed, always run with BOTH:
       `DATABASE_URL=...adventure_test TEST_DATABASE_URL=...adventure_test .venv/bin/pytest`.
       Proper fix: set `os.environ["DATABASE_URL"]` before `from app import ...` in conftest.
-- [ ] **Flaky tests (pre-existing, not from Path A):**
-      - `tests/test_combat_persistence.py` — ~50% failure even alone; a race in the combat
-        engine's background turn advancement. Needs a combat-scheduler fix.
-      - `tests/test_encounter_config.py` — FIXED ✅: an autouse fixture now seeds a
-        boss+common monster spanning the band and clears the spawn cache. Full suite is
-        green except the combat-persistence race below.
+- [x] **Flaky tests — FIXED ✅. The full suite is now green (355 passed, no deselects).**
+      - `tests/test_combat_persistence.py` — was ~50% flaky; root cause was the tests
+        patching `random` AFTER `start_session` (where initiative is rolled), so the
+        monster sometimes acted first. Now patch `randint`/`random` before
+        `start_session`. Not an engine bug.
+      - `tests/test_encounter_config.py` — autouse fixture seeds a boss+common monster
+        spanning the band and clears the spawn cache.
 - [ ] **Test isolation generally:** the suite reuses one session DB (only
       `@pytest.mark.db_isolation` tests reset). New tests should use unique usernames
       (uuid) and unique seeds to avoid accumulation. A global per-test rollback/reset would
       remove a whole class of flakiness.
-- [ ] **Tracked bytecode:** `app/__pycache__/__init__.cpython-312.pyc` is committed and
-      keeps showing as dirty. Add `__pycache__/` to `.gitignore` and `git rm --cached` it.
+- [x] **Tracked bytecode — DONE ✅:** the 7 committed `.pyc` files were `git rm --cached`d
+      (`__pycache__/` was already gitignored). Working tree stays clean now.
 - [ ] **loot-body has no same-run guard** (`app/routes/hoard_api.py`): transfers a downed
       ally's bag to any owned character. Enforcing "same run" needs a notion of which run a
       *living* character is in (only downed characters get `locked_dungeon_id`).
