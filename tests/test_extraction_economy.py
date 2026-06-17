@@ -24,12 +24,29 @@ def test_extract_pools_bag_and_purse_into_hoard():
 
     ok, msg, result = extraction_service.extract_party(inst, [char.id], user.id)
     assert ok, msg
+    assert result["secured"] == {"copper": 300, "copper_display": "3s", "items": 1}
     hoard = Hoard.query.filter_by(user_id=user.id).first()
     assert hoard.copper == 300
     assert any(i.get("slug") == "potion_heal_l1" for i in json.loads(hoard.items_json))
     db.session.refresh(char)
     assert char.gold == 0
     assert json.loads(char.items) == []
+
+
+def test_extract_secured_totals_aggregate_across_party():
+    user = create_user("extr_secured_" + uuid.uuid4().hex[:8])
+    inst = _instance_for(user)
+    char_a = create_character(user, name="A", items=[{"slug": "potion_heal_l1", "qty": 1}])
+    char_a.gold = 200
+    char_a.locked_dungeon_id = inst.id
+    char_b = create_character(user, name="B", items=[{"slug": "potion_heal_l1", "qty": 1}, {"slug": "torch", "qty": 1}])
+    char_b.gold = 50
+    char_b.locked_dungeon_id = inst.id
+    db.session.commit()
+
+    ok, msg, result = extraction_service.extract_party(inst, [char_a.id, char_b.id], user.id)
+    assert ok, msg
+    assert result["secured"] == {"copper": 250, "copper_display": "2s 50c", "items": 3}
 
 
 def test_party_wipe_marks_characters_dead_and_permadeath():

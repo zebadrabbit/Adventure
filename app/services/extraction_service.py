@@ -10,6 +10,7 @@ from typing import Dict, List, Tuple
 
 from app import db
 from app.economy import hoard_service
+from app.economy.currency import format_copper
 from app.models.dungeon_instance import DungeonInstance
 from app.models.hoard import Hoard
 from app.models.models import Character
@@ -86,6 +87,8 @@ def extract_party(
         return False, "Must select at least one character to extract", {}
 
     hoard = Hoard.get_or_create(user_id)
+    secured_copper = 0
+    secured_items = 0
 
     # Apply penalties to extracting characters
     for char in extracting_chars:
@@ -119,7 +122,9 @@ def extract_party(
             progression.grant_xp(char, int(extraction_xp * penalties["xp_multiplier"]))
 
         # Pool this character's run haul (bag + run-purse) into the hoard
-        hoard_service.pool_run_haul(hoard, char)
+        moved = hoard_service.pool_run_haul(hoard, char)
+        secured_copper += moved["copper"]
+        secured_items += moved["items"]
 
     # Mark left behind characters as permadeath
     for char in left_behind_chars:
@@ -134,6 +139,11 @@ def extract_party(
         "left_behind": [c.name for c in left_behind_chars],
         "penalties": penalties,
         "early_extraction": early_extraction,
+        "secured": {
+            "copper": secured_copper,
+            "copper_display": format_copper(secured_copper),
+            "items": secured_items,
+        },
     }
 
     message = f"Extracted {len(extracting_chars)} character(s)"
