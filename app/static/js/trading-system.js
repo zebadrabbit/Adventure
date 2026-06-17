@@ -2,8 +2,8 @@
  * Trading & Economy System
  *
  * Features:
- * - Merchant shop UI with buy/sell tabs
- * - Gold currency management
+ * - Merchant shop UI with buy/sell/repair tabs
+ * - Hoard (per-user) copper currency management
  * - Item pricing with buy/sell modifiers
  * - Stock management for limited inventory
  * - Trade confirmations with quantity selector
@@ -12,13 +12,14 @@
  *
  * API Endpoints:
  * - GET  /api/merchants/{slug} - Get merchant details and inventory
- * - POST /api/trade/buy - Purchase items from merchant
- * - POST /api/trade/sell - Sell items to merchant
- * - GET  /api/characters/{id}/gold - Get character gold balance
+ * - GET  /api/hoard - Get the current user's hoard (copper + items)
+ * - POST /api/trade/buy - Purchase items from merchant (debits the hoard)
+ * - POST /api/trade/sell - Sell items to merchant (credits the hoard)
+ * - POST /api/trade/repair - Repair a gear instance (debits the hoard)
  *
  * Events:
- * - 'trade-complete' - Fired when transaction completes
- * - 'gold-changed' - Fired when gold amount changes
+ * - 'trade-complete' - Fired when a buy/sell transaction completes
+ * - 'repair-complete' - Fired when a repair completes
  */
 
 class TradingSystem {
@@ -237,7 +238,7 @@ class TradingSystem {
         <span class="price-amount">${buyPrice.toLocaleString()}</span>
     </div>
     ${!inStock ? '<div class="text-danger text-center mt-2 small">Out of Stock</div>' : ''}
-    ${!canAfford && inStock ? '<div class="text-warning text-center mt-2 small">Not enough gold</div>' : ''}
+    ${!canAfford && inStock ? '<div class="text-warning text-center mt-2 small">Not enough copper</div>' : ''}
 </div>`;
         }).join('');
 
@@ -566,9 +567,9 @@ class TradingSystem {
             // Show success
             const itemName = item ? item.name : (slug || uid);
             if (type === 'buy') {
-                this.showToast('Purchase Complete!', `Bought ${quantity}x ${itemName} for ${unitPrice * quantity} gold`, 'success');
+                this.showToast('Purchase Complete!', `Bought ${quantity}x ${itemName} for ${unitPrice * quantity} copper`, 'success');
             } else {
-                this.showToast('Sale Complete!', `Sold ${quantity}x ${itemName} for ${unitPrice * quantity} gold`, 'success');
+                this.showToast('Sale Complete!', `Sold ${quantity}x ${itemName} for ${unitPrice * quantity} copper`, 'success');
             }
 
             // Fire event
