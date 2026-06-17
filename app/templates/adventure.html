@@ -459,19 +459,66 @@
               const charList = document.getElementById('character-selection-list');
               charList.innerHTML = '';
 
+              const livingChars = data.characters.filter(c => !c.is_dead);
+
               data.characters.forEach(char => {
                 const div = document.createElement('div');
-                div.className = 'form-check';
-                div.innerHTML = `
-              <input class="form-check-input extraction-char-check" type="checkbox"
-                     value="${char.id}" id="extract-char-${char.id}" checked>
-              <label class="form-check-label" for="extract-char-${char.id}">
-                ${char.name} (Level ${char.level})
-                ${char.is_dead ? '<span class="badge bg-danger ms-1">DEAD</span>' : ''}
-                ${char.permadeath ? '<span class="badge bg-dark ms-1">PERMADEATH</span>' : ''}
-              </label>
-            `;
+                div.className = 'form-check d-flex align-items-center justify-content-between';
+
+                const labelHtml = `
+              <div>
+                <input class="form-check-input extraction-char-check" type="checkbox"
+                       value="${char.id}" id="extract-char-${char.id}" checked>
+                <label class="form-check-label" for="extract-char-${char.id}">
+                  ${char.name} (Level ${char.level})
+                  ${char.is_dead ? '<span class="badge bg-danger ms-1">DEAD</span>' : ''}
+                  ${char.permadeath ? '<span class="badge bg-dark ms-1">PERMADEATH</span>' : ''}
+                </label>
+              </div>`;
+
+                let lootBodyHtml = '';
+                if (char.is_dead && livingChars.length > 0) {
+                  lootBodyHtml = `
+              <div class="dropdown">
+                <button class="btn btn-sm btn-outline-warning dropdown-toggle" type="button"
+                        data-bs-toggle="dropdown" id="loot-body-btn-${char.id}">
+                  Loot Body
+                </button>
+                <ul class="dropdown-menu">
+                  ${livingChars.map(lc => `<li><a class="dropdown-item loot-body-target"
+                      href="#" data-downed-id="${char.id}" data-survivor-id="${lc.id}">${lc.name}</a></li>`).join('')}
+                </ul>
+              </div>`;
+                }
+
+                div.innerHTML = labelHtml + lootBodyHtml;
                 charList.appendChild(div);
+              });
+
+              charList.querySelectorAll('.loot-body-target').forEach(link => {
+                link.addEventListener('click', async (ev) => {
+                  ev.preventDefault();
+                  const downedId = parseInt(link.getAttribute('data-downed-id'), 10);
+                  const survivorId = parseInt(link.getAttribute('data-survivor-id'), 10);
+                  const btn = document.getElementById(`loot-body-btn-${downedId}`);
+                  try {
+                    const r = await fetch('/api/dungeon/loot-body', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ downed_id: downedId, survivor_id: survivorId })
+                    });
+                    const res = await r.json();
+                    if (r.ok && res.success) {
+                      btn.outerHTML = '<span class="badge bg-secondary">Looted</span>';
+                      document.dispatchEvent(new CustomEvent('mud-characters-state-invalidated', { detail: { character_id: survivorId } }));
+                    } else {
+                      alert(res.error || 'Loot failed');
+                    }
+                  } catch (err) {
+                    console.error('Loot body failed:', err);
+                    alert('Loot failed (network error)');
+                  }
+                });
               });
 
               confirmBtn.disabled = false;
