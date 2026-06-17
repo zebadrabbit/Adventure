@@ -27,7 +27,9 @@ class TradingSystem {
         this.confirmDialog = null;
         this.currentMerchant = null;
         this.currentCharacter = null;
-        this.characterGold = 0;
+        this.hoardCopper = 0;
+        this.hoardCopperDisplay = '0c';
+        this.hoardItems = [];
         this.currentTab = 'buy';
         this.pendingTrade = null;
 
@@ -62,8 +64,8 @@ class TradingSystem {
                 <div class="character-gold">
                     <i class="bi bi-coin gold-icon"></i>
                     <div>
-                        <div class="gold-amount" id="character-gold-amount">0</div>
-                        <div class="gold-label">Gold</div>
+                        <div class="gold-amount" id="hoard-copper-amount">0c</div>
+                        <div class="gold-label">Hoard</div>
                     </div>
                 </div>
             </div>
@@ -158,12 +160,7 @@ class TradingSystem {
 
             this.currentMerchant = await merchantResponse.json();
 
-            // Load character gold
-            const goldResponse = await fetch(`/api/characters/${characterId}/gold`);
-            if (goldResponse.ok) {
-                const goldData = await goldResponse.json();
-                this.characterGold = goldData.gold || 0;
-            }
+            await this.refreshHoard();
 
             this.renderMerchantShop();
             this.shopModal.show();
@@ -174,12 +171,22 @@ class TradingSystem {
         }
     }
 
+    async refreshHoard() {
+        const hoardResponse = await fetch('/api/hoard');
+        if (hoardResponse.ok) {
+            const hoardData = await hoardResponse.json();
+            this.hoardCopper = hoardData.copper || 0;
+            this.hoardCopperDisplay = hoardData.copper_display || `${this.hoardCopper}c`;
+            this.hoardItems = hoardData.items || [];
+        }
+    }
+
     renderMerchantShop() {
         // Set merchant info
         document.getElementById('merchant-name').textContent = this.currentMerchant.name;
         document.getElementById('merchant-type').textContent = this.currentMerchant.type || 'General Merchant';
         document.getElementById('merchant-portrait').innerHTML = this.currentMerchant.icon || '<i class="bi bi-shop"></i>';
-        document.getElementById('character-gold-amount').textContent = this.characterGold.toLocaleString();
+        document.getElementById('hoard-copper-amount').textContent = this.hoardCopperDisplay;
 
         this.switchTab(this.currentTab);
     }
@@ -209,7 +216,7 @@ class TradingSystem {
 
         const html = this.currentMerchant.inventory.map(item => {
             const buyPrice = Math.floor(item.base_price * this.currentMerchant.buy_modifier);
-            const canAfford = this.characterGold >= buyPrice;
+            const canAfford = this.hoardCopper >= buyPrice;
             const inStock = item.stock === null || item.stock > 0;
 
             return `
@@ -281,14 +288,14 @@ class TradingSystem {
         if (!item) return;
 
         const buyPrice = Math.floor(item.base_price * this.currentMerchant.buy_modifier);
-        const maxQty = item.stock !== null ? item.stock : Math.floor(this.characterGold / buyPrice);
+        const maxQty = item.stock !== null ? item.stock : Math.floor(this.hoardCopper / buyPrice);
 
         if (item.stock !== null && item.stock === 0) {
             this.showToast('Out of Stock', 'This item is currently unavailable', 'error');
             return;
         }
 
-        if (buyPrice > this.characterGold) {
+        if (buyPrice > this.hoardCopper) {
             this.showToast('Insufficient Gold', 'You cannot afford this item', 'error');
             return;
         }
@@ -345,7 +352,7 @@ class TradingSystem {
 
         // Update quantity buttons
         document.getElementById('qty-decrease').disabled = quantity <= 1;
-        document.getElementById('qty-increase').disabled = quantity >= maxQuantity || (type === 'buy' && (unitPrice * (quantity + 1)) > this.characterGold);
+        document.getElementById('qty-increase').disabled = quantity >= maxQuantity || (type === 'buy' && (unitPrice * (quantity + 1)) > this.hoardCopper);
 
         document.getElementById('trade-confirm-overlay').style.display = 'flex';
     }
@@ -361,7 +368,7 @@ class TradingSystem {
         // Check if can afford
         if (this.pendingTrade.type === 'buy') {
             const totalCost = this.pendingTrade.unitPrice * newQty;
-            if (totalCost > this.characterGold) return;
+            if (totalCost > this.hoardCopper) return;
         }
 
         this.pendingTrade.quantity = newQty;
@@ -407,9 +414,10 @@ class TradingSystem {
 
             const result = await response.json();
 
-            // Update gold
-            this.characterGold = result.new_balance;
-            document.getElementById('character-gold-amount').textContent = this.characterGold.toLocaleString();
+            // Update hoard copper
+            this.hoardCopper = result.new_balance;
+            this.hoardCopperDisplay = result.new_balance_display || `${this.hoardCopper}c`;
+            document.getElementById('hoard-copper-amount').textContent = this.hoardCopperDisplay;
 
             // Show success
             const itemName = item ? item.name : slug;
@@ -421,7 +429,7 @@ class TradingSystem {
 
             // Fire event
             document.dispatchEvent(new CustomEvent('trade-complete', {
-                detail: { type, item: slug, quantity, gold: this.characterGold }
+                detail: { type, item: slug, quantity, copper: this.hoardCopper }
             }));
 
             // Refresh display
