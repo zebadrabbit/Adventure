@@ -563,8 +563,9 @@
               const statusDiv = document.getElementById('extraction-status');
               statusDiv.classList.remove('d-none');
               document.getElementById('extraction-characters').classList.add('d-none');
-              // data.message is server-built from integer counts only (extraction_service.extract_party) --
-              // safe to interpolate raw today. If it ever incorporates a player-chosen string, escape it first.
+              // data.message and the secured.* summary fields are all server-built from integer
+              // counts/format_copper output (extraction_service.extract_party) -- safe to interpolate
+              // raw today. If any of them ever incorporate a player-chosen string, escape it first.
               statusDiv.innerHTML = `
                 <div class="alert alert-success">
                   <strong>${data.message}</strong>
