@@ -34,7 +34,13 @@ def _ensure_primary_user_and_char():
     return user, char
 
 
-def test_persist_after_monster_defeat(auth_client):
+def test_persist_after_monster_defeat(auth_client, monkeypatch):
+    import random as _random
+
+    # Deterministic initiative: patch BEFORE start_session (initiative is rolled there).
+    # The player's derived speed far exceeds the monster's (5), so any fixed roll makes
+    # the player act first — removing the ~50% monster-first flakiness.
+    monkeypatch.setattr(_random, "randint", lambda a, b: b)
     user, char = _ensure_primary_user_and_char()
     monster = {"slug": "slime", "name": "Slime", "hp": 1, "damage": 1, "speed": 5}
     session = combat_service.start_session(user.id, monster)
@@ -54,6 +60,12 @@ def test_persist_after_monster_defeat(auth_client):
 
 
 def test_persist_after_player_flee(auth_client, monkeypatch):
+    import random as _random
+
+    # Patch BEFORE start_session so the player wins initiative (deterministic) and the
+    # flee resolves on the player's turn; random()=0 makes the flee attempt succeed.
+    monkeypatch.setattr(_random, "randint", lambda a, b: b)
+    monkeypatch.setattr(_random, "random", lambda: 0.0)
     user, char = _ensure_primary_user_and_char()
     monster = {"slug": "orc", "name": "Orc", "hp": 30, "damage": 2, "speed": 5}
     session = combat_service.start_session(user.id, monster)
@@ -63,9 +75,6 @@ def test_persist_after_player_flee(auth_client, monkeypatch):
     party["members"][0]["mana"] = 3
     session.party_snapshot_json = json.dumps(party)
     db.session.commit()
-    import random as _random
-
-    monkeypatch.setattr(_random, "random", lambda: 0.0)
     combat_service.player_flee(session.id, user.id, session.version, actor_id=actor_id)
     # Assert against the actual combat actor row (actor_id) rather than first character
     # to avoid ordering dependence if multiple characters exist for the user.
@@ -76,20 +85,22 @@ def test_persist_after_player_flee(auth_client, monkeypatch):
 
 
 def test_action_codes_present(auth_client, monkeypatch):
+    import random as _random
+
+    def fake_randint(a, b):
+        # Force the d20 attack roll to be 2 (non-crit, low) guaranteeing a miss vs high armor.
+        # Also used for initiative (randint(1,20)) -> player speed >> monster, so player first.
+        if a == 1 and b == 20:
+            return 2
+        return (a + b) // 2
+
+    # Patch BEFORE start_session so initiative is deterministic (player first).
+    monkeypatch.setattr(_random, "randint", fake_randint)
     user, char = _ensure_primary_user_and_char()
     monster = {"slug": "dummy", "name": "Dummy", "hp": 50, "damage": 0, "speed": 5, "armor": 500}
     session = combat_service.start_session(user.id, monster)
     party = json.loads(session.party_snapshot_json)
     actor_id = party["members"][0]["char_id"]  # explicit actor id reference
-    import random as _random
-
-    def fake_randint(a, b):
-        # Force the d20 attack roll to be 2 (non-crit, low) guaranteeing a miss vs high armor
-        if a == 1 and b == 20:
-            return 2
-        return (a + b) // 2
-
-    monkeypatch.setattr(_random, "randint", fake_randint)
     # Use dynamic version; if a rare version_conflict occurs (e.g., background turn advance) retry once.
     resp = combat_service.player_attack(session.id, user.id, session.version, actor_id=actor_id)
     if resp.get("error") == "version_conflict":  # pragma: no cover - defensive path
