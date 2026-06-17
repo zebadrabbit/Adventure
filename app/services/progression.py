@@ -25,6 +25,7 @@ from app.models.xp import xp_for_level
 _DEFAULT_PROGRESSION = {
     "xp_difficulty_mod": 1.0,
     "talent_points_per_level": 1,
+    "stat_points_per_level": 2,
     "extraction_xp": 50,
 }
 
@@ -81,6 +82,7 @@ def grant_xp(character, amount: int) -> Dict[str, int]:
     cfg = progression_config()
     mod = float(cfg.get("xp_difficulty_mod", 1.0))
     per_level = int(cfg.get("talent_points_per_level", 1))
+    stat_per_level = int(cfg.get("stat_points_per_level", 2))
 
     amount = max(0, int(amount))
     old_level = int(character.level or 1)
@@ -89,6 +91,7 @@ def grant_xp(character, amount: int) -> Dict[str, int]:
     new_level = level_for_xp(character.xp, mod)
     levels_gained = max(0, new_level - old_level)
     talent_awarded = 0
+    stat_awarded = 0
     if levels_gained > 0:
         character.level = new_level
         talent_awarded = levels_gained * per_level
@@ -96,10 +99,14 @@ def grant_xp(character, amount: int) -> Dict[str, int]:
             tp = _talent_points(character.id)
             tp.total_earned = (tp.total_earned or 0) + talent_awarded
             tp.available = (tp.available or 0) + talent_awarded
+        stat_awarded = levels_gained * stat_per_level
+        if stat_awarded > 0:
+            character.stat_points = int(character.stat_points or 0) + stat_awarded
 
     return {
         "xp": character.xp,
         "level": int(character.level or 1),
         "levels_gained": levels_gained,
         "talent_points_awarded": talent_awarded,
+        "stat_points_awarded": stat_awarded,
     }

@@ -535,14 +535,27 @@ def level_up_character(cid: int):
     data = request.get_json(silent=True) or {}
     allocations = data.get("stat_allocations", {})
 
+    # Validate allocations against earned, unspent stat points (no free stats).
+    valid_keys = ("str", "dex", "int", "con", "wis", "cha")
+    try:
+        requested = {k: int(v) for k, v in allocations.items() if k in valid_keys}
+    except (TypeError, ValueError):
+        return jsonify({"error": "invalid allocations"}), 400
+    if any(v < 0 for v in requested.values()):
+        return jsonify({"error": "allocations must be non-negative"}), 400
+    total_requested = sum(requested.values())
+    available = int(ch.stat_points or 0)
+    if total_requested > available:
+        return jsonify({"error": "not enough stat points", "available": available, "requested": total_requested}), 400
+
     # Load current stats
     stats = _safe_json_load(ch.stats, {})
 
     # Apply stat allocations
-    for stat_key, points in allocations.items():
-        if stat_key in ("str", "dex", "int", "con", "wis", "cha"):
-            current = stats.get(stat_key, 10)
-            stats[stat_key] = current + int(points)
+    for stat_key, points in requested.items():
+        current = stats.get(stat_key, 10)
+        stats[stat_key] = current + points
+    ch.stat_points = available - total_requested
 
     # Update HP/Mana based on level (simple formula)
     level = ch.level or 1
@@ -554,4 +567,4 @@ def level_up_character(cid: int):
     ch.stats = _safe_json_dump(stats)
     db.session.commit()
 
-    return jsonify({"ok": True, "level": ch.level, "stats": stats})
+    return jsonify({"ok": True, "level": ch.level, "stats": stats, "stat_points": ch.stat_points})

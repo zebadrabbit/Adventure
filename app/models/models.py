@@ -139,6 +139,8 @@ class Character(db.Model):
     is_dead = db.Column(db.Boolean, nullable=False, default=False)
     permadeath = db.Column(db.Boolean, nullable=False, default=False)
     death_count = db.Column(db.Integer, nullable=False, default=0)
+    # Unspent stat points earned on level-up (allocated via the level-up endpoint).
+    stat_points = db.Column(db.Integer, nullable=False, default=0)
     # Add more fields as needed
 
 
