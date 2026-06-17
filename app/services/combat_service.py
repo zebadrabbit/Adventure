@@ -571,7 +571,7 @@ def _check_end(session: CombatSession):
             share = int(xp_total / len(members)) if members else xp_total
             xp_map = {}
 
-            from app.services import progression
+            from app.services import durability, progression
 
             for m in members:
                 row = char_rows.get(m.get("char_id") or m.get("id"))
@@ -579,6 +579,10 @@ def _check_end(session: CombatSession):
                     # Unified progression: grant_xp uses the canonical XP table
                     # (app/models/xp.py) and applies level-ups + talent points.
                     progression.grant_xp(row, share)
+                    # Gentle gear wear for survivors on a win (config-driven, no-op
+                    # if durability disabled).
+                    if m.get("hp", 0) > 0:
+                        durability.degrade_gear(row)
                     db.session.add(row)
                     try:
                         xp_map[str(m.get("char_id") or m.get("id"))] = share
