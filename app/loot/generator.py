@@ -309,6 +309,9 @@ def generate_item(
     base_value = 8 + level * 4
     value = int((base_value + sum(a["val"] for a in affixes) * 3) * RARITIES[rarity]["value_mult"])
 
+    from app.services.durability import default_max_durability
+
+    maxd = default_max_durability()
     return {
         "uid": uuid.UUID(int=rng.getrandbits(128), version=4).hex[:12],
         "base": arch_key,
@@ -318,4 +321,6 @@ def generate_item(
         "ilvl": level,
         "affixes": affixes,
         "value": value,
+        "durability": maxd,
+        "max_durability": maxd,
     }

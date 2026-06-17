@@ -315,6 +315,82 @@ def sell_item():
         return jsonify({"error": "Transaction failed"}), 500
 
 
+@bp_trading.route("/api/trade/repair", methods=["POST"])
+@login_required
+def repair_item():
+    """Repair a gear instance (by uid) to full durability, paid from the hoard.
+
+    Searches the user's hoard items and their characters' equipped gear for the
+    uid. Cost = (max - current) * repair_cost_per_point, debited from hoard copper.
+    """
+    from app.services import durability
+
+    data = request.get_json() or {}
+    uid = data.get("uid")
+    if not uid:
+        return jsonify({"error": "Missing uid"}), 400
+
+    cfg = durability.durability_config()
+    if not cfg.get("enabled", True):
+        return jsonify({"error": "Durability is disabled"}), 400
+
+    hoard = Hoard.get_or_create(current_user.id)
+
+    # Find the instance: hoard items first, then equipped gear on owned characters.
+    target = None
+    container = None  # ("hoard", inv_list) or ("gear", character, gear_dict)
+    hoard_items = load_inventory(hoard.items_json)
+    found = find_instance(hoard_items, uid)
+    if found is not None:
+        target, container = found, ("hoard", hoard_items)
+    else:
+        for ch in Character.query.filter_by(user_id=current_user.id).all():
+            try:
+                gear = json.loads(ch.gear) if ch.gear else {}
+            except Exception:
+                gear = {}
+            if isinstance(gear, dict):
+                for inst in gear.values():
+                    if isinstance(inst, dict) and inst.get("uid") == uid:
+                        target, container = inst, ("gear", ch, gear)
+                        break
+            if target is not None:
+                break
+
+    if target is None:
+        return jsonify({"error": "Item not found"}), 404
+
+    cost = durability.repair_cost(target)
+    if (hoard.copper or 0) < cost:
+        return jsonify({"error": "Insufficient funds"}), 400
+
+    try:
+        durability.apply_repair(target)
+        hoard.copper -= cost
+        if container[0] == "hoard":
+            hoard.items_json = json.dumps(container[1])
+        else:
+            _, ch, gear = container
+            ch.gear = json.dumps(gear)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"[trading] Repair failed: {e}")
+        return jsonify({"error": "Transaction failed"}), 500
+
+    return jsonify(
+        {
+            "success": True,
+            "uid": uid,
+            "durability": target.get("durability"),
+            "cost": cost,
+            "cost_display": format_copper(cost),
+            "new_balance": hoard.copper,
+            "new_balance_display": format_copper(hoard.copper),
+        }
+    )
+
+
 @bp_trading.route("/api/characters/<int:character_id>/inventory", methods=["GET"])
 def get_character_inventory_for_trade(character_id):
     """Get character inventory with pricing info for selling"""
