@@ -45,6 +45,7 @@ from .combat_constants import (
     PLAYER_DEFEND,
     PLAYER_FLEE_FAIL,
     PLAYER_FLEE_SUCCESS,
+    PLAYER_SKILL,
     PLAYER_SPELL_FIZZLE,
     PLAYER_SPELL_HIT,
     PLAYER_SPELL_MISS,
@@ -1537,6 +1538,96 @@ def player_cast_spell(
         _emit_session("combat_end", session)
     session = _auto_progress_monster_after_player(session)
     return {"ok": True, "state": session.to_dict(), "spell": spell, "damage": dmg, "crit": crit}
+
+
+def player_cast_skill(
+    combat_id: int, user_id: int, version: int, skill_id: int, actor_id: Optional[int] = None
+) -> Dict[str, Any]:
+    """Use an unlocked *active* skill in combat.
+
+    Applies the skill's effect_json: 'damage'/'spell_damage' -> monster, 'heal' ->
+    caster (capped at max_hp). Respects turn order, version, cooldown, and ownership.
+    Skills auto-hit (no accuracy roll) to keep them distinct from weapon/spell attacks.
+    """
+    session = _load_session(combat_id)
+    if not session:
+        return {"error": "not_found"}
+    if session.status != "active":
+        return {"error": "inactive", "state": session.to_dict()}
+    if session.version != version:
+        return {"error": "version_conflict", "state": session.to_dict()}
+    initiative = json.loads(session.initiative_json or "[]")
+    actor = initiative[session.active_index]
+    if actor["type"] != "player":
+        return {"error": "not_your_turn", "state": session.to_dict()}
+    if actor_id is None:
+        actor_id = actor.get("id")
+    if actor.get("controller_id") != user_id or actor.get("id") != actor_id:
+        return {"error": "not_your_turn", "state": session.to_dict()}
+
+    from app.models.skill import CharacterSkill, Skill
+
+    cs = CharacterSkill.query.filter_by(character_id=actor_id, skill_id=skill_id).first()
+    if not cs:
+        return {"error": "skill_not_unlocked"}
+    skill = db.session.get(Skill, skill_id)
+    if not skill or skill.skill_type != "active":
+        return {"error": "not_active_skill"}
+    # Cooldown (seconds) parallels skill_api.use_skill.
+    if cs.last_used and skill.cooldown:
+        elapsed = (_now() - cs.last_used).total_seconds()
+        if elapsed < skill.cooldown:
+            return {"error": "on_cooldown", "remaining_seconds": int(skill.cooldown - elapsed)}
+
+    try:
+        eff = json.loads(skill.effect_json or "{}")
+    except Exception:
+        eff = {}
+    if not isinstance(eff, dict):
+        eff = {}
+
+    party = json.loads(session.party_snapshot_json or "{}") or {}
+    caster = _player_ref(party, actor_id)
+    if not caster:
+        return {"error": "no_caster"}
+
+    dmg = int(eff.get("damage", 0) or 0) + int(eff.get("spell_damage", 0) or 0)
+    heal = int(eff.get("heal", 0) or 0)
+    if dmg <= 0 and heal <= 0:
+        return {"error": "no_effect"}
+
+    extra: Dict[str, Any] = {}
+    if dmg > 0:
+        session.monster_hp = max(0, (session.monster_hp or 0) - dmg)
+        session.last_damage_json = json.dumps({"to_monster": {"amount": dmg, "is_miss": False, "is_critical": False}})
+        _append_log(
+            session,
+            f"Player uses {skill.name} for {dmg} damage (HP {session.monster_hp})",
+            code=PLAYER_SKILL,
+        )
+        extra["damage"] = dmg
+    if heal > 0:
+        cur_hp = int(caster.get("hp", 0))
+        max_hp = int(caster.get("max_hp", cur_hp))
+        new_hp = min(max_hp, cur_hp + heal)
+        healed = new_hp - cur_hp
+        caster["hp"] = new_hp
+        _append_log(session, f"Player uses {skill.name}, healing {healed} (HP {new_hp})", code=PLAYER_SKILL)
+        extra["heal"] = healed
+
+    session.party_snapshot_json = json.dumps(party)
+    cs.times_used = (cs.times_used or 0) + 1
+    cs.last_used = _now()
+
+    session.phase = "end"
+    _progress_phase(session)
+    _check_end(session)
+    db.session.commit()
+    _emit_session("combat_update", session)
+    if session.status != "active":
+        _emit_session("combat_end", session)
+    session = _auto_progress_monster_after_player(session)
+    return {"ok": True, "state": session.to_dict(), "skill": skill.name, **extra}
 
 
 # ---------------- Auto Monster Progression Helper -----------------

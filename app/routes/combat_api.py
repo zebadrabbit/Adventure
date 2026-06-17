@@ -138,6 +138,17 @@ def combat_cast_spell(combat_id: int):
     return jsonify(result), code
 
 
+@bp_combat.route("/api/combat/<int:combat_id>/cast_skill", methods=["POST"])  # use an unlocked active skill
+@login_required
+def combat_cast_skill(combat_id: int):
+    version = int(request.json.get("version", 0)) if request.is_json else 0
+    actor_id = request.json.get("actor_id") if request.is_json else None
+    skill_id = request.json.get("skill_id") if request.is_json else None
+    result = combat_service.player_cast_skill(combat_id, current_user.id, version, skill_id, actor_id=actor_id)
+    code = 200 if result.get("ok") or result.get("error") not in ("not_found",) else 404
+    return jsonify(result), code
+
+
 @bp_combat.route("/api/combat/<int:combat_id>/use_item", methods=["POST"])  # use item
 @login_required
 def combat_use_item(combat_id: int):
