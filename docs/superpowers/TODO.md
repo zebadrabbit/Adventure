@@ -56,8 +56,8 @@ spec → write an implementation plan (TDD, small tasks) → implement → verif
             applies the skill's `effect_json` damage/heal). `use_skill` endpoint exists
             but isn't integrated into the combat turn loop yet. (Touches the combat
             action handlers — do with combat tests in view.)
-      - [ ] (polish) Fold passives into the dashboard stat display too
-            (`dashboard_helpers.py` currently shows gear bonuses only).
+      - [x] Fold passives into the dashboard HP/mana display ✅
+            (`dashboard_helpers.py`, matches combat).
 - [ ] **5c Progression UI:** character sheet (level/XP bar, stat allocation, skill tree).
 
 ## Known issues / cleanup (not blockers)
