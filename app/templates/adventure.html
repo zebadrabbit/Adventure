@@ -509,10 +509,20 @@
             const data = await resp.json();
 
             if (data.success) {
-              extractionModal.hide();
-              alert(data.message);
-              // Reload page to reflect changes
-              window.location.reload();
+              const secured = data.result && data.result.secured;
+              const summary = secured
+                ? `Secured ${secured.copper_display} and ${secured.items} item(s) to the Hoard.`
+                : '';
+              const statusDiv = document.getElementById('extraction-status');
+              statusDiv.classList.remove('d-none');
+              document.getElementById('extraction-characters').classList.add('d-none');
+              statusDiv.innerHTML = `
+                <div class="alert alert-success">
+                  <strong>${data.message}</strong>
+                  ${summary ? `<div class="mt-1">${summary}</div>` : ''}
+                </div>`;
+              document.getElementById('btn-confirm-extraction').classList.add('d-none');
+              setTimeout(() => { window.location.href = '/dashboard'; }, 1800);
             } else {
               alert(data.error || 'Extraction failed');
             }
