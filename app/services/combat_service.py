@@ -90,6 +90,14 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
     except Exception:
         _gear = {}
     _gb = gear_bonuses(_gear)
+    # Fold unlocked passive skill effects in alongside gear (same stat vocabulary).
+    try:
+        from app.services.skill_effects import passive_bonuses
+
+        for _k, _v in passive_bonuses(char.id).items():
+            _gb[_k] = _gb.get(_k, 0) + _v
+    except Exception:
+        pass
     STR += int(_gb.get("str", 0))
     DEX += int(_gb.get("dex", 0))
     INT += int(_gb.get("int", 0))
