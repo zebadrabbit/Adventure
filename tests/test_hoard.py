@@ -69,7 +69,8 @@ def test_pool_run_haul_moves_bag_and_purse_then_zeroes():
     char = create_character(user, name="Runner", items=[{"slug": "potion_heal_l1", "qty": 1}])
     char.gold = 500  # run-purse (copper)
     hoard = Hoard.get_or_create(user.id)
-    hoard_service.pool_run_haul(hoard, char)
+    moved = hoard_service.pool_run_haul(hoard, char)
+    assert moved == {"copper": 500, "items": 1}
     assert hoard.copper == 500
     assert any(i.get("slug") == "potion_heal_l1" for i in json.loads(hoard.items_json))
     assert char.gold == 0

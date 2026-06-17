@@ -67,10 +67,15 @@ def withdraw_to_character(
     return True
 
 
-def pool_run_haul(hoard: Hoard, character: Character) -> None:
-    """Move a character's entire bag + run-purse into the hoard, then zero them."""
+def pool_run_haul(hoard: Hoard, character: Character) -> dict:
+    """Move a character's entire bag + run-purse into the hoard, then zero them.
+
+    Returns {"copper": int, "items": int} — what was moved, for caller-side reporting.
+    """
     bag = _load(character.items)
+    copper = character.gold or 0
     deposit_items(hoard, bag)
-    deposit_copper(hoard, character.gold or 0)
+    deposit_copper(hoard, copper)
     character.items = "[]"
     character.gold = 0
+    return {"copper": copper, "items": len(bag)}
