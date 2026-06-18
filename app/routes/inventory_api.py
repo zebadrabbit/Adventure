@@ -20,6 +20,8 @@ from app.inventory.utils import (
     remove_one,
 )
 from app.models.models import Character, Item
+from app.models.xp import xp_for_level
+from app.services.progression import progression_config
 from app.services.time_service import advance_for
 
 bp_inventory = Blueprint("inventory", __name__)
@@ -168,6 +170,17 @@ def _computed_stats(base_stats: dict, gear: dict, items_lookup: dict[str, Item])
     return cur
 
 
+def _progression_fields(ch: Character) -> dict:
+    """Stat points + XP thresholds for the progression UI (read-only, derived)."""
+    mod = float(progression_config().get("xp_difficulty_mod", 1.0))
+    level = ch.level or 1
+    return {
+        "stat_points": ch.stat_points or 0,
+        "xp_for_current_level": xp_for_level(level, mod),
+        "xp_for_next_level": xp_for_level(level + 1, mod),
+    }
+
+
 def _serialize_item(item: Item) -> dict:
     return {
         "slug": item.slug,
@@ -274,6 +287,7 @@ def list_characters_state():
                     "gear": {slot: _serialize_gear_slot(val, items_map) for slot, val in (gear or {}).items()},
                     "bag": bag_payload,
                     "encumbrance": enc_state,
+                    **_progression_fields(ch),
                 }
             )
             # Persist migrated format if legacy list was detected (length mismatch between slugs list and objects)
@@ -353,6 +367,7 @@ def get_character_state(cid: int):
             "gear": gear_payload,
             "bag": bag_payload,
             "encumbrance": enc_state,
+            **_progression_fields(ch),
         }
     )
 
