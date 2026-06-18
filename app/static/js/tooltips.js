@@ -293,6 +293,12 @@
 
   // --- Effects inference helpers ---
   function effectsText(it) {
+    if (it && Array.isArray(it.affixes) && it.affixes.length) {
+      const tokens = it.affixes
+        .filter(a => a && a.stat && typeof a.val === 'number')
+        .map(a => formatEffect(a.stat, a.val));
+      if (tokens.length) return tokens.join(' ');
+    }
     if (it && it.effects && typeof it.effects === 'object' && Object.keys(it.effects).length) {
       return Object.entries(it.effects).map(([k, v]) => formatEffect(k, v)).join(' ');
     }
@@ -301,7 +307,8 @@
   }
   function formatEffect(stat, delta) {
     const sign = delta >= 0 ? '+' : '';
-    return `${sign}${delta} ${stat.toUpperCase()}`;
+    const num = Number.isInteger(delta) ? delta : Math.round(delta * 10) / 10;
+    return `${sign}${num} ${stat.toUpperCase()}`;
   }
   function inferEffects(it) {
     if (!it || !it.type) return [];
