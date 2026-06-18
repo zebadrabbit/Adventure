@@ -18,6 +18,7 @@ from app import db
 from app.models import GameClock
 from app.models.models import Character, User
 from app.models.xp import xp_for_level
+from app.services.progression import progression_config
 
 
 def _stable_current_user_id() -> int | None:
@@ -153,6 +154,8 @@ def serialize_character_list(user_id: int) -> list[dict[str, Any]]:
                 gear = {}
         except Exception:
             gear = {}
+        mod = float(progression_config().get("xp_difficulty_mod", 1.0))
+        level = getattr(c, "level", 1)
         out.append(
             {
                 "id": c.id,
@@ -163,8 +166,10 @@ def serialize_character_list(user_id: int) -> list[dict[str, Any]]:
                 "gear": gear,
                 "class_name": class_name,
                 "xp": getattr(c, "xp", 0),
-                "level": getattr(c, "level", 1),
-                "xp_next": xp_for_level(getattr(c, "level", 1) + 1),
+                "level": level,
+                "xp_current": xp_for_level(level, mod),
+                "xp_next": xp_for_level(level + 1, mod),
+                "stat_points": getattr(c, "stat_points", 0) or 0,
             }
         )
     if backfilled:
