@@ -456,7 +456,11 @@ def dungeon_map():
                 if chars:
                     avg_level = max(1, sum(c.level for c in chars) // len(chars))
             except Exception:
-                pass
+                # A failed statement aborts the whole Postgres transaction, not just
+                # this query -- roll back so later commits in this request don't
+                # fail with "current transaction is aborted" on an unrelated statement.
+                db.session.rollback()
+                logger.warning("dungeon_map: failed to compute avg_level", exc_info=True)
             cfg = LootConfig(
                 avg_party_level=avg_level,
                 width=MAP_SIZE,
@@ -466,7 +470,8 @@ def dungeon_map():
             try:
                 generate_loot_for_seed(cfg, walkables)
             except Exception:
-                pass
+                db.session.rollback()
+                logger.warning("dungeon_map: failed to generate loot for seed", seed=instance.seed, exc_info=True)
             # Simplified entrance: first room center (if any)
             entrance = None
             if getattr(dungeon, "rooms", None):
