@@ -178,16 +178,7 @@
                                 </div>
                             </div>
 
-                            <!-- Skill Trees -->
-                            <div class="mt-4">
-                                <div class="subtitle mb-3">{{ svg_icon('star-fill', 16, 'me-2') }}SKILLS</div>
-                                <div class="d-flex flex-column gap-2">
-                                    <button type="button" class="tactical-btn-secondary"
-                                        onclick="window.skillTreeSystem && skillTreeSystem.openSkillTree({{ characters[0].id if characters else 1 }})">
-                                        <i class="bi bi-star-fill me-2"></i> Skill Tree
-                                    </button>
-                                </div>
-                            </div>
+                            <!-- Skill Trees: opened per-character from each operative card's button -->
 
                             <!-- Achievements -->
                             <div class="mt-4">
@@ -252,12 +243,27 @@
                 <div class="operative-body">
 
                     <!-- XP Progress -->
-                    <div
+                    {% set xp_span = c.xp_next - c.xp_current %}
+                    {% set xp_pct = ((c.xp - c.xp_current) / xp_span * 100) if xp_span > 0 else 100 %}
+                    {% set xp_pct = xp_pct if xp_pct <= 100 else 100 %}
+                    {% set xp_pct = xp_pct if xp_pct >= 0 else 0 %}
+                    <div class="xp-bar-anchor" data-char-id="{{ c.id }}"
                         style="font-size: 0.85rem; padding: 8px 12px; background: rgba(13, 10, 10, 0.6); border: 1px solid var(--dungeon-border);">
-                        <span style="color: var(--dungeon-text-dim);">EXPERIENCE:</span>
-                        <span style="color: var(--dungeon-accent);">{{ c.xp }}</span> /
-                        <span style="color: var(--dungeon-text-dim);">{{ c.xp_next }}</span>
-                        <span style="opacity: 0.7; margin-left: 8px;">(Next: LV{{ c.level + 1 }})</span>
+                        <div class="d-flex justify-content-between">
+                            <span style="color: var(--dungeon-text-dim);">EXPERIENCE:</span>
+                            <span><span style="color: var(--dungeon-accent);">{{ c.xp }}</span> /
+                                <span style="color: var(--dungeon-text-dim);">{{ c.xp_next }}</span></span>
+                        </div>
+                        <div class="progress mt-1" style="height:6px;">
+                            <div class="progress-bar xp-fill" style="width:{{ xp_pct }}%"></div>
+                        </div>
+                        <span style="opacity: 0.7;">(Next: LV{{ c.level + 1 }})</span>
+                        {% if c.stat_points and c.stat_points > 0 %}
+                        <button type="button" class="tactical-btn-secondary btn-allocate-stats mt-2"
+                            data-char-id="{{ c.id }}" style="width: 100%;">
+                            <i class="bi bi-star-fill me-1"></i> Allocate {{ c.stat_points }} Stat Point{{ 's' if c.stat_points != 1 else '' }}
+                        </button>
+                        {% endif %}
                     </div>
 
                     <!-- Stats Block -->
@@ -335,6 +341,10 @@
                         <button class="tactical-btn-secondary btn-bag-panel" data-char-id="{{ c.id }}" title="Inventory"
                             style="padding: 8px 12px;">
                             {{ svg_icon('knapsack', 18) }}
+                        </button>
+                        <button class="tactical-btn-secondary btn-skill-panel" data-char-id="{{ c.id }}"
+                            title="Skill Tree" style="padding: 8px 12px;">
+                            {{ svg_icon('star-fill', 18) }}
                         </button>
                     </div>
                     <input type="checkbox" class="party-select d-none" id="char-select-{{ c.id }}" data-id="{{ c.id }}"

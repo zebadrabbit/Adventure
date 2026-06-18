@@ -107,3 +107,39 @@ def test_character_state_with_equipped_gear_instance_does_not_crash(client):
     r2 = client.get(f"/api/characters/{char_id}")
     assert r2.status_code == 200
     assert r2.get_json()["gear"]["weapon"]["uid"] == "test-uid-equipped"
+
+
+@pytest.mark.db_isolation
+def test_character_state_exposes_stat_points_and_xp_thresholds(client):
+    with app.app_context():
+        u = create_user("progression-checker", "pw")
+        char = create_character(u, "ProgressionChecker", "fighter", items=[])
+        char.level = 3
+        char.xp = 1000
+        char.stat_points = 4
+        db.session.commit()
+        char_id = char.id
+
+    login(client, "progression-checker", "pw")
+    with client.session_transaction() as sess:
+        sess["_user_id"] = "1"
+
+    from app.models.xp import xp_for_level
+
+    expected_current = xp_for_level(3)
+    expected_next = xp_for_level(4)
+
+    r = client.get(f"/api/characters/{char_id}")
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["stat_points"] == 4
+    assert body["xp_for_current_level"] == expected_current
+    assert body["xp_for_next_level"] == expected_next
+
+    r2 = client.get("/api/characters/state")
+    assert r2.status_code == 200
+    chars = r2.get_json()["characters"]
+    match = next(c for c in chars if c["id"] == char_id)
+    assert match["stat_points"] == 4
+    assert match["xp_for_current_level"] == expected_current
+    assert match["xp_for_next_level"] == expected_next

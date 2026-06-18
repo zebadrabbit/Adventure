@@ -1,5 +1,6 @@
 import json
-from app.routes.dashboard_helpers import build_party_payload
+from app.routes.dashboard_helpers import build_party_payload, serialize_character_list
+from app.models.models import db, User
 
 
 class _C:
@@ -20,3 +21,32 @@ def test_payload_reflects_gear_hp(test_app):
         payload = build_party_payload([c])
         # base hp_max = 50 + con*2 + level*5 = 50+20+5 = 75; +25 gear = 100
         assert payload[0]["hp_max"] == 100
+
+
+def test_serialize_character_list_exposes_stat_points_and_xp_current(test_app):
+    with test_app.app_context():
+        u = User(username="progression-dash-checker", email="pdc@test.local")
+        u.set_password("pw")
+        db.session.add(u)
+        db.session.commit()
+
+        from app.models.models import Character
+
+        char = Character(
+            user_id=u.id,
+            name="DashChecker",
+            level=3,
+            xp=1000,
+            stat_points=4,
+            stats=json.dumps({"str": 10, "dex": 10, "int": 10, "con": 10, "wis": 10, "cha": 10}),
+        )
+        db.session.add(char)
+        db.session.commit()
+
+        from app.models.xp import xp_for_level
+
+        out = serialize_character_list(u.id)
+        match = next(c for c in out if c["id"] == char.id)
+        assert match["stat_points"] == 4
+        assert match["xp_current"] == xp_for_level(3)
+        assert match["xp_next"] == xp_for_level(4)

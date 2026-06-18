@@ -19,6 +19,12 @@ class SkillTreeSystem {
 
     init() {
         console.log('Skill Tree System initialized');
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-skill-panel');
+            if (!btn) return;
+            const charId = parseInt(btn.getAttribute('data-char-id'), 10);
+            if (charId) this.openSkillTree(charId);
+        });
     }
 
     /**
