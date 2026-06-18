@@ -128,6 +128,18 @@ class Theme(db.Model):
     --adv-warning: {self.warning};
     --adv-link-color: {self.link_color};
     --adv-link-hover-color: {self.link_hover_color};
+
+    --ui-bg: {self.body_bg};
+    --ui-panel: {self.card_bg};
+    --ui-elevated: {self.border_color};
+    --ui-accent: {self.primary};
+    --ui-accent-hover: {self.secondary};
+    --ui-danger: {self.danger};
+    --ui-success: {self.success};
+    --ui-warning: {self.warning};
+    --ui-text: {self.body_color};
+    --ui-text-dim: {self.light};
+    --ui-font: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }}
 
 body {{
