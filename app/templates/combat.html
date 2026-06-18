@@ -133,6 +133,7 @@
 {% block head %}
 {{ super() }}
 <link rel="stylesheet" href="{{ asset_url('css/glass-theme.css') }}">
+<link rel="stylesheet" href="{{ url_for('theme.get_active_theme_css') }}">
 <link rel="stylesheet" href="{{ asset_url('css/combat-effects.css') }}">
 <link rel="stylesheet" href="{{ asset_url('css/loot-distribution.css') }}">
 {% endblock %}
