@@ -88,6 +88,18 @@ spec → write an implementation plan (TDD, small tasks) → implement → verif
       `loot-distribution.js` still called post-combat/post-loot — fixed with a
       backward-compatible shim. Design: `specs/2026-06-17-progression-ui-design.md`.
 
+### UI Redesign Phase 1 — Design system foundation ✅
+Consolidated the 4 competing CSS palettes into one canonical `--ui-*` namespace
+("Cold Steel": slate/charcoal + teal accent, sans-serif), with `--dungeon-*`/
+`--adv-*` kept as aliases so no call site needed to change. Shipped via the
+existing `Theme` DB model — seeded "Cold Steel" (active) and "Classic Dungeon"
+(the old look, still selectable) via `python run.py seed-themes`. Also discovered
+and fixed: the admin theme-switcher's `/api/admin/themes/active/css` endpoint was
+never linked from any template — now wired into `base.html`/`admin_base.html`/
+`combat.html`, so switching themes in the admin panel actually affects what
+players see for the first time. Design: `specs/2026-06-18-phase1-design-system-design.md`.
+Next: Phase 2 (hub/dashboard layout redesign).
+
 ## Known issues / cleanup (not blockers)
 - [x] **Test-DB targeting quirk — FIXED ✅:** `conftest.py` now sets `DATABASE_URL`
       from `TEST_DATABASE_URL` *before* importing `app`, so `pytest` with only
