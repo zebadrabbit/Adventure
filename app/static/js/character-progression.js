@@ -216,7 +216,7 @@ class CharacterProgression {
     async refreshCharacterUI(charId) {
         try {
             const r = await fetch(`/api/characters/${charId}`);
-            if (!r.ok) return;
+            if (!r.ok) return null;
             const char = await r.json();
 
             const anchor = document.querySelector(`.xp-bar-anchor[data-char-id="${charId}"]`);
@@ -235,8 +235,23 @@ class CharacterProgression {
                     btn.remove();
                 }
             }
+
+            return char;
         } catch (err) {
             console.error('Failed to refresh character UI:', err);
+            return null;
+        }
+    }
+
+    // Backward-compatible shim for combat.js/loot-distribution.js, which still
+    // call this method (predating the refreshCharacterUI/maybeCelebrateLevelUp
+    // split). charId may arrive as a string (e.g. from Object.keys()), so
+    // normalize it the same way attachButtonListeners does for data-char-id.
+    async updateXPBar(charId, checkLevelUp) {
+        const normalizedId = parseInt(charId, 10);
+        const char = await this.refreshCharacterUI(normalizedId);
+        if (checkLevelUp && char) {
+            this.maybeCelebrateLevelUp(normalizedId, char.level);
         }
     }
 }
