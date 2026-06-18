@@ -22,16 +22,38 @@
    =================================================================== */
 
 :root {
-    --dungeon-bg: #0d0a0a;
-    --dungeon-panel: #1a1512;
-    --dungeon-border: #3d3226;
-    --dungeon-accent: #d4a574;
-    --dungeon-danger: #8b2e2e;
-    --dungeon-success: #4a6741;
-    --dungeon-warn: #c17a3a;
-    --dungeon-text: #d4c5b0;
-    --dungeon-text-dim: #8a7d6f;
-    --parchment-texture: url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E");
+    /* Canonical "Cold Steel" namespace — the single source of truth.
+       --dungeon-* / --adv-* below are aliases for existing call sites. */
+    --ui-bg: #0c0e12;
+    --ui-panel: #1b1f27;
+    --ui-elevated: #2e3440;
+    --ui-accent: #5ad1c9;
+    --ui-accent-hover: #7adbd4;
+    --ui-danger: #c0392b;
+    --ui-success: #4caf82;
+    --ui-warning: #d6a23a;
+    --ui-text: #dfe4ea;
+    --ui-text-dim: #8d97a3;
+    --ui-font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+
+    --dungeon-bg: var(--ui-bg);
+    --dungeon-panel: var(--ui-panel);
+    --dungeon-border: var(--ui-elevated);
+    --dungeon-accent: var(--ui-accent);
+    --dungeon-danger: var(--ui-danger);
+    --dungeon-success: var(--ui-success);
+    --dungeon-warn: var(--ui-warning);
+    --dungeon-text: var(--ui-text);
+    --dungeon-text-dim: var(--ui-text-dim);
+
+    --adv-primary: var(--ui-accent);
+    --adv-primary-hover: var(--ui-accent-hover);
+    --adv-secondary: var(--ui-elevated);
+    --adv-success: var(--ui-success);
+    --adv-danger: var(--ui-danger);
+    --adv-warning: var(--ui-warning);
+    --adv-link-color: var(--ui-accent);
+    --adv-link-hover-color: var(--ui-accent-hover);
 }
 
 /* ========================================
@@ -39,15 +61,10 @@
    ======================================== */
 
 body {
-    background: var(--dungeon-bg);
-    background-image:
-        linear-gradient(rgba(13, 10, 10, 0.8), rgba(20, 15, 12, 0.9)),
-        radial-gradient(ellipse at 50% 0%, rgba(61, 50, 38, 0.2) 0%, transparent 60%),
-        var(--parchment-texture);
-    background-size: cover, cover, 100px 100px;
+    background: var(--ui-bg);
     min-height: 100vh;
-    color: var(--dungeon-text);
-    font-family: Georgia, 'Times New Roman', serif;
+    color: var(--ui-text);
+    font-family: var(--ui-font);
 }
 
 /* ========================================
