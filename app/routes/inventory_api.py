@@ -160,7 +160,10 @@ def _apply_effects(stats: dict, effects: dict) -> dict:
 def _computed_stats(base_stats: dict, gear: dict, items_lookup: dict[str, Item]) -> dict:
     cur = dict(base_stats)
     for slot, slug in (gear or {}).items():
-        if not slug:
+        if not slug or not isinstance(slug, str):
+            # Procedural gear instances are stored as dicts, not slugs; their
+            # affixes aren't folded into displayed computed stats (separate,
+            # known gap), but they must not crash this lookup.
             continue
         it = items_lookup.get(slug)
         if it:
