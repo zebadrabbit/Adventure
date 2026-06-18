@@ -29,31 +29,26 @@
 
 /* === 1. Medieval Dark Fantasy Theme ===================================== */
 :root {
-  /* Base Colors - Dark Dungeon */
-  --adv-bg: #0d0a0a;
-  --adv-bg-secondary: #1a1512;
-  --adv-surface: #1a1512;
-  --adv-surface-hover: #26211c;
+  --adv-bg: var(--ui-bg);
+  --adv-bg-secondary: var(--ui-panel);
+  --adv-surface: var(--ui-panel);
+  --adv-surface-hover: var(--ui-elevated);
 
-  /* Accent Colors - Medieval Amber Theme */
-  --adv-primary: #d4a574;
-  --adv-primary-hover: #e8c9a0;
-  --adv-secondary: #c17a3a;
-  --adv-accent: #8b6f47;
-  --adv-success: #4a6741;
-  --adv-warning: #c17a3a;
-  --adv-danger: #8b2e2e;
+  --adv-primary: var(--ui-accent);
+  --adv-primary-hover: var(--ui-accent-hover);
+  --adv-secondary: var(--ui-elevated);
+  --adv-accent: var(--ui-accent);
+  --adv-success: var(--ui-success);
+  --adv-warning: var(--ui-warning);
+  --adv-danger: var(--ui-danger);
 
-  /* Text Colors - Parchment & Candlelight */
-  --adv-text: #d4c5b0;
-  --adv-text-muted: #a89c8a;
-  --adv-text-dim: #8a7d6f;
+  --adv-text: var(--ui-text);
+  --adv-text-muted: var(--ui-text-dim);
+  --adv-text-dim: var(--ui-text-dim);
 
-  /* Borders & Dividers - Worn Medieval */
-  --adv-border: rgba(61, 50, 38, 0.5);
-  --adv-border-hover: rgba(212, 165, 116, 0.3);
+  --adv-border: var(--ui-elevated);
+  --adv-border-hover: var(--ui-accent);
 
-  /* Shadows */
   --adv-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
   --adv-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
   --adv-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
