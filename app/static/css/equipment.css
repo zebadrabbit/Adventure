@@ -525,3 +525,12 @@
     font-size: 0.75rem;
     margin-left: 0.25rem;
 }
+
+/* Encumbrance Indicator */
+.encumbrance-bar {
+    font-size: 0.8rem;
+}
+
+.encumbrance-bar .progress {
+    background: rgba(100, 100, 120, 0.3);
+}
