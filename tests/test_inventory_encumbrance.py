@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from app import app, db
@@ -60,3 +62,48 @@ def test_stacking_and_encumbrance(client):
     # Encumbrance must be present
     enc = chars[0]["encumbrance"]
     assert "capacity" in enc and "weight" in enc
+
+
+@pytest.mark.db_isolation
+def test_character_state_with_equipped_gear_instance_does_not_crash(client):
+    """Procedural gear instances stored in `gear[slot]` are dicts, not slugs.
+
+    `_computed_stats` must not crash when looking up a dict-shaped gear value
+    (regression: TypeError: unhashable type: 'dict').
+    """
+    with app.app_context():
+        u = create_user("instance-equipper", "pw")
+        char = create_character(u, "InstanceWielder", "fighter", items=[])
+        char.gear = json.dumps(
+            {
+                "weapon": {
+                    "uid": "test-uid-equipped",
+                    "slug": "rare-sword",
+                    "name": "Test Rare Sword",
+                    "type": "weapon",
+                    "slot": "weapon",
+                    "rarity": "rare",
+                    "level": 5,
+                    "durability": 50,
+                    "max_durability": 100,
+                    "value": 500,
+                    "weight": 3.0,
+                    "affixes": [{"stat": "str", "val": 4}],
+                }
+            }
+        )
+        db.session.commit()
+        char_id = char.id
+
+    login(client, "instance-equipper", "pw")
+    with client.session_transaction() as sess:
+        sess["_user_id"] = "1"
+
+    r = client.get("/api/characters/state")
+    assert r.status_code == 200
+    chars = r.get_json()["characters"]
+    assert chars and "warning" not in chars[0]
+
+    r2 = client.get(f"/api/characters/{char_id}")
+    assert r2.status_code == 200
+    assert r2.get_json()["gear"]["weapon"]["uid"] == "test-uid-equipped"

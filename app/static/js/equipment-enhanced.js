@@ -38,6 +38,8 @@ class EquipmentManager {
                             <i class="bi bi-shield-check me-2"></i>Equipped
                         </h6>
                         <div id="equipment-slots-list"></div>
+                        <div id="gear-bonus-summary" class="small text-info mt-2"></div>
+                        <div id="encumbrance-bar" class="mt-2"></div>
                         <div class="stats-summary mt-3">
                             <h6>Total Stats</h6>
                             <div id="total-stats"></div>
@@ -255,6 +257,58 @@ class EquipmentManager {
             </div>
         `;
         document.getElementById('total-stats').innerHTML = html;
+        this.renderEncumbrance();
+        this.renderGearBonus();
+    }
+
+    renderEncumbrance() {
+        const enc = this.character && this.character.encumbrance;
+        const container = document.getElementById('encumbrance-bar');
+        if (!container) return;
+        if (!enc || typeof enc.weight !== 'number' || typeof enc.capacity !== 'number') {
+            container.innerHTML = '';
+            return;
+        }
+        const pct = enc.capacity > 0 ? Math.min(100, (enc.weight / enc.capacity) * 100) : 0;
+        const barClass = enc.status === 'blocked' ? 'bg-danger' : (enc.status === 'encumbered' ? 'bg-warning' : 'bg-success');
+        const textClass = enc.status === 'blocked' ? 'text-danger' : (enc.status === 'encumbered' ? 'text-warning' : '');
+        const statusLabel = enc.status === 'blocked' ? 'Overloaded — cannot carry more' : (enc.status === 'encumbered' ? 'Encumbered' : '');
+        const penaltyNote = (enc.status !== 'normal' && enc.dex_penalty) ? ` (-${enc.dex_penalty} DEX)` : '';
+        container.innerHTML = `
+            <div class="d-flex justify-content-between small" style="color: rgba(255,255,255,0.8);">
+                <span>Carry Weight</span>
+                <span>${enc.weight.toFixed(1)} / ${enc.capacity.toFixed(1)}</span>
+            </div>
+            <div class="progress" style="height:6px;">
+                <div class="progress-bar ${barClass}" style="width:${pct}%"></div>
+            </div>
+            ${statusLabel ? `<div class="small ${textClass} mt-1">${statusLabel}${penaltyNote}</div>` : ''}
+        `;
+    }
+
+    renderGearBonus() {
+        const container = document.getElementById('gear-bonus-summary');
+        if (!container) return;
+        const gear = (this.character && this.character.gear) || {};
+        const totals = {};
+        Object.values(gear).forEach(inst => {
+            if (!inst) return;
+            const affixes = Array.isArray(inst.affixes) ? inst.affixes
+                : (inst.effects && typeof inst.effects === 'object'
+                    ? Object.entries(inst.effects).map(([stat, val]) => ({ stat, val }))
+                    : []);
+            affixes.forEach(a => {
+                if (!a || !a.stat || typeof a.val !== 'number') return;
+                totals[a.stat] = (totals[a.stat] || 0) + a.val;
+            });
+        });
+        const parts = Object.entries(totals)
+            .filter(([, v]) => v !== 0)
+            .map(([stat, v]) => {
+                const num = Number.isInteger(v) ? v : Math.round(v * 10) / 10;
+                return `${num >= 0 ? '+' : ''}${num} ${stat.toUpperCase()}`;
+            });
+        container.innerHTML = parts.length ? `Gear bonus: ${this.escapeHTML(parts.join(', '))}` : '';
     }
 
     // Drag-and-drop handlers
