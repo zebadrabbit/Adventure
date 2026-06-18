@@ -75,7 +75,18 @@ spec → write an implementation plan (TDD, small tasks) → implement → verif
             Remaining: a UI button to invoke it (part of 5c/combat UI).
       - [x] Fold passives into the dashboard HP/mana display ✅
             (`dashboard_helpers.py`, matches combat).
-- [ ] **5c Progression UI:** character sheet (level/XP bar, stat allocation, skill tree).
+- [x] **5c Progression UI** ✅ merged: found `character-progression.js` was almost entirely
+      dead (fake XP curve, a CSS selector that never matched real markup so the XP bar
+      never rendered at all, hardcoded placeholder stats). Rebuilt: real XP bar + a
+      "stat_points > 0" allocation badge are now server-rendered in `dashboard.html`
+      (`app/routes/dashboard_helpers.py` + `app/routes/inventory_api.py` now expose
+      `stat_points`/XP thresholds); `character-progression.js` rewritten to handle only
+      the interactive allocation modal (all 6 stats, real values) + a cosmetic level-up
+      celebration. Also fixed `skill-tree.js`'s "Skill Tree" button, which was hardcoded
+      to always open the first character's tree. Final review caught a real regression
+      before merge: the rewrite deleted `updateXPBar`, which `combat.js`/
+      `loot-distribution.js` still called post-combat/post-loot — fixed with a
+      backward-compatible shim. Design: `specs/2026-06-17-progression-ui-design.md`.
 
 ## Known issues / cleanup (not blockers)
 - [x] **Test-DB targeting quirk — FIXED ✅:** `conftest.py` now sets `DATABASE_URL`
