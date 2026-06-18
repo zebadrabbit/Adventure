@@ -91,11 +91,13 @@ def seed_themes(verbose: bool = True) -> int:
 
         db.session.flush()
 
-        for spec in THEMES:
-            if spec.get("is_active"):
-                Theme.query.update({"is_active": False})
-                theme = Theme.query.filter_by(name=spec["name"]).first()
-                theme.is_active = True
+        # Enforce that at most one theme is marked as active.
+        active_specs = [spec for spec in THEMES if spec.get("is_active")]
+        assert len(active_specs) <= 1, "THEMES must define at most one is_active=True spec"
+        if active_specs:
+            Theme.query.update({"is_active": False})
+            theme = Theme.query.filter_by(name=active_specs[0]["name"]).first()
+            theme.is_active = True
 
         db.session.commit()
         if verbose:
