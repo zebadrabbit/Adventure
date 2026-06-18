@@ -37,7 +37,17 @@ spec → write an implementation plan (TDD, small tasks) → implement → verif
             modal for downed party members (`POST /api/dungeon/loot-body`). Small backend
             addition: `pool_run_haul`/`extract_party` now report what was secured instead of
             discarding it. Design: `specs/2026-06-17-run-extraction-surface-design.md`.
-      - [ ] Encumbrance bar + affix breakdown in the equipment panel (`equipment.js`).
+      - [x] **Encumbrance bar + affix breakdown** ✅ merged: real-affix tooltips
+            (`tooltips.js` now reads gear-instance `affixes` instead of guessing), an
+            encumbrance bar, and a "Gear bonus: ..." summary — added to BOTH
+            `equipment.js` and (the one users actually see) `equipment-enhanced.js`'s
+            `EquipmentManager`. Verification also found and fixed a pre-existing crash:
+            `_computed_stats` raised `TypeError: unhashable type: 'dict'` whenever a
+            character had a procedural gear instance equipped (hit `/api/characters/state`
+            and `/api/characters/<id>`). Design: `specs/2026-06-17-equipment-encumbrance-affix-design.md`.
+            Follow-up (Minor, non-blocking): `equipment.js` and `equipment-enhanced.js` now
+            each have their own near-identical encumbrance/gear-bonus-summary helpers —
+            worth hoisting into a shared module (like `tooltips.js`) if either changes again.
 
 ### Spec 5 — Character progression  (`specs/2026-06-16-progression-design.md`)
 - [x] **5a XP + levels** ✅ (this session): `app/services/progression.py`
