@@ -2,16 +2,16 @@
 /* Medieval gothic aesthetic with worn textures and candlelit atmosphere */
 
 :root {
-    --dungeon-bg: #0d0a0a;
-    --dungeon-panel: #1a1512;
-    --dungeon-border: #3d3226;
-    --dungeon-accent: #d4a574;
-    --dungeon-danger: #8b2e2e;
-    --dungeon-success: #4a6741;
-    --dungeon-warn: #c17a3a;
-    --dungeon-text: #d4c5b0;
-    --dungeon-text-dim: #8a7d6f;
-    --parchment-texture: url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E");
+    --ui-font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --dungeon-bg: var(--ui-bg, #0c0e12);
+    --dungeon-panel: var(--ui-panel, #1b1f27);
+    --dungeon-border: var(--ui-elevated, #2e3440);
+    --dungeon-accent: var(--ui-accent, #5ad1c9);
+    --dungeon-danger: var(--ui-danger, #c0392b);
+    --dungeon-success: var(--ui-success, #4caf82);
+    --dungeon-warn: var(--ui-warning, #d6a23a);
+    --dungeon-text: var(--ui-text, #dfe4ea);
+    --dungeon-text-dim: var(--ui-text-dim, #8d97a3);
 }
 
 /* ========================================
@@ -27,7 +27,7 @@ body {
     background-size: cover, cover, 100px 100px;
     min-height: 100vh;
     color: var(--dungeon-text);
-    font-family: Georgia, 'Times New Roman', serif;
+    font-family: var(--ui-font);
 }
 
 /* ========================================
@@ -50,7 +50,7 @@ body {
     border: 3px solid var(--dungeon-border);
     border-right: 4px solid var(--dungeon-accent);
     padding: 12px 18px;
-    font-family: Georgia, serif;
+    font-family: var(--ui-font);
     font-size: 0.85rem;
     box-shadow:
         0 6px 20px rgba(0, 0, 0, 0.8),
@@ -64,7 +64,7 @@ body {
     margin-bottom: 4px;
     text-transform: uppercase;
     letter-spacing: 2px;
-    font-family: 'Trebuchet MS', sans-serif;
+    font-family: var(--ui-font);
 }
 
 .hud-status .value {
@@ -94,11 +94,11 @@ body {
     font-size: 0.7rem;
     letter-spacing: 2px;
     margin: 0 0 6px 0;
-    font-family: 'Trebuchet MS', sans-serif;
+    font-family: var(--ui-font);
 }
 
 .time-widget .fs-3 {
-    font-family: Georgia, serif;
+    font-family: var(--ui-font);
     color: var(--dungeon-accent);
     text-shadow: 0 0 12px rgba(212, 165, 116, 0.5);
 }
@@ -128,7 +128,7 @@ body {
     color: var(--dungeon-accent);
     font-weight: 400;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-    font-family: Georgia, serif;
+    font-family: var(--ui-font);
 }
 
 .briefing-header .subtitle {
@@ -186,12 +186,12 @@ body {
     font-size: 1.1rem;
     color: var(--dungeon-text);
     font-weight: 500;
-    font-family: Georgia, serif;
+    font-family: var(--ui-font);
     letter-spacing: 0.5px;
 }
 
 .panel-header .badge {
-    font-family: 'Trebuchet MS', sans-serif;
+    font-family: var(--ui-font);
     font-size: 0.75rem;
     padding: 4px 10px;
     background: rgba(212, 165, 116, 0.15);
@@ -278,7 +278,7 @@ body {
     font-size: 1.15rem;
     font-weight: 500;
     letter-spacing: 0.5px;
-    font-family: Georgia, serif;
+    font-family: var(--ui-font);
 }
 
 .operative-meta {
@@ -291,7 +291,7 @@ body {
     font-size: 0.7rem;
     padding: 3px 9px;
     border: 1px solid;
-    font-family: Georgia, serif;
+    font-family: var(--ui-font);
     letter-spacing: 0.5px;
 }
 
@@ -352,7 +352,7 @@ body {
     letter-spacing: 1px;
     margin-bottom: 10px;
     font-weight: 500;
-    font-family: 'Trebuchet MS', sans-serif;
+    font-family: var(--ui-font);
 }
 
 .stat-grid {
@@ -360,7 +360,7 @@ body {
     grid-template-columns: repeat(4, 1fr);
     gap: 8px;
     font-size: 0.85rem;
-    font-family: Georgia, serif;
+    font-family: var(--ui-font);
 }
 
 .stat-grid div {
@@ -424,7 +424,7 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-family: Georgia, serif;
+    font-family: var(--ui-font);
 }
 
 .inventory-list li:last-child {
@@ -450,7 +450,7 @@ body {
     letter-spacing: 0.5px;
     cursor: pointer;
     transition: all 0.2s ease;
-    font-family: Georgia, serif;
+    font-family: var(--ui-font);
     font-weight: 500;
 }
 
@@ -483,7 +483,7 @@ body {
     letter-spacing: 1px;
     margin-bottom: 8px;
     font-weight: 500;
-    font-family: 'Trebuchet MS', sans-serif;
+    font-family: var(--ui-font);
 }
 
 .loadout-form .form-control,
@@ -491,7 +491,7 @@ body {
     background: rgba(13, 10, 10, 0.8);
     border: 1px solid var(--dungeon-border);
     color: var(--dungeon-text);
-    font-family: Georgia, serif;
+    font-family: var(--ui-font);
     padding: 10px 14px;
 }
 
@@ -511,7 +511,7 @@ body {
     letter-spacing: 0.5px;
     font-weight: 500;
     padding: 12px 22px;
-    font-family: Georgia, serif;
+    font-family: var(--ui-font);
 }
 
 /* ========================================
@@ -539,7 +539,7 @@ body {
     font-size: 3rem;
     margin: 0;
     color: var(--dungeon-accent);
-    font-family: Georgia, serif;
+    font-family: var(--ui-font);
     text-shadow: 0 0 18px rgba(212, 165, 116, 0.4);
     font-weight: 400;
 }
@@ -565,7 +565,7 @@ body {
     box-shadow:
         0 4px 15px rgba(212, 165, 116, 0.3),
         inset 0 1px 0 rgba(255, 255, 255, 0.2);
-    font-family: Georgia, serif;
+    font-family: var(--ui-font);
 }
 
 .deploy-btn:hover:not(:disabled) {
@@ -589,7 +589,7 @@ body {
     letter-spacing: 0.5px;
     padding: 11px 20px;
     transition: all 0.2s ease;
-    font-family: Georgia, serif;
+    font-family: var(--ui-font);
 }
 
 .tactical-btn-secondary:hover {
@@ -606,7 +606,7 @@ body {
     padding: 6px 12px;
     font-size: 0.85rem;
     transition: all 0.2s ease;
-    font-family: Georgia, serif;
+    font-family: var(--ui-font);
 }
 
 .tactical-btn-danger:hover {
@@ -626,7 +626,7 @@ body {
     color: var(--dungeon-text);
     padding: 18px 20px;
     margin-bottom: 20px;
-    font-family: Georgia, serif;
+    font-family: var(--ui-font);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
