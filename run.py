@@ -222,6 +222,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     seed_skills_parser.set_defaults(command="seed-skills")
 
+    # seed-themes subcommand
+    seed_themes_parser = subparsers.add_parser(
+        "seed-themes",
+        help="Create/update the Cold Steel and Classic Dungeon themes (idempotent)",
+        formatter_class=argparse.RawTextHelpFormatter,
+        description="Seed the Phase 1 design-system themes via the ORM. Safe to run repeatedly.",
+    )
+    seed_themes_parser.set_defaults(command="seed-themes")
+
     # import-items-csv
     import_items_parser = subparsers.add_parser(
         "import-items-csv",
@@ -391,6 +400,12 @@ def main(argv: list[str]) -> int:
         from app.seed_skills import seed_skills
 
         seed_skills(verbose=True)
+        return 0
+
+    elif mode == "seed-themes":
+        from app.seed_themes import seed_themes
+
+        seed_themes(verbose=True)
         return 0
 
     elif mode == "import-items-csv":
