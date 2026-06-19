@@ -93,7 +93,74 @@ class DungeonCanvasThree {
         this.width = data.width;
         this.height = data.height;
         this.seed = data.seed;
+
+        this._buildTileGrid();
+        this._positionCamera(new THREE.Vector3(this.width / 2, 0, this.height / 2));
         this._renderFrame();
+    }
+
+    _buildTileGrid() {
+        if (this.floorMesh) {
+            this.scene.remove(this.floorMesh);
+            this.floorMesh.dispose?.();
+        }
+        if (this.wallMesh) {
+            this.scene.remove(this.wallMesh);
+            this.wallMesh.dispose?.();
+        }
+
+        const floorCells = [];
+        const wallCells = [];
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                const cellType = this.grid[y][x];
+                if (FLOOR_TYPES.has(cellType)) {
+                    floorCells.push({ x, y, type: cellType });
+                } else if (WALL_TYPES.has(cellType)) {
+                    wallCells.push({ x, y, type: cellType });
+                }
+                // 'cave' and 'unknown' (and anything else unrecognized):
+                // intentionally skipped, no instance allocated.
+            }
+        }
+
+        this.floorMesh = this._buildInstancedMesh(
+            floorCells,
+            new THREE.PlaneGeometry(1, 1),
+            (mesh, i, cell) => {
+                const m = new THREE.Matrix4();
+                m.makeRotationX(-Math.PI / 2);
+                m.setPosition(cell.x, 0, cell.y);
+                mesh.setMatrixAt(i, m);
+                mesh.setColorAt(i, new THREE.Color(TILE_COLORS[cell.type]));
+            }
+        );
+
+        this.wallMesh = this._buildInstancedMesh(
+            wallCells,
+            new THREE.BoxGeometry(1, 1, 1),
+            (mesh, i, cell) => {
+                const m = new THREE.Matrix4();
+                m.setPosition(cell.x, 0.5, cell.y);
+                mesh.setMatrixAt(i, m);
+                mesh.setColorAt(i, new THREE.Color(TILE_COLORS[cell.type]));
+            }
+        );
+
+        this.scene.add(this.floorMesh);
+        this.scene.add(this.wallMesh);
+    }
+
+    _buildInstancedMesh(cells, geometry, placeFn) {
+        const material = new THREE.MeshBasicMaterial({ vertexColors: true });
+        const mesh = new THREE.InstancedMesh(geometry, material, Math.max(cells.length, 1));
+        mesh.count = cells.length;
+        cells.forEach((cell, i) => placeFn(mesh, i, cell));
+        mesh.instanceMatrix.needsUpdate = true;
+        if (mesh.instanceColor) {
+            mesh.instanceColor.needsUpdate = true;
+        }
+        return mesh;
     }
 
     updatePlayerPosition(x, y) {
