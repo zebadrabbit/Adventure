@@ -49,6 +49,10 @@ class DungeonCanvasThree {
         this.floorMesh = null;
         this.wallMesh = null;
 
+        this._textureCache = new Map();
+        this.playerSprite = null;
+        this.entitySprites = [];
+
         this._initScene();
     }
 
@@ -85,6 +89,35 @@ class DungeonCanvasThree {
 
     _renderFrame() {
         this.renderer.render(this.scene, this.camera);
+    }
+
+    _getOrLoadTexture(path) {
+        if (this._textureCache.has(path)) {
+            return this._textureCache.get(path);
+        }
+        const texture = new THREE.Texture();
+        const img = new Image();
+        img.onload = () => {
+            texture.image = img;
+            texture.needsUpdate = true;
+            this._renderFrame();
+        };
+        img.onerror = () => {
+            console.warn('Failed to load icon texture:', path);
+        };
+        img.src = path;
+        this._textureCache.set(path, texture);
+        return texture;
+    }
+
+    _makeSprite(iconPath) {
+        const material = new THREE.SpriteMaterial({
+            map: this._getOrLoadTexture(iconPath),
+            transparent: true,
+        });
+        const sprite = new THREE.Sprite(material);
+        sprite.scale.set(0.8, 0.8, 1);
+        return sprite;
     }
 
     // -- Public API (stubs in this task; filled in by later tasks) --
