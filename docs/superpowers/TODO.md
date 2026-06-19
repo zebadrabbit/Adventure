@@ -138,6 +138,26 @@ per the roadmap's "room for iteration, not a fixed-scope cutover" guidance
 for this phase. Design: `specs/2026-06-19-phase3a-threejs-dungeon-scene-design.md`.
 Next: Phase 3b (player/entity billboards + movement).
 
+### UI Redesign Phase 3b — Three.js entity/player billboards + movement ✅
+Added `THREE.Sprite` billboards for the player (fixed `axe-sword.svg` icon)
+and entities (per-entity `icon` field, falling back to `goblin-scout-t1.svg`),
+with a small per-path texture cache. Entities beyond `OUTER_VIS_RADIUS` (26,
+matching `dungeon-canvas.js`'s default) from the player are skipped — a
+binary cutoff, not the opacity gradient (that's Phase 3c's fog-of-war work).
+`updatePlayerPosition` now moves/creates the player sprite and re-centers
+the camera on every call (camera-follow movement, snap-only, no easing).
+`centerOnPlayer()` is a real call now, no longer a no-op stub. Real bug
+found and fixed during live-browser verification: feeding a loaded SVG
+`<img>` directly into a raw `THREE.Texture` uploaded nothing — every
+billboard rendered fully transparent regardless of `needsUpdate`, confirmed
+via a GL pixel readback at the sprite's exact screen position reading
+`(0,0,0,0)` despite valid image data and correct placement (a textureless
+colored sprite rendered fine in the same spot). Fixed by drawing the loaded
+icon onto an offscreen canvas first and wrapping that in a
+`THREE.CanvasTexture`, which does upload correctly. Design:
+`specs/2026-06-19-phase3b-threejs-entity-billboards-design.md`.
+Next: Phase 3c (client-side fog-of-war opacity dimming).
+
 ## Known issues / cleanup (not blockers)
 - [x] **Test-DB targeting quirk — FIXED ✅:** `conftest.py` now sets `DATABASE_URL`
       from `TEST_DATABASE_URL` *before* importing `app`, so `pytest` with only
