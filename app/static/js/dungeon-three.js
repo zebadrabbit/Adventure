@@ -3,7 +3,7 @@
  * Toggle-gated alternative to dungeon-canvas.js; see docs/superpowers/specs/
  * 2026-06-19-phase3a-threejs-dungeon-scene-design.md for full design.
  */
-import * as THREE from 'three';
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
 
 const ZOOM_STEP = 0.1;
 const MIN_ZOOM = 0.5;
