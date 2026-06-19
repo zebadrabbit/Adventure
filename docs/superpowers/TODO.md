@@ -198,6 +198,32 @@ fog-of-war, and the minimap, while remaining toggle-gated behind
 `specs/2026-06-19-phase3d-threejs-minimap-design.md`.
 Next: Phase 4 (combat visuals), per the roadmap.
 
+### UI Redesign Phase 5a — Cold Steel: remaining embedded literals ✅
+Converted `home.css`'s 19 remaining old-palette `rgba()` literals (6 RGB
+triples — 4 reused from Phase 2's `theme.css` mapping, plus 2 new ones found
+only here: `rgb(193, 122, 58)` and `rgb(139, 111, 71)`, both low-opacity
+hero-section background-glow blobs) to `color-mix()` expressions on the Cold
+Steel namespace, via the same mechanical script-based technique Phase 2
+used. Investigated and ruled out two other Phase-5-shaped candidates before
+landing on this scope: (1) `auth.css` (login/register page styles) — already
+clean, zero old-palette literals; (2) `account/profile.html` and
+`account/settings.html`'s use of `glass-theme.css` — initially suspected as
+a leftover "third palette" inconsistency per Phase 1's findings, but
+confirmed on inspection that the specific classes these pages actually use
+(`.section-card`, `.stat-card`) are already neutral frosted-glass cards
+already referencing `var(--adv-primary)`, and the literally-purple
+`.theme-purple-gradient`/`.purple-gradient` body-class rules in
+`glass-theme.css` are dead code (no template ever applies either class to
+`<body>`) — no fix needed there. Left `home.css`'s indigo hero-badge accent
+(`rgba(99, 102, 241, ...)`) untouched — confirmed intentional, not a
+leftover from the old amber/brown palette. Verified via Playwright: landing
+page renders with Cold Steel tones, hero badge still indigo, zero console
+errors. Design: `specs/2026-06-19-phase5a-coldsteel-remaining-literals-design.md`.
+Next: the dead `glass-theme.css` body-class rules are a candidate
+follow-up (need to confirm they're also unused on `admin_themes.html`
+before removing), and Phase 4 (combat visuals) remains deferred pending
+live user availability for its visual judgment calls.
+
 ## Known issues / cleanup (not blockers)
 - [x] **Test-DB targeting quirk — FIXED ✅:** `conftest.py` now sets `DATABASE_URL`
       from `TEST_DATABASE_URL` *before* importing `app`, so `pytest` with only
