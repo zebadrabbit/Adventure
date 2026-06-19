@@ -223,7 +223,7 @@ body {
 }
 
 .panel-header {
-    background: color-mix(in srgb, var(--dungeon-border) 30%, transparent);
+    background: color-mix(in srgb, var(--dungeon-border) 35%, transparent);
     border-bottom: 2px solid var(--dungeon-border);
     padding: 14px 20px;
     display: flex;
@@ -408,13 +408,13 @@ body {
 .stat-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
+    gap: 6px;
     font-size: 0.85rem;
     font-family: var(--ui-font);
 }
 
 .stat-grid div {
-    padding: 6px;
+    padding: 8px 6px;
     background: color-mix(in srgb, var(--dungeon-bg) 60%, transparent);
     border: 1px solid color-mix(in srgb, var(--dungeon-border) 40%, transparent);
     text-align: center;
