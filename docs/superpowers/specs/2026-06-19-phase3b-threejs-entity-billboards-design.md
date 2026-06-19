@@ -45,12 +45,17 @@ except fog-of-war opacity gradient and the minimap (still Phase 3c/3d).
   raster formats); the existing icons are all SVG. The standard, dependency-free
   way to bridge this (already implicit in how `dungeon-canvas.js` itself draws
   SVGs onto a 2D canvas via `drawImage`) is: load the SVG into an `Image`
-  element (browsers rasterize SVG `<img>` sources natively), then feed that
-  `Image` directly to `new THREE.Texture(image)` (Three.js accepts any
-  `CanvasImageSource`, including a loaded `<img>`, with `texture.needsUpdate =
-  true` after load) — no intermediate `<canvas>` draw needed, simpler than
-  `dungeon-canvas.js`'s own approach (which draws to canvas because 2D canvas
-  has no other way to composite an SVG).
+  element (browsers rasterize SVG `<img>` sources natively), then composite it.
+  **Superseded during implementation (commit `8e793c4`):** the approach
+  originally planned here — feeding the loaded `Image` directly into
+  `new THREE.Texture(image)` with no intermediate canvas — was proven broken
+  by live-browser verification: `WebGLTextures` silently rejects a raw `<img>`
+  as a texture source, so every billboard rendered fully transparent
+  regardless of `texture.needsUpdate`. The shipped code instead draws the
+  loaded image onto an offscreen `<canvas>` and wraps that in a
+  `THREE.CanvasTexture` — the same `drawImage`-to-canvas step
+  `dungeon-canvas.js` already uses, not the simpler shortcut this spec
+  assumed would work.
 - `THREE.Sprite` always faces the camera (billboard behavior is the *default*
   for this primitive, not something to implement) — exactly the "2D sprite
   billboards in a real 3D environment" approach the original roadmap called
@@ -110,6 +115,9 @@ except fog-of-war opacity gradient and the minimap (still Phase 3c/3d).
 
 ## Sprite construction details
 
+**As originally planned (superseded — see "Superseded during implementation"
+note above; kept here for the historical record):**
+
 ```javascript
 _getOrLoadTexture(path) {
     if (this._textureCache.has(path)) return this._textureCache.get(path);
@@ -124,6 +132,30 @@ _getOrLoadTexture(path) {
     this._textureCache.set(path, texture);
     return texture;
 }
+```
+
+**As actually shipped (commit `8e793c4`):**
+
+```javascript
+_getOrLoadTexture(path) {
+    if (this._textureCache.has(path)) return this._textureCache.get(path);
+    const texture = new THREE.CanvasTexture(document.createElement('canvas'));
+    texture.generateMipmaps = false; // icon rasters are non-power-of-two
+    texture.minFilter = THREE.LinearFilter;
+    const img = new Image();
+    img.onload = () => {
+        const canvas = texture.image;
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        texture.needsUpdate = true;
+        this._renderFrame();
+    };
+    img.src = path;
+    this._textureCache.set(path, texture);
+    return texture;
+}
+```
 
 _makeSprite(iconPath) {
     const material = new THREE.SpriteMaterial({
