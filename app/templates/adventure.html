@@ -183,6 +183,12 @@
 
   {% block scripts %}
   {{ super() }}
+  <!-- Three.js (Phase 3a dungeon scene, toggle-gated via ?renderer=three) -->
+  <!-- Import map externalized to a static .json file (rather than inlined per
+       the original brief) to satisfy this repo's no-inline-script convention
+       (scripts/check_inline_scripts.py); see commit message for details. -->
+  <script type="importmap" src="{{ asset_url('js/three-importmap.json') }}"></script>
+  <script type="module" src="{{ asset_url('js/dungeon-three.js') }}"></script>
   <!-- Canvas-based dungeon renderer -->
   <script src="{{ asset_url('js/dungeon-canvas.js') }}"></script>
   <!-- Adventure page logic -->
