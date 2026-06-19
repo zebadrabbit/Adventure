@@ -41,6 +41,16 @@ const TILE_COLORS = {
     secret_door: 0x39414f,
 };
 
+const TILE_COLOR_STRINGS = {
+    room: '#2d3340',
+    tunnel: '#242a36',
+    door: '#9a6b35',
+    locked_door: '#964a4a',
+    teleporter: '#6b46c1',
+    wall: '#39414f',
+    secret_door: '#39414f',
+};
+
 const FLOOR_TYPES = new Set(['room', 'tunnel', 'door', 'locked_door', 'teleporter']);
 const WALL_TYPES = new Set(['wall', 'secret_door']);
 
@@ -71,6 +81,12 @@ class DungeonCanvasThree {
         this.playerSprite = null;
         this.entitySprites = [];
         this.fogMeshes = [];
+
+        this.minimapCanvas = document.getElementById('dungeon-minimap-three');
+        this.minimapCtx = this.minimapCanvas ? this.minimapCanvas.getContext('2d') : null;
+        if (this.minimapCanvas) {
+            this.minimapCanvas.style.display = 'block';
+        }
 
         this._initScene();
     }
@@ -166,6 +182,7 @@ class DungeonCanvasThree {
 
         this._buildTileGrid();
         this._buildFogOverlay();
+        this._renderMinimap();
         this._positionCamera(new THREE.Vector3(this.width / 2, 0, this.height / 2));
         this._renderFrame();
     }
@@ -292,6 +309,49 @@ class DungeonCanvasThree {
         this._renderFrame();
     }
 
+    _renderMinimap() {
+        if (!this.minimapCtx || !this.grid || !this.playerPos) {
+            return;
+        }
+
+        const ctx = this.minimapCtx;
+        const minimapSize = 120;
+        const tileScale = minimapSize / Math.max(this.width, this.height);
+
+        ctx.clearRect(0, 0, minimapSize, minimapSize);
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, 0, minimapSize, minimapSize);
+
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                const key = `${x},${y}`;
+                if (!this.seenTiles.has(key)) {
+                    continue;
+                }
+                const cell = this.grid[y][x];
+                if (!cell || cell === 'unknown') {
+                    continue;
+                }
+                const mx = x * tileScale;
+                const my = (this.height - 1 - y) * tileScale;
+                ctx.fillStyle = TILE_COLOR_STRINGS[cell] || '#2d3340';
+                ctx.fillRect(mx, my, tileScale, tileScale);
+            }
+        }
+
+        const px = this.playerPos.x * tileScale;
+        const py = (this.height - 1 - this.playerPos.y) * tileScale;
+        ctx.fillStyle = '#FFD700';
+        ctx.beginPath();
+        ctx.arc(px + tileScale / 2, py + tileScale / 2, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(0, 0, minimapSize, minimapSize);
+    }
+
     _buildInstancedMesh(cells, geometry, colorHex, placeFn) {
         const material = new THREE.MeshBasicMaterial({ color: colorHex });
         const mesh = new THREE.InstancedMesh(geometry, material, Math.max(cells.length, 1));
@@ -316,6 +376,7 @@ class DungeonCanvasThree {
         this.playerSprite.position.set(x, 0.6, y);
         this.centerOnPlayer();
         this._buildFogOverlay();
+        this._renderMinimap();
     }
 
     setEntities(entities) {
