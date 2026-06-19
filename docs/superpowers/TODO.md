@@ -100,6 +100,21 @@ never linked from any template — now wired into `base.html`/`admin_base.html`/
 players see for the first time. Design: `specs/2026-06-18-phase1-design-system-design.md`.
 Next: Phase 2 (hub/dashboard layout redesign).
 
+### UI Redesign Phase 2 — Hub/dashboard visual hierarchy polish ✅
+Removed a dead `--mud-*` CSS variable block from `dashboard.css` (zero
+consumers, confirmed via grep). Converted the last 57 hardcoded amber/brown
+`rgba()` literals embedded in `theme.css`'s component rules (character cards,
+panel headers, stat blocks) to `color-mix()` expressions on the Cold Steel
+namespace — Phase 1 only converted `:root` variable definitions and fonts, not
+these embedded literals, so faint amber tints were still leaking through on
+card backgrounds/glows despite borders and text already looking correct.
+Small spacing/contrast polish: tighter `.stat-grid` spacing, stronger
+`.panel-header` visual separation from body content. No layout/markup
+changes — deeper hub restructuring (zoned roster/merchants/hoard layout,
+folding `skill-tree.js` onto the Bootstrap Modal API) deferred to a later
+pass. Design: `specs/2026-06-19-phase2-hub-visual-hierarchy-design.md`.
+Next: Phase 3 (Three.js dungeon view).
+
 ## Known issues / cleanup (not blockers)
 - [x] **Test-DB targeting quirk — FIXED ✅:** `conftest.py` now sets `DATABASE_URL`
       from `TEST_DATABASE_URL` *before* importing `app`, so `pytest` with only
