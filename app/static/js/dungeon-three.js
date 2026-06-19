@@ -232,7 +232,10 @@ class DungeonCanvasThree {
     setEntities(entities) {
         this.entities = entities;
 
-        this.entitySprites.forEach((sprite) => this.scene.remove(sprite));
+        this.entitySprites.forEach((sprite) => {
+            this.scene.remove(sprite);
+            sprite.material.dispose();
+        });
         this.entitySprites = [];
 
         if (!this.playerPos) {
