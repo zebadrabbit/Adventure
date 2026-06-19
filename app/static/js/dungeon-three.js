@@ -12,6 +12,8 @@ const FRUSTUM_HALF_SIZE = 10; // world units at zoom = 1.0
 const CAMERA_RADIUS = 12; // world units
 const CAMERA_ELEVATION_DEG = 55;
 const CAMERA_AZIMUTH_DEG = 45;
+const OUTER_VIS_RADIUS = 26; // matches dungeon-canvas.js's default fogConfig.fullRadius
+const ENTITY_DEFAULT_ICON = '/static/iconography/goblin-scout-t1.svg';
 
 const TILE_COLORS = {
     room: 0x2d3340,
@@ -219,6 +221,27 @@ class DungeonCanvasThree {
 
     setEntities(entities) {
         this.entities = entities;
+
+        this.entitySprites.forEach((sprite) => this.scene.remove(sprite));
+        this.entitySprites = [];
+
+        if (!this.playerPos) {
+            this._renderFrame();
+            return;
+        }
+
+        entities.forEach((entity) => {
+            const dist = Math.hypot(entity.x - this.playerPos.x, entity.y - this.playerPos.y);
+            if (dist > OUTER_VIS_RADIUS) {
+                return;
+            }
+            const sprite = this._makeSprite(entity.icon || ENTITY_DEFAULT_ICON);
+            sprite.position.set(entity.x, 0.6, entity.y);
+            this.entitySprites.push(sprite);
+            this.scene.add(sprite);
+        });
+
+        this._renderFrame();
     }
 
     setNotices(notices) {
