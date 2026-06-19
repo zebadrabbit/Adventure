@@ -9,6 +9,10 @@ __pycache__/
 # SQLite / instance data
 instance/
 *.db
+*.sqlite
+
+# Runtime artifacts
+*.pid
 
 # Environments
 .env
