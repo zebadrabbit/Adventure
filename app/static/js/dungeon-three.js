@@ -209,6 +209,12 @@ class DungeonCanvasThree {
 
     updatePlayerPosition(x, y) {
         this.playerPos = { x, y };
+        if (!this.playerSprite) {
+            this.playerSprite = this._makeSprite('/static/iconography/axe-sword.svg');
+            this.scene.add(this.playerSprite);
+        }
+        this.playerSprite.position.set(x, 0.6, y);
+        this.centerOnPlayer();
     }
 
     setEntities(entities) {
@@ -266,7 +272,9 @@ class DungeonCanvasThree {
     }
 
     centerOnPlayer() {
-        // No-op in this milestone (no player rendering/camera-follow yet).
+        if (!this.playerPos) return;
+        this._positionCamera(new THREE.Vector3(this.playerPos.x, 0, this.playerPos.y));
+        this._renderFrame();
     }
 }
 
