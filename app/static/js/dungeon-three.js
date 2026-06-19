@@ -15,6 +15,22 @@ const CAMERA_AZIMUTH_DEG = 45;
 const OUTER_VIS_RADIUS = 26; // matches dungeon-canvas.js's default fogConfig.fullRadius
 const ENTITY_DEFAULT_ICON = '/static/iconography/goblin-scout-t1.svg';
 
+const INNER_VIS_RADIUS = 8;
+const MIN_FOG_ALPHA = 0.18;
+const MAX_FOG_ALPHA = 0.92;
+const MEMORY_DIM_ALPHA = 0.35;
+
+// 4 discrete buckets approximating dungeon-canvas.js's continuous gradient
+// between INNER_VIS_RADIUS and OUTER_VIS_RADIUS. Each bucket's alpha is the
+// 2D renderer's own formula (MIN_FOG_ALPHA + fogProgress * (MAX_FOG_ALPHA -
+// MIN_FOG_ALPHA)) evaluated at that bucket's distance-range midpoint.
+const FOG_GRADIENT_BUCKETS = [
+    { maxDist: 12.5, alpha: 0.272 },
+    { maxDist: 17, alpha: 0.458 },
+    { maxDist: 21.5, alpha: 0.643 },
+    { maxDist: 26, alpha: 0.828 },
+];
+
 const TILE_COLORS = {
     room: 0x2d3340,
     tunnel: 0x242a36,
@@ -54,6 +70,7 @@ class DungeonCanvasThree {
         this._textureCache = new Map();
         this.playerSprite = null;
         this.entitySprites = [];
+        this.fogMeshes = [];
 
         this._initScene();
     }
@@ -148,6 +165,7 @@ class DungeonCanvasThree {
         }
 
         this._buildTileGrid();
+        this._buildFogOverlay();
         this._positionCamera(new THREE.Vector3(this.width / 2, 0, this.height / 2));
         this._renderFrame();
     }
@@ -204,6 +222,76 @@ class DungeonCanvasThree {
         this.wallMesh = this.tileMeshes.find((m) => m.userData.isWall) || null;
     }
 
+    _buildFogOverlay() {
+        this.fogMeshes.forEach((mesh) => {
+            this.scene.remove(mesh);
+            mesh.material.dispose();
+        });
+        this.fogMeshes = [];
+
+        if (!this.playerPos) {
+            this._renderFrame();
+            return;
+        }
+
+        // bucket key -> { alpha, cells: [{x, y, isWall}] }
+        const cellsByBucket = new Map();
+
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                const cellType = this.grid[y][x];
+                const isWall = WALL_TYPES.has(cellType);
+                if (!FLOOR_TYPES.has(cellType) && !isWall) {
+                    continue;
+                }
+
+                const dist = Math.hypot(x - this.playerPos.x, y - this.playerPos.y);
+                let alpha = null;
+
+                if (dist <= INNER_VIS_RADIUS) {
+                    alpha = null;
+                } else if (dist <= OUTER_VIS_RADIUS) {
+                    const bucket = FOG_GRADIENT_BUCKETS.find((b) => dist <= b.maxDist);
+                    alpha = bucket.alpha;
+                } else if (this.seenTiles.has(`${x},${y}`)) {
+                    alpha = MEMORY_DIM_ALPHA;
+                }
+
+                if (alpha === null) {
+                    continue;
+                }
+
+                const bucketKey = alpha;
+                if (!cellsByBucket.has(bucketKey)) {
+                    cellsByBucket.set(bucketKey, { alpha, cells: [] });
+                }
+                cellsByBucket.get(bucketKey).cells.push({ x, y, isWall });
+            }
+        }
+
+        for (const { alpha, cells } of cellsByBucket.values()) {
+            const material = new THREE.MeshBasicMaterial({
+                color: 0x000000,
+                transparent: true,
+                opacity: alpha,
+            });
+            const geometry = new THREE.PlaneGeometry(1, 1);
+            const mesh = new THREE.InstancedMesh(geometry, material, cells.length);
+            const m = new THREE.Matrix4();
+            cells.forEach((cell, i) => {
+                m.identity();
+                m.makeRotationX(-Math.PI / 2);
+                m.setPosition(cell.x, cell.isWall ? 1.02 : 0.02, cell.y);
+                mesh.setMatrixAt(i, m);
+            });
+            mesh.instanceMatrix.needsUpdate = true;
+            this.fogMeshes.push(mesh);
+            this.scene.add(mesh);
+        }
+
+        this._renderFrame();
+    }
+
     _buildInstancedMesh(cells, geometry, colorHex, placeFn) {
         const material = new THREE.MeshBasicMaterial({ color: colorHex });
         const mesh = new THREE.InstancedMesh(geometry, material, Math.max(cells.length, 1));
@@ -227,6 +315,7 @@ class DungeonCanvasThree {
         }
         this.playerSprite.position.set(x, 0.6, y);
         this.centerOnPlayer();
+        this._buildFogOverlay();
     }
 
     setEntities(entities) {
