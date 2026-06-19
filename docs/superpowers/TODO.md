@@ -176,6 +176,28 @@ any move, visibly dimmed at room corners after moving, default 2D renderer
 unaffected. Design: `specs/2026-06-19-phase3c-threejs-fog-of-war-design.md`.
 Next: Phase 3d (minimap + polish).
 
+### UI Redesign Phase 3d — Three.js minimap ✅
+Added a dedicated, absolutely-positioned `<canvas id="dungeon-minimap-three">`
+element (hidden by default, shown only by `DungeonCanvasThree`'s
+constructor) since a single canvas can't host both a `webgl` and a `2d`
+context — the minimap can't share the main WebGL canvas the way
+`dungeon-canvas.js`'s own minimap shares its 2D canvas. `_renderMinimap()` is
+a direct, mechanical port of `dungeon-canvas.js`'s `renderMinimap()` onto
+this new element's 2D context: explored-tile colors, a gold player-position
+dot, and a border, using the exact same `minimapSize = 120` and color
+constants. Recomputed on `loadMap` and every `updatePlayerPosition` call,
+alongside Phase 3c's fog-overlay recomputation. Verified via Playwright,
+including a cropped screenshot of just the minimap element showing colored
+explored tiles and the gold player dot; also confirmed the minimap/zoom-
+button visual overlap in the top-right corner is pre-existing in the 2D
+renderer too (identical layout), not a regression from this port. This
+closes out Phase 3 (Three.js dungeon view) — `DungeonCanvasThree` now has
+full feature parity with `dungeon-canvas.js` on tiles, entities, movement,
+fog-of-war, and the minimap, while remaining toggle-gated behind
+`?renderer=three` and never the default for real players. Design:
+`specs/2026-06-19-phase3d-threejs-minimap-design.md`.
+Next: Phase 4 (combat visuals), per the roadmap.
+
 ## Known issues / cleanup (not blockers)
 - [x] **Test-DB targeting quirk — FIXED ✅:** `conftest.py` now sets `DATABASE_URL`
       from `TEST_DATABASE_URL` *before* importing `app`, so `pytest` with only
