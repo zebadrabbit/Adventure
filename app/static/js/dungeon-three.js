@@ -94,6 +94,14 @@ class DungeonCanvasThree {
         this.height = data.height;
         this.seed = data.seed;
 
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                if (this.grid[y][x] !== 'unknown') {
+                    this.seenTiles.add(`${x},${y}`);
+                }
+            }
+        }
+
         this._buildTileGrid();
         this._positionCamera(new THREE.Vector3(this.width / 2, 0, this.height / 2));
         this._renderFrame();
@@ -184,14 +192,24 @@ class DungeonCanvasThree {
 
     zoomIn() {
         this.targetZoom = Math.min(MAX_ZOOM, this.targetZoom + ZOOM_STEP);
+        this._applyZoom();
     }
 
     zoomOut() {
         this.targetZoom = Math.max(MIN_ZOOM, this.targetZoom - ZOOM_STEP);
+        this._applyZoom();
     }
 
     resetZoom() {
         this.targetZoom = 1.0;
+        this._applyZoom();
+    }
+
+    _applyZoom() {
+        this.zoom = this.targetZoom;
+        this.camera.zoom = this.zoom;
+        this.camera.updateProjectionMatrix();
+        this._renderFrame();
     }
 
     getCoverage() {
