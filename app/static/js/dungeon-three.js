@@ -100,66 +100,69 @@ class DungeonCanvasThree {
     }
 
     _buildTileGrid() {
-        if (this.floorMesh) {
-            this.scene.remove(this.floorMesh);
-            this.floorMesh.dispose?.();
+        if (this.tileMeshes) {
+            this.tileMeshes.forEach((mesh) => {
+                this.scene.remove(mesh);
+                mesh.dispose?.();
+            });
         }
-        if (this.wallMesh) {
-            this.scene.remove(this.wallMesh);
-            this.wallMesh.dispose?.();
-        }
+        this.tileMeshes = [];
 
-        const floorCells = [];
-        const wallCells = [];
+        // Group cells by exact tile type (one InstancedMesh per type, plain
+        // solid-color material — see commit message for why per-instance
+        // vertexColors was abandoned: MeshBasicMaterial's vertexColors path
+        // multiplies instanceColor against the geometry's own vertex color
+        // attribute, which BoxGeometry/PlaneGeometry don't define, producing
+        // solid black instead of the intended per-instance color).
+        const cellsByType = new Map();
         for (let y = 0; y < this.height; y++) {
             for (let x = 0; x < this.width; x++) {
                 const cellType = this.grid[y][x];
-                if (FLOOR_TYPES.has(cellType)) {
-                    floorCells.push({ x, y, type: cellType });
-                } else if (WALL_TYPES.has(cellType)) {
-                    wallCells.push({ x, y, type: cellType });
+                if (!FLOOR_TYPES.has(cellType) && !WALL_TYPES.has(cellType)) {
+                    // 'cave' and 'unknown' (and anything else unrecognized):
+                    // intentionally skipped, no instance allocated.
+                    continue;
                 }
-                // 'cave' and 'unknown' (and anything else unrecognized):
-                // intentionally skipped, no instance allocated.
+                if (!cellsByType.has(cellType)) {
+                    cellsByType.set(cellType, []);
+                }
+                cellsByType.get(cellType).push({ x, y });
             }
         }
 
-        this.floorMesh = this._buildInstancedMesh(
-            floorCells,
-            new THREE.PlaneGeometry(1, 1),
-            (mesh, i, cell) => {
-                const m = new THREE.Matrix4();
-                m.makeRotationX(-Math.PI / 2);
-                m.setPosition(cell.x, 0, cell.y);
-                mesh.setMatrixAt(i, m);
-                mesh.setColorAt(i, new THREE.Color(TILE_COLORS[cell.type]));
-            }
-        );
+        for (const [cellType, cells] of cellsByType) {
+            const isWall = WALL_TYPES.has(cellType);
+            const geometry = isWall ? new THREE.BoxGeometry(1, 1, 1) : new THREE.PlaneGeometry(1, 1);
+            const yOffset = isWall ? 0.5 : 0;
+            const mesh = this._buildInstancedMesh(cells, geometry, TILE_COLORS[cellType], (m, cell) => {
+                if (!isWall) {
+                    m.makeRotationX(-Math.PI / 2);
+                }
+                m.setPosition(cell.x, yOffset, cell.y);
+            });
+            this.tileMeshes.push(mesh);
+            this.scene.add(mesh);
+        }
 
-        this.wallMesh = this._buildInstancedMesh(
-            wallCells,
-            new THREE.BoxGeometry(1, 1, 1),
-            (mesh, i, cell) => {
-                const m = new THREE.Matrix4();
-                m.setPosition(cell.x, 0.5, cell.y);
-                mesh.setMatrixAt(i, m);
-                mesh.setColorAt(i, new THREE.Color(TILE_COLORS[cell.type]));
-            }
-        );
-
-        this.scene.add(this.floorMesh);
-        this.scene.add(this.wallMesh);
+        // Back-compat aliases for any external code/tests inspecting these by
+        // name (e.g. floor vs. wall tile counts) — point at the first mesh of
+        // each category, or null if that category has no cells this map.
+        this.floorMesh = this.tileMeshes.find((m) => !m.userData.isWall) || null;
+        this.wallMesh = this.tileMeshes.find((m) => m.userData.isWall) || null;
     }
 
-    _buildInstancedMesh(cells, geometry, placeFn) {
-        const material = new THREE.MeshBasicMaterial({ vertexColors: true });
+    _buildInstancedMesh(cells, geometry, colorHex, placeFn) {
+        const material = new THREE.MeshBasicMaterial({ color: colorHex });
         const mesh = new THREE.InstancedMesh(geometry, material, Math.max(cells.length, 1));
         mesh.count = cells.length;
-        cells.forEach((cell, i) => placeFn(mesh, i, cell));
+        mesh.userData.isWall = geometry.type === 'BoxGeometry';
+        const m = new THREE.Matrix4();
+        cells.forEach((cell, i) => {
+            m.identity();
+            placeFn(m, cell);
+            mesh.setMatrixAt(i, m);
+        });
         mesh.instanceMatrix.needsUpdate = true;
-        if (mesh.instanceColor) {
-            mesh.instanceColor.needsUpdate = true;
-        }
         return mesh;
     }
 
