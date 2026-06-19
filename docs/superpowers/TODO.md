@@ -158,6 +158,24 @@ icon onto an offscreen canvas first and wrapping that in a
 `specs/2026-06-19-phase3b-threejs-entity-billboards-design.md`.
 Next: Phase 3c (client-side fog-of-war opacity dimming).
 
+### UI Redesign Phase 3c — Three.js client-side fog-of-war opacity dimming ✅
+Added `_buildFogOverlay()`: buckets every rendered tile by Euclidean distance
+from the player into one of 5 discrete alpha levels (4 gradient buckets
+between `INNER_VIS_RADIUS` (8) and `OUTER_VIS_RADIUS` (26), plus a flat
+`MEMORY_DIM_ALPHA` (0.35) bucket for previously-seen-but-now-distant tiles —
+all constants matching `dungeon-canvas.js` exactly), then builds one
+semi-transparent black `InstancedMesh` per non-empty bucket positioned just
+above each tile's visible top surface. Recomputed on `loadMap` and on every
+`updatePlayerPosition` call. Deliberately approximates the 2D renderer's
+continuous per-pixel gradient with 4 discrete bands rather than porting its
+noise-dithering trick — banding is far less perceptible on 3D geometry at
+this tile density than on a flat 2D canvas; revisit only if live feedback
+says otherwise. Known simplification: wall tiles get top-surface dimming
+only, not per-side-face dimming. Verified via Playwright: undimmed before
+any move, visibly dimmed at room corners after moving, default 2D renderer
+unaffected. Design: `specs/2026-06-19-phase3c-threejs-fog-of-war-design.md`.
+Next: Phase 3d (minimap + polish).
+
 ## Known issues / cleanup (not blockers)
 - [x] **Test-DB targeting quirk — FIXED ✅:** `conftest.py` now sets `DATABASE_URL`
       from `TEST_DATABASE_URL` *before* importing `app`, so `pytest` with only
