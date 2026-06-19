@@ -22,9 +22,9 @@
     position: absolute;
     inset: 0;
     background:
-        radial-gradient(circle at 20% 50%, rgba(212, 165, 116, 0.08) 0%, transparent 50%),
-        radial-gradient(circle at 80% 50%, rgba(193, 122, 58, 0.08) 0%, transparent 50%),
-        radial-gradient(circle at 50% 80%, rgba(139, 111, 71, 0.06) 0%, transparent 50%);
+        radial-gradient(circle at 20% 50%, color-mix(in srgb, var(--dungeon-accent) 8%, transparent) 0%, transparent 50%),
+        radial-gradient(circle at 80% 50%, color-mix(in srgb, var(--dungeon-accent) 8%, transparent) 0%, transparent 50%),
+        radial-gradient(circle at 50% 80%, color-mix(in srgb, var(--dungeon-border) 6%, transparent) 0%, transparent 50%);
     animation: gradientShift 15s ease-in-out infinite;
     pointer-events: none;
 }
@@ -48,8 +48,8 @@
     position: absolute;
     inset: 0;
     background-image:
-        linear-gradient(rgba(212, 165, 116, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(212, 165, 116, 0.03) 1px, transparent 1px);
+        linear-gradient(color-mix(in srgb, var(--dungeon-accent) 3%, transparent) 1px, transparent 1px),
+        linear-gradient(90deg, color-mix(in srgb, var(--dungeon-accent) 3%, transparent) 1px, transparent 1px);
     background-size: 50px 50px;
     mask-image: radial-gradient(ellipse at center, black 20%, transparent 70%);
     pointer-events: none;
@@ -161,8 +161,8 @@
     border: none;
     border-radius: 0.75rem;
     box-shadow:
-        0 4px 14px rgba(212, 165, 116, 0.4),
-        0 0 0 1px rgba(212, 165, 116, 0.1) inset;
+        0 4px 14px color-mix(in srgb, var(--dungeon-accent) 40%, transparent),
+        0 0 0 1px color-mix(in srgb, var(--dungeon-accent) 10%, transparent) inset;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     text-decoration: none;
 }
@@ -170,8 +170,8 @@
 .btn-hero-primary:hover {
     transform: translateY(-2px);
     box-shadow:
-        0 8px 24px rgba(212, 165, 116, 0.5),
-        0 0 0 1px rgba(212, 165, 116, 0.2) inset;
+        0 8px 24px color-mix(in srgb, var(--dungeon-accent) 50%, transparent),
+        0 0 0 1px color-mix(in srgb, var(--dungeon-accent) 20%, transparent) inset;
     color: #0d0a0a;
 }
 
@@ -185,9 +185,9 @@
     padding: 0.875rem 2rem;
     font-size: 1rem;
     font-weight: 600;
-    background: rgba(212, 165, 116, 0.1);
+    background: color-mix(in srgb, var(--dungeon-accent) 10%, transparent);
     color: #d4a574;
-    border: 1px solid rgba(212, 165, 116, 0.2);
+    border: 1px solid color-mix(in srgb, var(--dungeon-accent) 20%, transparent);
     border-radius: 0.75rem;
     backdrop-filter: blur(10px);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -195,8 +195,8 @@
 }
 
 .btn-hero-secondary:hover {
-    background: rgba(212, 165, 116, 0.15);
-    border-color: rgba(212, 165, 116, 0.3);
+    background: color-mix(in srgb, var(--dungeon-accent) 15%, transparent);
+    border-color: color-mix(in srgb, var(--dungeon-accent) 30%, transparent);
     transform: translateY(-2px);
     color: #e8c9a0;
 }
@@ -222,16 +222,16 @@
     font-size: 0.875rem;
     font-weight: 500;
     padding: 0.5rem 1rem;
-    background: rgba(26, 21, 18, 0.5);
-    border: 1px solid rgba(61, 50, 38, 0.5);
+    background: color-mix(in srgb, var(--dungeon-panel) 50%, transparent);
+    border: 1px solid color-mix(in srgb, var(--dungeon-border) 50%, transparent);
     border-radius: 0.5rem;
     transition: all 0.3s ease;
 }
 
 .feature-item:hover {
     color: #d4a574;
-    border-color: rgba(212, 165, 116, 0.3);
-    background: rgba(212, 165, 116, 0.05);
+    border-color: color-mix(in srgb, var(--dungeon-accent) 30%, transparent);
+    background: color-mix(in srgb, var(--dungeon-accent) 5%, transparent);
 }
 
 .feature-item i {
@@ -244,8 +244,8 @@
     position: relative;
     z-index: 10;
     padding: 2rem 0;
-    border-top: 1px solid rgba(61, 50, 38, 0.3);
-    background: rgba(13, 10, 10, 0.8);
+    border-top: 1px solid color-mix(in srgb, var(--dungeon-border) 30%, transparent);
+    background: color-mix(in srgb, var(--dungeon-bg) 80%, transparent);
     backdrop-filter: blur(10px);
 }
 
