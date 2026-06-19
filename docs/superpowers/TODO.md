@@ -115,6 +115,29 @@ folding `skill-tree.js` onto the Bootstrap Modal API) deferred to a later
 pass. Design: `specs/2026-06-19-phase2-hub-visual-hierarchy-design.md`.
 Next: Phase 3 (Three.js dungeon view).
 
+### UI Redesign Phase 3a — Three.js dungeon scene (static tile grid) ✅
+First milestone of the Three.js dungeon view: a toggle-gated
+(`?renderer=three`) scene rendering the dungeon's tile grid at a fixed
+3/4-angle orthographic camera, reading the existing unmodified
+`/api/dungeon/map` contract. Implements `dungeon-canvas.js`'s full public
+method surface so `adventure.js` needed only a one-line renderer-selection
+change — the existing 2D canvas renderer stays the unconditional default
+for every real player session; this is purely a toggle-gated dev preview.
+Real bug found and fixed during live-browser verification: the originally
+planned 2-mesh `InstancedMesh` + `vertexColors`/`setColorAt` approach
+rendered every tile solid black (vertexColors multiplies the per-instance
+color against a per-vertex geometry color attribute that `BoxGeometry`/
+`PlaneGeometry` don't define) — replaced with one `InstancedMesh` per
+distinct tile type (up to 6 for a full map), each with its own plain
+solid-color material. Confirmed working end-to-end via real screenshots
+(a correctly-colored diamond-shaped room with door tiles) and a
+`getCoverage()` cross-check against an independent manual tile count
+(exact match). No player/entity rendering, movement, client-side fog
+dimming, or minimap yet — each is its own follow-up milestone (3b/3c/3d)
+per the roadmap's "room for iteration, not a fixed-scope cutover" guidance
+for this phase. Design: `specs/2026-06-19-phase3a-threejs-dungeon-scene-design.md`.
+Next: Phase 3b (player/entity billboards + movement).
+
 ## Known issues / cleanup (not blockers)
 - [x] **Test-DB targeting quirk — FIXED ✅:** `conftest.py` now sets `DATABASE_URL`
       from `TEST_DATABASE_URL` *before* importing `app`, so `pytest` with only
