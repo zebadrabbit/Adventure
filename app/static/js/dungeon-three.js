@@ -97,10 +97,20 @@ class DungeonCanvasThree {
         if (this._textureCache.has(path)) {
             return this._textureCache.get(path);
         }
-        const texture = new THREE.Texture();
+        // Feeding a loaded SVG <img> directly into a raw THREE.Texture
+        // uploads nothing — WebGLTextures silently rejects it as a texture
+        // source, rendering fully transparent regardless of needsUpdate.
+        // Drawing it onto an offscreen canvas first and wrapping that canvas
+        // in a THREE.CanvasTexture is the approach that actually uploads.
+        const texture = new THREE.CanvasTexture(document.createElement('canvas'));
+        texture.generateMipmaps = false;
+        texture.minFilter = THREE.LinearFilter;
         const img = new Image();
         img.onload = () => {
-            texture.image = img;
+            const canvas = texture.image;
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            canvas.getContext('2d').drawImage(img, 0, 0);
             texture.needsUpdate = true;
             this._renderFrame();
         };
