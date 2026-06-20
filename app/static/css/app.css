@@ -643,4 +643,13 @@ body {
   transform-origin: center center;
 }
 
+/* === Admin Table Scroll Containers ======================================= */
+.table-scroll-300 {
+  max-height: 300px;
+}
+
+.config-value-cell {
+  max-width: 600px;
+}
+
 /* End Consolidated */
