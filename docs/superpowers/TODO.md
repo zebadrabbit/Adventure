@@ -376,6 +376,16 @@ already-noted `glass-theme.css` dead-code follow-up.
       the MP bar entirely for those classes. Came up while discussing whether barbarian
       needs a rage/energy-style alternate resource instead (it currently has none at all —
       not implemented in any form, confirmed by grep across the codebase).
+- [ ] **Combat potions are a shared party pool by accident, not by design** (well, by an
+      explicit "for now" shortcut that was never revisited): `combat_service.py`'s
+      `_base_player_snapshot` only ever reads healing-potion count from `chars[0]`'s
+      inventory ("shared inventory count... for now we only expose ... from the first
+      character's inventory list"), and `player_use_item` always deducts the consumed
+      potion from `Character.query.filter_by(user_id=session.user_id).first()` —
+      character #1, regardless of who actually drank it. Healing correctly applies to the
+      acting character; only the inventory deduction/count-gating is wrong. Also: the
+      "Potion" action is hardcoded to `potion-healing` only (flat 25 HP) — there's no
+      mana-potion action at all.
 - [ ] **Combat instance resolution** uses "most recent DungeonInstance for the user"
       (`combat_service._current_instance_for_user`) — fragile with multiple instances.
 - [ ] **Migrations vs dev DB:** the dev `adventure` DB is in a `create_all` state, so
