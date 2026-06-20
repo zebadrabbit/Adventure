@@ -182,6 +182,29 @@ class CombatEffects {
     }
 
     /**
+     * Basic-attack slash: a brief X-shaped swipe across the target.
+     */
+    showAttackSlash(targetElement) {
+        const el = document.createElement('div');
+        el.className = 'combat-attack-slash';
+        el.innerHTML = '<span class="combat-attack-slash-line combat-attack-slash-line-1"></span>' +
+            '<span class="combat-attack-slash-line combat-attack-slash-line-2"></span>';
+        targetElement.appendChild(el);
+        setTimeout(() => el.remove(), 400);
+    }
+
+    /**
+     * Defend flash: a brief shield icon over the defending character.
+     */
+    showDefendShield(targetElement) {
+        const el = document.createElement('div');
+        el.className = 'combat-defend-shield';
+        el.innerHTML = '<i class="bi bi-shield-fill"></i>';
+        targetElement.appendChild(el);
+        setTimeout(() => el.remove(), 600);
+    }
+
+    /**
      * Particle System for Spell Effects
      */
     createParticles(sourceElement, targetElement, spell) {

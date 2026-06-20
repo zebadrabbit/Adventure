@@ -461,6 +461,19 @@
                 }
             }
         }
+
+        // Show visual effect for a basic attack or defend
+        if (window.combatEffects && action === 'attack') {
+            const monsterPanel = document.getElementById('monster-panel');
+            if (monsterPanel) {
+                window.combatEffects.showAttackSlash(monsterPanel);
+            }
+        } else if (window.combatEffects && action === 'defend') {
+            const casterCard = partyContainer.querySelector(`[data-char-id="${actorId}"]`);
+            if (casterCard) {
+                window.combatEffects.showDefendShield(casterCard);
+            }
+        }
         try {
             const r = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             const j = await r.json();
