@@ -26,7 +26,6 @@ ALLOWED_FILES = {
     "app/templates/admin/users.html",
     "app/templates/admin/combat_settings.html",
     "app/templates/admin/fog_settings.html",
-    "app/templates/admin/server_status.html",
     "app/templates/admin/database.html",
     "app/templates/admin/seed_data.html",
     "app/templates/admin/dungeon_settings.html",
