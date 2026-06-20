@@ -148,4 +148,10 @@
         }
 
     })();
+
+    // Apply server-rendered XP bar fill percentages (kept out of inline
+    // style attrs so templates stay free of style=).
+    document.querySelectorAll('.xp-fill[data-xp-pct]').forEach((bar) => {
+        bar.style.width = bar.dataset.xpPct + '%';
+    });
 })();

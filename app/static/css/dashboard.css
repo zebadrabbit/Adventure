@@ -200,6 +200,9 @@ body {
 /* Operative card XP bar background */
 .xp-bar-anchor {
     background: color-mix(in srgb, var(--ui-bg) 60%, transparent);
+    font-size: 0.85rem;
+    padding: 8px 12px;
+    border: 1px solid var(--dungeon-border);
 }
 
 .chat-messages {
@@ -298,6 +301,85 @@ body {
     background: rgba(0, 0, 0, 0.2);
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     padding: 1rem 1.25rem;
+}
+
+/* === Dashboard inline-style extraction utilities ======================= */
+.icon-warn-lg {
+    font-size: 1.5rem;
+    color: var(--dungeon-warn);
+}
+
+.opacity-85 {
+    opacity: 0.85;
+}
+
+.btn-compact {
+    font-size: 0.85rem;
+    padding: 8px 16px;
+}
+
+.bare-form {
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+.btn-icon-square {
+    padding: 10px 15px;
+}
+
+.party-table-min-height {
+    min-height: 60px;
+}
+
+.section-divider-spacing {
+    margin-top: 50px;
+    margin-bottom: 30px;
+}
+
+.xp-label-dim {
+    color: var(--dungeon-text-dim);
+}
+
+.xp-label-accent {
+    color: var(--dungeon-accent);
+}
+
+.xp-progress-track {
+    height: 6px;
+}
+
+.opacity-70 {
+    opacity: 0.7;
+}
+
+.btn-full-width {
+    width: 100%;
+}
+
+.flex-grow-1-block {
+    flex-grow: 1;
+}
+
+.item-type-tag {
+    opacity: 0.6;
+    margin-left: auto;
+}
+
+.unarmed-placeholder {
+    opacity: 0.5;
+    font-size: 0.85rem;
+    padding: 12px;
+    text-align: center;
+}
+
+.btn-icon-compact {
+    padding: 8px 12px;
+}
+
+.select-operative-label {
+    cursor: pointer;
+    margin: 0;
 }
 
 /* Horizontal rule styling */

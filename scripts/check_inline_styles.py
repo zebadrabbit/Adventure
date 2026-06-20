@@ -18,7 +18,6 @@ TEMPLATES = ROOT / "app" / "templates"
 # *other* existing file gaining a fresh inline style, are still caught below.
 ALLOWED_FILES = {
     "app/templates/admin_themes.html",
-    "app/templates/dashboard.html",
     "app/templates/adventure.html",
 }
 VIOLATIONS = []

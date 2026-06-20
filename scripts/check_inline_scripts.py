@@ -19,7 +19,6 @@ pattern = re.compile(r"<script(?![^>]*\bsrc=)([^>]*)>(.*?)</script>", re.DOTALL 
 # any *other* existing file gaining a fresh inline script, are still caught.
 ALLOWED_FILES = {
     "app/templates/admin_themes.html",
-    "app/templates/dashboard.html",
     "app/templates/adventure.html",
 }
 violations = []

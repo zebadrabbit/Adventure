@@ -23,14 +23,14 @@
     {% if validation_error %}
     <div class="alert-tactical">
         <div class="d-flex align-items-start gap-3">
-            <i class="bi bi-exclamation-triangle-fill" style="font-size: 1.5rem; color: var(--dungeon-warn);"></i>
+            <i class="bi bi-exclamation-triangle-fill icon-warn-lg"></i>
             <div class="flex-grow-1">
                 <strong>[ PARTY FORMATION ERROR ]</strong>
                 <div class="mt-2">{{ validation_error }}</div>
-                <div class="small mt-1" style="opacity: 0.85;">Select adventurers by clicking SELECT on their cards.
+                <div class="small mt-1 opacity-85">Select adventurers by clicking SELECT on their cards.
                 </div>
-                <div class="small" style="opacity: 0.85;">Party size: 1-4 adventurers required.</div>
-                <button type="button" class="tactical-btn-secondary mt-3" style="font-size: 0.85rem; padding: 8px 16px;"
+                <div class="small opacity-85">Party size: 1-4 adventurers required.</div>
+                <button type="button" class="tactical-btn-secondary mt-3 btn-compact"
                     onclick="document.getElementById('autofill-party-btn').click()">
                     {{ svg_icon('shuffle', 16, 'me-1') }} AUTO-FILL PARTY
                 </button>
@@ -55,14 +55,14 @@
                     <h5>{{ svg_icon('plus-circle', 20, 'me-2') }}RECRUIT ADVENTURER</h5>
                 </div>
                 <div class="panel-body">
-                    <form method="POST" class="loadout-form" style="background: none; border: none; padding: 0;">
+                    <form method="POST" class="loadout-form bare-form">
                         <div class="mb-3">
                             <label for="name" class="form-label">Character Name</label>
                             <div class="input-group">
                                 <input type="text" class="form-control" id="name" name="name"
                                     placeholder="Enter adventurer name" required>
-                                <button class="btn tactical-btn-secondary" type="button" id="randomize-name"
-                                    title="Generate random name" style="padding: 10px 15px;">
+                                <button class="btn tactical-btn-secondary btn-icon-square" type="button"
+                                    id="randomize-name" title="Generate random name">
                                     {{ svg_icon('dice-5', 20) }}
                                 </button>
                             </div>
@@ -94,13 +94,13 @@
                     <span class="badge"><span id="party-count">0</span> / 4 READY</span>
                 </div>
                 <div class="panel-body">
-                    <div class="deployment-panel" style="background: none; border: none; padding: 0;">
+                    <div class="deployment-panel bare-form">
                         <div class="party-counter">
                             <h3 id="party-count-display">0/4</h3>
                             <p>Party Members</p>
                         </div>
 
-                        <div id="party-table" class="mb-3" style="min-height: 60px;"></div>
+                        <div id="party-table" class="mb-3 party-table-min-height"></div>
 
                         <form method="POST" id="begin-adventure-form">
                             <input type="hidden" name="form" value="start_adventure">
@@ -222,7 +222,7 @@
     </div>
 
     <!-- Section Divider -->
-    <div class="briefing-header" style="margin-top: 50px; margin-bottom: 30px;">
+    <div class="briefing-header section-divider-spacing">
         <h2>{{ svg_icon('people-fill', 28, 'me-3 align-text-bottom') }}AVAILABLE ADVENTURERS</h2>
         <div class="subtitle">Review attributes // Manage equipment // Select for quest</div>
     </div>
@@ -271,20 +271,19 @@
                     {% set xp_pct = ((c.xp - c.xp_current) / xp_span * 100) if xp_span > 0 else 100 %}
                     {% set xp_pct = xp_pct if xp_pct <= 100 else 100 %}
                     {% set xp_pct = xp_pct if xp_pct >= 0 else 0 %}
-                    <div class="xp-bar-anchor" data-char-id="{{ c.id }}"
-                        style="font-size: 0.85rem; padding: 8px 12px; border: 1px solid var(--dungeon-border);">
+                    <div class="xp-bar-anchor" data-char-id="{{ c.id }}">
                         <div class="d-flex justify-content-between">
-                            <span style="color: var(--dungeon-text-dim);">EXPERIENCE:</span>
-                            <span><span style="color: var(--dungeon-accent);">{{ c.xp }}</span> /
-                                <span style="color: var(--dungeon-text-dim);">{{ c.xp_next }}</span></span>
+                            <span class="xp-label-dim">EXPERIENCE:</span>
+                            <span><span class="xp-label-accent">{{ c.xp }}</span> /
+                                <span class="xp-label-dim">{{ c.xp_next }}</span></span>
                         </div>
-                        <div class="progress mt-1" style="height:6px;">
-                            <div class="progress-bar xp-fill" style="width:{{ xp_pct }}%"></div>
+                        <div class="progress mt-1 xp-progress-track">
+                            <div class="progress-bar xp-fill" data-xp-pct="{{ xp_pct }}"></div>
                         </div>
-                        <span style="opacity: 0.7;">(Next: LV{{ c.level + 1 }})</span>
+                        <span class="opacity-70">(Next: LV{{ c.level + 1 }})</span>
                         {% if c.stat_points and c.stat_points > 0 %}
-                        <button type="button" class="tactical-btn-secondary btn-allocate-stats mt-2"
-                            data-char-id="{{ c.id }}" style="width: 100%;">
+                        <button type="button" class="tactical-btn-secondary btn-allocate-stats mt-2 btn-full-width"
+                            data-char-id="{{ c.id }}">
                             <i class="bi bi-star-fill me-1"></i> Allocate {{ c.stat_points }} Stat Point{{ 's' if c.stat_points != 1 else '' }}
                         </button>
                         {% endif %}
@@ -313,7 +312,7 @@
                     </div>
 
                     <!-- Inventory -->
-                    <div class="stat-block" style="flex-grow: 1;">
+                    <div class="stat-block flex-grow-1-block">
                         <h6>{{ svg_icon('knapsack', 16, 'me-1') }}EQUIPMENT</h6>
                         {% if c.inventory and c.inventory|length > 0 %}
                         <div class="inventory-list">
@@ -336,13 +335,13 @@
                                     {{ svg_icon('chest', 16) }}
                                     {% endif %}
                                     <span>{{ it.name }}</span>
-                                    <span style="opacity: 0.6; margin-left: auto;">[{{ it.type }}]</span>
+                                    <span class="item-type-tag">[{{ it.type }}]</span>
                                 </li>
                                 {% endfor %}
                             </ul>
                         </div>
                         {% else %}
-                        <div style="opacity: 0.5; font-size: 0.85rem; padding: 12px; text-align: center;">
+                        <div class="unarmed-placeholder">
                             [ UNARMED ]
                         </div>
                         {% endif %}
@@ -358,23 +357,23 @@
                         </button>
                     </form>
                     <div class="btn-group">
-                        <button class="tactical-btn-secondary btn-equip-panel" data-char-id="{{ c.id }}"
-                            title="Equipment Panel" style="padding: 8px 12px;">
+                        <button class="tactical-btn-secondary btn-equip-panel btn-icon-compact"
+                            data-char-id="{{ c.id }}" title="Equipment Panel">
                             {{ svg_icon('anvil', 18) }}
                         </button>
-                        <button class="tactical-btn-secondary btn-bag-panel" data-char-id="{{ c.id }}" title="Inventory"
-                            style="padding: 8px 12px;">
+                        <button class="tactical-btn-secondary btn-bag-panel btn-icon-compact" data-char-id="{{ c.id }}"
+                            title="Inventory">
                             {{ svg_icon('knapsack', 18) }}
                         </button>
-                        <button class="tactical-btn-secondary btn-skill-panel" data-char-id="{{ c.id }}"
-                            title="Skill Tree" style="padding: 8px 12px;">
+                        <button class="tactical-btn-secondary btn-skill-panel btn-icon-compact"
+                            data-char-id="{{ c.id }}" title="Skill Tree">
                             {{ svg_icon('star-fill', 18) }}
                         </button>
                     </div>
                     <input type="checkbox" class="party-select d-none" id="char-select-{{ c.id }}" data-id="{{ c.id }}"
                         data-name="{{ c.name }}" data-class="{{ c.class_name }}" {% if session.get('party') %}{% for p
                         in session.get('party') %}{% if p.id==c.id %}checked{% endif %}{% endfor %}{% endif %}>
-                    <label for="char-select-{{ c.id }}" class="select-operative" style="cursor: pointer; margin: 0;">
+                    <label for="char-select-{{ c.id }}" class="select-operative select-operative-label">
                         <span class="select-text">{% if session.get('party') %}{% for p in session.get('party') %}{% if
                             p.id == c.id %}SELECTED{% else %}SELECT{% endif %}{% endfor %}{% else %}SELECT{% endif
                             %}</span>
@@ -432,55 +431,7 @@
 <script src="{{ asset_url('js/seed-widget.js') }}"></script>
 <script src="{{ asset_url('js/dashboard-autofill.js') }}"></script>
 <script src="{{ asset_url('js/character.js') }}"></script>
-<script>
-    // Update select button text when party changes
-    document.addEventListener('DOMContentLoaded', function () {
-        const updateSelectButtons = () => {
-            document.querySelectorAll('.select-operative').forEach(btn => {
-                const isSelected = btn.dataset.selected === 'true' || btn.classList.contains('selected');
-                btn.querySelector('.select-text').textContent = isSelected ? 'SELECTED' : 'SELECT';
-                if (isSelected) {
-                    btn.classList.add('selected');
-                    btn.closest('.operative-card').classList.add('selected');
-                }
-            });
-        };
-
-        // Hook into party selection
-        document.querySelectorAll('.party-select').forEach(checkbox => {
-            checkbox.addEventListener('change', updateSelectButtons);
-        });
-
-        updateSelectButtons();
-
-        // Add equipped item badges
-        if (window.equipmentManager) {
-            document.querySelectorAll('.operative-card').forEach(card => {
-                const charId = card.dataset.id;
-                if (!charId) return;
-
-                // Fetch character data to show equipped count
-                fetch(`/api/characters/${charId}`)
-                    .then(r => r.json())
-                    .then(char => {
-                        const gearCount = Object.keys(char.gear || {}).filter(slot => char.gear[slot]).length;
-                        if (gearCount > 0) {
-                            const equipBtn = card.querySelector('.btn-equip-panel');
-                            if (equipBtn) {
-                                equipBtn.style.position = 'relative';
-                                const badge = document.createElement('span');
-                                badge.className = 'position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success';
-                                badge.style.fontSize = '0.65rem';
-                                badge.textContent = gearCount;
-                                equipBtn.appendChild(badge);
-                            }
-                        }
-                    })
-                    .catch(() => { });
-            });
-        }
-    });
-</script>
+<script src="{{ asset_url('js/dashboard-operative-cards.js') }}"></script>
 
 <!-- Party Management Modal -->
 <div id="partyModal" class="party-modal">
