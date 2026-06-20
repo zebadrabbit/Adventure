@@ -270,17 +270,25 @@ def handle_autofill(existing: list[Character], current_user_id: int):
     created: list[Character] = []
     if needed:
         classes = list(BASE_STATS.keys())
+        def _name_taken(candidate: str) -> bool:
+            return any(c.name == candidate for c in existing) or any(c.name == candidate for c in created)
+
         for _ in range(needed):
             cls = random.choice(classes)
             pool = NAME_POOLS.get(cls, [])
-            base_name = random.choice(pool) if pool else cls.capitalize()
-            suffix = random.randint(100, 999)
-            name = f"{base_name}{suffix}"
-            attempts = 0
-            while attempts < 5 and (any(c.name == name for c in existing) or any(c.name == name for c in created)):
+            # Prefer an unsuffixed pool name — only fall back to a numeric
+            # suffix once every pool name for this class is already taken.
+            shuffled_pool = random.sample(pool, len(pool)) if pool else []
+            name = next((candidate for candidate in shuffled_pool if not _name_taken(candidate)), None)
+            if name is None:
+                base_name = random.choice(pool) if pool else cls.capitalize()
                 suffix = random.randint(100, 999)
                 name = f"{base_name}{suffix}"
-                attempts += 1
+                attempts = 0
+                while attempts < 5 and _name_taken(name):
+                    suffix = random.randint(100, 999)
+                    name = f"{base_name}{suffix}"
+                    attempts += 1
             stats = dict(BASE_STATS.get(cls, BASE_STATS["fighter"]))
             # BASE_STATS["hp"]/["mana"] are legacy flat per-class baselines, not
             # a fresh character's current HP/MP — start at the same computed

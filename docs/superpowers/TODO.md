@@ -393,16 +393,15 @@ already-noted `glass-theme.css` dead-code follow-up.
       dashboard theming pass below if it needs the same treatment. Barbarian still has no
       rage/energy-style alternate resource (confirmed via grep, not implemented in any
       form) — that remains a separate, unscoped feature idea if ever revisited.
-- [ ] **Autofill character names are unrealistic (e.g. "Barbarian735")**: `handle_autofill`
-      in `app/routes/dashboard_helpers.py` (~line 264) always appends a random 3-digit
-      numeric suffix (`random.randint(100, 999)`) to the base name, even when a curated
-      `NAME_POOLS[cls]` fantasy name is available (`app/routes/main.py`) — so the result is
-      always `f"{base_name}{suffix}"` rather than just the pool name, defeating the point
-      of having a name pool. The suffix exists only to dedupe against existing/created
-      character names within the same autofill batch. Fix should prefer trying pool names
-      unsuffixed first (looping through the pool, or shuffling it) and only fall back to a
-      numeric suffix if the pool is exhausted/collides repeatedly — needs a look at how
-      large `NAME_POOLS` actually is per class before deciding the exact dedupe strategy.
+- [x] **Autofill character names are unrealistic (e.g. "Barbarian735")**: fixed two root
+      causes in `handle_autofill` (`app/routes/dashboard_helpers.py`). (1) 6 of 12 classes
+      (barbarian/bard/monk/paladin/sorcerer/warlock) had no `NAME_POOLS` entry at all
+      (`app/routes/main.py`), always falling back to `cls.capitalize()`; added a 12-name
+      fantasy pool for each. (2) the dedupe logic always appended a numeric suffix even
+      when an unused pool name existed — now shuffles the pool and tries unsuffixed names
+      first, only falling back to `f"{base_name}{suffix}"` once the whole pool for that
+      class is taken within the same autofill batch. TDD'd via
+      `tests/test_autofill_name_pools.py`; full suite green (386 passed).
 - [ ] **Ambient encounters need to be a finite per-instance pool, not an infinite random
       roll (real feature, not a quick fix)**: even at the lowered 5%/move rate, the user
       is still getting attacked within 1-3 tiles routinely — but the deeper complaint is
