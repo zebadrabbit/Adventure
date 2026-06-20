@@ -3,6 +3,13 @@
  * Provides floating damage numbers, hit animations, spell effects, and status indicators
  */
 
+function uiColor(name, fallback) {
+    const v = getComputedStyle(document.documentElement)
+        .getPropertyValue(`--ui-${name}`)
+        .trim();
+    return v || fallback;
+}
+
 class CombatEffects {
     constructor() {
         this.effectsContainer = null;
@@ -96,10 +103,10 @@ class CombatEffects {
         // Styling
         let baseColor = color;
         if (!baseColor) {
-            if (isHeal) baseColor = '#4ade80'; // Green
-            else if (isCritical) baseColor = '#fbbf24'; // Yellow/Gold
-            else if (isMiss) baseColor = '#94a3b8'; // Gray
-            else baseColor = '#ef4444'; // Red
+            if (isHeal) baseColor = uiColor('success', '#4caf82');
+            else if (isCritical) baseColor = uiColor('warning', '#d6a23a');
+            else if (isMiss) baseColor = uiColor('text-dim', '#8d97a3');
+            else baseColor = uiColor('danger', '#c0392b');
         }
 
         const fontSize = isCritical ? '2.5rem' : (isMiss ? '1.5rem' : '2rem');
@@ -138,7 +145,7 @@ class CombatEffects {
 
         // Add flash effect
         if (!isMiss) {
-            this.flashElement(targetElement, isHeal ? '#4ade80' : '#ef4444');
+            this.flashElement(targetElement, isHeal ? uiColor('success', '#4caf82') : uiColor('danger', '#c0392b'));
         }
     }
 
@@ -159,7 +166,7 @@ class CombatEffects {
     /**
      * Flash Animation
      */
-    flashElement(element, color = '#ef4444') {
+    flashElement(element, color = uiColor('danger', '#c0392b')) {
         const originalBg = element.style.backgroundColor || '';
         const originalTransition = element.style.transition || '';
 
@@ -335,7 +342,7 @@ class CombatEffects {
         }
 
         // Glow effect on target
-        this.flashElement(targetElement, '#4ade80');
+        this.flashElement(targetElement, uiColor('success', '#4caf82'));
     }
 
     createGenericProjectile(startX, startY, endX, endY) {
