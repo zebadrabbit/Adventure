@@ -48,6 +48,10 @@ ENEMY_SCALING_FILES = [
     "dungeon_affixes_seed.sql",
 ]
 
+MONSTER_CATALOG_FILES = [
+    "monsters_seed.sql",
+]
+
 
 def _augment_item_level_default(line: str, has_level: bool) -> str:
     """Ensure an item VALUES tuple carries (level, rarity, weight).
@@ -250,11 +254,28 @@ def reseed_items(clear_first: bool = False, verbose: bool = True) -> None:
                 if verbose:
                     print(" OK")
 
+        # Load the monster compendium (35+ monsters across all level bands/families/
+        # rarities/bosses already existed in sql/monsters_seed.sql — it was just never
+        # added to a loading list, leaving MonsterCatalog permanently empty and random
+        # encounters unable to roll a monster).
+        for path in _existing_sql_files(MONSTER_CATALOG_FILES):
+            if verbose:
+                print(f"[reseed] Loading {path.name} ...", end="")
+            try:
+                execute_sql_file(path)
+            except Exception as e:
+                if verbose:
+                    print(" ERROR")
+                raise RuntimeError(f"Failed loading {path.name}: {e}") from e
+            else:
+                if verbose:
+                    print(" OK")
+
         if verbose:
             # Quick count summary
             from app.models.dungeon_tier import DungeonAffix, DungeonTier
             from app.models.enemy_archetype import EnemyArchetype
-            from app.models.models import Item
+            from app.models.models import Item, MonsterCatalog
             from app.models.weapon_category import WeaponCategory
 
             total = db.session.query(Item).count()
@@ -262,12 +283,14 @@ def reseed_items(clear_first: bool = False, verbose: bool = True) -> None:
             archetype_count = db.session.query(EnemyArchetype).count()
             tier_count = db.session.query(DungeonTier).count()
             dungeon_affix_count = db.session.query(DungeonAffix).count()
+            monster_count = db.session.query(MonsterCatalog).count()
             print(f"[reseed] Done. Item table now has {total} rows.")
             print(f"[reseed] WeaponCategory table has {weapon_cat_count} rows.")
             print(f"[reseed] EnemyArchetype table has {archetype_count} rows.")
             print(f"[reseed] DungeonTier table has {tier_count} rows.")
             print(f"[reseed] DungeonAffix table has {dungeon_affix_count} rows.")
             print(f"[reseed] WeaponCategory table has {weapon_cat_count} rows.")
+            print(f"[reseed] MonsterCatalog table has {monster_count} rows.")
 
 
 __all__ = [
