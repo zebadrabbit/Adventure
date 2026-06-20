@@ -177,6 +177,7 @@
 
         let activeCharId = null;
         let activeMember = null;
+        let activeContainer = null;
 
         party.forEach(mem => {
             // Clone template
@@ -194,6 +195,7 @@
                 card.setAttribute('aria-current', 'true');
                 activeCharId = mem.char_id;
                 activeMember = mem;
+                activeContainer = container;
             }
 
             // Update data fields
@@ -247,9 +249,14 @@
             partyContainer.appendChild(clone);
         });
 
-        // Setup centralized action panel
+        // Setup centralized action panel — attach it directly under whichever
+        // character card is currently active, instead of leaving it as a
+        // static block below the whole party list.
         if (actionPanel && activeCharId && activeMember) {
             const canAct = state.status === 'active';
+            if (activeContainer) {
+                activeContainer.appendChild(actionPanel);
+            }
             actionPanel.style.display = 'block';
             if (activeCharName) {
                 activeCharName.textContent = '- ' + (activeMember.name || 'Hero');
