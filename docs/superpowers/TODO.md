@@ -383,9 +383,19 @@ already-noted `glass-theme.css` dead-code follow-up.
       feature items, footer links). Mapped each to the matching `var(--dungeon-*)` Cold
       Steel alias. Mechanical literal sweep, same category as the navbar/`app.css` fixes —
       didn't need a separate brainstorm. The one remaining hex (`#a5b4fc`, indigo hero-badge
-      accent) is an unrelated distinct accent, left alone. No layout/structural changes were
-      needed or made — if the landing page still feels off after this, that would be a real
-      layout/structure complaint warranting its own brainstorm, not another literal sweep.
+      accent) is an unrelated distinct accent, left alone.
+- [x] **Landing page hero layout redesign** — the user did come back with the predicted
+      "still feels weirdly placed and awkward" layout complaint, so this got its own
+      brainstorm (with the visual companion: 3 mockup directions, user picked the
+      asymmetric split outright). Restructured the single centered hero stack
+      (badge/title/description/CTAs/four-inline-icons) into a two-column split: text
+      content left, four feature highlights upgraded from small inline icons to bordered
+      cards stacked right; collapses to text-first-then-cards on `<lg` via Bootstrap's
+      existing grid order (no extra media query needed). Navbar/header/footer stay
+      intentionally hidden on this page (confirmed deliberate, not a bug) — unchanged. No
+      copy changes. Spec:
+      `docs/superpowers/specs/2026-06-20-landing-hero-layout-design.md`. Template/CSS-only,
+      no automated tests; full suite green (388 passed).
 - [x] **Dashboard hub layout & flow** — fixed the concrete complaint ("dashboard
       location of items, redesign the layout to flow better"): Merchants/Hoard/
       Party-Management/Achievements were stacked vertically inside the Party Roster
