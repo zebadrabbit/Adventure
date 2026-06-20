@@ -398,16 +398,16 @@ already-noted `glass-theme.css` dead-code follow-up.
       Worth checking whether this is specific to spell casts (vs. basic attack/defend,
       which don't seem to trigger it) — `combat.js`'s spell-effect path
       (`createParticles`/`doAction`'s `cast_firebolt` branch) is the obvious place to start.
-- [ ] **Combat potions are a shared party pool by accident, not by design** (well, by an
-      explicit "for now" shortcut that was never revisited): `combat_service.py`'s
-      `_base_player_snapshot` only ever reads healing-potion count from `chars[0]`'s
-      inventory ("shared inventory count... for now we only expose ... from the first
-      character's inventory list"), and `player_use_item` always deducts the consumed
-      potion from `Character.query.filter_by(user_id=session.user_id).first()` —
-      character #1, regardless of who actually drank it. Healing correctly applies to the
-      acting character; only the inventory deduction/count-gating is wrong. Also: the
-      "Potion" action is hardcoded to `potion-healing` only (flat 25 HP) — there's no
-      mana-potion action at all.
+- [x] **Combat potions were a shared party pool — FIXED ✅**: `item_counts["potion-
+      healing"]` changed from a flat int (always `chars[0]`'s count) to a per-character
+      dict; `player_use_item` now deducts from the *acting* character's own row.
+      `_potion_counts_by_character()` helper used consistently at session start, after
+      loot rewards, and in `combat_api.py`'s legacy backfill path. Tests:
+      `tests/test_potions_per_character.py` (2 passed, TDD — first run was a false
+      positive because the random seed happened to make character #1 act first,
+      coincidentally matching the bug; re-biased initiative to expose it for real).
+      Still true and unaddressed: the "Potion" action is hardcoded to `potion-healing`
+      only (flat 25 HP) — there's no mana-potion action at all.
 - [ ] **Combat instance resolution** uses "most recent DungeonInstance for the user"
       (`combat_service._current_instance_for_user`) — fragile with multiple instances.
 - [ ] **Migrations vs dev DB:** the dev `adventure` DB is in a `create_all` state, so

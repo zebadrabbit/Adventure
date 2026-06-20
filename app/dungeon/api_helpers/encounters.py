@@ -37,7 +37,7 @@ def _load_spawn_config():
 
     Structure:
       {
-        "base": float   # base per-move spawn probability (default 0.15, admin-configurable)
+        "base": float   # base per-move spawn probability (default 0.05, admin-configurable)
         "streak_bonus_max": float  # cap for streak-based bonus added progressively
         "streak_unit": int  # multiplier for miss streak -> bonus scaling
       }
@@ -47,7 +47,7 @@ def _load_spawn_config():
 
     from app.models import GameConfig as _GC
 
-    base_cfg = {"base": 0.15, "streak_bonus_max": 0.035, "streak_unit": 2}
+    base_cfg = {"base": 0.05, "streak_bonus_max": 0.035, "streak_unit": 2}
 
     # First, try to load from admin panel game_rules.encounter_spawn_rate
     admin_rate = _GC.get("game_rules.encounter_spawn_rate")
