@@ -31,6 +31,78 @@
     padding: 0;
     font-size: 16px;
   }
+
+  #dungeon-minimap-three {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
+    display: none;
+    border-radius: 4px;
+  }
+
+  #hotkeys-panel {
+    display: none;
+    max-width: 300px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    z-index: 100;
+  }
+
+  #adventure-action-panel {
+    min-width: 110px;
+  }
+
+  .party-card-compact {
+    font-size: 0.85rem;
+  }
+
+  .party-card-header,
+  .party-card-body {
+    padding: 8px 12px;
+  }
+
+  .class-icon-slot {
+    width: 20px;
+    height: 20px;
+  }
+
+  .class-icon-slot img {
+    width: 18px;
+    height: 18px;
+  }
+
+  .avatar-circle-sm {
+    font-size: 0.7rem;
+  }
+
+  .party-card-name {
+    font-size: 0.95rem;
+  }
+
+  .party-card-badge {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+  }
+
+  .party-stat-bar {
+    height: 0.9rem;
+    font-size: 0.7rem;
+  }
+
+  .party-stat-bar-fill {
+    line-height: 0.9rem;
+  }
+
+  .last-roll-line {
+    min-height: 1rem;
+    font-size: 0.7rem;
+  }
+
+  .party-card-action-btn {
+    padding: 4px 10px;
+    font-size: 0.75rem;
+  }
 </style>
 <div class="mission-briefing">
   <div class="row">
@@ -54,15 +126,13 @@
         <div class="panel-body position-relative">
           <div class="position-relative">
             <canvas id="dungeon-map" class="map-fluid-fixed-height mb-2" width="800" height="600"></canvas>
-            <canvas id="dungeon-minimap-three" width="120" height="120"
-              style="position: absolute; top: 10px; right: 10px; z-index: 10; display: none; border-radius: 4px;"></canvas>
+            <canvas id="dungeon-minimap-three" width="120" height="120"></canvas>
             <div class="map-controls" id="map-controls-panel">
               <button id="btn-zoom-in" class="btn btn-sm btn-dark" title="Zoom In">+</button>
               <button id="btn-zoom-out" class="btn btn-sm btn-dark" title="Zoom Out">−</button>
               <button id="btn-zoom-reset" class="btn btn-sm btn-dark" title="Reset View">⌂</button>
             </div>
-            <div id="hotkeys-panel" class="position-absolute top-0 start-0 p-3 bg-dark text-light"
-              style="display: none; max-width: 300px; border-radius: 4px; font-size: 0.85rem; z-index: 100;">
+            <div id="hotkeys-panel" class="position-absolute top-0 start-0 p-3 bg-dark text-light">
               <div class="d-flex justify-content-between align-items-center mb-2">
                 <strong>Hotkeys</strong>
                 <button id="btn-close-hotkeys" class="btn btn-sm btn-close btn-close-white"></button>
@@ -82,7 +152,7 @@
           </div>
           <div id="dungeon-controls" class="mb-3">
             <div class="d-flex align-items-start gap-3">
-              <div id="adventure-action-panel" class="d-flex flex-column gap-2 me-1" style="min-width:110px;">
+              <div id="adventure-action-panel" class="d-flex flex-column gap-2 me-1">
                 <button id="btn-search" type="button" class="tactical-btn-primary w-100"
                   title="Search the current tile for hidden treasures (2 turns)">Search</button>
                 <button id="btn-party-inventory" type="button" class="tactical-btn-info w-100"
@@ -111,62 +181,54 @@
         {% for m in party %}
         {% set class_lower = m.class.lower() %}
         <div
-          class="operative-card border-{{ class_lower if class_lower in ['fighter','rogue','mage','cleric','druid','ranger'] else 'secondary' }}"
-          style="font-size: 0.85rem;">
-          <div class="operative-header d-flex align-items-center justify-content-between" style="padding: 8px 12px;">
+          class="operative-card party-card-compact border-{{ class_lower if class_lower in ['fighter','rogue','mage','cleric','druid','ranger'] else 'secondary' }}">
+          <div class="operative-header party-card-header d-flex align-items-center justify-content-between">
             <div class="d-flex align-items-center gap-2">
-              <span class="u-flex-center" style="width: 20px; height: 20px;">
+              <span class="u-flex-center class-icon-slot">
                 {% if class_lower == 'fighter' %}
-                <img src="{{ url_for('static', filename='iconography/swords-power.svg') }}" alt="Fighter"
-                  style="width: 18px; height: 18px;">
+                <img src="{{ url_for('static', filename='iconography/swords-power.svg') }}" alt="Fighter">
                 {% elif class_lower == 'mage' %}
-                <img src="{{ url_for('static', filename='iconography/fire-silhouette.svg') }}" alt="Mage"
-                  style="width: 18px; height: 18px;">
+                <img src="{{ url_for('static', filename='iconography/fire-silhouette.svg') }}" alt="Mage">
                 {% elif class_lower == 'rogue' %}
-                <img src="{{ url_for('static', filename='iconography/rogue.svg') }}" alt="Rogue"
-                  style="width: 18px; height: 18px;">
+                <img src="{{ url_for('static', filename='iconography/rogue.svg') }}" alt="Rogue">
                 {% elif class_lower == 'druid' %}
-                <img src="{{ url_for('static', filename='iconography/heavy-thorny-triskelion.svg') }}" alt="Druid"
-                  style="width: 18px; height: 18px;">
+                <img src="{{ url_for('static', filename='iconography/heavy-thorny-triskelion.svg') }}" alt="Druid">
                 {% elif class_lower == 'cleric' %}
-                <img src="{{ url_for('static', filename='iconography/aura.svg') }}" alt="Cleric"
-                  style="width: 18px; height: 18px;">
+                <img src="{{ url_for('static', filename='iconography/aura.svg') }}" alt="Cleric">
                 {% elif class_lower == 'ranger' %}
-                <img src="{{ url_for('static', filename='iconography/bowman.svg') }}" alt="Ranger"
-                  style="width: 18px; height: 18px;">
+                <img src="{{ url_for('static', filename='iconography/bowman.svg') }}" alt="Ranger">
                 {% else %}
-                <span class="avatar-circle" style="font-size: 0.7rem;">{{ m.name[0]|upper }}</span>
+                <span class="avatar-circle avatar-circle-sm">{{ m.name[0]|upper }}</span>
                 {% endif %}
               </span>
-              <h6 class="mb-0 fw-bold" style="font-size: 0.95rem;">{{ m.name }}</h6>
+              <h6 class="mb-0 fw-bold party-card-name">{{ m.name }}</h6>
             </div>
             <div class="d-flex gap-1">
-              <span class="badge class-badge-{{ class_lower }}" style="font-size: 0.7rem; padding: 2px 6px;">{{ m.class
+              <span class="badge class-badge-{{ class_lower }} party-card-badge">{{ m.class
                 }}</span>
-              <span class="badge" style="font-size: 0.7rem; padding: 2px 6px;">Lv {{ m.level or 1 }}</span>
+              <span class="badge party-card-badge">Lv {{ m.level or 1 }}</span>
             </div>
           </div>
-          <div class="operative-body" style="padding: 8px 12px;">
+          <div class="operative-body party-card-body">
             <div class="mb-1">
-              <div class="progress hp-bar mb-1" data-hp="{{ m.hp }}" data-hp-max="{{ m.hp_max }}" aria-label="HP"
-                style="height: 0.9rem; font-size: 0.7rem;">
-                <div class="progress-bar hp-fill" data-bar="hp" style="line-height: 0.9rem;">HP {{ m.hp }}/{{ m.hp_max
+              <div class="progress hp-bar mb-1 party-stat-bar" data-hp="{{ m.hp }}" data-hp-max="{{ m.hp_max }}"
+                aria-label="HP">
+                <div class="progress-bar hp-fill party-stat-bar-fill" data-bar="hp">HP {{ m.hp }}/{{ m.hp_max
                   }}</div>
               </div>
-              <div class="progress mana-bar mb-1" data-mana="{{ m.mana }}" data-mana-max="{{ m.mana_max }}"
-                aria-label="Mana" style="height: 0.9rem; font-size: 0.7rem;">
-                <div class="progress-bar mana-fill" data-bar="mana" style="line-height: 0.9rem;">MP {{ m.mana }}/{{
+              <div class="progress mana-bar mb-1 party-stat-bar" data-mana="{{ m.mana }}" data-mana-max="{{ m.mana_max }}"
+                aria-label="Mana">
+                <div class="progress-bar mana-fill party-stat-bar-fill" data-bar="mana">MP {{ m.mana }}/{{
                   m.mana_max }}</div>
               </div>
             </div>
-            <div class="text-warning small last-roll-line" data-char-id="{{ m.id }}" aria-live="polite"
-              style="min-height: 1rem; font-size: 0.7rem;"></div>
+            <div class="text-warning small last-roll-line" data-char-id="{{ m.id }}" aria-live="polite"></div>
             <div class="d-flex justify-content-end mt-1">
               <div class="btn-group btn-group-sm" role="group" aria-label="Character actions">
-                <button class="tactical-btn-secondary btn-equip-panel" data-char-id="{{ m.id }}" aria-label="Equipment"
-                  title="Equipment" style="padding: 4px 10px; font-size: 0.75rem;"><i class="bi bi-box"></i></button>
-                <button class="tactical-btn-secondary btn-bag-panel" data-char-id="{{ m.id }}" aria-label="Bags"
-                  title="Bags" style="padding: 4px 10px; font-size: 0.75rem;"><i class="bi bi-bag"></i></button>
+                <button class="tactical-btn-secondary btn-equip-panel party-card-action-btn" data-char-id="{{ m.id }}"
+                  aria-label="Equipment" title="Equipment"><i class="bi bi-box"></i></button>
+                <button class="tactical-btn-secondary btn-bag-panel party-card-action-btn" data-char-id="{{ m.id }}"
+                  aria-label="Bags" title="Bags"><i class="bi bi-bag"></i></button>
               </div>
             </div>
           </div>
@@ -198,185 +260,7 @@
   <script src="{{ asset_url('js/tooltips.js') }}"></script>
   <script src="{{ asset_url('js/equipment.js') }}"></script>
   <script src="{{ asset_url('js/time-widget.js') }}"></script>
-  <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      // Wire static Search, Camp & Hearth buttons (now left of log)
-      (function bindActionButtons() {
-        const searchBtn = document.getElementById('btn-search');
-        const partyInventoryBtn = document.getElementById('btn-party-inventory');
-        const campBtn = document.getElementById('btn-camp');
-        const hearthBtn = document.getElementById('btn-hearth');
-        function appendLog(msg, cls) {
-          try { const out = document.getElementById('dungeon-output'); if (!out) return; const div = document.createElement('div'); div.textContent = msg; if (cls) div.className = cls; out.appendChild(div); div.scrollIntoView({ block: 'nearest' }); } catch (e) { }
-        }
-        if (searchBtn) {
-          searchBtn.addEventListener('click', () => {
-            // Use the global doSearchTile function
-            if (window.doSearchTile) {
-              window.doSearchTile(searchBtn);
-            } else {
-              // Fallback if function not loaded yet
-              searchBtn.disabled = true;
-              fetch('/api/dungeon/search_tile', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
-                .then(r => r.json().catch(() => ({ error: 'bad json' })))
-                .then(j => {
-                  if (j && j.message) appendLog(j.message);
-                  if (j && j.revealed_caches > 0) {
-                    appendLog(`Revealed ${j.revealed_caches} hidden cache(s)!`, 'text-success');
-                    if (window.refreshEntities) window.refreshEntities();
-                  }
-                  if (j && j.encounter && j.encounter.combat_id) { window.location.href = '/combat/' + j.encounter.combat_id; }
-                })
-                .catch(() => appendLog('Search failed (network error)', 'text-danger'))
-                .finally(() => { searchBtn.disabled = false; });
-            }
-          });
-        }
-        if (campBtn) {
-          campBtn.addEventListener('click', () => {
-            campBtn.disabled = true;
-            fetch('/api/dungeon/camp', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
-              .then(r => r.json().catch(() => ({ error: 'bad json' })))
-              .then(j => {
-                if (j && j.message) appendLog(j.message);
-                if (j && j.restored_hp_total) appendLog(`Party recovers ${j.restored_hp_total} HP collectively.`, `text-success small`);
-                if (j && j.encounter && j.encounter.combat_id) { window.location.href = '/combat/' + j.encounter.combat_id; }
-              })
-              .catch(() => appendLog('Camp failed (network error)', 'text-danger'))
-              .finally(() => { campBtn.disabled = false; });
-          });
-        }
-        if (hearthBtn) {
-          hearthBtn.addEventListener('click', () => {
-            if (!confirm('Hearth and abandon this dungeon run? Penalties will apply.')) return;
-            hearthBtn.disabled = true;
-            fetch('/api/dungeon/hearth', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
-              .then(r => r.json().catch(() => ({ error: 'bad json' })))
-              .then(j => {
-                if (j && j.message) appendLog(j.message, 'text-warning');
-                setTimeout(() => { window.location.href = '/dashboard'; }, 1200);
-              })
-              .catch(() => appendLog('Hearth failed (network error)', 'text-danger'))
-              .finally(() => { hearthBtn.disabled = false; });
-          });
-        }
-        if (partyInventoryBtn) {
-          partyInventoryBtn.addEventListener('click', () => {
-            // Show party stash modal (simplified for now - can be expanded)
-            alert('Party Stash feature coming soon! This will show shared gold and items that party members can contribute to and withdraw from.');
-          });
-        }
-      })();
-
-      // Toggle map controls visibility
-      (function bindMapControlsToggle() {
-        const toggleBtn = document.getElementById('btn-toggle-controls');
-        const controlsPanel = document.getElementById('map-controls-panel');
-        if (toggleBtn && controlsPanel) {
-          toggleBtn.addEventListener('click', () => {
-            const isHidden = controlsPanel.style.display === 'none';
-            controlsPanel.style.display = isHidden ? '' : 'none';
-            toggleBtn.classList.toggle('active', isHidden);
-          });
-        }
-      })();
-
-      // Hotkeys panel toggle
-      (function bindHotkeysPanel() {
-        const showBtn = document.getElementById('btn-show-hotkeys');
-        const closeBtn = document.getElementById('btn-close-hotkeys');
-        const panel = document.getElementById('hotkeys-panel');
-        if (showBtn && panel) {
-          showBtn.addEventListener('click', () => {
-            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-          });
-        }
-        if (closeBtn && panel) {
-          closeBtn.addEventListener('click', () => {
-            panel.style.display = 'none';
-          });
-        }
-      })();
-
-      // Keyboard shortcuts
-      (function bindKeyboardShortcuts() {
-        document.addEventListener('keydown', (e) => {
-          // Don't trigger if user is typing in an input
-          if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-
-          const key = e.key.toLowerCase();
-
-          // Movement
-          if (key === 'w' || key === 'arrowup') {
-            e.preventDefault();
-            const btn = document.querySelector('[data-dir="n"]');
-            if (btn && !btn.disabled) btn.click();
-          } else if (key === 's' || key === 'arrowdown') {
-            e.preventDefault();
-            const btn = document.querySelector('[data-dir="s"]');
-            if (btn && !btn.disabled) btn.click();
-          } else if (key === 'a' || key === 'arrowleft') {
-            e.preventDefault();
-            const btn = document.querySelector('[data-dir="w"]');
-            if (btn && !btn.disabled) btn.click();
-          } else if (key === 'd' || key === 'arrowright') {
-            e.preventDefault();
-            const btn = document.querySelector('[data-dir="e"]');
-            if (btn && !btn.disabled) btn.click();
-          }
-          // Actions
-          else if (key === ' ') {
-            e.preventDefault();
-            const searchBtn = document.getElementById('btn-search');
-            if (searchBtn && !searchBtn.disabled) searchBtn.click();
-          } else if (key === 'c') {
-            const campBtn = document.getElementById('btn-camp');
-            if (campBtn && !campBtn.disabled) campBtn.click();
-          } else if (key === 'h') {
-            const hearthBtn = document.getElementById('btn-hearth');
-            if (hearthBtn && !hearthBtn.disabled) hearthBtn.click();
-          } else if (key === 'i') {
-            // Open first character's bag panel
-            const bagBtn = document.querySelector('.btn-bag-panel');
-            if (bagBtn) bagBtn.click();
-          } else if (key === 'escape') {
-            // Close hotkeys panel
-            const panel = document.getElementById('hotkeys-panel');
-            if (panel && panel.style.display !== 'none') {
-              panel.style.display = 'none';
-            }
-          }
-        });
-      })();
-
-      function clamp(v, min, max) { return v < min ? min : (v > max ? max : v); }
-      document.querySelectorAll('.hp-bar').forEach(w => {
-        const hp = parseFloat(w.getAttribute('data-hp')) || 0;
-        const max = parseFloat(w.getAttribute('data-hp-max')) || 0;
-        const pct = max > 0 ? clamp((hp / max) * 100, 0, 100) : 0;
-        const hue = Math.floor(120 * (pct / 100)); // 120 green -> 0 red
-        const fill = w.querySelector('[data-bar="hp"]');
-        if (fill) {
-          fill.style.width = pct.toFixed(1) + '%';
-          fill.style.backgroundColor = 'hsl(' + hue + ',70%,45%)';
-          fill.style.transition = 'width 0.3s ease-in-out, background-color 0.3s ease-in-out';
-        }
-      });
-      document.querySelectorAll('.mana-bar').forEach(w => {
-        const mana = parseFloat(w.getAttribute('data-mana')) || 0;
-        const max = parseFloat(w.getAttribute('data-mana-max')) || 0;
-        const pct = max > 0 ? clamp((mana / max) * 100, 0, 100) : 0;
-        const fill = w.querySelector('[data-bar="mana"]');
-        if (fill) {
-          fill.style.width = pct.toFixed(1) + '%';
-          fill.style.backgroundColor = '#3b82f6'; // Consistent blue color
-          fill.style.transition = 'width 0.3s ease-in-out';
-        }
-      });
-
-      // Equipment/Bags buttons now handled by equipment.js (same as dashboard)
-    });
-  </script>
+  <script src="{{ asset_url('js/adventure-controls.js') }}"></script>
   <!-- Modals are now handled by equipment.js -->
 
   <!-- Templates for dynamic content -->
@@ -412,7 +296,7 @@
             <div class="alert alert-warning mt-3" id="extraction-warning">
               <strong>Warning:</strong> Characters left behind will suffer <strong>PERMADEATH</strong>!
             </div>
-            <div class="alert alert-info mt-2" id="extraction-penalties" style="display:none;">
+            <div class="alert alert-info mt-2 d-none" id="extraction-penalties">
               <strong>Early Extraction Penalties:</strong>
               <ul class="mb-0">
                 <li>XP Loss: <span id="xp-penalty">30%</span></li>
@@ -431,164 +315,5 @@
     </div>
   </div>
 
-  <script>
-    // Extraction Modal Handler
-    document.addEventListener('DOMContentLoaded', () => {
-      const hearthBtn = document.getElementById('btn-hearth');
-      const extractionModal = new bootstrap.Modal(document.getElementById('extractionModal'));
-
-      if (hearthBtn) {
-        hearthBtn.addEventListener('click', async () => {
-          // Load extraction status
-          try {
-            const resp = await fetch('/api/dungeon/extraction/status');
-            const data = await resp.json();
-
-            const statusDiv = document.getElementById('extraction-status');
-            const charactersDiv = document.getElementById('extraction-characters');
-            const confirmBtn = document.getElementById('btn-confirm-extraction');
-            const penaltiesDiv = document.getElementById('extraction-penalties');
-
-            if (data.characters && data.characters.length > 0) {
-              statusDiv.classList.add('d-none');
-              charactersDiv.classList.remove('d-none');
-
-              // Show penalties if early extraction
-              if (!data.all_bosses_defeated && data.penalties) {
-                penaltiesDiv.style.display = 'block';
-                const xpPenalty = Math.round((1 - data.penalties.xp_multiplier) * 100);
-                const lootPenalty = Math.round((1 - data.penalties.loot_quality_multiplier) * 100);
-                document.getElementById('xp-penalty').textContent = xpPenalty + '%';
-                document.getElementById('loot-penalty').textContent = lootPenalty + '%';
-              }
-
-              // Build character selection list
-              const charList = document.getElementById('character-selection-list');
-              charList.innerHTML = '';
-
-              const livingChars = data.characters.filter(c => !c.is_dead);
-
-              data.characters.forEach(char => {
-                const div = document.createElement('div');
-                div.className = 'form-check d-flex align-items-center justify-content-between';
-
-                const labelHtml = `
-              <div>
-                <input class="form-check-input extraction-char-check" type="checkbox"
-                       value="${char.id}" id="extract-char-${char.id}" checked>
-                <label class="form-check-label" for="extract-char-${char.id}">
-                  ${char.name} (Level ${char.level})
-                  ${char.is_dead ? '<span class="badge bg-danger ms-1">DEAD</span>' : ''}
-                  ${char.permadeath ? '<span class="badge bg-dark ms-1">PERMADEATH</span>' : ''}
-                </label>
-              </div>`;
-
-                let lootBodyHtml = '';
-                if (char.is_dead && livingChars.length > 0) {
-                  lootBodyHtml = `
-              <div class="dropdown">
-                <button class="btn btn-sm btn-outline-warning dropdown-toggle" type="button"
-                        data-bs-toggle="dropdown" id="loot-body-btn-${char.id}">
-                  Loot Body
-                </button>
-                <ul class="dropdown-menu">
-                  ${livingChars.map(lc => `<li><a class="dropdown-item loot-body-target"
-                      href="#" data-downed-id="${char.id}" data-survivor-id="${lc.id}">${lc.name}</a></li>`).join('')}
-                </ul>
-              </div>`;
-                }
-
-                div.innerHTML = labelHtml + lootBodyHtml;
-                charList.appendChild(div);
-              });
-
-              charList.querySelectorAll('.loot-body-target').forEach(link => {
-                link.addEventListener('click', async (ev) => {
-                  ev.preventDefault();
-                  const downedId = parseInt(link.getAttribute('data-downed-id'), 10);
-                  const survivorId = parseInt(link.getAttribute('data-survivor-id'), 10);
-                  const btn = document.getElementById(`loot-body-btn-${downedId}`);
-                  try {
-                    const r = await fetch('/api/dungeon/loot-body', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ downed_id: downedId, survivor_id: survivorId })
-                    });
-                    const res = await r.json();
-                    if (r.ok && res.success) {
-                      btn.outerHTML = '<span class="badge bg-secondary">Looted</span>';
-                      document.dispatchEvent(new CustomEvent('mud-characters-state-invalidated', { detail: { character_id: survivorId } }));
-                    } else {
-                      alert(res.error || 'Loot failed');
-                    }
-                  } catch (err) {
-                    console.error('Loot body failed:', err);
-                    alert('Loot failed (network error)');
-                  }
-                });
-              });
-
-              confirmBtn.disabled = false;
-            } else {
-              statusDiv.innerHTML = '<p class="text-warning">No characters in dungeon.</p>';
-            }
-
-            extractionModal.show();
-          } catch (err) {
-            console.error('Failed to load extraction status:', err);
-            alert('Failed to load extraction status');
-          }
-        });
-      }
-
-      // Handle extraction confirmation
-      const confirmBtn = document.getElementById('btn-confirm-extraction');
-      if (confirmBtn) {
-        confirmBtn.addEventListener('click', async () => {
-          const selectedChars = Array.from(document.querySelectorAll('.extraction-char-check:checked'))
-            .map(cb => parseInt(cb.value));
-
-          if (selectedChars.length === 0) {
-            alert('You must select at least one character to extract');
-            return;
-          }
-
-          try {
-            const resp = await fetch('/api/dungeon/extraction/extract', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ character_ids: selectedChars })
-            });
-
-            const data = await resp.json();
-
-            if (data.success) {
-              const secured = data.result && data.result.secured;
-              const summary = secured
-                ? `Secured ${secured.copper_display} and ${secured.items} item(s) to the Hoard.`
-                : '';
-              const statusDiv = document.getElementById('extraction-status');
-              statusDiv.classList.remove('d-none');
-              document.getElementById('extraction-characters').classList.add('d-none');
-              // data.message and the secured.* summary fields are all server-built from integer
-              // counts/format_copper output (extraction_service.extract_party) -- safe to interpolate
-              // raw today. If any of them ever incorporate a player-chosen string, escape it first.
-              statusDiv.innerHTML = `
-                <div class="alert alert-success">
-                  <strong>${data.message}</strong>
-                  ${summary ? `<div class="mt-1">${summary}</div>` : ''}
-                </div>`;
-              document.getElementById('btn-confirm-extraction').classList.add('d-none');
-              setTimeout(() => { window.location.href = '/dashboard'; }, 1800);
-            } else {
-              alert(data.error || 'Extraction failed');
-            }
-          } catch (err) {
-            console.error('Extraction failed:', err);
-            alert('Extraction failed');
-          }
-        });
-      }
-    });
-  </script>
+  <script src="{{ asset_url('js/adventure-extraction.js') }}"></script>
   {% endblock %}
