@@ -110,8 +110,9 @@ a:hover {
 }
 
 .party-member.border-warning {
-    border-color: color-mix(in srgb, var(--ui-warning) 60%, transparent) !important;
-    box-shadow: 0 0 15px color-mix(in srgb, var(--ui-warning) 40%, transparent);
+    border-color: var(--ui-warning) !important;
+    box-shadow: 0 0 18px color-mix(in srgb, var(--ui-warning) 70%, transparent),
+        0 0 4px color-mix(in srgb, var(--ui-warning) 90%, transparent);
 }
 
 /* Stats bars in party cards */
@@ -441,8 +442,9 @@ a:hover {
 
 /* Active party member highlight */
 .party-member.border-warning {
-    border-color: color-mix(in srgb, var(--ui-warning) 60%, transparent) !important;
-    box-shadow: 0 0 15px color-mix(in srgb, var(--ui-warning) 40%, transparent);
+    border-color: var(--ui-warning) !important;
+    box-shadow: 0 0 18px color-mix(in srgb, var(--ui-warning) 70%, transparent),
+        0 0 4px color-mix(in srgb, var(--ui-warning) 90%, transparent);
 }
 
 /* Trim duplicate timestamp groups visually */
