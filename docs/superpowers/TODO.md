@@ -323,9 +323,11 @@ already-noted `glass-theme.css` dead-code follow-up.
             +6 hp_max into the assertion. Changed to `id = -1` (no real row can collide).
 - [x] **Tracked bytecode — DONE ✅:** the 7 committed `.pyc` files were `git rm --cached`d
       (`__pycache__/` was already gitignored). Working tree stays clean now.
-- [ ] **loot-body has no same-run guard** (`app/routes/hoard_api.py`): transfers a downed
-      ally's bag to any owned character. Enforcing "same run" needs a notion of which run a
-      *living* character is in (only downed characters get `locked_dungeon_id`).
+- [x] **loot-body has no same-run guard — FIXED ✅** (`app/routes/hoard_api.py`): added a
+      guard requiring both `downed_id` and `survivor_id` to be in
+      `session['last_party_ids']` (the current run's party) — the same source-of-truth
+      used by `combat_service.party_is_wiped()`. Tests: `tests/test_hoard_api.py` (5
+      passed, TDD).
 - [x] **Monster HP label never updates — FIXED ✅**: `render()` now updates the actual
       `#monster-hp-text` label instead of writing into `#monster-hp-bar`'s fill div.
       Found and fixed during Phase 4 live verification.
@@ -378,6 +380,11 @@ already-noted `glass-theme.css` dead-code follow-up.
       Not yet scoped — likely a UI Redesign follow-up in the same vein as Phases 1/2/5a
       (sweeping any remaining non-Cold-Steel literals/layout there), but should get its
       own brainstorm to confirm scope before starting.
+- [ ] **Dashboard theme needs a real pass too** ("badly broken", per the user) — same
+      family of work as the landing page item above; not yet scoped. The game-clock
+      widget on the dashboard (`#dashboard-time-tick`, `app/static/js/time-widget.js`) is
+      purely cosmetic/optional (nothing reads the displayed value back for gameplay
+      logic) — safe to remove/restyle/relocate freely as part of this pass.
 - [ ] **Hide the mana bar for manaless classes**: barbarian is the only class with a flat
       `BASE_STATS["mana"]` baseline of 0 (`app/routes/main.py`), but the universally-applied
       `mana_max = 20 + int*2` formula (`dashboard_helpers.py`, `combat_service.py`) always
