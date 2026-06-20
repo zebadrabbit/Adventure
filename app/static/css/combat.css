@@ -23,46 +23,44 @@ a:hover {
 }
 
 /* ========================================
-   GLASS CARD COMPONENTS
+   COLD STEEL CARD COMPONENTS
    ======================================== */
 
 .card-glass {
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: var(--ui-panel);
+    border: 1px solid color-mix(in srgb, var(--ui-accent) 25%, transparent);
     border-radius: 16px;
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    box-shadow: 0 8px 24px 0 color-mix(in srgb, var(--ui-bg) 60%, transparent);
     transition: all 0.3s ease;
 }
 
 .card-glass:hover {
-    border-color: rgba(255, 255, 255, 0.3);
-    box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.45);
+    border-color: color-mix(in srgb, var(--ui-accent) 45%, transparent);
+    box-shadow: 0 12px 32px 0 color-mix(in srgb, var(--ui-bg) 70%, transparent);
 }
 
 .card-header-glass {
     background: linear-gradient(135deg,
-            color-mix(in srgb, var(--adv-primary) 30%, transparent),
-            color-mix(in srgb, var(--adv-secondary) 30%, transparent));
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            color-mix(in srgb, var(--ui-accent) 30%, var(--ui-elevated)),
+            color-mix(in srgb, var(--ui-elevated) 70%, var(--ui-bg)));
+    border-bottom: 1px solid color-mix(in srgb, var(--ui-accent) 25%, transparent);
     padding: 1rem 1.25rem;
     border-radius: 16px 16px 0 0;
-    color: #fff;
+    color: var(--ui-text);
     font-weight: 600;
     font-size: 1rem;
 }
 
 .card-body-glass {
     padding: 1.25rem;
-    color: rgba(255, 255, 255, 0.9);
+    color: var(--ui-text);
 }
 
-/* Badge glass styling */
+/* Badge styling */
 .badge-glass {
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    color: #fff;
+    background: var(--ui-elevated);
+    border: 1px solid color-mix(in srgb, var(--ui-accent) 35%, transparent);
+    color: var(--ui-text);
     padding: 0.35rem 0.65rem;
     font-size: 0.75rem;
     border-radius: 8px;
@@ -72,9 +70,9 @@ a:hover {
 }
 
 .badge-glass-sm {
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    color: #fff;
+    background: var(--ui-elevated);
+    border: 1px solid color-mix(in srgb, var(--ui-accent) 35%, transparent);
+    color: var(--ui-text);
     padding: 0.25rem 0.6rem;
     font-size: 0.7rem;
     border-radius: 6px;
