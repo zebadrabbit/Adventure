@@ -3,9 +3,9 @@
    =================================================================== */
 
 :root {
-    --hero-gradient-1: #d4a574;
-    --hero-gradient-2: #c17a3a;
-    --hero-gradient-3: #8b6f47;
+    --hero-gradient-1: var(--dungeon-accent);
+    --hero-gradient-2: color-mix(in srgb, var(--dungeon-accent) 70%, white);
+    --hero-gradient-3: color-mix(in srgb, var(--dungeon-accent) 70%, black);
 }
 
 .hero-section {
@@ -14,7 +14,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    background: linear-gradient(135deg, #0d0a0a 0%, #1a1512 50%, #26211c 100%);
+    background: linear-gradient(135deg, var(--dungeon-bg) 0%, var(--dungeon-panel) 50%, var(--dungeon-border) 100%);
 }
 
 /* Animated gradient overlay */
@@ -99,7 +99,7 @@
 }
 
 .hero-badge i {
-    color: #d4a574;
+    color: var(--dungeon-accent);
     font-size: 1rem;
 }
 
@@ -109,7 +109,7 @@
     font-weight: 800;
     line-height: 1.1;
     margin-bottom: 1.5rem;
-    color: #e8dcc8;
+    color: var(--dungeon-text);
     letter-spacing: -0.02em;
     animation: fadeInUp 0.8s ease-out 0.2s backwards;
     font-family: Georgia, 'Times New Roman', serif;
@@ -134,7 +134,7 @@
 .hero-description {
     font-size: clamp(1rem, 2vw, 1.25rem);
     line-height: 1.7;
-    color: #a89c8a;
+    color: var(--dungeon-text-dim);
     max-width: 48rem;
     margin: 0 auto 2.5rem;
     animation: fadeInUp 0.8s ease-out 0.3s backwards;
@@ -156,8 +156,8 @@
     padding: 0.875rem 2rem;
     font-size: 1rem;
     font-weight: 600;
-    background: linear-gradient(135deg, #d4a574 0%, #c17a3a 100%);
-    color: #0d0a0a;
+    background: linear-gradient(135deg, var(--dungeon-accent) 0%, color-mix(in srgb, var(--dungeon-accent) 70%, black) 100%);
+    color: var(--dungeon-bg);
     border: none;
     border-radius: 0.75rem;
     box-shadow:
@@ -172,7 +172,7 @@
     box-shadow:
         0 8px 24px color-mix(in srgb, var(--dungeon-accent) 50%, transparent),
         0 0 0 1px color-mix(in srgb, var(--dungeon-accent) 20%, transparent) inset;
-    color: #0d0a0a;
+    color: var(--dungeon-bg);
 }
 
 .btn-hero-primary:active {
@@ -186,7 +186,7 @@
     font-size: 1rem;
     font-weight: 600;
     background: color-mix(in srgb, var(--dungeon-accent) 10%, transparent);
-    color: #d4a574;
+    color: var(--dungeon-accent);
     border: 1px solid color-mix(in srgb, var(--dungeon-accent) 20%, transparent);
     border-radius: 0.75rem;
     backdrop-filter: blur(10px);
@@ -198,7 +198,7 @@
     background: color-mix(in srgb, var(--dungeon-accent) 15%, transparent);
     border-color: color-mix(in srgb, var(--dungeon-accent) 30%, transparent);
     transform: translateY(-2px);
-    color: #e8c9a0;
+    color: color-mix(in srgb, var(--dungeon-accent) 70%, white);
 }
 
 .btn-hero-secondary:active {
@@ -218,7 +218,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    color: #8a7d6f;
+    color: var(--dungeon-text-dim);
     font-size: 0.875rem;
     font-weight: 500;
     padding: 0.5rem 1rem;
@@ -229,13 +229,13 @@
 }
 
 .feature-item:hover {
-    color: #d4a574;
+    color: var(--dungeon-accent);
     border-color: color-mix(in srgb, var(--dungeon-accent) 30%, transparent);
     background: color-mix(in srgb, var(--dungeon-accent) 5%, transparent);
 }
 
 .feature-item i {
-    color: #d4a574;
+    color: var(--dungeon-accent);
     font-size: 1.125rem;
 }
 
@@ -250,7 +250,7 @@
 }
 
 .footer-link {
-    color: #8a7d6f;
+    color: var(--dungeon-text-dim);
     text-decoration: none;
     font-size: 0.875rem;
     margin-left: 1.5rem;
@@ -258,7 +258,7 @@
 }
 
 .footer-link:hover {
-    color: #d4a574;
+    color: var(--dungeon-accent);
 }
 
 /* Responsive adjustments */
