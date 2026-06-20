@@ -343,21 +343,16 @@ already-noted `glass-theme.css` dead-code follow-up.
       route (redirects to dashboard). Tests:
       `tests/test_party_wipe_blocks_exploration.py` (3 passed). Found during Phase 4 live
       verification — not a combat-theming issue, just noticed along the way.
-- [ ] **No random encounters while walking the dungeon — ROOT-CAUSED, not fixed**: the
-      encounter-roll hook (`maybe_spawn_encounter`) is correctly wired into
-      `process_movement()` and rolls correctly, but `spawn_service.choose_monster()`
-      raises `ValueError: No monsters available for level N` because the
-      **`MonsterCatalog` table is completely empty** — confirmed by forcing a guaranteed
-      roll and removing the outer `except Exception: pass` that was silently swallowing
-      it. Unlike `Item`/`EnemyArchetype`/`WeaponCategory` (seeded from bundled
-      `sql/*.sql` via `reseed-items`), `MonsterCatalog` has no bundled default seed —
-      only a CSV *template* (`docs/data_templates/monster_catalog_template.csv`) and an
-      admin-UI/CLI import path (`run.py import-monsters-csv`). This is a content/data gap,
-      not a logic bug — needs either a bundled default monster CSV + seed step (mirroring
-      `reseed-items`), or for whoever owns game content to run the import. Separately:
-      the silent exception swallowing should at least log a warning so this doesn't fail
-      invisibly again. (The boss/elite mobs you *do* see come from a different system —
-      pre-placed `DungeonEntity` spawns — which is why they still appeared.)
+- [x] **No random encounters while walking the dungeon — FIXED ✅**: `MonsterCatalog` was
+      permanently empty (confirmed by forcing a guaranteed roll and removing the outer
+      `except Exception: pass` in `maybe_spawn_encounter` that was silently swallowing
+      `spawn_service.choose_monster()`'s `ValueError: No monsters available`). Turned out
+      `sql/monsters_seed.sql` already had 38 fully-designed monsters across every level
+      band/family/rarity/boss — it was just never added to `reseed-items`'s loading list
+      (`app/seed_items.py`). No content needed, pure wiring fix. Verified end-to-end:
+      `reseed-items` now loads it, `choose_monster()` returns real monsters at level 1
+      and level 10. The silent-exception-swallowing itself is still a latent footgun
+      (failed invisibly with zero log output) but isn't blocking now that the data exists.
 - [x] **Predetermined encounters visible before being uncovered — FIXED ✅**: the server's
       `entities_update` broadcast has no visibility filtering at all (sends every
       `spawn_manager.spawns` entry unconditionally); `dungeon-canvas.js`'s
