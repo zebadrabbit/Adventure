@@ -289,6 +289,14 @@ live user availability for its visual judgment calls.
       already checks `attacker.get("hp", 0) <= 0` in at least one path — the gap is
       likely one of the other action handlers, or a turn-order edge case, not
       yet root-caused). Found during Phase 4 live verification.
+- [ ] **Character cards need more detail (deferred feature, not a bug)**: full stats/DPS,
+      buffs/debuffs, and correct per-character spell costs aren't shown on the combat
+      party cards today. Came up repeatedly during Phase 4 live verification (e.g. asking
+      "is Elias's spell list correct" and "what's his DPS" had to be answered by querying
+      the DB directly, not from the UI). Related to the already-logged "shared static
+      spell list" bug above — once that's fixed, the per-character skill data should flow
+      into whatever this card redesign shows. Worth its own brainstorm/spec before
+      starting (it's a real feature, not a quick fix).
 - [ ] **Combat instance resolution** uses "most recent DungeonInstance for the user"
       (`combat_service._current_instance_for_user`) — fragile with multiple instances.
 - [ ] **Migrations vs dev DB:** the dev `adventure` DB is in a `create_all` state, so
