@@ -58,6 +58,68 @@ def _push_app_context(test_app):
         ctx.pop()
 
 
+@pytest.fixture(autouse=True)
+def _db_transaction_rollback(request, test_app, _push_app_context):
+    """Wrap each test in a SAVEPOINT and roll back everything afterward.
+
+    The suite used to share one session-long DB: any test that called
+    db.session.commit() (directly, or indirectly via a route under
+    test_client()) permanently wrote rows that later tests could observe,
+    which is why several fixtures above (_reset_volatile_game_config,
+    auth_client's password/character reset, etc.) exist purely to manually
+    undo specific known leaks. This fixture makes that whole category of
+    leak impossible: it opens a connection + outer transaction, starts a
+    nested SAVEPOINT, and rebinds db.session to a new scoped session on that
+    connection for the duration of the test. Application code calling
+    db.session.commit() only ends the SAVEPOINT; the after_transaction_end
+    listener immediately reopens a new one, so nothing ever reaches the
+    outer transaction. After the test, the outer transaction is rolled back
+    and the connection closed, discarding every write -- committed or not.
+
+    Tests marked @pytest.mark.db_isolation skip this: they call
+    db.drop_all()/create_all() directly (DDL), which would fight the
+    SAVEPOINT nesting if it ran inside one. They already get full isolation
+    from _conditional_db_isolation's rebuild, so they don't need this too.
+    """
+    if "db_isolation" in request.keywords:
+        yield
+        return
+
+    from sqlalchemy import event
+
+    connection = db.engine.connect()
+    outer_transaction = connection.begin()
+
+    original_session = db.session
+    # Preserve the app's real session options (notably expire_on_commit=False
+    # -- without it, attributes get marked stale on commit and raise
+    # DetachedInstanceError as soon as a test's own nested app-context usage
+    # tears down an intermediate scoped-session entry), just rebinding to
+    # our SAVEPOINT-backed connection.
+    session_options = dict(original_session.session_factory.kw)
+    session_options.pop("db", None)
+    session_options["bind"] = connection
+    db.session = db._make_scoped_session(session_options)
+
+    session = db.session()
+    session.begin_nested()
+
+    def _restart_savepoint(sess, transaction):
+        if transaction.nested and not transaction._parent.nested:
+            sess.begin_nested()
+
+    event.listen(session, "after_transaction_end", _restart_savepoint)
+
+    try:
+        yield
+    finally:
+        event.remove(session, "after_transaction_end", _restart_savepoint)
+        db.session.remove()
+        db.session = original_session
+        outer_transaction.rollback()
+        connection.close()
+
+
 @pytest.fixture()
 def client(test_app):
     return test_app.test_client()
