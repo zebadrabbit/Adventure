@@ -526,11 +526,28 @@ already-noted `glass-theme.css` dead-code follow-up.
       `check_inline_scripts.py`: grandfathered the 13 known violators so the hooks stop
       blocking unrelated commits, while still catching any *new* inline style/script
       usage anywhere else — verified with a synthetic violation in a throwaway file.
-      `pre-commit run --all-files` now passes both hooks cleanly. The actual cleanup
-      (extracting each of the 13 templates' inline styles/scripts into real `.css`/`.js`
-      files) is real, substantial, multi-surface work (admin panel, dashboard, adventure,
-      combat) that needs live browser verification per file — deliberately NOT attempted
-      unsupervised; remains a deferred follow-up if picked up later.
+      `pre-commit run --all-files` now passes both hooks cleanly.
+- [x] **Inline style/script extraction (the full cleanup, done file-by-file)**: all 13
+      grandfathered templates cleaned and removed from both `ALLOWED_FILES` ratchets —
+      both sets are now empty. Pattern used throughout: constant-value `style=` attrs
+      became classes (existing CSS files, or the page's own inline `<style>` block where
+      one already existed, e.g. `adventure.html`/`admin_themes.html`); the one genuinely
+      per-request dynamic style (`dashboard.html`'s XP bar `width:{{ xp_pct }}%`) moved to
+      a `data-xp-pct` attribute applied by JS on load instead. Inline `<script>` blocks
+      with no Jinja templating moved verbatim into new `static/js/*.js` files; the two
+      blocks that did template a URL (`fog_settings.html`'s save/reset endpoints) had
+      those moved to `data-*` attrs on the form instead so the script itself stayed
+      static. Each file verified individually: hook scripts re-run clean, full pytest
+      suite green after each commit, and a render-test (real authenticated request,
+      asserting `"style=" not in body`) confirmed no inline style leaked into the actual
+      rendered HTML for the four largest/most dynamic templates (dashboard, adventure,
+      admin_themes, plus combat's progress-bar JS behavior check). Files done: 9 admin
+      settings/tools pages, `account/settings.html`, `combat.html`, `dashboard.html`,
+      `adventure.html`, `admin_themes.html`. Pre-existing shared-DB test flakiness
+      (`test_combat_flee_and_monster.py`, `test_dungeon_api.py`, `test_auth_routes.py`
+      register test, varies by run) surfaced twice during verification — reproduced on a
+      clean stash of this work, confirming it's unrelated and already covered by the test
+      isolation audit above.
 
 ## How to run the suite
 ```bash
