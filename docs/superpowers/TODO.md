@@ -385,15 +385,14 @@ already-noted `glass-theme.css` dead-code follow-up.
       widget on the dashboard (`#dashboard-time-tick`, `app/static/js/time-widget.js`) is
       purely cosmetic/optional (nothing reads the displayed value back for gameplay
       logic) — safe to remove/restyle/relocate freely as part of this pass.
-- [ ] **Hide the mana bar for manaless classes**: barbarian is the only class with a flat
-      `BASE_STATS["mana"]` baseline of 0 (`app/routes/main.py`), but the universally-applied
-      `mana_max = 20 + int*2` formula (`dashboard_helpers.py`, `combat_service.py`) always
-      computes a nonzero value regardless of class, so the UI can't just check
-      `mana_max == 0` — needs an explicit "manaless classes" list (just `{"barbarian"}`
-      today) consulted by the combat party-card render (and dashboard?) to skip showing
-      the MP bar entirely for those classes. Came up while discussing whether barbarian
-      needs a rage/energy-style alternate resource instead (it currently has none at all —
-      not implemented in any form, confirmed by grep across the codebase).
+- [x] **Hide the mana bar for manaless classes** (combat screen): added a
+      `MANALESS_CLASSES = {'barbarian'}` set in `combat.js`, wrapped the MP bar in a
+      `data-field="mana-group"` element in `combat.html`, and hide that group entirely
+      for manaless classes instead of showing a permanently-empty 0/0. Dashboard's plain
+      `c.stats.mana` text (not a bar, no 0/0 bug) left as-is — folds into the already-logged
+      dashboard theming pass below if it needs the same treatment. Barbarian still has no
+      rage/energy-style alternate resource (confirmed via grep, not implemented in any
+      form) — that remains a separate, unscoped feature idea if ever revisited.
 - [ ] **Ambient encounters need to be a finite per-instance pool, not an infinite random
       roll (real feature, not a quick fix)**: even at the lowered 5%/move rate, the user
       is still getting attacked within 1-3 tiles routinely — but the deeper complaint is

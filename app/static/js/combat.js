@@ -15,6 +15,9 @@
     // it permanently (document.getElementById would return null forever
     // after, since the node itself is gone, not just its position).
     const combatLeft = document.getElementById('combat-left');
+    // Classes with no mana resource at all — their party card should skip
+    // the MP bar entirely rather than show a permanently-empty 0/0.
+    const MANALESS_CLASSES = new Set(['barbarian']);
     // Every action handler emits 'combat_update' twice per turn (once for the
     // player's own action, once more inside monster_auto_turn() for the
     // counterattack) with no guaranteed delivery order. Without this guard, an
@@ -268,13 +271,18 @@
                 }
             }
 
-            // Update Mana
-            const manaText = clone.querySelector('[data-field="mana-text"]');
-            const manaBar = clone.querySelector('[data-field="mana-bar"]');
-            if (manaText) manaText.textContent = `${mem.mana}/${mem.mana_max}`;
-            if (manaBar) {
-                const manaPct = mem.mana_max > 0 ? (mem.mana / mem.mana_max * 100) : 0;
-                manaBar.style.width = manaPct + '%';
+            // Update Mana (hidden entirely for manaless classes, e.g. barbarian)
+            const manaGroup = clone.querySelector('[data-field="mana-group"]');
+            if (MANALESS_CLASSES.has(charClass)) {
+                if (manaGroup) manaGroup.style.display = 'none';
+            } else {
+                const manaText = clone.querySelector('[data-field="mana-text"]');
+                const manaBar = clone.querySelector('[data-field="mana-bar"]');
+                if (manaText) manaText.textContent = `${mem.mana}/${mem.mana_max}`;
+                if (manaBar) {
+                    const manaPct = mem.mana_max > 0 ? (mem.mana / mem.mana_max * 100) : 0;
+                    manaBar.style.width = manaPct + '%';
+                }
             }
 
             partyContainer.appendChild(clone);
