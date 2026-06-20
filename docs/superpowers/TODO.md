@@ -367,6 +367,15 @@ already-noted `glass-theme.css` dead-code follow-up.
       Not yet scoped — likely a UI Redesign follow-up in the same vein as Phases 1/2/5a
       (sweeping any remaining non-Cold-Steel literals/layout there), but should get its
       own brainstorm to confirm scope before starting.
+- [ ] **Hide the mana bar for manaless classes**: barbarian is the only class with a flat
+      `BASE_STATS["mana"]` baseline of 0 (`app/routes/main.py`), but the universally-applied
+      `mana_max = 20 + int*2` formula (`dashboard_helpers.py`, `combat_service.py`) always
+      computes a nonzero value regardless of class, so the UI can't just check
+      `mana_max == 0` — needs an explicit "manaless classes" list (just `{"barbarian"}`
+      today) consulted by the combat party-card render (and dashboard?) to skip showing
+      the MP bar entirely for those classes. Came up while discussing whether barbarian
+      needs a rage/energy-style alternate resource instead (it currently has none at all —
+      not implemented in any form, confirmed by grep across the codebase).
 - [ ] **Combat instance resolution** uses "most recent DungeonInstance for the user"
       (`combat_service._current_instance_for_user`) — fragile with multiple instances.
 - [ ] **Migrations vs dev DB:** the dev `adventure` DB is in a `create_all` state, so
