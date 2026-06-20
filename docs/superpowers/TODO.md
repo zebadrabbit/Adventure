@@ -396,6 +396,20 @@ already-noted `glass-theme.css` dead-code follow-up.
       copy changes. Spec:
       `docs/superpowers/specs/2026-06-20-landing-hero-layout-design.md`. Template/CSS-only,
       no automated tests; full suite green (388 passed).
+- [x] **Landing page footer repaired** — 3 issues: (1) a page-wide inline `.container`
+      CSS override (meant for `.hero-container` specifically) also stripped the footer's
+      own `.container` padding/max-width, smashing the copyright text and links against
+      the viewport edges — removed the redundant rule. (2) Terms/Privacy links were dead
+      `#` placeholders despite real routes already existing (`main.terms`/`main.privacy`)
+      — wired them up. (3) hardcoded "© 2025" — now passed from the `index` route as
+      `current_year`. Full suite green (388 passed).
+- [ ] **No "Support" destination exists anywhere in the app**: the landing page footer
+      (and the main site footer, `partials/footer.html`) both have a "Support" link that
+      points to `#` — confirmed via grep there's no support route, page, or even a contact
+      email anywhere in the codebase. Same gap in both places, so it's a site-wide
+      placeholder, not specific to the landing page footer fix. Needs a decision: a real
+      support page/route, a mailto: link, or a third-party link (Discord, etc.) — not
+      scoped yet.
 - [x] **Dashboard hub layout & flow** — fixed the concrete complaint ("dashboard
       location of items, redesign the layout to flow better"): Merchants/Hoard/
       Party-Management/Achievements were stacked vertically inside the Party Roster
