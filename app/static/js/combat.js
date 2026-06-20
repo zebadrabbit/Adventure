@@ -8,6 +8,12 @@
     const monsterLevelEl = document.getElementById('monster-level');
     const monsterHpBar = document.getElementById('monster-hp-bar');
     const partyContainer = document.getElementById('party-panels');
+    // Stable home for the action panel — it gets re-parented into whichever
+    // character card is active each render, so it must be moved back out
+    // here before partyContainer.innerHTML is wiped, or the wipe destroys
+    // it permanently (document.getElementById would return null forever
+    // after, since the node itself is gone, not just its position).
+    const combatLeft = document.getElementById('combat-left');
     let latestVersion = null;
     let socket = null;
     let pollingInterval = null; // fallback
@@ -165,6 +171,12 @@
             }
         }
         // Party panels
+        const actionPanel = document.getElementById('combat-action-panel');
+        if (actionPanel && combatLeft) {
+            // Move it back to its stable home BEFORE wiping partyContainer —
+            // see comment at combatLeft's declaration.
+            combatLeft.appendChild(actionPanel);
+        }
         partyContainer.innerHTML = '';
         const initiative = state.initiative || [];
         const activeIndex = state.active_index;
@@ -172,7 +184,6 @@
         const active = initiative[activeIndex];
         const itemCounts = (state.party && state.party.item_counts) || {};
         const template = document.getElementById('party-member-template');
-        const actionPanel = document.getElementById('combat-action-panel');
         const activeCharName = document.getElementById('active-char-name');
 
         let activeCharId = null;
