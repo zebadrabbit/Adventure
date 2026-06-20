@@ -230,6 +230,77 @@ follow-up (need to confirm they're also unused on `admin_themes.html`
 before removing), and Phase 4 (combat visuals) remains deferred pending
 live user availability for its visual judgment calls.
 
+### UI Redesign Phase 4 — Combat Cold Steel theming ✅
+Dropped combat's leftover white-glass skin (`combat.css`'s `.card-glass`/
+`.badge-glass`/blur effects, candy-colored buttons) for flat Cold Steel
+panels; collapsed 18 ANSI-style combat-log colors onto 4 semantic tones
+(danger/success/warning/accent); recolored `combat-effects.css`'s status
+indicators the same way; re-keyed `combat-effects.js`'s generic damage-
+number colors onto the `--ui-*` tokens via `getComputedStyle` (elemental
+fire/ice/lightning particle colors left untouched as intentional flavor).
+Design: `specs/2026-06-19-phase4-combat-cold-steel-design.md`; plan:
+`plans/2026-06-19-phase4-combat-cold-steel-plan.md`.
+
+Live verification (with the user, in a real browser) surfaced a long tail
+of real bugs beyond the recolor itself, all fixed in this branch:
+- Active-turn glow was tuned for the old glass background and read too
+  faint against the new flat panels — stronger glow + solid border.
+- Fresh characters started at partial HP: `BASE_STATS["hp"]` (a legacy
+  flat per-class baseline) was being read as *current* HP instead of full
+  health on creation; also fixed an aliasing bug where the same dict
+  mutation would have corrupted the shared `BASE_STATS` global.
+- The action panel now re-parents into the active character's card each
+  render instead of sitting as a disconnected static block — found and
+  fixed a real regression of that change too (`partyContainer.innerHTML`
+  was destroying the panel node outright once it had been moved inside
+  it, only recoverable via full page reload).
+- **Confirmed and fixed a real safety gap in `tests/conftest.py`**: the
+  DB-isolation check re-read `os.getenv("DATABASE_URL")` *after*
+  `from app import ...` had already run, and that import's `load_dotenv()`
+  leaks the dev DB's URL into the environment as a side effect — so
+  `pytest` with nothing exported was silently wiping the shared dev
+  Postgres DB via `db.drop_all()` instead of refusing to run. Confirmed
+  via reproduction; fixed by snapshotting env vars before the import.
+- Two separate cascade bugs flattened class-badge colors: `combat.css`'s
+  `.combat-container .badge` and `theme.css`'s `.panel-header .badge`
+  (both 2-class selectors) always outranked the single-class
+  `.fighter-badge`/`.warlock-badge`/etc rules — scoped both with
+  `:not(.class-badge)`. Also: 6 of the 12 classes (barbarian/bard/monk/
+  paladin/sorcerer/warlock) never had badge colors defined at all; added
+  them, then raised opacity/adjusted hue (warlock vs. sorcerer) after
+  live feedback.
+- Combat log layout: `.combat-layout`'s `align-items: stretch` forced all
+  three columns to match whichever was tallest (usually the party column)
+  — reverted to `flex-start` so panels size independently. A stale
+  `app.css` rule (`#combat-log { max-height: 400px }`, left over from a
+  prior left/right-swapped layout) was still clamping the log despite
+  combat.css's fix. Finally, `.combat-log-card`'s `min-height: 600px` was
+  fighting its own `max-height: calc(100vh - 160px)` — CSS gives
+  min-height the win on conflict, so it was still pushing the page into
+  scrollbars on shorter viewports; lowered the floor to 300px.
+- Added missing visual feedback: an attack slash (X swipe) over the
+  monster panel, a defend shield pop over the defender's card, and a
+  subtle highlight on the most recent combat-log entry.
+- Removed a redundant "- CharName" label now that the action panel is
+  visually fused to the active card.
+- **Every player-action combat-log line hardcoded the word "Player"**
+  instead of the acting character's name (attack/miss/defend/flee/
+  use_item/cast spell/cast skill) — fixed across the board, each handler
+  already had the character snapshot in scope.
+
+Logged, not fixed here (out of scope for a theming branch, found along
+the way): monster HP label never wired to live state; the action panel's
+3 spells are a shared static list, not per-character; no run-end on full
+party wipe; no random encounters while walking; predetermined encounters
+visible before being uncovered; unconscious characters can sometimes
+still attack; character cards need more detail (stats/DPS/buffs — a real
+feature, not a quick fix); the landing page needs another theming pass.
+See entries below.
+
+Next: UI Redesign is now complete across Phases 1–5a and this Phase 4.
+Remaining open items are the logged bugs/features above, plus the
+already-noted `glass-theme.css` dead-code follow-up.
+
 ## Known issues / cleanup (not blockers)
 - [x] **Test-DB targeting quirk — FIXED ✅:** `conftest.py` now sets `DATABASE_URL`
       from `TEST_DATABASE_URL` *before* importing `app`, so `pytest` with only
