@@ -328,6 +328,7 @@ def _reset_volatile_game_config(test_app):
         "game_rules.encounter_spawn_rate",
         "monster_ai",
         "debug_encounters",
+        "regen_rates",
     )
 
     def _purge():
