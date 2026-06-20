@@ -48,12 +48,6 @@
         padding-left: 0 !important;
         padding-right: 0 !important;
     }
-
-    .container {
-        max-width: 100% !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-    }
 </style>
 {% endblock %}
 
@@ -127,11 +121,11 @@
         <div class="container">
             <div class="row align-items-center">
                 <div class="col-md-6 text-center text-md-start">
-                    <p class="mb-0 text-muted small">© 2025 Adventure MUD. Built with ❤️ for adventurers.</p>
+                    <p class="mb-0 text-muted small">© {{ current_year }} Adventure MUD. Built with ❤️ for adventurers.</p>
                 </div>
                 <div class="col-md-6 text-center text-md-end mt-3 mt-md-0">
-                    <a href="#" class="footer-link">Terms</a>
-                    <a href="#" class="footer-link">Privacy</a>
+                    <a href="{{ url_for('main.terms') }}" class="footer-link">Terms</a>
+                    <a href="{{ url_for('main.privacy') }}" class="footer-link">Privacy</a>
                     <a href="#" class="footer-link">Support</a>
                 </div>
             </div>

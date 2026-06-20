@@ -363,4 +363,6 @@ def conduct():
 
 @bp.route("/")
 def index():
-    return render_template("index.html")
+    from datetime import datetime
+
+    return render_template("index.html", current_year=datetime.utcnow().year)
