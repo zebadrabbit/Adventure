@@ -270,6 +270,12 @@ live user availability for its visual judgment calls.
       exists end-to-end (`POST /api/combat/<id>/cast_skill`, Spec 5b) but has no UI button
       wired to it — this static panel is the older "legacy hardcoded spell system" the
       Spec 5 entry above already flags as separate. Found during Phase 4 live verification.
+- [ ] **No run-end on full party wipe**: when every party member is downed/dead, the
+      player can still walk around the dungeon instead of the run ending and returning
+      them to the lobby/hub. Should detect full-party-defeat and force-end the dungeon
+      instance (reconcile back to lobby), consistent with how individual character death/
+      permadeath already wires into combat (Spec 2). Found during Phase 4 live
+      verification — not a combat-theming issue, just noticed along the way.
 - [ ] **Combat instance resolution** uses "most recent DungeonInstance for the user"
       (`combat_service._current_instance_for_user`) — fragile with multiple instances.
 - [ ] **Migrations vs dev DB:** the dev `adventure` DB is in a `create_all` state, so
