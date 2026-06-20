@@ -5,7 +5,11 @@ from app.models.models import db, User
 
 class _C:
     def __init__(self, stats, gear):
-        self.id = 1
+        # Negative id: real Character rows are autoincrement-positive, so this can
+        # never collide with a leftover row in the shared session-scoped test DB
+        # (passive_bonuses(c.id) hits the real DB and would otherwise pick up
+        # whatever skills a real character with the colliding id has unlocked).
+        self.id = -1
         self.name = "P"
         self.level = 1
         self.stats = json.dumps(stats)
