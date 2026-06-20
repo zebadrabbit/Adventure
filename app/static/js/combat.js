@@ -7,6 +7,7 @@
     const monsterNameEl = document.getElementById('monster-name');
     const monsterLevelEl = document.getElementById('monster-level');
     const monsterHpBar = document.getElementById('monster-hp-bar');
+    const monsterHpText = document.getElementById('monster-hp-text');
     const partyContainer = document.getElementById('party-panels');
     // Stable home for the action panel — it gets re-parented into whichever
     // character card is active each render, so it must be moved back out
@@ -168,7 +169,7 @@
         const curHp = state.monster_hp ?? maxHp;
         const pct = maxHp > 0 ? Math.max(0, Math.min(100, (curHp / maxHp) * 100)) : 0;
         monsterHpBar.style.width = pct + '%';
-        monsterHpBar.textContent = curHp + ' / ' + maxHp;
+        if (monsterHpText) monsterHpText.textContent = curHp + ' / ' + maxHp;
 
         // Show damage if HP changed
         if (window.combatEffects && state.last_damage_to_monster) {
