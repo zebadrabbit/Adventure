@@ -31,8 +31,10 @@ a:hover {
 
 #combat-right .monster-panel {
     flex: 1;
+    max-height: calc(100vh - 160px);
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 /* ========================================
@@ -328,9 +330,15 @@ a:hover {
 
 .combat-log-card {
     min-height: 600px;
+    /* Cap growth to the viewport — without this, the flex chain isn't
+       "definite" enough end-to-end to make #combat-log's overflow-y: auto
+       engage, so the panel just keeps growing taller as log entries
+       accumulate instead of scrolling internally. */
+    max-height: calc(100vh - 160px);
     flex: 1;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 .combat-log-wrapper {
