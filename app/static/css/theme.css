@@ -382,39 +382,39 @@ body {
 }
 
 .barbarian-badge {
-    background: rgba(168, 67, 31, 0.25);
-    color: #d9875c;
-    border-color: #a8431f;
+    background: rgba(168, 67, 31, 0.55);
+    color: #ffd8c2;
+    border-color: #d9875c;
 }
 
 .bard-badge {
-    background: rgba(184, 154, 58, 0.25);
-    color: #d8c178;
-    border-color: #b89a3a;
+    background: rgba(184, 154, 58, 0.55);
+    color: #fbf0cf;
+    border-color: #d8c178;
 }
 
 .monk-badge {
-    background: rgba(47, 125, 114, 0.25);
-    color: #7fc4b8;
-    border-color: #2f7d72;
+    background: rgba(47, 125, 114, 0.55);
+    color: #d4f3ee;
+    border-color: #7fc4b8;
 }
 
 .paladin-badge {
-    background: rgba(203, 182, 118, 0.25);
-    color: #e3d6ad;
-    border-color: #cbb676;
+    background: rgba(203, 182, 118, 0.55);
+    color: #fbf5e6;
+    border-color: #e3d6ad;
 }
 
 .sorcerer-badge {
-    background: rgba(168, 64, 122, 0.25);
-    color: #d488b8;
-    border-color: #a8407a;
+    background: rgba(168, 64, 122, 0.55);
+    color: #fbdcec;
+    border-color: #d488b8;
 }
 
 .warlock-badge {
-    background: rgba(122, 47, 74, 0.25);
-    color: #c47a96;
-    border-color: #7a2f4a;
+    background: rgba(122, 47, 74, 0.55);
+    color: #f5d3df;
+    border-color: #c47a96;
 }
 
 .operative-body {
