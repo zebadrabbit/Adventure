@@ -441,6 +441,26 @@ def _player_ref(party: Dict[str, Any], char_id: int):
     return None
 
 
+def _skip_if_unconscious(session: CombatSession, party: Dict[str, Any], char_id: int) -> Optional[Dict[str, Any]]:
+    """If the acting character is downed (hp<=0), log it, skip their turn, and
+    return the response dict the caller should return immediately.
+
+    Returns None if the actor is conscious and the caller should proceed
+    with its normal action handling.
+    """
+    actor_ref = _player_ref(party, char_id)
+    if actor_ref and actor_ref.get("hp", 0) <= 0:
+        _append_log(session, f"{actor_ref.get('name', 'Character')} is unconscious and cannot act!")
+        _advance_turn(session)
+        _check_end(session)
+        db.session.commit()
+        _emit_session("combat_update", session)
+        _emit_if_completed(session)
+        session = _auto_progress_monster_after_player(session)
+        return {"ok": True, "state": session.to_dict(), "skipped": True}
+    return None
+
+
 def _is_monster_turn(session: CombatSession) -> bool:
     initiative = json.loads(session.initiative_json or "[]")
     if not initiative:
@@ -850,16 +870,10 @@ def player_attack(combat_id: int, user_id: int, version: int, actor_id: Optional
         return {"error": "not_your_turn", "state": session.to_dict()}
     # Check if character is alive (dead characters cannot act)
     party = json.loads(session.party_snapshot_json or "{}") or {}
+    skip_result = _skip_if_unconscious(session, party, actor_id)
+    if skip_result is not None:
+        return skip_result
     attacker = _player_ref(party, actor_id)
-    if attacker and attacker.get("hp", 0) <= 0:
-        _append_log(session, f"{attacker.get('name', 'Character')} is unconscious and cannot act!")
-        _advance_turn(session)
-        _check_end(session)
-        db.session.commit()
-        _emit_session("combat_update", session)
-        _emit_if_completed(session)
-        session = _auto_progress_monster_after_player(session)
-        return {"ok": True, "state": session.to_dict(), "skipped": True}
     # Improved damage model with accuracy/evasion & crits (placeholder formulas)
     monster = session.monster()
     atk = attacker.get("attack", 12) if attacker else 12
@@ -934,6 +948,9 @@ def player_flee(combat_id: int, user_id: int, version: int, actor_id: Optional[i
         # Provided actor_id is stale; proceed anyway (tests may have cached earlier id)
         pass
     party = json.loads(session.party_snapshot_json or "{}") or {}
+    skip_result = _skip_if_unconscious(session, party, actor.get("id"))
+    if skip_result is not None:
+        return skip_result
     fleeing = _player_ref(party, actor.get("id"))
     fleeing_name = fleeing.get("name", "Player") if fleeing else "Player"
     success = random.random() < 0.5
@@ -1310,6 +1327,9 @@ def player_defend(combat_id: int, user_id: int, version: int, actor_id: Optional
     if actor.get("controller_id") != user_id or actor.get("id") != actor_id:
         return {"error": "not_your_turn", "state": session.to_dict()}
     party = json.loads(session.party_snapshot_json or "{}") or {}
+    skip_result = _skip_if_unconscious(session, party, actor_id)
+    if skip_result is not None:
+        return skip_result
     defender_name = "Player"
     for m in party.get("members", []):
         if m.get("char_id") == actor_id:
@@ -1359,6 +1379,9 @@ def player_use_item(
         return {"error": "item_required"}
     # Only simple healing potion for now
     party = json.loads(session.party_snapshot_json or "{}") or {}
+    skip_result = _skip_if_unconscious(session, party, actor_id)
+    if skip_result is not None:
+        return skip_result
     used = False
     for m in party.get("members", []):
         if m.get("char_id") == actor_id:
@@ -1471,6 +1494,9 @@ def player_cast_spell(
 
     config = spell_config[spell]
     party = json.loads(session.party_snapshot_json or "{}") or {}
+    skip_result = _skip_if_unconscious(session, party, actor_id)
+    if skip_result is not None:
+        return skip_result
     caster = _player_ref(party, actor_id)
     if not caster:
         return {"error": "no_caster"}
@@ -1576,6 +1602,11 @@ def player_cast_skill(
     if actor.get("controller_id") != user_id or actor.get("id") != actor_id:
         return {"error": "not_your_turn", "state": session.to_dict()}
 
+    party = json.loads(session.party_snapshot_json or "{}") or {}
+    skip_result = _skip_if_unconscious(session, party, actor_id)
+    if skip_result is not None:
+        return skip_result
+
     from app.models.skill import CharacterSkill, Skill
 
     cs = CharacterSkill.query.filter_by(character_id=actor_id, skill_id=skill_id).first()
@@ -1597,7 +1628,6 @@ def player_cast_skill(
     if not isinstance(eff, dict):
         eff = {}
 
-    party = json.loads(session.party_snapshot_json or "{}") or {}
     caster = _player_ref(party, actor_id)
     if not caster:
         return {"error": "no_caster"}
