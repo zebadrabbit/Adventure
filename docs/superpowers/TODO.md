@@ -276,6 +276,14 @@ live user availability for its visual judgment calls.
       instance (reconcile back to lobby), consistent with how individual character death/
       permadeath already wires into combat (Spec 2). Found during Phase 4 live
       verification — not a combat-theming issue, just noticed along the way.
+- [ ] **No random encounters while walking the dungeon**: moving around doesn't seem to
+      trigger any random encounter rolls. Need to check whether the encounter-roll-on-move
+      hook is wired up at all in the current movement path, or is just configured at too
+      low a rate to notice. Found during Phase 4 live verification.
+- [ ] **Predetermined encounters visible before being uncovered**: fixed/seeded encounter
+      markers show on the map even in tiles that haven't been explored yet — should be
+      hidden by fog-of-war/perception like everything else until the player actually
+      uncovers that tile. Found during Phase 4 live verification.
 - [ ] **Combat instance resolution** uses "most recent DungeonInstance for the user"
       (`combat_service._current_instance_for_user`) — fragile with multiple instances.
 - [ ] **Migrations vs dev DB:** the dev `adventure` DB is in a `create_all` state, so
