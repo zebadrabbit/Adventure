@@ -240,7 +240,10 @@ body {
     letter-spacing: 0.5px;
 }
 
-.panel-header .badge {
+/* :not(.class-badge): this 2-class selector's specificity otherwise always
+   beats the single-class .fighter-badge/.warlock-badge/etc rules below,
+   flattening every class badge to this generic accent color. */
+.panel-header .badge:not(.class-badge) {
     font-family: var(--ui-font);
     font-size: 0.75rem;
     padding: 4px 10px;
