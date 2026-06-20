@@ -6,6 +6,11 @@ from werkzeug.security import check_password_hash
 from app import create_app, db
 from app.models.models import User
 
+# This file swaps the app's engine to an in-memory SQLite DB mid-test (see
+# app_mem below), which is incompatible with _db_transaction_rollback's
+# Postgres-connection pinning in conftest.py -- skip that fixture entirely.
+pytestmark = pytest.mark.db_isolation
+
 
 @pytest.fixture()
 def app_mem():

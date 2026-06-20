@@ -60,7 +60,7 @@ def _push_app_context(test_app):
 
 @pytest.fixture(autouse=True)
 def _db_transaction_rollback(request, test_app, _push_app_context):
-    """Wrap each test in a SAVEPOINT and roll back everything afterward.
+    """Wrap each test in a transaction and roll back everything afterward.
 
     The suite used to share one session-long DB: any test that called
     db.session.commit() (directly, or indirectly via a route under
@@ -68,55 +68,140 @@ def _db_transaction_rollback(request, test_app, _push_app_context):
     which is why several fixtures above (_reset_volatile_game_config,
     auth_client's password/character reset, etc.) exist purely to manually
     undo specific known leaks. This fixture makes that whole category of
-    leak impossible: it opens a connection + outer transaction, starts a
-    nested SAVEPOINT, and rebinds db.session to a new scoped session on that
-    connection for the duration of the test. Application code calling
-    db.session.commit() only ends the SAVEPOINT; the after_transaction_end
-    listener immediately reopens a new one, so nothing ever reaches the
-    outer transaction. After the test, the outer transaction is rolled back
-    and the connection closed, discarding every write -- committed or not.
+    leak impossible.
+
+    An earlier version of this fixture tried to rebind db.session to a new
+    scoped session constructed with bind=connection in session_options.
+    That silently did nothing: Flask-SQLAlchemy 3.x's Session.get_bind()
+    (flask_sqlalchemy/session.py) resolves every query through
+    self._db.engines[bind_key], never consulting a sessionmaker-level
+    bind= kwarg. db.session kept talking to the real pooled engine the
+    whole time, committing for real on every test -- invisible to pytest's
+    pass/fail output because test usernames were unique enough to avoid
+    visible collisions, but permanently polluting the test database.
+
+    Fix part 1: patch Session.get_bind itself (class-level, for every
+    Flask-SQLAlchemy Session instance, including ones created in nested
+    `with app.app_context():` blocks -- see auth_client and
+    test_cache_flow.py for that pattern) to always return our externally
+    managed Connection. A tempting alternative -- swapping db.engines[None]
+    to the Connection instead -- looked equivalent but broke
+    app/seed_items.py and tests/test_monsters.py, both of which call
+    db.engine.raw_connection() directly; db.engine is also sourced from
+    db.engines[None], so that swap silently replaced the real Engine
+    wherever raw (non-ORM) access expected one. Patching get_bind leaves
+    db.engine/db.engines[None] untouched, affecting only ORM Session
+    traffic.
+
+    Fix part 2: get_bind alone isn't sufficient, because several existing
+    test files (e.g. tests/test_extraction.py's local `setup_database`
+    autouse fixture) call db.session.rollback() / db.session.remove()
+    directly in their own teardown. Once get_bind correctly routes those
+    calls to our connection, db.session.remove() discards the one Session
+    instance we could attach a SAVEPOINT-restart listener to (the classic
+    "join an external transaction" recipe) -- the next db.session.x access
+    creates a brand new Session instance with no such protection, and a
+    real commit from that instance ends our transaction for good (silent
+    SAWarning: "transaction already deassociated from connection" later,
+    plus the connection drifting back towards the pool's bookkeeping while
+    we still hold and reuse it -- eventually exhausting the pool a few
+    hundred tests in and hanging every later test's db.engine.connect()).
+    A SAVEPOINT reattached per Session instance only protects that one
+    instance, not the ones created after a mid-test db.session.remove().
+
+    A first attempt at fix part 2 made do_commit a flat no-op at the
+    dialect-class level (below the ORM entirely, so Session churn doesn't
+    matter). That stopped the pool exhaustion, but introduced a worse bug:
+    with commit() doing *nothing* durable, any later rollback() from
+    completely unrelated code (e.g. tests/test_admin_actions.py's
+    `player_client` fixture goes through Flask-SocketIO's test client,
+    which triggers its own app-context teardown and a real
+    session.rollback() somewhere inside) discarded every prior write in
+    the test, not just the current unit of work -- e.g. a fixture commits
+    "admin_actor" into existence, a later unrelated rollback() wipes it
+    out, and the test fails with the user mysteriously gone.
+
+    The actual fix: give commit() and rollback() SAVEPOINT semantics at the
+    dialect level instead of skipping them outright. A SAVEPOINT is
+    created once, immediately, on the raw connection. do_commit is
+    patched to RELEASE that savepoint and immediately open a new one
+    (advancing the checkpoint without ever telling Postgres to really
+    commit). do_rollback is patched to roll back *to* that savepoint
+    instead of rolling back the whole transaction. The result: every
+    commit() call -- regardless of which Session instance issued it --
+    advances a durable-for-the-rest-of-the-test checkpoint; every
+    rollback() call undoes only what happened since the last checkpoint,
+    exactly matching what application/test code assumes commit/rollback
+    mean. Nothing ever reaches disk because the checkpoint itself is a
+    SAVEPOINT, not a real COMMIT. After the test, both methods are
+    restored and one real connection.rollback() + connection.close()
+    discards everything, checkpoints included.
 
     Tests marked @pytest.mark.db_isolation skip this: they call
-    db.drop_all()/create_all() directly (DDL), which would fight the
-    SAVEPOINT nesting if it ran inside one. They already get full isolation
-    from _conditional_db_isolation's rebuild, so they don't need this too.
+    db.drop_all()/create_all() directly (DDL), which would fight an open
+    transaction. They already get full isolation from
+    _conditional_db_isolation's rebuild, so they don't need this too.
     """
     if "db_isolation" in request.keywords:
         yield
         return
 
-    from sqlalchemy import event
+    import flask_sqlalchemy.session as _fsa_session
 
     connection = db.engine.connect()
-    outer_transaction = connection.begin()
+    raw = connection.connection.dbapi_connection
+    cur = raw.cursor()
+    cur.execute("SAVEPOINT test_checkpoint")
+    cur.close()
 
-    original_session = db.session
-    # Preserve the app's real session options (notably expire_on_commit=False
-    # -- without it, attributes get marked stale on commit and raise
-    # DetachedInstanceError as soon as a test's own nested app-context usage
-    # tears down an intermediate scoped-session entry), just rebinding to
-    # our SAVEPOINT-backed connection.
-    session_options = dict(original_session.session_factory.kw)
-    session_options.pop("db", None)
-    session_options["bind"] = connection
-    db.session = db._make_scoped_session(session_options)
+    # do_commit/do_rollback are patched at the dialect *class* level, which
+    # is shared by every connection the engine hands out -- not just ours.
+    # Other code (e.g. db.create_all() during this same test) opens its own
+    # separate pooled connection and commits it normally; that connection
+    # never got our SAVEPOINT, so redirecting its commit/rollback the same
+    # way raises "savepoint does not exist". Gate on dbapi_connection
+    # identity so only our connection gets the SAVEPOINT treatment; every
+    # other connection falls through to the real implementation.
+    dialect_cls = type(connection.dialect)
+    original_do_commit = dialect_cls.do_commit
+    original_do_rollback = dialect_cls.do_rollback
 
-    session = db.session()
-    session.begin_nested()
+    def _is_ours(dbapi_connection):
+        return getattr(dbapi_connection, "dbapi_connection", dbapi_connection) is raw
 
-    def _restart_savepoint(sess, transaction):
-        if transaction.nested and not transaction._parent.nested:
-            sess.begin_nested()
+    def _do_commit(self, dbapi_connection):
+        if not _is_ours(dbapi_connection):
+            return original_do_commit(self, dbapi_connection)
+        c = dbapi_connection.cursor()
+        c.execute("RELEASE SAVEPOINT test_checkpoint")
+        c.execute("SAVEPOINT test_checkpoint")
+        c.close()
 
-    event.listen(session, "after_transaction_end", _restart_savepoint)
+    def _do_rollback(self, dbapi_connection):
+        if not _is_ours(dbapi_connection):
+            return original_do_rollback(self, dbapi_connection)
+        c = dbapi_connection.cursor()
+        c.execute("ROLLBACK TO SAVEPOINT test_checkpoint")
+        c.close()
+
+    dialect_cls.do_commit = _do_commit
+    dialect_cls.do_rollback = _do_rollback
+
+    original_get_bind = _fsa_session.Session.get_bind
+
+    def _get_bind(self, mapper=None, clause=None, bind=None, **kwargs):
+        return connection
+
+    _fsa_session.Session.get_bind = _get_bind
 
     try:
         yield
     finally:
-        event.remove(session, "after_transaction_end", _restart_savepoint)
         db.session.remove()
-        db.session = original_session
-        outer_transaction.rollback()
+        _fsa_session.Session.get_bind = original_get_bind
+        dialect_cls.do_commit = original_do_commit
+        dialect_cls.do_rollback = original_do_rollback
+        connection.rollback()
         connection.close()
 
 
@@ -287,6 +372,27 @@ def auth_client(test_app, client):
         inst_id = inst.id
     # Perform actual login so flask-login manages session
     client.post("/login", data={"username": "tester", "password": "pass"}, follow_redirects=True)
+    # The login redirect lands on /dashboard, whose stat-backfill helper
+    # (dashboard_helpers.py's `for key in (...): stats.setdefault(key, 0)`)
+    # fills any missing "hp" key with 0 rather than a computed max -- a
+    # real, pre-existing bug, not something to silently work around at the
+    # source. It defeats the hp-pop above (which exists specifically so
+    # combat re-derives a full HP each test) the instant follow_redirects
+    # hits that view. Re-set hp to the character's actual computed max here,
+    # after login, so this fixture's "start every test with full HP" promise
+    # holds regardless of that backfill bug. See TODO.md.
+    with test_app.app_context():
+        import json
+
+        from app.services.character_stats import compute_hp_mana_max
+
+        fresh_char = db.session.get(_Char, new_char.id)
+        stats_obj = json.loads(fresh_char.stats) if fresh_char.stats else {}
+        hp_max, _mana_max = compute_hp_mana_max(fresh_char)
+        stats_obj["hp"] = hp_max
+        fresh_char.stats = json.dumps(stats_obj)
+        db.session.add(fresh_char)
+        db.session.commit()
     # Ensure dungeon instance id in session
     with client.session_transaction() as sess:
         sess["dungeon_instance_id"] = inst_id
