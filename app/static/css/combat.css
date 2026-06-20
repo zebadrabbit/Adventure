@@ -109,6 +109,24 @@ a:hover {
     box-shadow: 0 0 20px color-mix(in srgb, var(--adv-primary) 40%, transparent);
 }
 
+/* When the action panel is attached under the active character's card
+   (combat.js re-parents it there each render), make the two read as one
+   connected block instead of two separate floating boxes: matching glow,
+   no gap between them, flattened seam. */
+.party-member-wrapper #combat-action-panel {
+    margin-top: 0 !important;
+    border-top: none;
+    border-color: var(--ui-warning) !important;
+    box-shadow: 0 8px 18px color-mix(in srgb, var(--ui-warning) 25%, transparent);
+}
+
+/* Flatten the active card's bottom border so it visually fuses with the
+   action panel attached directly beneath it (both panels are square by
+   default — match that, don't introduce new rounding). */
+.party-member-wrapper:has(#combat-action-panel) .party-member.tactical-panel {
+    border-bottom: none;
+}
+
 .party-member.border-warning {
     border-color: var(--ui-warning) !important;
     box-shadow: 0 0 18px color-mix(in srgb, var(--ui-warning) 70%, transparent),
