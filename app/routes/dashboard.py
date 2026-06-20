@@ -219,7 +219,11 @@ def dashboard():
         from app.routes.main import BASE_STATS, STARTER_ITEMS
         from app.services.auto_equip import auto_equip_for
 
-        stats = BASE_STATS.get(char_class, BASE_STATS["fighter"])
+        stats = dict(BASE_STATS.get(char_class, BASE_STATS["fighter"]))
+        # BASE_STATS["hp"] is a legacy flat per-class baseline, not a fresh
+        # character's current HP — start at the same computed hp_max combat/
+        # the dashboard use everywhere else (50 + con*2 + level*5, level 1).
+        stats["hp"] = 50 + int(stats.get("con", 10)) * 2 + 1 * 5
         coins = {"gold": 5, "silver": 20, "copper": 50}
         items = STARTER_ITEMS.get(char_class, STARTER_ITEMS["fighter"])
         # Auto-equip using shared helper (tolerates both slug and dict entries)

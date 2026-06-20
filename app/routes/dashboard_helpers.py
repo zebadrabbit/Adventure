@@ -281,7 +281,11 @@ def handle_autofill(existing: list[Character], current_user_id: int):
                 suffix = random.randint(100, 999)
                 name = f"{base_name}{suffix}"
                 attempts += 1
-            stats = BASE_STATS.get(cls, BASE_STATS["fighter"])
+            stats = dict(BASE_STATS.get(cls, BASE_STATS["fighter"]))
+            # BASE_STATS["hp"] is a legacy flat per-class baseline, not a fresh
+            # character's current HP — start at the same computed hp_max combat/
+            # the dashboard use everywhere else (50 + con*2 + level*5, level 1).
+            stats["hp"] = 50 + int(stats.get("con", 10)) * 2 + 1 * 5
             coins = {"gold": 5, "silver": 20, "copper": 50}
             raw_items = STARTER_ITEMS.get(cls, STARTER_ITEMS["fighter"])
             # Expanded slug list for backward compatibility
