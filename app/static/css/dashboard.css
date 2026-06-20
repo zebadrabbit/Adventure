@@ -191,6 +191,17 @@ body {
     border-bottom: 2px solid color-mix(in srgb, var(--adv-primary) 80%, transparent);
 }
 
+/* "OPEN" status badge on Hub Actions merchant buttons */
+.badge-open {
+    background: color-mix(in srgb, var(--adv-success) 25%, transparent);
+    font-size: 0.65rem;
+}
+
+/* Operative card XP bar background */
+.xp-bar-anchor {
+    background: color-mix(in srgb, var(--ui-bg) 60%, transparent);
+}
+
 .chat-messages {
     background: rgba(0, 0, 0, 0.3);
     padding: 1rem;

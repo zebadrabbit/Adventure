@@ -173,22 +173,19 @@
                                     class="tactical-btn-secondary d-flex align-items-center justify-content-between"
                                     onclick="window.tradingSystem && tradingSystem.openMerchant('general-merchant', {{ characters[0].id if characters else 1 }})">
                                     <span><i class="bi bi-basket me-2"></i> General Store</span>
-                                    <span class="badge"
-                                        style="background: rgba(212, 165, 116, 0.2); font-size: 0.65rem;">OPEN</span>
+                                    <span class="badge badge-open">OPEN</span>
                                 </button>
                                 <button type="button"
                                     class="tactical-btn-secondary d-flex align-items-center justify-content-between"
                                     onclick="window.tradingSystem && tradingSystem.openMerchant('weapon-shop', {{ characters[0].id if characters else 1 }})">
                                     <span>{{ svg_icon('bloody-sword', 16, 'me-2') }} Weapon Smith</span>
-                                    <span class="badge"
-                                        style="background: rgba(212, 165, 116, 0.2); font-size: 0.65rem;">OPEN</span>
+                                    <span class="badge badge-open">OPEN</span>
                                 </button>
                                 <button type="button"
                                     class="tactical-btn-secondary d-flex align-items-center justify-content-between"
                                     onclick="window.tradingSystem && tradingSystem.openMerchant('armor-shop', {{ characters[0].id if characters else 1 }})">
                                     <span><i class="bi bi-shield-fill me-2"></i> Armor Smith</span>
-                                    <span class="badge"
-                                        style="background: rgba(212, 165, 116, 0.2); font-size: 0.65rem;">OPEN</span>
+                                    <span class="badge badge-open">OPEN</span>
                                 </button>
                             </div>
                         </div>
@@ -275,7 +272,7 @@
                     {% set xp_pct = xp_pct if xp_pct <= 100 else 100 %}
                     {% set xp_pct = xp_pct if xp_pct >= 0 else 0 %}
                     <div class="xp-bar-anchor" data-char-id="{{ c.id }}"
-                        style="font-size: 0.85rem; padding: 8px 12px; background: rgba(13, 10, 10, 0.6); border: 1px solid var(--dungeon-border);">
+                        style="font-size: 0.85rem; padding: 8px 12px; border: 1px solid var(--dungeon-border);">
                         <div class="d-flex justify-content-between">
                             <span style="color: var(--dungeon-text-dim);">EXPERIENCE:</span>
                             <span><span style="color: var(--dungeon-accent);">{{ c.xp }}</span> /
