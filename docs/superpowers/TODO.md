@@ -378,6 +378,10 @@ already-noted `glass-theme.css` dead-code follow-up.
       the MP bar entirely for those classes. Came up while discussing whether barbarian
       needs a rage/energy-style alternate resource instead (it currently has none at all —
       not implemented in any form, confirmed by grep across the codebase).
+- [ ] **Combat log appears to reload/redraw after casting Firebolt**: not yet root-caused.
+      Worth checking whether this is specific to spell casts (vs. basic attack/defend,
+      which don't seem to trigger it) — `combat.js`'s spell-effect path
+      (`createParticles`/`doAction`'s `cast_firebolt` branch) is the obvious place to start.
 - [ ] **Combat potions are a shared party pool by accident, not by design** (well, by an
       explicit "for now" shortcut that was never revisited): `combat_service.py`'s
       `_base_player_snapshot` only ever reads healing-potion count from `chars[0]`'s
