@@ -750,6 +750,15 @@
             this.entities.forEach(entity => {
                 if (!this.playerPos) return;
 
+                // Fog-of-war: the server broadcasts every entity's true position
+                // regardless of what the player has actually uncovered (entities_update
+                // has no visibility filtering of its own), so the client must apply the
+                // same "skip unknown tiles" rule the map renderer already uses below —
+                // otherwise elite/boss markers are visible before being revealed.
+                const row = this.grid && this.grid[entity.y];
+                const cell = row ? row[entity.x] : undefined;
+                if (cell === undefined || cell === 'unknown') return;
+
                 const dist = Math.hypot(entity.x - this.playerPos.x, entity.y - this.playerPos.y);
                 if (dist > OUTER_VIS_RADIUS) return; // Don't render entities outside vision
 
