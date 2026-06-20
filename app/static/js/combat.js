@@ -184,7 +184,6 @@
         const active = initiative[activeIndex];
         const itemCounts = (state.party && state.party.item_counts) || {};
         const template = document.getElementById('party-member-template');
-        const activeCharName = document.getElementById('active-char-name');
 
         let activeCharId = null;
         let activeMember = null;
@@ -269,9 +268,6 @@
                 activeContainer.appendChild(actionPanel);
             }
             actionPanel.style.display = 'block';
-            if (activeCharName) {
-                activeCharName.textContent = '- ' + (activeMember.name || 'Hero');
-            }
 
             const charClass = (activeMember.char_class || 'fighter').toLowerCase();
             const intStat = activeMember.int_stat || 10;
