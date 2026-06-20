@@ -19,7 +19,6 @@ TEMPLATES = ROOT / "app" / "templates"
 ALLOWED_FILES = {
     "app/templates/admin_themes.html",
     "app/templates/dashboard.html",
-    "app/templates/combat.html",
     "app/templates/adventure.html",
 }
 VIOLATIONS = []

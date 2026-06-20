@@ -210,6 +210,7 @@ a:hover {
             var(--ui-danger),
             color-mix(in srgb, var(--ui-danger) 70%, black));
     height: 100%;
+    width: 0%;
     transition: width 0.4s ease;
     box-shadow: inset 0 1px 2px color-mix(in srgb, var(--ui-text) 20%, transparent);
     border-radius: 10px;
@@ -220,6 +221,7 @@ a:hover {
             var(--ui-accent),
             color-mix(in srgb, var(--ui-accent) 70%, black));
     height: 100%;
+    width: 0%;
     transition: width 0.4s ease;
     box-shadow: inset 0 1px 2px color-mix(in srgb, var(--ui-text) 20%, transparent);
     border-radius: 10px;
