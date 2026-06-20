@@ -21,7 +21,6 @@ ALLOWED_FILES = {
     "app/templates/admin_themes.html",
     "app/templates/dashboard.html",
     "app/templates/adventure.html",
-    "app/templates/admin/progression_settings.html",
     "app/templates/admin/loot_settings.html",
     "app/templates/admin/combat_settings.html",
     "app/templates/admin/seed_data.html",
