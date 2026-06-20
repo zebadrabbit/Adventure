@@ -19,7 +19,12 @@ a:hover {
 }
 
 .combat-layout {
-    align-items: stretch;
+    /* flex-start, not stretch: the three columns should size independently.
+       stretch was forcing the log/monster columns to match whichever column
+       was naturally tallest (usually the party column, now that the action
+       panel fuses into it), which is what was pushing the whole page down —
+       each panel below already caps its own height/scroll independently. */
+    align-items: flex-start;
 }
 
 #combat-left,

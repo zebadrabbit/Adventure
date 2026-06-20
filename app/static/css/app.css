@@ -486,10 +486,6 @@ body {
   margin: 0 auto;
 }
 
-.combat-layout {
-  align-items: stretch;
-}
-
 /* #combat-log sizing/scrollbar/font-family is owned by combat.css, which
    loads after this file on the combat page. The selectors that used to
    live here (#combat-left .monster-panel, #combat-right .combat-log-
