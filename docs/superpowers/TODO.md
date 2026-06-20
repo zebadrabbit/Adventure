@@ -255,6 +255,21 @@ live user availability for its visual judgment calls.
 - [ ] **loot-body has no same-run guard** (`app/routes/hoard_api.py`): transfers a downed
       ally's bag to any owned character. Enforcing "same run" needs a notion of which run a
       *living* character is in (only downed characters get `locked_dungeon_id`).
+- [ ] **Monster HP label never updates** (`app/templates/combat.html`'s `#monster-hp-text`
+      span vs. `app/static/js/combat.js:145-154`'s `render()`): the live "X / Y" text is
+      written into `#monster-hp-bar` (the progress-bar fill div) instead of the visible
+      `#monster-hp-text` label, which stays frozen at its template default "0 / 0" for the
+      whole fight. Backend data is correct (verified against a live `CombatSession` row —
+      `monster.hp`/`monster_hp` populated properly); this is a pure front-end wiring bug.
+      Found during Phase 4 combat-theming live verification (unrelated to that change —
+      predates it).
+- [ ] **Combat action panel is one static spell list for every character**
+      (`app/templates/combat.html`'s single `#combat-action-panel`, hardcoded Firebolt/Ice
+      Shard/Lightning buttons): not class- or character-specific, so every party member
+      appears to have identical abilities. The real per-character skill system already
+      exists end-to-end (`POST /api/combat/<id>/cast_skill`, Spec 5b) but has no UI button
+      wired to it — this static panel is the older "legacy hardcoded spell system" the
+      Spec 5 entry above already flags as separate. Found during Phase 4 live verification.
 - [ ] **Combat instance resolution** uses "most recent DungeonInstance for the user"
       (`combat_service._current_instance_for_user`) — fragile with multiple instances.
 - [ ] **Migrations vs dev DB:** the dev `adventure` DB is in a `create_all` state, so
