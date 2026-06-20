@@ -491,9 +491,22 @@ already-noted `glass-theme.css` dead-code follow-up.
       the wrong instance. Now prefers the session pointer, falling back to "most recent
       row" only when there's no request context (direct service-level calls). TDD'd via
       `tests/test_combat_current_instance.py`; full suite green (388 passed).
-- [ ] **Migrations vs dev DB:** the dev `adventure` DB is in a `create_all` state, so
-      `alembic upgrade` fails on older migrations. Stamp/realign before relying on
-      migrations in dev (`alembic stamp head` after a clean `create_all`, or rebuild).
+- [x] **Migrations vs dev DB fixed** — root cause was deeper than "needs stamping": three
+      schema systems (`db.create_all()`, `app/server.py`'s legacy `_run_migrations()`, and
+      `app/migrations/__init__.py`'s separate versioned `apply_migrations()`) all run as a
+      module-level import-time side effect, so anything importing `app` (including
+      Alembic's own `env.py`) rebuilds the schema before Alembic's migration chain gets a
+      chance to run — confirmed directly: `alembic upgrade head` against a freshly dropped
+      DB failed with `DuplicateColumn` because the import-time bootstrap re-added the
+      column moments before Alembic's migration tried to. Fixed by self-stamping to `head`
+      once, in `app/__init__.py`, immediately after the existing bootstrap — but only if
+      `alembic_version` doesn't exist yet (never touches a DB already under real Alembic
+      control). Verified: fresh `drop_all()` + reimport auto-stamps, `alembic upgrade head`
+      then no-ops cleanly, re-import doesn't error/double-stamp. Also fixed the actual dev
+      DB (restarted the server, confirmed `alembic current` now reports `head`,
+      `b2c3d4e5f6a7`, with the existing 25 characters/data untouched). Spec:
+      `docs/superpowers/specs/2026-06-20-migrations-self-stamp-design.md`. Full suite green
+      (388 passed).
 - [ ] **Inline-script-check pre-commit hook routinely bypassed for `adventure.html`:**
       the file already has inline `<script>` blocks predating this work, so every edit to
       it (including the run/extraction surface above) fails the `inline-script-check` hook
