@@ -350,11 +350,12 @@ already-noted `glass-theme.css` dead-code follow-up.
       markers show on the map even in tiles that haven't been explored yet — should be
       hidden by fog-of-war/perception like everything else until the player actually
       uncovers that tile. Found during Phase 4 live verification.
-- [ ] **Unconscious characters can sometimes still attack**: `player_attack`/skill-cast
-      paths should be rejecting any action from a downed character (`combat_service.py`
-      already checks `attacker.get("hp", 0) <= 0` in at least one path — the gap is
-      likely one of the other action handlers, or a turn-order edge case, not
-      yet root-caused). Found during Phase 4 live verification.
+- [x] **Unconscious characters could act — FIXED ✅**: `player_attack` was the only one
+      of six action handlers checking `hp<=0`; `flee`/`defend`/`use_item`/`cast_spell`/
+      `cast_skill` had no guard at all. Extracted a shared `_skip_if_unconscious()` helper
+      used by all six. Tests: `tests/test_unconscious_actions.py` (5 passed, TDD —
+      confirmed each failed for the right reason before the fix). Found during Phase 4
+      live verification.
 - [ ] **Character cards need more detail (deferred feature, not a bug)**: full stats/DPS,
       buffs/debuffs, and correct per-character spell costs aren't shown on the combat
       party cards today. Came up repeatedly during Phase 4 live verification (e.g. asking
