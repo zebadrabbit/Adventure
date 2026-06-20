@@ -380,11 +380,23 @@ already-noted `glass-theme.css` dead-code follow-up.
       Not yet scoped — likely a UI Redesign follow-up in the same vein as Phases 1/2/5a
       (sweeping any remaining non-Cold-Steel literals/layout there), but should get its
       own brainstorm to confirm scope before starting.
-- [ ] **Dashboard theme needs a real pass too** ("badly broken", per the user) — same
-      family of work as the landing page item above; not yet scoped. The game-clock
-      widget on the dashboard (`#dashboard-time-tick`, `app/static/js/time-widget.js`) is
-      purely cosmetic/optional (nothing reads the displayed value back for gameplay
-      logic) — safe to remove/restyle/relocate freely as part of this pass.
+- [x] **Dashboard hub layout & flow** — fixed the concrete complaint ("dashboard
+      location of items, redesign the layout to flow better"): Merchants/Hoard/
+      Party-Management/Achievements were stacked vertically inside the Party Roster
+      card's `<form>`, buried below the deploy button. Moved them into a new full-width
+      tabbed "Hub Actions" panel (Bootstrap nav-tabs) below the Recruit/Roster row;
+      buttons keep identical `onclick`/class wiring, only their container moved. Tabs
+      styled consistently with the existing `.chat-header .nav-tabs` Cold Steel pattern
+      (`color-mix()`/`var(--adv-*)`, no new literals). Spec:
+      `docs/superpowers/specs/2026-06-20-dashboard-hub-layout-design.md`, plan:
+      `docs/superpowers/plans/2026-06-20-dashboard-hub-layout.md`. Template/CSS-only, no
+      automated tests (verified via curl-based structural check — no Playwright/
+      chromium-cli available in this environment to screenshot it; recommend a quick
+      manual eyeball pass in a real browser). The game-clock widget
+      (`#dashboard-time-tick`, `app/static/js/time-widget.js`) remains purely cosmetic/
+      optional and untouched — still safe to remove/restyle/relocate if a future pass
+      wants to. Broader "badly broken" theming complaint is otherwise resolved; the
+      landing page item below is the only theming work left unscoped.
 - [x] **Hide the mana bar for manaless classes** (combat screen): added a
       `MANALESS_CLASSES = {'barbarian'}` set in `combat.js`, wrapped the MP bar in a
       `data-field="mana-group"` element in `combat.html`, and hide that group entirely
