@@ -321,6 +321,23 @@ try:  # pragma: no cover - defensive import-time safeguard
             db.session.rollback()
         seed_items()
         _seed_game_config()
+        # One-time self-stamp: if this DB has never been under Alembic's
+        # control (no alembic_version table yet), stamp it to head now that
+        # the bootstrap above has built a schema equivalent to head (no
+        # migration does non-additive data work). Once alembic_version
+        # exists -- whether from this stamp or a real `alembic upgrade` --
+        # this never runs again, and Alembic owns versioning from there.
+        try:
+            from sqlalchemy import inspect as _sa_inspect
+
+            if not _sa_inspect(db.engine).has_table("alembic_version"):
+                from alembic import command as _alembic_command
+                from alembic.config import Config as _AlembicConfig
+
+                _alembic_cfg = _AlembicConfig(os.path.join(os.path.dirname(__file__), "..", "alembic.ini"))
+                _alembic_command.stamp(_alembic_cfg, "head")
+        except Exception:
+            db.session.rollback()
 except Exception:
     # A failed import-time bootstrap must not leave db.session in an aborted
     # transaction; that would poison every later DB user (the cause of the
