@@ -21,7 +21,6 @@ ALLOWED_FILES = {
     "app/templates/dashboard.html",
     "app/templates/combat.html",
     "app/templates/adventure.html",
-    "app/templates/admin/seed_data.html",
 }
 VIOLATIONS = []
 
