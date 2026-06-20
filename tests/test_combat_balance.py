@@ -65,6 +65,7 @@ def test_player_attack_variance_bounds(monkeypatch, test_app):
     session = combat_service.start_session(user.id, _simple_monster())  # retain for variance assertions
     party = session.to_dict()["party"]
     atk = party["members"][0]["attack"]
+    attacker_name = party["members"][0]["name"]
     # We will force every attack roll to be a guaranteed hit (use high natural rolls) and control variance extremes
     # Sequence: accuracy d20 (always 15), then variance one value per attack (-atk//4 .. +atk//4)
     low_var = -atk // 4
@@ -91,7 +92,7 @@ def test_player_attack_variance_bounds(monkeypatch, test_app):
     assert r2.get("ok")
     import re
 
-    lines = [entry["m"] for entry in session.to_dict()["log"] if "Player hits" in entry["m"]][-2:]
+    lines = [entry["m"] for entry in session.to_dict()["log"] if f"{attacker_name} hits" in entry["m"]][-2:]
     base = atk
     vals = []
     for ln in lines:

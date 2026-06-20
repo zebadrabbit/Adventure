@@ -872,8 +872,9 @@ def player_attack(combat_id: int, user_id: int, version: int, actor_id: Optional
         hit = True
     else:
         hit = accuracy >= evasion
+    attacker_name = attacker.get("name", "Player") if attacker else "Player"
     if not hit:
-        _append_log(session, f"Player misses {monster.get('name')} (roll {acc_roll})", code=PLAYER_ATTACK_MISS)
+        _append_log(session, f"{attacker_name} misses {monster.get('name')} (roll {acc_roll})", code=PLAYER_ATTACK_MISS)
         # Track miss for visual effects
         session.last_damage_json = json.dumps({"to_monster": {"amount": 0, "is_miss": True, "is_critical": False}})
         _advance_turn(session)
@@ -892,7 +893,8 @@ def player_attack(combat_id: int, user_id: int, version: int, actor_id: Optional
     session.monster_hp = max(0, (session.monster_hp or 0) - dmg)
     _append_log(
         session,
-        f"Player hits {monster.get('name')} for {dmg}{' (CRIT)' if crit else ''} damage (HP {session.monster_hp})",
+        f"{attacker_name} hits {monster.get('name')} for {dmg}{' (CRIT)' if crit else ''} damage "
+        f"(HP {session.monster_hp})",
         code=PLAYER_ATTACK_HIT,
     )
     # Track damage for visual effects
@@ -931,14 +933,17 @@ def player_flee(combat_id: int, user_id: int, version: int, actor_id: Optional[i
     if actor_id is not None and actor.get("id") != actor_id:
         # Provided actor_id is stale; proceed anyway (tests may have cached earlier id)
         pass
+    party = json.loads(session.party_snapshot_json or "{}") or {}
+    fleeing = _player_ref(party, actor.get("id"))
+    fleeing_name = fleeing.get("name", "Player") if fleeing else "Player"
     success = random.random() < 0.5
     if success:
         session.status = "complete"
-        _append_log(session, "Player flees successfully.", code=PLAYER_FLEE_SUCCESS)
+        _append_log(session, f"{fleeing_name} flees successfully.", code=PLAYER_FLEE_SUCCESS)
         _persist_party_resources(session)
         set_combat_state(False)
     else:
-        _append_log(session, "Flee attempt failed.", code=PLAYER_FLEE_FAIL)
+        _append_log(session, f"{fleeing_name}'s flee attempt failed.", code=PLAYER_FLEE_FAIL)
     # Flee consumes the whole turn (advance immediately)
     session.phase = "end"
     _progress_phase(session)
@@ -1305,12 +1310,14 @@ def player_defend(combat_id: int, user_id: int, version: int, actor_id: Optional
     if actor.get("controller_id") != user_id or actor.get("id") != actor_id:
         return {"error": "not_your_turn", "state": session.to_dict()}
     party = json.loads(session.party_snapshot_json or "{}") or {}
+    defender_name = "Player"
     for m in party.get("members", []):
         if m.get("char_id") == actor_id:
             m["defending"] = True
+            defender_name = m.get("name", "Player")
             break
     session.party_snapshot_json = json.dumps(party)
-    _append_log(session, "Player braces for impact (Defend).", code=PLAYER_DEFEND)
+    _append_log(session, f"{defender_name} braces for impact (Defend).", code=PLAYER_DEFEND)
     session.phase = "end"
     _progress_phase(session)
     _check_end(session)
@@ -1415,7 +1422,9 @@ def player_use_item(
     except Exception:
         pass
     session.party_snapshot_json = json.dumps(party)
-    _append_log(session, f"Player uses {slug}.", code=PLAYER_USE_ITEM)
+    user_ref = _player_ref(party, actor_id)
+    user_name = user_ref.get("name", "Player") if user_ref else "Player"
+    _append_log(session, f"{user_name} uses {slug}.", code=PLAYER_USE_ITEM)
     session.phase = "end"
     _progress_phase(session)
     _check_end(session)
@@ -1524,9 +1533,11 @@ def player_cast_spell(
     session.party_snapshot_json = json.dumps(party)
     # Track damage for visual effects
     session.last_damage_json = json.dumps({"to_monster": {"amount": dmg, "is_miss": False, "is_critical": crit}})
+    caster_name = caster.get("name", "Player")
     _append_log(
         session,
-        f"Player casts {config['name']} for {dmg}{' (CRIT)' if crit else ''} damage (HP {session.monster_hp})",
+        f"{caster_name} casts {config['name']} for {dmg}{' (CRIT)' if crit else ''} damage "
+        f"(HP {session.monster_hp})",
         code=PLAYER_SPELL_HIT,
     )
     session.phase = "end"
@@ -1602,7 +1613,7 @@ def player_cast_skill(
         session.last_damage_json = json.dumps({"to_monster": {"amount": dmg, "is_miss": False, "is_critical": False}})
         _append_log(
             session,
-            f"Player uses {skill.name} for {dmg} damage (HP {session.monster_hp})",
+            f"{caster.get('name', 'Player')} uses {skill.name} for {dmg} damage (HP {session.monster_hp})",
             code=PLAYER_SKILL,
         )
         extra["damage"] = dmg
@@ -1612,7 +1623,11 @@ def player_cast_skill(
         new_hp = min(max_hp, cur_hp + heal)
         healed = new_hp - cur_hp
         caster["hp"] = new_hp
-        _append_log(session, f"Player uses {skill.name}, healing {healed} (HP {new_hp})", code=PLAYER_SKILL)
+        _append_log(
+            session,
+            f"{caster.get('name', 'Player')} uses {skill.name}, healing {healed} (HP {new_hp})",
+            code=PLAYER_SKILL,
+        )
         extra["heal"] = healed
 
     session.party_snapshot_json = json.dumps(party)
