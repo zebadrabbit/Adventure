@@ -739,6 +739,22 @@ def sync_member_death_states(session) -> None:
         db.session.commit()
 
 
+def party_is_wiped(user_id: int) -> bool:
+    """True if the user has a tracked current party and every member of it
+    is dead. Used to stop dungeon movement/exploration after a full wipe —
+    combat already marks each member is_dead=True via
+    resolve_party_defeat_if_any, but nothing outside combat checked it."""
+    from flask import session as _session
+
+    party_ids = _session.get("last_party_ids") or []
+    if not party_ids:
+        return False
+    chars = Character.query.filter(Character.id.in_(party_ids), Character.user_id == user_id).all()
+    if not chars:
+        return False
+    return all(c.is_dead for c in chars)
+
+
 def resolve_party_defeat_if_any(session) -> bool:
     """If every party member is at 0 HP, permadeath the run.
 

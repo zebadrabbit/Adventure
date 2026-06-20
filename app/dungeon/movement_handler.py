@@ -65,6 +65,11 @@ def process_movement(instance: DungeonInstance, direction: str) -> Tuple[bool, D
         - encounter: dict (if encounter triggered)
         - game_tick: int (if time advanced)
     """
+    from app.services.combat_service import party_is_wiped
+
+    if party_is_wiped(instance.user_id):
+        return False, {"ok": False, "moved": False, "error": "party_defeated"}
+
     MAP_SIZE = 75
     dungeon = get_cached_dungeon(instance.seed, (MAP_SIZE, MAP_SIZE, 1))
     walkable_chars = {ROOM, TUNNEL, DOOR, getattr(dungeon, "TELEPORT", "P"), "P"}

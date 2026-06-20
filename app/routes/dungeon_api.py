@@ -1927,6 +1927,11 @@ def adventure():
     if not party:
         flash("Please select a party before starting your adventure.", "warning")
         return redirect(url_for("dashboard.dashboard"))
+    from app.services.combat_service import party_is_wiped
+
+    if party_is_wiped(current_user.id):
+        flash("Your party has been defeated. Select a new party to continue.", "danger")
+        return redirect(url_for("dashboard.dashboard"))
     seed = session.get("dungeon_seed")
     pos = None
     dungeon_instance_id = session.get("dungeon_instance_id")
