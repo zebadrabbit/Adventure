@@ -96,6 +96,9 @@ def advance_time(delta: int, reason: str, actor_id: Optional[int] = None) -> int
     except Exception:
         db.session.rollback()
         return clock.tick  # return last known even if failed
+    from .status_effects import apply_tick_decay
+
+    apply_tick_decay(delta)
     payload = {"tick": clock.tick, "delta": delta, "reason": reason, "actor_id": actor_id}
     try:
         socketio.emit("time_update", payload, namespace="/adventure")
