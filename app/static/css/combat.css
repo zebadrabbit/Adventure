@@ -110,8 +110,8 @@ a:hover {
 }
 
 .party-member.border-warning {
-    border-color: rgba(251, 191, 36, 0.6) !important;
-    box-shadow: 0 0 15px rgba(251, 191, 36, 0.4);
+    border-color: color-mix(in srgb, var(--ui-warning) 60%, transparent) !important;
+    box-shadow: 0 0 15px color-mix(in srgb, var(--ui-warning) 40%, transparent);
 }
 
 /* Stats bars in party cards */
@@ -129,13 +129,13 @@ a:hover {
 
 .stat-label {
     font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--ui-text-dim);
     font-weight: 500;
 }
 
 .stat-value {
     font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.9);
+    color: var(--ui-text);
     font-weight: 600;
     font-family: 'Courier New', monospace;
 }
@@ -313,8 +313,8 @@ a:hover {
     font-family: 'Courier New', 'Consolas', 'Monaco', monospace;
     font-size: 0.85rem;
     line-height: 1.4rem;
-    background: rgba(10, 14, 20, 0.8);
-    color: #AAAAAA;
+    background: color-mix(in srgb, var(--ui-bg) 90%, black);
+    color: var(--ui-text-dim);
     padding: 1rem;
     border-radius: 0 0 16px 16px;
     position: relative;
@@ -329,8 +329,8 @@ a:hover {
     right: 0;
     bottom: 0;
     background: repeating-linear-gradient(0deg,
-            rgba(0, 0, 0, 0.15),
-            rgba(0, 0, 0, 0.15) 1px,
+            color-mix(in srgb, black 15%, transparent),
+            color-mix(in srgb, black 15%, transparent) 1px,
             transparent 1px,
             transparent 2px);
     pointer-events: none;
@@ -359,7 +359,7 @@ a:hover {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(18, 16, 16, 0.1);
+    background: color-mix(in srgb, var(--ui-elevated) 10%, transparent);
     opacity: 0;
     animation: flicker 0.15s infinite;
     pointer-events: none;
@@ -371,7 +371,7 @@ a:hover {
     display: inline-block;
     width: 0.6em;
     height: 1em;
-    background-color: #AAAAAA;
+    background-color: var(--ui-text-dim);
     animation: blink 1s step-end infinite;
     vertical-align: text-bottom;
     margin-left: 2px;
@@ -391,18 +391,18 @@ a:hover {
     margin: 2px 0 1em 0;
 }
 
-/* Glass-morphism buttons */
+/* Combat-container button/progress/badge overrides */
 .combat-container .btn {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: rgba(255, 255, 255, 0.9);
+    background: var(--ui-elevated);
+    border: 1px solid color-mix(in srgb, var(--ui-accent) 25%, transparent);
+    color: var(--ui-text);
     transition: all 0.2s ease;
 }
 
 .combat-container .btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-    border-color: rgba(255, 255, 255, 0.3);
-    color: #fff;
+    background: color-mix(in srgb, var(--ui-elevated) 70%, var(--ui-accent));
+    border-color: color-mix(in srgb, var(--ui-accent) 45%, transparent);
+    color: var(--ui-text);
     transform: translateY(-1px);
 }
 
@@ -410,21 +410,23 @@ a:hover {
 
 /* Progress bars */
 .combat-container .progress {
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: color-mix(in srgb, var(--ui-bg) 70%, var(--ui-elevated));
+    border: 1px solid color-mix(in srgb, var(--ui-accent) 15%, transparent);
     border-radius: 10px;
 }
 
 .combat-container .progress-bar {
-    background: linear-gradient(90deg, #ef4444, #dc2626);
+    background: linear-gradient(90deg,
+            var(--ui-danger),
+            color-mix(in srgb, var(--ui-danger) 70%, black));
     border-radius: 10px;
 }
 
 /* Badges */
 .combat-container .badge {
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    color: #fff;
+    background: var(--ui-elevated);
+    border: 1px solid color-mix(in srgb, var(--ui-accent) 35%, transparent);
+    color: var(--ui-text);
     padding: 0.35rem 0.65rem;
 }
 
@@ -439,8 +441,8 @@ a:hover {
 
 /* Active party member highlight */
 .party-member.border-warning {
-    border-color: rgba(251, 191, 36, 0.6) !important;
-    box-shadow: 0 0 0.5rem rgba(251, 191, 36, 0.5);
+    border-color: color-mix(in srgb, var(--ui-warning) 60%, transparent) !important;
+    box-shadow: 0 0 15px color-mix(in srgb, var(--ui-warning) 40%, transparent);
 }
 
 /* Trim duplicate timestamp groups visually */
@@ -448,96 +450,67 @@ a:hover {
     opacity: 0.6;
 }
 
-.combat-log .log-damage {
-    color: #FF5555;
-    font-weight: bold;
-}
-
-.combat-log .log-heal {
-    color: #55FF55;
-    font-weight: bold;
-}
-
-.combat-log .log-turn {
-    color: #FFFF55;
-    font-weight: 600;
-}
-
-.combat-log .log-system {
-    color: #AAAAAA;
-    font-style: italic;
-}
-
-.combat-log .log-loot {
-    color: #FFFF55;
-    font-weight: 600;
-}
-
-.combat-log .log-curse {
-    color: #AA55FF;
-}
-
-.combat-log .log-poison {
-    color: #55FF55;
-}
-
-.combat-log .log-buff {
-    color: #55FFFF;
-}
-
-.combat-log .log-debuff {
-    color: #FFAA00;
-}
-
-.combat-log .log-crit {
-    color: #FF5555;
-    font-weight: 700;
-}
-
-.combat-log .log-miss {
-    color: #555555;
-    font-style: italic;
-}
-
-.combat-log .log-block {
-    color: #55FFFF;
-}
-
-.combat-log .log-dodge {
-    color: #55FFFF;
-}
-
-.combat-log .log-shield {
-    color: #AA55FF;
-}
-
-.combat-log .log-stun {
-    color: #FFFF55;
-}
-
-.combat-log .log-bleed {
-    color: #FF5555;
-}
-
+/* Danger group: damage, crit, death, bleed, burn */
+.combat-log .log-damage,
+.combat-log .log-bleed,
 .combat-log .log-burn {
-    color: #FFAA00;
+    color: var(--ui-danger);
+    font-weight: bold;
 }
 
-.combat-log .log-freeze {
-    color: #55FFFF;
-}
-
+.combat-log .log-crit,
 .combat-log .log-death {
-    color: #FF5555;
+    color: var(--ui-danger);
     font-weight: 700;
 }
 
-.combat-log .log-flee {
-    color: #AA55FF;
-    font-style: italic;
+/* Success group: heal, buff, victory */
+.combat-log .log-heal,
+.combat-log .log-buff {
+    color: var(--ui-success);
+    font-weight: bold;
 }
 
 .combat-log .log-victory {
-    color: #55FF55;
+    color: var(--ui-success);
     font-weight: 700;
+}
+
+/* Warning group: debuff, stun, curse, poison, loot */
+.combat-log .log-debuff,
+.combat-log .log-stun,
+.combat-log .log-curse,
+.combat-log .log-poison {
+    color: var(--ui-warning);
+}
+
+.combat-log .log-loot {
+    color: var(--ui-warning);
+    font-weight: 600;
+}
+
+/* Accent group: shield, block, dodge, freeze */
+.combat-log .log-shield,
+.combat-log .log-block,
+.combat-log .log-dodge,
+.combat-log .log-freeze {
+    color: var(--ui-accent);
+}
+
+/* Informational marker */
+.combat-log .log-turn {
+    color: var(--ui-accent);
+    font-weight: 600;
+}
+
+/* Neutral/dim group: system, miss, flee */
+.combat-log .log-system,
+.combat-log .log-flee {
+    color: var(--ui-text-dim);
+    font-style: italic;
+}
+
+.combat-log .log-miss {
+    color: var(--ui-text-dim);
+    font-style: italic;
 }
