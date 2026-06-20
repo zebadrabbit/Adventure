@@ -172,6 +172,10 @@ a:hover {
     font-weight: 500;
 }
 
+.mp-icon {
+    color: #1e3a8a;
+}
+
 .stat-value {
     font-size: 0.75rem;
     color: var(--ui-text);
