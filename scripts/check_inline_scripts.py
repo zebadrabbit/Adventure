@@ -11,15 +11,12 @@ ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = ROOT / "app" / "templates"
 pattern = re.compile(r"<script(?![^>]*\bsrc=)([^>]*)>(.*?)</script>", re.DOTALL | re.IGNORECASE)
 
-# Grandfathered pre-existing violations (confirmed via `git stash` to predate
-# any specific change -- not caused by current work). This is a ratchet, not
-# a permanent allowance: do not add new files here. Each entry should get
-# cleaned up and removed as part of the deferred "extract inline scripts into
-# real .js files" follow-up (see docs/superpowers/TODO.md). New files, and
-# any *other* existing file gaining a fresh inline script, are still caught.
-ALLOWED_FILES = {
-    "app/templates/admin_themes.html",
-}
+# Grandfathered pre-existing violations -- now empty (the full inline-script
+# extraction follow-up logged in docs/superpowers/TODO.md is complete). Keep
+# this set so a future regression has somewhere obvious to add an entry
+# without restructuring the script, but do not add to it casually: any new
+# inline <script> block should be moved to a real .js file instead.
+ALLOWED_FILES = set()
 violations = []
 
 for html in TEMPLATES.rglob("*.html"):

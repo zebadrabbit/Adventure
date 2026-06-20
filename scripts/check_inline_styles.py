@@ -10,15 +10,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = ROOT / "app" / "templates"
 
-# Grandfathered pre-existing violations (confirmed via `git stash` to predate
-# any specific change -- not caused by current work). This is a ratchet, not
-# a permanent allowance: do not add new files here. Each entry should get
-# cleaned up and removed as part of the deferred "extract inline styles into
-# real CSS" follow-up (see docs/superpowers/TODO.md). New files, and any
-# *other* existing file gaining a fresh inline style, are still caught below.
-ALLOWED_FILES = {
-    "app/templates/admin_themes.html",
-}
+# Grandfathered pre-existing violations -- now empty (the full inline-style
+# extraction follow-up logged in docs/superpowers/TODO.md is complete). Keep
+# this set so a future regression has somewhere obvious to add an entry
+# without restructuring the script, but do not add to it casually: any new
+# inline style= attribute should be fixed at the source instead.
+ALLOWED_FILES = set()
 VIOLATIONS = []
 
 for html in TEMPLATES.rglob("*.html"):
