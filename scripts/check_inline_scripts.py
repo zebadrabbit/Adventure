@@ -23,7 +23,6 @@ ALLOWED_FILES = {
     "app/templates/adventure.html",
     "app/templates/admin/progression_settings.html",
     "app/templates/admin/loot_settings.html",
-    "app/templates/admin/users.html",
     "app/templates/admin/combat_settings.html",
     "app/templates/admin/fog_settings.html",
     "app/templates/admin/database.html",
