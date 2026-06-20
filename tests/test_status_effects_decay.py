@@ -145,6 +145,49 @@ def test_apply_tick_decay_noop_when_nothing_to_update():
     assert char.stats == before
 
 
+def test_apply_tick_decay_does_not_rewrite_stats_when_no_hp_mana_change():
+    from app.models import GameConfig
+
+    # Zero out regen so it doesn't trigger an hp/mana change of its own.
+    GameConfig.set("regen_rates", json.dumps({"hp_pct_per_tick": 0.0, "mp_pct_per_tick": 0.0}))
+    db.session.commit()
+
+    char = _make_character("nooprealeffect")
+    hp_max, mana_max = compute_hp_mana_max(char)
+    char.stats = json.dumps({"con": 10, "int": 10, "hp": hp_max, "current_mana": mana_max})
+    db.session.add(char)
+    db.session.commit()
+    # Poison with zero damage: an active effect that does not change hp/mana.
+    effect = CharacterStatusEffect(character_id=char.id, name="poison", remaining=5, data='{"damage": 0}')
+    db.session.add(effect)
+    db.session.commit()
+
+    before = char.stats
+
+    # Track every object the implementation hands to db.session.add(); the
+    # fix should not add the Character to the session when hp/mana didn't
+    # actually change, even though the effect row bookkeeping still runs.
+    added_objects = []
+    real_add = db.session.add
+
+    def tracking_add(obj):
+        added_objects.append(obj)
+        return real_add(obj)
+
+    db.session.add = tracking_add
+    try:
+        apply_tick_decay(1)
+    finally:
+        db.session.add = real_add
+
+    db.session.refresh(char)
+    assert char.stats == before
+    assert char not in added_objects, "char.stats should not be re-added/rewritten when hp/mana are unchanged"
+
+    remaining_effect = CharacterStatusEffect.query.filter_by(character_id=char.id).first()
+    assert remaining_effect.remaining == 4
+
+
 def test_apply_tick_decay_respects_custom_regen_rates_from_game_config():
     from app.models import GameConfig
 

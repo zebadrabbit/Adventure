@@ -176,7 +176,7 @@ def apply_tick_decay(delta: int) -> None:
             mana_key = "current_mana" if "current_mana" in stats else "mana"
             mana = int(stats.get(mana_key, mana_max))
 
-            row_changed = False
+            stats_changed = False
 
             effects = CharacterStatusEffect.query.filter_by(character_id=char.id).all()
             for effect in effects:
@@ -188,22 +188,21 @@ def apply_tick_decay(delta: int) -> None:
                     damage = int(payload.get("damage", 0)) * delta
                     if damage > 0:
                         hp = max(1, hp - damage)
-                        row_changed = True
+                        stats_changed = True
                 effect.remaining -= delta
                 if effect.remaining <= 0:
                     db.session.delete(effect)
                 else:
                     db.session.add(effect)
-                row_changed = True
 
             if hp < hp_max:
                 hp = min(hp_max, hp + math.ceil(hp_max * rates["hp_pct_per_tick"] / 100 * delta))
-                row_changed = True
+                stats_changed = True
             if mana < mana_max:
                 mana = min(mana_max, mana + math.ceil(mana_max * rates["mp_pct_per_tick"] / 100 * delta))
-                row_changed = True
+                stats_changed = True
 
-            if row_changed:
+            if stats_changed:
                 stats["hp"] = hp
                 stats[mana_key] = mana
                 char.stats = json.dumps(stats)
