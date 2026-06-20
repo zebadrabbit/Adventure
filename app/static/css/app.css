@@ -27,7 +27,7 @@
      * If a removed style is reported, search original file notes above.
 --------------------------------------------------------------------*/
 
-/* === 1. Medieval Dark Fantasy Theme ===================================== */
+/* === 1. Cold Steel Theme ================================================ */
 :root {
   --adv-bg: var(--ui-bg);
   --adv-bg-secondary: var(--ui-panel);
@@ -58,7 +58,7 @@
   --bs-body-bg: var(--adv-bg);
   --bs-body-color: var(--adv-text);
   --bs-primary: var(--adv-primary);
-  --bs-primary-rgb: 212, 165, 116;
+  --bs-primary-rgb: 90, 209, 201;
   --bs-secondary: var(--adv-secondary);
   --bs-success: var(--adv-success);
   --bs-info: var(--adv-accent);
@@ -79,7 +79,7 @@ body {
   letter-spacing: -0.01em;
 }
 
-/* Buttons - Medieval Style */
+/* Buttons */
 .btn-primary {
   --bs-btn-bg: var(--adv-primary);
   --bs-btn-border-color: var(--adv-primary);
@@ -89,12 +89,12 @@ body {
   --bs-btn-color: #0d0a0a;
   font-weight: 500;
   border-radius: 0.5rem;
-  box-shadow: 0 1px 2px 0 rgba(212, 165, 116, 0.1), 0 0 0 1px rgba(212, 165, 116, 0.05);
+  box-shadow: 0 1px 2px 0 color-mix(in srgb, var(--adv-primary) 10%, transparent), 0 0 0 1px color-mix(in srgb, var(--adv-primary) 5%, transparent);
   transition: all 0.15s ease;
 }
 
 .btn-primary:hover {
-  box-shadow: 0 4px 8px 0 rgba(212, 165, 116, 0.3), 0 0 0 1px rgba(212, 165, 116, 0.1);
+  box-shadow: 0 4px 8px 0 color-mix(in srgb, var(--adv-primary) 30%, transparent), 0 0 0 1px color-mix(in srgb, var(--adv-primary) 10%, transparent);
   transform: translateY(-1px);
 }
 
@@ -127,7 +127,7 @@ body {
 }
 
 .card-header {
-  background: rgba(212, 165, 116, 0.05);
+  background: color-mix(in srgb, var(--adv-primary) 5%, transparent);
   border-bottom: 1px solid var(--adv-border);
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -254,7 +254,7 @@ body {
 }
 
 .icon-glow {
-  filter: drop-shadow(0 0 8px rgba(212, 165, 116, 0.5));
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--adv-primary) 50%, transparent));
 }
 
 /* Map & Game Areas */
@@ -366,7 +366,7 @@ body {
   transform-origin: 50% 50%;
   pointer-events: none;
   transition: transform 120ms ease;
-  filter: drop-shadow(0 0 4px rgba(212, 165, 116, 0.6));
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--adv-primary) 60%, transparent));
 }
 
 /* Movement Pad - Refined */
@@ -405,7 +405,7 @@ body {
 .movement-pad button:focus-visible:not(:disabled) {
   background: var(--adv-surface-hover);
   border-color: var(--adv-primary);
-  box-shadow: 0 0 0 2px rgba(212, 165, 116, 0.2), var(--adv-shadow);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--adv-primary) 20%, transparent), var(--adv-shadow);
   outline: none;
 }
 
@@ -555,7 +555,7 @@ body {
   background: var(--adv-surface-hover);
   border-color: var(--adv-primary);
   color: var(--adv-text);
-  box-shadow: 0 0 0 3px rgba(212, 165, 116, 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--adv-primary) 10%, transparent);
 }
 
 .form-control::placeholder {
@@ -573,7 +573,7 @@ body {
   --bs-table-bg: transparent;
   --bs-table-color: var(--adv-text);
   --bs-table-border-color: var(--adv-border);
-  --bs-table-hover-bg: rgba(212, 165, 116, 0.05);
+  --bs-table-hover-bg: color-mix(in srgb, var(--adv-primary) 5%, transparent);
 }
 
 .table thead th {
