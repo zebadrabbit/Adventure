@@ -701,7 +701,26 @@ def _check_end(session: CombatSession):
 
 
 def _current_instance_for_user(user_id: int):
-    """Resolve the user's active dungeon instance (most recent), or None."""
+    """Resolve the dungeon instance the user is actually in.
+
+    Prefers session['dungeon_instance_id'] — the canonical "current instance"
+    pointer every dungeon route (dungeon_api.py) reads/writes — over guessing
+    via "most recent DungeonInstance row for this user." A user can accumulate
+    multiple instance rows (e.g. an older, abandoned run), so "most recent by
+    id" can diverge from where they actually are. Falls back to the most
+    recent row when there's no request context or no session value (e.g.
+    direct service-level calls outside an HTTP request).
+    """
+    try:
+        from flask import session as _session
+
+        inst_id = _session.get("dungeon_instance_id")
+        if inst_id:
+            instance = db.session.get(DungeonInstance, inst_id)
+            if instance is not None and instance.user_id == user_id:
+                return instance
+    except RuntimeError:
+        pass
     return DungeonInstance.query.filter_by(user_id=user_id).order_by(DungeonInstance.id.desc()).first()
 
 

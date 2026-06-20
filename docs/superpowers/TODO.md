@@ -433,8 +433,14 @@ already-noted `glass-theme.css` dead-code follow-up.
       coincidentally matching the bug; re-biased initiative to expose it for real).
       Still true and unaddressed: the "Potion" action is hardcoded to `potion-healing`
       only (flat 25 HP) — there's no mana-potion action at all.
-- [ ] **Combat instance resolution** uses "most recent DungeonInstance for the user"
-      (`combat_service._current_instance_for_user`) — fragile with multiple instances.
+- [x] **Combat instance resolution** fixed: `_current_instance_for_user` guessed via
+      "most recent `DungeonInstance` row for this user" instead of reading
+      `session['dungeon_instance_id']` — the canonical current-instance pointer every
+      dungeon route (`dungeon_api.py`) already uses. A user with multiple instance rows
+      (e.g. an old abandoned run) could have death/extraction effects silently locked to
+      the wrong instance. Now prefers the session pointer, falling back to "most recent
+      row" only when there's no request context (direct service-level calls). TDD'd via
+      `tests/test_combat_current_instance.py`; full suite green (388 passed).
 - [ ] **Migrations vs dev DB:** the dev `adventure` DB is in a `create_all` state, so
       `alembic upgrade` fails on older migrations. Stamp/realign before relying on
       migrations in dev (`alembic stamp head` after a clean `create_all`, or rebuild).
