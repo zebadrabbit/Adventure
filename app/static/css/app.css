@@ -490,42 +490,15 @@ body {
   align-items: stretch;
 }
 
-#combat-left .monster-panel {
-  min-height: 300px;
-  background: var(--adv-surface);
-  border: 1px solid var(--adv-border);
-  border-radius: 0.75rem;
-  padding: 1rem;
-}
-
-#combat-right .combat-log-wrapper {
-  height: 100%;
-  background: var(--adv-surface);
-  border: 1px solid var(--adv-border);
-  border-radius: 0.75rem;
-}
-
-#combat-log {
-  overflow-y: auto;
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
-  font-size: 0.813rem;
-  line-height: 1.4rem;
-  padding: 1rem;
-  max-height: 400px;
-}
-
-#combat-log::-webkit-scrollbar {
-  width: 6px;
-}
-
-#combat-log::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-#combat-log::-webkit-scrollbar-thumb {
-  background: var(--adv-primary);
-  border-radius: 3px;
-}
+/* #combat-log sizing/scrollbar/font-family is owned by combat.css, which
+   loads after this file on the combat page. The selectors that used to
+   live here (#combat-left .monster-panel, #combat-right .combat-log-
+   wrapper) predated the current layout — the monster panel is in
+   #combat-right and the log lives in #combat-center now, so neither ever
+   matched. The unscoped #combat-log { max-height: 400px } rule below them
+   did still apply (combat.css never redeclared max-height), silently
+   clamping the log's height below combat.css's flex-based fill. Removed
+   the whole stale block. */
 
 @media (max-width: 991.98px) {
   #combat-right {
