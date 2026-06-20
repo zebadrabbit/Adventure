@@ -16,9 +16,15 @@ spec → write an implementation plan (TDD, small tasks) → implement → verif
 ## Remaining
 
 ### Spec 4 — Durability, Repair & UI  (`specs/2026-06-16-durability-repair-ui-design.md`)
-- [ ] **4a Durability (backend):** add `durability`/`max_durability` to generated gear;
-      gentle config-driven loss per fight; broken = reduced (not destroyed) bonuses;
-      `POST /api/trade/repair` paid from the hoard. Tests.
+- [x] **4a Durability (backend)** ✅ merged: `durability`/`max_durability` stamped on
+      generated gear (`app/loot/generator.py`), gentle config-driven loss per fight
+      (`app/services/durability.py::degrade_gear`, called from `combat_service`),
+      broken gear (durability 0) scales affix contribution by `broken_bonus_multiplier`
+      instead of removing it (`app/loot/equip.py::gear_bonuses`), and
+      `POST /api/trade/repair` restores it for hoard copper (`trading_api.py`). Tests:
+      `tests/test_durability.py` (8 passed). (Discovered already implemented/merged
+      under `b4371f9`/`b576cc7` — this session caught the TODO checkbox lagging behind
+      and verified it end-to-end.)
 - [~] **4b UI:** durability now shows in item tooltips (`app/static/js/tooltips.js`,
       flows automatically from the instance JSON). **Remaining (needs a live browser —
       do interactively with the `run`/`verify` skills + visual companion):**
@@ -240,6 +246,10 @@ live user availability for its visual judgment calls.
       `@pytest.mark.db_isolation` tests reset). New tests should use unique usernames
       (uuid) and unique seeds to avoid accumulation. A global per-test rollback/reset would
       remove a whole class of flakiness.
+      - [x] Concrete instance fixed: `test_payload_reflects_gear_hp`'s mock character
+            hardcoded `id = 1`, colliding with a real leftover `Character` row id=1 with
+            unlocked skills (+3 con) — `passive_bonuses(c.id)` hit the real DB and leaked
+            +6 hp_max into the assertion. Changed to `id = -1` (no real row can collide).
 - [x] **Tracked bytecode — DONE ✅:** the 7 committed `.pyc` files were `git rm --cached`d
       (`__pycache__/` was already gitignored). Working tree stays clean now.
 - [ ] **loot-body has no same-run guard** (`app/routes/hoard_api.py`): transfers a downed
