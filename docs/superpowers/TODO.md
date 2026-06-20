@@ -336,11 +336,12 @@ already-noted `glass-theme.css` dead-code follow-up.
       exists end-to-end (`POST /api/combat/<id>/cast_skill`, Spec 5b) but has no UI button
       wired to it — this static panel is the older "legacy hardcoded spell system" the
       Spec 5 entry above already flags as separate. Found during Phase 4 live verification.
-- [ ] **No run-end on full party wipe**: when every party member is downed/dead, the
-      player can still walk around the dungeon instead of the run ending and returning
-      them to the lobby/hub. Should detect full-party-defeat and force-end the dungeon
-      instance (reconcile back to lobby), consistent with how individual character death/
-      permadeath already wires into combat (Spec 2). Found during Phase 4 live
+- [x] **No run-end on full party wipe — FIXED ✅**: combat already correctly marked every
+      character `is_dead=True` on a wipe, but nothing outside combat checked it. Added
+      `combat_service.party_is_wiped()` and wired it into `process_movement()` (the one
+      function both the REST and WebSocket move paths call) and the `/adventure` page
+      route (redirects to dashboard). Tests:
+      `tests/test_party_wipe_blocks_exploration.py` (3 passed). Found during Phase 4 live
       verification — not a combat-theming issue, just noticed along the way.
 - [ ] **No random encounters while walking the dungeon**: moving around doesn't seem to
       trigger any random encounter rolls. Need to check whether the encounter-roll-on-move
