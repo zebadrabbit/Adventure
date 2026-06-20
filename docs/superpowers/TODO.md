@@ -394,6 +394,17 @@ already-noted `glass-theme.css` dead-code follow-up.
       the MP bar entirely for those classes. Came up while discussing whether barbarian
       needs a rage/energy-style alternate resource instead (it currently has none at all —
       not implemented in any form, confirmed by grep across the codebase).
+- [ ] **Ambient encounters need to be a finite per-instance pool, not an infinite random
+      roll (real feature, not a quick fix)**: even at the lowered 5%/move rate, the user
+      is still getting attacked within 1-3 tiles routinely — but the deeper complaint is
+      architectural: an infinite per-move roll lets a player farm XP endlessly by walking
+      back and forth, which isn't fair. Should redesign as: each `DungeonInstance` gets a
+      fixed number of ambient encounters seeded/placed when the instance is generated
+      (similar in spirit to `DungeonLoot`'s per-seed placement — see
+      `app/dungeon/api_helpers/encounters.py` / `generate_loot_for_seed` for the existing
+      pattern), depleted as the player encounters them, never regenerating. Needs its own
+      brainstorm/spec before implementation — this changes the core exploration loop, not
+      just a rate tweak.
 - [x] **Combat log clears and retypes after a spell cast — FIXED ✅**: every action
       handler emits `combat_update` twice per turn (player's action + the internal emit
       inside `monster_auto_turn()`), with no client-side ordering guarantee — if the
