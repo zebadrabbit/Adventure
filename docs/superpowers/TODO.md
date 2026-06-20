@@ -284,6 +284,11 @@ live user availability for its visual judgment calls.
       markers show on the map even in tiles that haven't been explored yet — should be
       hidden by fog-of-war/perception like everything else until the player actually
       uncovers that tile. Found during Phase 4 live verification.
+- [ ] **Unconscious characters can sometimes still attack**: `player_attack`/skill-cast
+      paths should be rejecting any action from a downed character (`combat_service.py`
+      already checks `attacker.get("hp", 0) <= 0` in at least one path — the gap is
+      likely one of the other action handlers, or a turn-order edge case, not
+      yet root-caused). Found during Phase 4 live verification.
 - [ ] **Combat instance resolution** uses "most recent DungeonInstance for the user"
       (`combat_service._current_instance_for_user`) — fragile with multiple instances.
 - [ ] **Migrations vs dev DB:** the dev `adventure` DB is in a `create_all` state, so
