@@ -376,10 +376,16 @@ already-noted `glass-theme.css` dead-code follow-up.
       spell list" bug above — once that's fixed, the per-character skill data should flow
       into whatever this card redesign shows. Worth its own brainstorm/spec before
       starting (it's a real feature, not a quick fix).
-- [ ] **Revisit the landing page's theming/styling**: user flagged it needs another pass.
-      Not yet scoped — likely a UI Redesign follow-up in the same vein as Phases 1/2/5a
-      (sweeping any remaining non-Cold-Steel literals/layout there), but should get its
-      own brainstorm to confirm scope before starting.
+- [x] **Landing page theming literal sweep** — root cause: Phase 5a only converted
+      `rgba(...)`-with-alpha literals in `home.css` to `color-mix()` and missed solid hex
+      colors (`--hero-gradient-1/2/3`, the hero section's dark-brown background gradient,
+      and ~9 more `color:` literals on the hero badge/title/description, CTA buttons,
+      feature items, footer links). Mapped each to the matching `var(--dungeon-*)` Cold
+      Steel alias. Mechanical literal sweep, same category as the navbar/`app.css` fixes —
+      didn't need a separate brainstorm. The one remaining hex (`#a5b4fc`, indigo hero-badge
+      accent) is an unrelated distinct accent, left alone. No layout/structural changes were
+      needed or made — if the landing page still feels off after this, that would be a real
+      layout/structure complaint warranting its own brainstorm, not another literal sweep.
 - [x] **Dashboard hub layout & flow** — fixed the concrete complaint ("dashboard
       location of items, redesign the layout to flow better"): Merchants/Hoard/
       Party-Management/Achievements were stacked vertically inside the Party Roster
