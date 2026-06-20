@@ -316,9 +316,10 @@
                     btn.disabled = false;
                 }
 
-                // Potion availability
+                // Potion availability — per-character, not a shared party pool.
                 if (btn.dataset.needsPotion) {
-                    const potCount = itemCounts['potion-healing'] || 0;
+                    const potionsByChar = itemCounts['potion-healing'] || {};
+                    const potCount = potionsByChar[String(activeCharId)] || 0;
                     if (potCount <= 0) {
                         btn.disabled = true;
                         btn.title = 'No potions available';

@@ -211,27 +211,14 @@ def _base_player_snapshot(user_id: int) -> Dict[str, Any]:
             "buffs": [],
         }
     ]
-    # Lightweight shared inventory count(s) surfaced for UI gating (e.g. potion button visibility)
-    # For now we only expose healing potion count from the first character's inventory list.
-    potion_count = 0
+    # Per-character inventory counts surfaced for UI gating (e.g. potion button
+    # visibility) — each character's potions are their own, not a shared pool.
     try:
-        first_char = chars[0] if chars else None
-        if first_char and first_char.items:
-            inv_raw = json.loads(first_char.items)
-            if isinstance(inv_raw, list):
-                for entry in inv_raw:
-                    if isinstance(entry, str) and entry == "potion-healing":
-                        potion_count += 1
-                    elif isinstance(entry, dict) and entry.get("slug") == "potion-healing":
-                        try:
-                            potion_count += int(entry.get("qty", 1))
-                        except Exception as e:
-                            logger.warning("Failed to parse potion quantity", entry=entry, exc_info=e)
-                            potion_count += 1
+        potion_counts = _potion_counts_by_character(chars)
     except Exception as e:
-        logger.warning("Failed to parse inventory", char_id=first_char.id if first_char else None, exc_info=e)
-        potion_count = potion_count or 0
-    return {"members": members, "item_counts": {"potion-healing": potion_count}}
+        logger.warning("Failed to parse inventory", exc_info=e)
+        potion_counts = {}
+    return {"members": members, "item_counts": {"potion-healing": potion_counts}}
 
 
 def _calc_initiative(party: Dict[str, Any], monster: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -439,6 +426,33 @@ def _player_ref(party: Dict[str, Any], char_id: int):
         if m.get("char_id") == char_id:
             return m
     return None
+
+
+def _count_potion_healing(character) -> int:
+    """Count potion-healing units in a single character's own inventory."""
+    count = 0
+    try:
+        if character and character.items:
+            inv_raw = json.loads(character.items)
+            if isinstance(inv_raw, list):
+                for entry in inv_raw:
+                    if isinstance(entry, str) and entry == "potion-healing":
+                        count += 1
+                    elif isinstance(entry, dict) and entry.get("slug") == "potion-healing":
+                        try:
+                            count += int(entry.get("qty", 1))
+                        except Exception:
+                            count += 1
+    except Exception:
+        pass
+    return count
+
+
+def _potion_counts_by_character(chars) -> Dict[str, int]:
+    """Per-character healing-potion counts, keyed by character id (string,
+    for JSON round-tripping). Each character's potions are their own —
+    there is no shared/party-wide potion pool."""
+    return {str(c.id): _count_potion_healing(c) for c in chars}
 
 
 def _skip_if_unconscious(session: CombatSession, party: Dict[str, Any], char_id: int) -> Optional[Dict[str, Any]]:
@@ -662,29 +676,11 @@ def _check_end(session: CombatSession):
         try:
             party = json.loads(session.party_snapshot_json or "{}") or {}
             if rewards.get("items") or rewards.get("items_list"):
-                potion_count = 0
-                from json import loads as _loads
-
-                char_rows = (
-                    Character.query.filter_by(user_id=session.user_id).order_by(Character.id.asc()).limit(1).all()
-                )
-                first_char = char_rows[0] if char_rows else None
-                if first_char and first_char.items:
-                    try:
-                        inv_raw = _loads(first_char.items)
-                        if isinstance(inv_raw, list):
-                            for entry in inv_raw:
-                                if isinstance(entry, str) and entry == "potion-healing":
-                                    potion_count += 1
-                                elif isinstance(entry, dict) and entry.get("slug") == "potion-healing":
-                                    try:
-                                        potion_count += int(entry.get("qty", 1))
-                                    except Exception:
-                                        potion_count += 1
-                    except Exception:
-                        pass
+                # Recompute per-character (not just whichever character happened to
+                # receive the loot) — each character's potions are their own.
+                reward_chars = Character.query.filter_by(user_id=session.user_id).all()
                 counts = party.setdefault("item_counts", {})
-                counts["potion-healing"] = potion_count
+                counts["potion-healing"] = _potion_counts_by_character(reward_chars)
                 session.party_snapshot_json = json.dumps(party)
         except Exception:
             pass
@@ -1408,10 +1404,11 @@ def player_use_item(
             break
     if not used:
         return {"error": "cannot_use"}
-    # Attempt to remove the item from the first character's inventory list if present
+    # Remove the item from the ACTING character's own inventory — potions are not
+    # a shared party pool, each character carries their own.
     removed_successfully = False
     try:
-        char_row = Character.query.filter_by(user_id=session.user_id).first()
+        char_row = db.session.get(Character, actor_id)
         if char_row and char_row.items:
             inv = []
             try:
@@ -1451,13 +1448,15 @@ def player_use_item(
                 db.session.add(char_row)
     except Exception:
         pass
-    # Decrement surfaced party item counts if present and we actually removed an item.
+    # Decrement the acting character's own surfaced item count (per-character,
+    # not a shared party pool).
     try:
         if removed_successfully:
-            counts = party.setdefault("item_counts", {})
+            all_counts = party.setdefault("item_counts", {})
             if slug == "potion-healing":
-                current = int(counts.get("potion-healing", 0))
-                counts["potion-healing"] = max(0, current - 1)
+                per_char = all_counts.setdefault("potion-healing", {})
+                current = int(per_char.get(str(actor_id), 0))
+                per_char[str(actor_id)] = max(0, current - 1)
     except Exception:
         pass
     session.party_snapshot_json = json.dumps(party)

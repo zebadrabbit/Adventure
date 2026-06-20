@@ -56,33 +56,17 @@ def combat_state(combat_id: int):
                 mana = m.get("mana", 0)
                 mana_max = m.get("mana_max", 0) or 1
                 m["mana_pct"] = round(100 * mana / mana_max, 1)
-            # Ensure item_counts present for older sessions (compute minimal potion-healing count)
+            # Ensure item_counts present for older sessions (per-character, not pooled —
+            # each character's potions are their own).
             if "item_counts" not in data["party"]:
-                import json as _json
-
                 from app.models.models import Character as _Ch
+                from app.services.combat_service import _potion_counts_by_character
 
                 try:
-                    counts = {"potion-healing": 0}
-                    char_row = _Ch.query.filter_by(user_id=current_user.id).first()
-                    if char_row and char_row.items:
-                        inv = []
-                        try:
-                            inv = _json.loads(char_row.items)
-                        except Exception:
-                            inv = []
-                        if isinstance(inv, list):
-                            for entry in inv:
-                                if isinstance(entry, str) and entry == "potion-healing":
-                                    counts["potion-healing"] += 1
-                                elif isinstance(entry, dict) and entry.get("slug") == "potion-healing":
-                                    try:
-                                        counts["potion-healing"] += int(entry.get("qty", 1))
-                                    except Exception:
-                                        counts["potion-healing"] += 1
-                    data["party"]["item_counts"] = counts
+                    chars = _Ch.query.filter_by(user_id=current_user.id).all()
+                    data["party"]["item_counts"] = {"potion-healing": _potion_counts_by_character(chars)}
                 except Exception:
-                    data["party"]["item_counts"] = {"potion-healing": 0}
+                    data["party"]["item_counts"] = {"potion-healing": {}}
         if data.get("monster_hp") is not None and data.get("monster_max_hp"):
             mhp = data["monster_hp"]
             mmax = data["monster_max_hp"] or 1
