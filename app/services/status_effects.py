@@ -37,7 +37,9 @@ Participant = Dict[str, Any]
 
 def _poison_start(target: Participant, effect: Effect) -> List[str]:
     dmg = int(effect.get("data", {}).get("damage", 5))
-    # Apply damage but not below zero
+    # Floors at 0, unlike apply_tick_decay's out-of-combat floor of 1 --
+    # poison can down a player mid-fight (same as any other damage source),
+    # but should never be the cause of death while just exploring.
     prev = target.get("hp", 0)
     target["hp"] = max(0, prev - dmg)
     return [f"{target.get('name','?')} suffers {dmg} poison damage ({target.get('hp')})"]

@@ -65,19 +65,25 @@ and `"current_mana"`/`"mana"`), and `hp_max`/`mana_max` are *computed* from
 CON/INT/level/gear bonuses/passive skills, not stored. That formula is
 already duplicated nearly verbatim in `dashboard_helpers.build_party_payload`
 and `combat_service.py`. Writing a third copy for `apply_tick_decay` would be
-a correctness risk (the three could silently drift apart), so this phase
-extracts one shared helper and points both existing call sites at it:
+a correctness risk (the three could silently drift apart).
 
-- New `app/services/character_stats.py`: `compute_hp_mana_max(character) ->
-  tuple[int, int]`, containing the formula currently duplicated in the two
-  files above (base + CON/INT/level + gear bonuses + passive skill bonuses).
-- `dashboard_helpers.build_party_payload` and `combat_service.py`'s
-  equivalent block both call this helper instead of recomputing inline.
-- `apply_tick_decay` (below) also calls this helper to know each character's
-  cap for regen.
-
-This is the one piece of "fix what's in the way" cleanup for this phase —
-no other refactoring is in scope.
+**Correction made during implementation planning (overrides the paragraph
+above):** the original intent here was to extract one shared helper and
+repoint `dashboard_helpers.build_party_payload`/`combat_service.py` at it,
+eliminating the duplication entirely. On closer inspection,
+`combat_service._derive_stats` doesn't compute *just* hp_max/mana_max — it
+derives attack/defense/speed in the same pass, so "extract and repoint"
+would mean touching tested, working combat math for a tangential dedup.
+The implementation plan narrowed this to: `compute_hp_mana_max` is new,
+standalone, and used **only** by this phase's new code (`apply_tick_decay`).
+`dashboard_helpers.build_party_payload` and `combat_service._derive_stats`
+keep their existing duplicated formulas untouched. This means the
+drift-risk this section originally warned about is **not eliminated** —
+there are still three independent copies of this formula (now including
+`compute_hp_mana_max` itself) that can silently diverge. That's a deliberate,
+confirmed tradeoff (smaller blast radius over full deduplication), not an
+oversight — but future phases should not assume the dedup described above
+actually happened.
 
 ### New model: `CharacterStatusEffect`
 
