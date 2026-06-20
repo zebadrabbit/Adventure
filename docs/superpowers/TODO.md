@@ -313,10 +313,21 @@ already-noted `glass-theme.css` dead-code follow-up.
         `start_session`. Not an engine bug.
       - `tests/test_encounter_config.py` — autouse fixture seeds a boss+common monster
         spanning the band and clears the spawn cache.
-- [ ] **Test isolation generally:** the suite reuses one session DB (only
-      `@pytest.mark.db_isolation` tests reset). New tests should use unique usernames
-      (uuid) and unique seeds to avoid accumulation. A global per-test rollback/reset would
-      remove a whole class of flakiness.
+- [ ] **Test isolation generally — audited, not architecturally fixed (deliberately
+      deferred):** the suite reuses one session DB (only `@pytest.mark.db_isolation` tests
+      reset). New tests should use unique usernames (uuid) and unique seeds to avoid
+      accumulation. The real fix — a global per-test transaction rollback — is correct but
+      is a fixture-architecture change that would invalidate assumptions several existing
+      tests already lean on (e.g. `auth_client`'s shared "tester" user reused across the
+      whole session, `test_party_wipe_blocks_exploration.py`'s autouse revive/cleanup
+      fixture). That needs a full audit of all ~390 tests' assumptions and a human review
+      of the resulting diff — explicitly NOT attempted unsupervised. Audited for the same
+      bug class as the fix below (hardcoded low integer IDs colliding with real leftover
+      rows) and found two more candidates, both confirmed safe on inspection, not bugs:
+      `test_time_and_encounters.py`'s `DummyInstance.id = 1` only feeds a fabricated
+      monster slug (`"m1"`) that can't match real seeded data; `test_unconscious_actions.py`'s
+      `skill_id=1` is short-circuited by the downed-character check firing before any real
+      Skill/CharacterSkill lookup (confirmed by the test's own comment and the code path).
       - [x] Concrete instance fixed: `test_payload_reflects_gear_hp`'s mock character
             hardcoded `id = 1`, colliding with a real leftover `Character` row id=1 with
             unlocked skills (+3 con) — `passive_bonuses(c.id)` hit the real DB and leaked
