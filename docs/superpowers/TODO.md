@@ -313,15 +313,23 @@ already-noted `glass-theme.css` dead-code follow-up.
         `start_session`. Not an engine bug.
       - `tests/test_encounter_config.py` — autouse fixture seeds a boss+common monster
         spanning the band and clears the spawn cache.
-- [ ] **Test isolation generally — audited, not architecturally fixed (deliberately
-      deferred):** the suite reuses one session DB (only `@pytest.mark.db_isolation` tests
-      reset). New tests should use unique usernames (uuid) and unique seeds to avoid
-      accumulation. The real fix — a global per-test transaction rollback — is correct but
-      is a fixture-architecture change that would invalidate assumptions several existing
-      tests already lean on (e.g. `auth_client`'s shared "tester" user reused across the
-      whole session, `test_party_wipe_blocks_exploration.py`'s autouse revive/cleanup
-      fixture). That needs a full audit of all ~390 tests' assumptions and a human review
-      of the resulting diff — explicitly NOT attempted unsupervised. Audited for the same
+- [x] **Test isolation — fixed for real via per-test SAVEPOINT rollback.** Added
+      `_db_transaction_rollback` to `tests/conftest.py`: wraps every unmarked test in a
+      connection + outer transaction + nested SAVEPOINT, rebinds `db.session` to that
+      connection for the test's duration, and an `after_transaction_end` listener restarts
+      the SAVEPOINT every time application code calls `session.commit()` — so commits
+      never reach the outer transaction. After the test, the outer transaction rolls back
+      and the connection closes, discarding every write (committed or not). Had to
+      preserve the app's real `session_options` (notably `expire_on_commit=False`) when
+      rebinding — dropping it caused `DetachedInstanceError` the moment a test's own
+      nested `with test_app.app_context():` usage tore down an intermediate
+      scoped-session entry. `@pytest.mark.db_isolation` tests are skipped by this fixture
+      (they call `drop_all()`/`create_all()` directly, which would fight SAVEPOINT
+      nesting) — they already get full isolation from `_conditional_db_isolation`'s
+      rebuild. Verified: full suite green across 3 consecutive runs (388 passed,
+      identical results every time) — the previously-flaky `test_combat_flee_and_monster.py`
+      and `test_auth_routes.py` register-test failures, both confirmed shared-DB-state
+      symptoms, did not reappear. Audited beforehand for the same
       bug class as the fix below (hardcoded low integer IDs colliding with real leftover
       rows) and found two more candidates, both confirmed safe on inspection, not bugs:
       `test_time_and_encounters.py`'s `DummyInstance.id = 1` only feeds a fabricated
