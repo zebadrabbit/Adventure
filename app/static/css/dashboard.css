@@ -167,6 +167,30 @@ body {
     border-bottom: 2px solid color-mix(in srgb, var(--adv-primary) 80%, transparent);
 }
 
+/* Hub Actions panel (Merchants/Hoard/Party/Achievements tabs) */
+.hub-actions-panel .nav-tabs {
+    border-bottom: 1px solid color-mix(in srgb, var(--adv-primary) 25%, transparent);
+}
+
+.hub-actions-panel .nav-link {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    padding: 0.5rem 1.25rem;
+    transition: all 0.2s ease;
+}
+
+.hub-actions-panel .nav-link:hover {
+    color: rgba(255, 255, 255, 0.9);
+    background: color-mix(in srgb, var(--adv-primary) 10%, transparent);
+}
+
+.hub-actions-panel .nav-link.active {
+    color: #fff;
+    background: color-mix(in srgb, var(--adv-primary) 15%, transparent);
+    border-bottom: 2px solid color-mix(in srgb, var(--adv-primary) 80%, transparent);
+}
+
 .chat-messages {
     background: rgba(0, 0, 0, 0.3);
     padding: 1rem;
