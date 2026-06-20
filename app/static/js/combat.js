@@ -15,7 +15,12 @@
     // it permanently (document.getElementById would return null forever
     // after, since the node itself is gone, not just its position).
     const combatLeft = document.getElementById('combat-left');
-    let latestVersion = null;
+    // Every action handler emits 'combat_update' twice per turn (once for the
+    // player's own action, once more inside monster_auto_turn() for the
+    // counterattack) with no guaranteed delivery order. Without this guard, an
+    // older (shorter-log) emit arriving after a newer one made appendLog()
+    // think the log "shrank" and wipe + retype the entire log from scratch.
+    let lastRenderedVersion = -1;
     let socket = null;
     let pollingInterval = null; // fallback
 
@@ -162,6 +167,10 @@
 
     function render(state) {
         if (!state) return;
+        if (typeof state.version === 'number') {
+            if (state.version < lastRenderedVersion) return; // stale/out-of-order — ignore
+            lastRenderedVersion = state.version;
+        }
         const m = state.monster || {};
         monsterNameEl.textContent = m.name || 'Monster';
         monsterLevelEl.textContent = 'Lv ' + (m.level || '?');
@@ -503,7 +512,6 @@
         socket.on('combat_update', (state) => {
             // Only process relevant combat id
             if (!state || state.id !== combatId) return;
-            latestVersion = state.version;
             render(state);
         });
         socket.on('combat_end', (state) => {
