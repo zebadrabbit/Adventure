@@ -387,14 +387,67 @@ already-noted `glass-theme.css` dead-code follow-up.
       used by all six. Tests: `tests/test_unconscious_actions.py` (5 passed, TDD —
       confirmed each failed for the right reason before the fix). Found during Phase 4
       live verification.
-- [ ] **Character cards need more detail (deferred feature, not a bug)**: full stats/DPS,
-      buffs/debuffs, and correct per-character spell costs aren't shown on the combat
-      party cards today. Came up repeatedly during Phase 4 live verification (e.g. asking
-      "is Elias's spell list correct" and "what's his DPS" had to be answered by querying
-      the DB directly, not from the UI). Related to the already-logged "shared static
-      spell list" bug above — once that's fixed, the per-character skill data should flow
-      into whatever this card redesign shows. Worth its own brainstorm/spec before
-      starting (it's a real feature, not a quick fix).
+- [x] **Character cards Phase A: persistent status effects — done.** Added
+      `CharacterStatusEffect` (new table, migration `c7d8e9f0a1b2`) so poison
+      survives past combat instead of vanishing at combat end, decaying via
+      the overworld GameClock (`apply_tick_decay`, hooked into
+      `time_service.advance_time`) when out of a fight, and via the existing
+      turn-based loop in combat (now actually wired for players too --
+      `apply_start_of_turn` previously only ever ran for the monster).
+      Out-of-combat poison floors at 1 HP (can't kill while exploring).
+      Added slow passive HP/MP regen on the same tick hook, rates tunable
+      via `GameConfig` `regen_rates` (defaults 0.5%/1% of max per tick).
+      Extracted `compute_hp_mana_max` as the one place this phase's new code
+      computes HP/mana caps -- deliberately did **not** touch the two
+      pre-existing duplicated copies in `combat_service._derive_stats` and
+      `dashboard_helpers.build_party_payload` to avoid risking working
+      combat/dashboard code for a tangential dedup. Spec:
+      `docs/superpowers/specs/2026-06-20-character-cards-phase-a-status-effects-design.md`.
+      Foundation only -- no card UI changes yet. Three more phases remain,
+      each its own future brainstorm/spec:
+      - [ ] Phase B: new effect sources (potion regen-over-time buff, camp buff).
+      - [ ] Phase C: dashboard roster card redesign (collapsed HP/MP/buffs/debuffs,
+            expand-on-select to a context area with actions + full stats).
+      - [ ] Phase D: combat party card redesign (collapsed, auto-expand on that
+            character's turn) + accurate per-character spell costs.
+- [x] **Test isolation fix from earlier this session never actually worked —
+      found and fixed while verifying Phase A.** The `_db_transaction_rollback`
+      SAVEPOINT fixture committed earlier today silently did nothing:
+      Flask-SQLAlchemy 3.x's `Session.get_bind()` resolves every query through
+      `self._db.engines[bind_key]`, never consulting a sessionmaker-level
+      `bind=` kwarg, so `db.session` kept committing for real to the test DB
+      the whole time -- invisible to pytest's pass/fail output since test
+      usernames were unique enough to avoid visible collisions (confirmed: 40+
+      permanently-leaked "Hero" characters from this session's own TDD work).
+      Real fix required three iterations: (1) patch `Session.get_bind` at the
+      class level instead, gated to leave `db.engines[None]`/`db.engine`
+      untouched (an `engines[None]` swap looked equivalent but broke
+      `app/seed_items.py` and `tests/test_monsters.py`'s `raw_connection()`
+      calls); (2) give `do_commit`/`do_rollback` SAVEPOINT semantics at the
+      connection's dialect *class* level rather than a flat no-op (a no-op
+      commit made any later, unrelated `rollback()` -- e.g. one buried inside
+      Flask-SocketIO's test client -- wipe out everything committed earlier in
+      the test, not just the current unit of work); (3) gate that dialect
+      patch by `dbapi_connection` identity, since the class-level patch
+      affects every connection the engine hands out, not just the held one
+      (`db.create_all()` opens its own separate connection mid-test and must
+      fall through to the real implementation). Verified: 4 consecutive full
+      runs post-fix, 402 passed / 0 failed / 0 errors every time, including
+      once against a `db.drop_all()` + `alembic upgrade head`-rebuilt DB.
+      Also marked `tests/test_legacy_sha256_upgrade.py` and
+      `tests/test_legacy_password_upgrade.py` `@pytest.mark.db_isolation`:
+      both swap `app.config["SQLALCHEMY_DATABASE_URI"]` to an in-memory
+      SQLite DB mid-test, a pattern Flask-SQLAlchemy 3.x silently ignores
+      (engine is cached at init, confirmed empirically that config changes
+      after that point have zero effect) -- their `db.drop_all()` has
+      therefore always targeted the real Postgres test schema the whole time,
+      "fixed" afterward only because other tests' fixtures defensively call
+      `create_all()` again.
+      - [ ] **Follow-up, not fixed:** the dead-SQLite-config pattern in those
+            two files should be removed/replaced with a real isolated SQLite
+            setup or deleted in favor of the now-working Postgres isolation --
+            currently harmless only by accident (other tests' defensive
+            `create_all()` calls happen to repair the dropped schema).
 - [x] **Landing page theming literal sweep** — root cause: Phase 5a only converted
       `rgba(...)`-with-alpha literals in `home.css` to `color-mix()` and missed solid hex
       colors (`--hero-gradient-1/2/3`, the hero section's dark-brown background gradient,
