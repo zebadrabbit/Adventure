@@ -133,13 +133,13 @@
     width: 24px;
     height: 24px;
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.7);
+    background: color-mix(in srgb, var(--ui-bg) 80%, black);
     backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid color-mix(in srgb, var(--ui-accent) 25%, transparent);
     animation: statusPulse 2s ease-in-out infinite;
 }
 
@@ -148,45 +148,50 @@
     0%,
     100% {
         transform: scale(1);
-        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4);
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--ui-accent) 40%, transparent);
     }
 
     50% {
         transform: scale(1.05);
-        box-shadow: 0 0 8px 2px rgba(255, 255, 255, 0.2);
+        box-shadow: 0 0 8px 2px color-mix(in srgb, var(--ui-accent) 20%, transparent);
     }
 }
 
-.status-poison {
-    border-color: rgba(74, 222, 128, 0.5);
-}
-
+/* Danger group */
 .status-burn {
-    border-color: rgba(239, 68, 68, 0.5);
+    border-color: color-mix(in srgb, var(--ui-danger) 50%, transparent);
 }
 
-.status-freeze {
-    border-color: rgba(96, 165, 250, 0.5);
-}
-
-.status-stun {
-    border-color: rgba(251, 191, 36, 0.5);
-}
-
-.status-shield {
-    border-color: rgba(59, 130, 246, 0.5);
-}
-
+/* Success group */
 .status-regen {
-    border-color: rgba(74, 222, 128, 0.5);
+    border-color: color-mix(in srgb, var(--ui-success) 50%, transparent);
+}
+
+/* Warning group */
+.status-stun {
+    border-color: color-mix(in srgb, var(--ui-warning) 50%, transparent);
 }
 
 .status-curse {
-    border-color: rgba(168, 85, 247, 0.5);
+    border-color: color-mix(in srgb, var(--ui-warning) 50%, transparent);
 }
 
 .status-blessed {
-    border-color: rgba(251, 191, 36, 0.5);
+    border-color: color-mix(in srgb, var(--ui-warning) 50%, transparent);
+}
+
+/* Accent group */
+.status-freeze {
+    border-color: color-mix(in srgb, var(--ui-accent) 50%, transparent);
+}
+
+.status-shield {
+    border-color: color-mix(in srgb, var(--ui-accent) 50%, transparent);
+}
+
+/* Poison is its own DOT effect alongside burn/bleed -> danger group */
+.status-poison {
+    border-color: color-mix(in srgb, var(--ui-danger) 50%, transparent);
 }
 
 /* Party member positioning for status indicators */
