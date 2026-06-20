@@ -146,8 +146,8 @@ a:hover {
 
 .progress-glass {
     height: 18px;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: color-mix(in srgb, var(--ui-bg) 70%, var(--ui-elevated));
+    border: 1px solid color-mix(in srgb, var(--ui-accent) 15%, transparent);
     border-radius: 10px;
     overflow: hidden;
     position: relative;
@@ -155,34 +155,40 @@ a:hover {
 
 .progress-glass-sm {
     height: 8px;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: color-mix(in srgb, var(--ui-bg) 70%, var(--ui-elevated));
+    border: 1px solid color-mix(in srgb, var(--ui-accent) 15%, transparent);
     border-radius: 6px;
     overflow: hidden;
     position: relative;
 }
 
 .progress-bar-danger {
-    background: linear-gradient(90deg, #ef4444, #dc2626);
+    background: linear-gradient(90deg,
+            var(--ui-danger),
+            color-mix(in srgb, var(--ui-danger) 70%, black));
     height: 100%;
     transition: width 0.4s ease;
-    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2);
+    box-shadow: inset 0 1px 2px color-mix(in srgb, var(--ui-text) 20%, transparent);
     border-radius: 10px;
 }
 
 .progress-bar-primary {
-    background: linear-gradient(90deg, #3b82f6, #2563eb);
+    background: linear-gradient(90deg,
+            var(--ui-accent),
+            color-mix(in srgb, var(--ui-accent) 70%, black));
     height: 100%;
     transition: width 0.4s ease;
-    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2);
+    box-shadow: inset 0 1px 2px color-mix(in srgb, var(--ui-text) 20%, transparent);
     border-radius: 10px;
 }
 
 .progress-bar-success {
-    background: linear-gradient(90deg, #10b981, #059669);
+    background: linear-gradient(90deg,
+            var(--ui-success),
+            color-mix(in srgb, var(--ui-success) 70%, black));
     height: 100%;
     transition: width 0.4s ease;
-    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2);
+    box-shadow: inset 0 1px 2px color-mix(in srgb, var(--ui-text) 20%, transparent);
 }
 
 /* ========================================
@@ -196,9 +202,9 @@ a:hover {
 }
 
 .btn-combat {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: rgba(255, 255, 255, 0.9);
+    background: var(--ui-elevated);
+    border: 1px solid color-mix(in srgb, var(--ui-accent) 25%, transparent);
+    color: var(--ui-text);
     padding: 0.5rem 0.75rem;
     border-radius: 8px;
     font-size: 0.85rem;
@@ -212,11 +218,11 @@ a:hover {
 }
 
 .btn-combat:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.2);
-    border-color: rgba(255, 255, 255, 0.3);
-    color: #fff;
+    background: color-mix(in srgb, var(--ui-elevated) 70%, var(--ui-accent));
+    border-color: color-mix(in srgb, var(--ui-accent) 45%, transparent);
+    color: var(--ui-text);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--ui-bg) 60%, transparent);
 }
 
 .btn-combat:active:not(:disabled) {
@@ -230,58 +236,58 @@ a:hover {
 
 /* Combat button variants */
 .btn-combat-attack {
-    border-color: rgba(239, 68, 68, 0.5);
-    color: rgba(248, 113, 113, 1);
+    border-color: color-mix(in srgb, var(--ui-danger) 50%, transparent);
+    color: color-mix(in srgb, var(--ui-danger) 80%, var(--ui-text));
 }
 
 .btn-combat-attack:hover:not(:disabled) {
-    background: rgba(239, 68, 68, 0.2);
-    border-color: rgba(239, 68, 68, 0.7);
-    color: #fff;
+    background: color-mix(in srgb, var(--ui-danger) 20%, var(--ui-elevated));
+    border-color: color-mix(in srgb, var(--ui-danger) 70%, transparent);
+    color: var(--ui-text);
 }
 
 .btn-combat-defend {
-    border-color: rgba(251, 191, 36, 0.5);
-    color: rgba(252, 211, 77, 1);
+    border-color: color-mix(in srgb, var(--ui-warning) 50%, transparent);
+    color: color-mix(in srgb, var(--ui-warning) 80%, var(--ui-text));
 }
 
 .btn-combat-defend:hover:not(:disabled) {
-    background: rgba(251, 191, 36, 0.2);
-    border-color: rgba(251, 191, 36, 0.7);
-    color: #fff;
+    background: color-mix(in srgb, var(--ui-warning) 20%, var(--ui-elevated));
+    border-color: color-mix(in srgb, var(--ui-warning) 70%, transparent);
+    color: var(--ui-text);
 }
 
 .btn-combat-spell {
-    border-color: rgba(139, 92, 246, 0.5);
-    color: rgba(167, 139, 250, 1);
+    border-color: color-mix(in srgb, var(--ui-accent) 50%, transparent);
+    color: color-mix(in srgb, var(--ui-accent) 80%, var(--ui-text));
 }
 
 .btn-combat-spell:hover:not(:disabled) {
-    background: rgba(139, 92, 246, 0.2);
-    border-color: rgba(139, 92, 246, 0.7);
-    color: #fff;
+    background: color-mix(in srgb, var(--ui-accent) 20%, var(--ui-elevated));
+    border-color: color-mix(in srgb, var(--ui-accent) 70%, transparent);
+    color: var(--ui-text);
 }
 
 .btn-combat-heal {
-    border-color: rgba(34, 197, 94, 0.5);
-    color: rgba(134, 239, 172, 1);
+    border-color: color-mix(in srgb, var(--ui-success) 50%, transparent);
+    color: color-mix(in srgb, var(--ui-success) 80%, var(--ui-text));
 }
 
 .btn-combat-heal:hover:not(:disabled) {
-    background: rgba(34, 197, 94, 0.2);
-    border-color: rgba(34, 197, 94, 0.7);
-    color: #fff;
+    background: color-mix(in srgb, var(--ui-success) 20%, var(--ui-elevated));
+    border-color: color-mix(in srgb, var(--ui-success) 70%, transparent);
+    color: var(--ui-text);
 }
 
 .btn-combat-flee {
-    border-color: rgba(156, 163, 175, 0.5);
-    color: rgba(209, 213, 219, 1);
+    border-color: color-mix(in srgb, var(--ui-text-dim) 50%, transparent);
+    color: var(--ui-text-dim);
 }
 
 .btn-combat-flee:hover:not(:disabled) {
-    background: rgba(156, 163, 175, 0.2);
-    border-color: rgba(156, 163, 175, 0.7);
-    color: #fff;
+    background: color-mix(in srgb, var(--ui-text-dim) 20%, var(--ui-elevated));
+    border-color: color-mix(in srgb, var(--ui-text-dim) 70%, transparent);
+    color: var(--ui-text);
 }
 
 /* ========================================
