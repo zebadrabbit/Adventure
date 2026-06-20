@@ -326,14 +326,9 @@ already-noted `glass-theme.css` dead-code follow-up.
 - [ ] **loot-body has no same-run guard** (`app/routes/hoard_api.py`): transfers a downed
       ally's bag to any owned character. Enforcing "same run" needs a notion of which run a
       *living* character is in (only downed characters get `locked_dungeon_id`).
-- [ ] **Monster HP label never updates** (`app/templates/combat.html`'s `#monster-hp-text`
-      span vs. `app/static/js/combat.js:145-154`'s `render()`): the live "X / Y" text is
-      written into `#monster-hp-bar` (the progress-bar fill div) instead of the visible
-      `#monster-hp-text` label, which stays frozen at its template default "0 / 0" for the
-      whole fight. Backend data is correct (verified against a live `CombatSession` row —
-      `monster.hp`/`monster_hp` populated properly); this is a pure front-end wiring bug.
-      Found during Phase 4 combat-theming live verification (unrelated to that change —
-      predates it).
+- [x] **Monster HP label never updates — FIXED ✅**: `render()` now updates the actual
+      `#monster-hp-text` label instead of writing into `#monster-hp-bar`'s fill div.
+      Found and fixed during Phase 4 live verification.
 - [ ] **Combat action panel is one static spell list for every character**
       (`app/templates/combat.html`'s single `#combat-action-panel`, hardcoded Firebolt/Ice
       Shard/Lightning buttons): not class- or character-specific, so every party member
