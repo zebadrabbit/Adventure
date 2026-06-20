@@ -297,6 +297,10 @@ live user availability for its visual judgment calls.
       spell list" bug above — once that's fixed, the per-character skill data should flow
       into whatever this card redesign shows. Worth its own brainstorm/spec before
       starting (it's a real feature, not a quick fix).
+- [ ] **Revisit the landing page's theming/styling**: user flagged it needs another pass.
+      Not yet scoped — likely a UI Redesign follow-up in the same vein as Phases 1/2/5a
+      (sweeping any remaining non-Cold-Steel literals/layout there), but should get its
+      own brainstorm to confirm scope before starting.
 - [ ] **Combat instance resolution** uses "most recent DungeonInstance for the user"
       (`combat_service._current_instance_for_user`) — fragile with multiple instances.
 - [ ] **Migrations vs dev DB:** the dev `adventure` DB is in a `create_all` state, so
