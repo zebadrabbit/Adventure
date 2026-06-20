@@ -214,6 +214,10 @@
         margin-bottom: 1.5rem;
     }
 
+    .settings-checkbox {
+        margin-right: 0.5rem;
+    }
+
     @media (max-width: 768px) {
         .settings-grid {
             grid-template-columns: 1fr;
@@ -354,8 +358,8 @@
             <form method="POST" action="{{ url_for('account.settings') }}" class="settings-form">
                 <div class="form-group">
                     <label class="form-label">
-                        <input type="checkbox" name="email_notifications" {{ 'checked' if
-                            current_user.email_notifications else '' }} style="margin-right: 0.5rem;">
+                        <input type="checkbox" name="email_notifications" class="settings-checkbox" {{ 'checked' if
+                            current_user.email_notifications else '' }}>
                         Email Notifications
                     </label>
                     <div class="form-hint">Receive updates about your adventures</div>
@@ -363,8 +367,8 @@
 
                 <div class="form-group">
                     <label class="form-label">
-                        <input type="checkbox" name="combat_animations" {{ 'checked' if current_user.combat_animations
-                            else '' }} style="margin-right: 0.5rem;">
+                        <input type="checkbox" name="combat_animations" class="settings-checkbox" {{ 'checked' if
+                            current_user.combat_animations else '' }}>
                         Combat Animations
                     </label>
                     <div class="form-hint">Enable visual effects during battles</div>
@@ -388,14 +392,5 @@
     </div>
 </div>
 
-<script>
-    function confirmDeleteAccount() {
-        if (confirm('Are you absolutely sure you want to delete your account? This action cannot be undone and all your characters, progress, and data will be permanently lost.')) {
-            if (confirm('This is your last chance. Type "DELETE" in the prompt to confirm.\n\nAre you really sure?')) {
-                // TODO: Implement account deletion endpoint
-                alert('Account deletion is not yet implemented. Please contact an administrator.');
-            }
-        }
-    }
-</script>
+<script src="{{ asset_url('js/account-settings.js') }}"></script>
 {% endblock %}
