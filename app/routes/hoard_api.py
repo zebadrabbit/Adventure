@@ -2,7 +2,7 @@
 
 import json
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 from flask_login import current_user, login_required
 
 from app import db
@@ -71,6 +71,13 @@ def loot_body():
         return jsonify({"error": "Character not found"}), 404
     if not downed.is_dead:
         return jsonify({"error": "Character is not downed"}), 400
+    # Same-run guard: owning both characters isn't enough — survivor must
+    # actually be part of the party that started this run, or any character
+    # could risklessly vacuum up a downed ally's loot via an uninvolved mule
+    # that never entered the dungeon at all.
+    current_party_ids = session.get("last_party_ids") or []
+    if downed_id not in current_party_ids or survivor_id not in current_party_ids:
+        return jsonify({"error": "Character not part of the current run"}), 403
 
     bag = load_inventory(downed.items)
     survivor_bag = load_inventory(survivor.items)

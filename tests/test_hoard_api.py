@@ -53,6 +53,8 @@ def test_loot_body_transfers_bag_to_survivor(client):
     survivor = create_character(user, name="Living", items=[])
     db.session.commit()
     _login(client, user)
+    with client.session_transaction() as sess:
+        sess["last_party_ids"] = [downed.id, survivor.id]
 
     resp = client.post(
         "/api/dungeon/loot-body",
@@ -63,6 +65,36 @@ def test_loot_body_transfers_bag_to_survivor(client):
     db.session.refresh(downed)
     assert any(i.get("slug") == "potion_heal_l1" for i in json.loads(survivor.items))
     assert json.loads(downed.items) == []
+
+
+def test_loot_body_rejects_survivor_outside_current_run(client):
+    """A character not in the current run's party must not be able to loot a
+    downed ally's bag — even though it's the same user, that survivor never
+    set foot in this run, so this would otherwise let players risklessly
+    extract a downed character's loot via an uninvolved mule character."""
+    import uuid
+
+    from tests.factories import create_character, create_user
+
+    user = create_user("loot_c_" + uuid.uuid4().hex[:8])
+    downed = create_character(user, name="Fallen", items=[{"slug": "potion_heal_l1", "qty": 2}])
+    downed.is_dead = True
+    outsider = create_character(user, name="NotInThisRun", items=[])
+    db.session.commit()
+    _login(client, user)
+    with client.session_transaction() as sess:
+        # Only "downed" was ever part of this run's party.
+        sess["last_party_ids"] = [downed.id]
+
+    resp = client.post(
+        "/api/dungeon/loot-body",
+        json={"downed_id": downed.id, "survivor_id": outsider.id},
+    )
+    assert resp.status_code == 403, resp.get_json()
+    db.session.refresh(outsider)
+    db.session.refresh(downed)
+    assert json.loads(outsider.items) == []
+    assert any(i.get("slug") == "potion_heal_l1" for i in json.loads(downed.items))
 
 
 def test_loot_body_requires_downed_character(client):
