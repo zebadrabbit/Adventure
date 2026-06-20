@@ -113,10 +113,12 @@ def test_advance_time_triggers_decay_outside_combat(auth_client):
 
     from app import db
     from app.models import CharacterStatusEffect, GameClock
-    from app.models.models import Character
+    from app.models.models import Character, User
     from app.services import time_service
 
-    char = Character.query.filter_by(name="Hero").first()
+    user = User.query.filter_by(username="tester").first()
+    assert user is not None
+    char = Character.query.filter_by(user_id=user.id).first()
     assert char is not None
     char.stats = _json.dumps({"con": 10, "int": 10, "hp": 5, "current_mana": 5})
     db.session.add(char)
@@ -124,7 +126,7 @@ def test_advance_time_triggers_decay_outside_combat(auth_client):
     db.session.commit()
 
     GameClock.get()  # ensure row exists
-    time_service.advance_time(1, reason="test")
+    time_service.advance_time(1, reason="test", character_ids=[char.id])
 
     db.session.refresh(char)
     stats = _json.loads(char.stats)
@@ -132,15 +134,48 @@ def test_advance_time_triggers_decay_outside_combat(auth_client):
     assert stats["hp"] == 4  # 5 - 2 + 1 = 4
 
 
+def test_advance_time_skips_decay_when_no_character_ids_given(auth_client):
+    """character_ids is opt-in: omitting it must not fall back to scanning
+    every character in the database -- it should simply skip decay/regen
+    for that call, leaving other characters' state untouched.
+    """
+    import json as _json
+
+    from app import db
+    from app.models import CharacterStatusEffect
+    from app.models.models import Character, User
+    from app.services import time_service
+
+    user = User.query.filter_by(username="tester").first()
+    assert user is not None
+    char = Character.query.filter_by(user_id=user.id).first()
+    assert char is not None
+    char.stats = _json.dumps({"con": 10, "int": 10, "hp": 5, "current_mana": 5})
+    db.session.add(char)
+    db.session.add(CharacterStatusEffect(character_id=char.id, name="poison", remaining=5, data='{"damage": 2}'))
+    db.session.commit()
+
+    time_service.advance_time(1, reason="test")  # no character_ids passed
+
+    db.session.refresh(char)
+    stats = _json.loads(char.stats)
+    assert stats["hp"] == 5  # untouched -- decay never ran for this call
+
+    effect = CharacterStatusEffect.query.filter_by(character_id=char.id).first()
+    assert effect.remaining == 5  # untouched
+
+
 def test_advance_time_does_not_decay_during_combat(auth_client):
     import json as _json
 
     from app import db
     from app.models import CharacterStatusEffect
-    from app.models.models import Character
+    from app.models.models import Character, User
     from app.services import time_service
 
-    char = Character.query.filter_by(name="Hero").first()
+    user = User.query.filter_by(username="tester").first()
+    assert user is not None
+    char = Character.query.filter_by(user_id=user.id).first()
     assert char is not None
     char.stats = _json.dumps({"con": 10, "int": 10, "hp": 5, "current_mana": 5})
     db.session.add(char)
@@ -149,9 +184,42 @@ def test_advance_time_does_not_decay_during_combat(auth_client):
 
     time_service.set_combat_state(True)
     try:
-        time_service.advance_time(1, reason="test")
+        time_service.advance_time(1, reason="test", character_ids=[char.id])
         db.session.refresh(char)
         stats = _json.loads(char.stats)
         assert stats["hp"] == 5  # unchanged -- combat pauses overworld ticking entirely
     finally:
         time_service.set_combat_state(False)
+
+
+def test_advance_non_combat_time_triggers_decay_for_instance_party(auth_client):
+    """Movement bypasses time_service.advance_time entirely (its own raw
+    GameClock increment in dungeon_api.py) -- confirm it still triggers
+    persisted status-effect decay/regen for the instance's party.
+    """
+    import json as _json
+
+    from app import db
+    from app.models import CharacterStatusEffect
+    from app.models.models import Character, User
+    from app.models.dungeon_instance import DungeonInstance
+    from app.routes.dungeon_api import advance_non_combat_time
+
+    user = User.query.filter_by(username="tester").first()
+    assert user is not None
+    char = Character.query.filter_by(user_id=user.id).first()
+    assert char is not None
+    char.stats = _json.dumps({"con": 10, "int": 10, "hp": 5, "current_mana": 5})
+    db.session.add(char)
+    db.session.add(CharacterStatusEffect(character_id=char.id, name="poison", remaining=5, data='{"damage": 2}'))
+    db.session.commit()
+
+    instance = DungeonInstance.query.filter_by(user_id=user.id).first()
+    assert instance is not None
+
+    advance_non_combat_time(instance, tick_amount=1)
+
+    db.session.refresh(char)
+    stats = _json.loads(char.stats)
+    # Poison deals 2 damage per tick; with 0.5% regen per tick on hp_max=75, regen=1
+    assert stats["hp"] == 4  # 5 - 2 + 1 = 4

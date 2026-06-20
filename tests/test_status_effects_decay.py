@@ -93,7 +93,7 @@ def test_apply_tick_decay_applies_poison_damage_and_floors_at_one_hp():
     db.session.add(effect)
     db.session.commit()
 
-    apply_tick_decay(1)
+    apply_tick_decay(1, character_ids=[char.id])
 
     db.session.refresh(char)
     stats = json.loads(char.stats)
@@ -108,7 +108,7 @@ def test_apply_tick_decay_deletes_expired_effects():
     db.session.add(CharacterStatusEffect(character_id=char.id, name="poison", remaining=1, data='{"damage": 1}'))
     db.session.commit()
 
-    apply_tick_decay(1)
+    apply_tick_decay(1, character_ids=[char.id])
 
     assert CharacterStatusEffect.query.filter_by(character_id=char.id).count() == 0
 
@@ -120,7 +120,7 @@ def test_apply_tick_decay_regen_caps_at_max_and_scales_with_delta():
     db.session.commit()
     hp_max, mana_max = compute_hp_mana_max(char)
 
-    apply_tick_decay(10)
+    apply_tick_decay(10, character_ids=[char.id])
 
     db.session.refresh(char)
     stats = json.loads(char.stats)
@@ -139,7 +139,7 @@ def test_apply_tick_decay_noop_when_nothing_to_update():
     db.session.commit()
     before = char.stats
 
-    apply_tick_decay(5)
+    apply_tick_decay(5, character_ids=[char.id])
 
     db.session.refresh(char)
     assert char.stats == before
@@ -176,7 +176,7 @@ def test_apply_tick_decay_does_not_rewrite_stats_when_no_hp_mana_change():
 
     db.session.add = tracking_add
     try:
-        apply_tick_decay(1)
+        apply_tick_decay(1, character_ids=[char.id])
     finally:
         db.session.add = real_add
 
@@ -186,6 +186,37 @@ def test_apply_tick_decay_does_not_rewrite_stats_when_no_hp_mana_change():
 
     remaining_effect = CharacterStatusEffect.query.filter_by(character_id=char.id).first()
     assert remaining_effect.remaining == 4
+
+
+def test_apply_tick_decay_only_affects_specified_character_ids():
+    from app.models import GameConfig
+
+    GameConfig.set("regen_rates", json.dumps({"hp_pct_per_tick": 0.0, "mp_pct_per_tick": 0.0}))
+    db.session.commit()
+
+    in_scope = _make_character("scoped_in")
+    in_scope.stats = json.dumps({"con": 10, "int": 10, "hp": 5, "current_mana": 20})
+    out_of_scope = _make_character("scoped_out")
+    out_of_scope.stats = json.dumps({"con": 10, "int": 10, "hp": 5, "current_mana": 20})
+    db.session.add_all([in_scope, out_of_scope])
+    db.session.commit()
+    db.session.add(CharacterStatusEffect(character_id=in_scope.id, name="poison", remaining=5, data='{"damage": 2}'))
+    db.session.add(
+        CharacterStatusEffect(character_id=out_of_scope.id, name="poison", remaining=5, data='{"damage": 2}')
+    )
+    db.session.commit()
+
+    apply_tick_decay(1, character_ids=[in_scope.id])
+
+    db.session.refresh(in_scope)
+    db.session.refresh(out_of_scope)
+    assert json.loads(in_scope.stats)["hp"] == 3  # 5 - 2, in scope
+    assert json.loads(out_of_scope.stats)["hp"] == 5  # untouched, not in scope
+
+    in_scope_effect = CharacterStatusEffect.query.filter_by(character_id=in_scope.id).first()
+    out_of_scope_effect = CharacterStatusEffect.query.filter_by(character_id=out_of_scope.id).first()
+    assert in_scope_effect.remaining == 4  # decremented
+    assert out_of_scope_effect.remaining == 5  # untouched, not in scope
 
 
 def test_apply_tick_decay_respects_custom_regen_rates_from_game_config():
@@ -200,7 +231,7 @@ def test_apply_tick_decay_respects_custom_regen_rates_from_game_config():
     db.session.commit()
     hp_max, mana_max = compute_hp_mana_max(char)
 
-    apply_tick_decay(1)
+    apply_tick_decay(1, character_ids=[char.id])
 
     db.session.refresh(char)
     stats = json.loads(char.stats)

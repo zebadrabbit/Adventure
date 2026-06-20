@@ -7,7 +7,7 @@ via an in_combat() predicate.
 
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Dict, Iterable, Optional
 
 from app import db, socketio
 from app.models import GameClock, GameConfig
@@ -66,8 +66,15 @@ def _load_action_costs() -> Dict[str, int]:
         return DEFAULT_ACTION_TICK_COSTS
 
 
-def advance_for(action: str, actor_id: Optional[int] = None) -> int:
+def advance_for(action: str, actor_id: Optional[int] = None, character_ids: Optional[Iterable[int]] = None) -> int:
     """Advance time based on an action key using the configured cost table.
+
+    ``character_ids`` should be the character(s) this action belongs to
+    (the acting character, or the full party for party-wide actions like
+    movement/search) -- passed through to apply_tick_decay so persisted
+    status-effect decay/regen only ever applies to them, not every
+    character in the database. Omit it only when no character context
+    exists for the action; decay/regen simply won't run for that call.
 
     Returns the new tick value (or current if no advancement applied).
     """
@@ -75,14 +82,19 @@ def advance_for(action: str, actor_id: Optional[int] = None) -> int:
     delta = int(costs.get(action, 0))
     if delta <= 0:
         return GameClock.get().tick
-    return advance_time(delta, reason=action, actor_id=actor_id)
+    return advance_time(delta, reason=action, actor_id=actor_id, character_ids=character_ids)
 
 
-def advance_time(delta: int, reason: str, actor_id: Optional[int] = None) -> int:
+def advance_time(
+    delta: int,
+    reason: str,
+    actor_id: Optional[int] = None,
+    character_ids: Optional[Iterable[int]] = None,
+) -> int:
     """Advance the global clock by delta ticks if not in combat.
 
     Emits a 'time_update' Socket.IO event on namespace '/adventure'.
-    Returns the new tick count.
+    Returns the new tick count. See advance_for for character_ids.
     """
     if delta <= 0:
         return GameClock.get().tick
@@ -96,9 +108,10 @@ def advance_time(delta: int, reason: str, actor_id: Optional[int] = None) -> int
     except Exception:
         db.session.rollback()
         return clock.tick  # return last known even if failed
-    from .status_effects import apply_tick_decay
+    if character_ids:
+        from .status_effects import apply_tick_decay
 
-    apply_tick_decay(delta)
+        apply_tick_decay(delta, character_ids=character_ids)
     payload = {"tick": clock.tick, "delta": delta, "reason": reason, "actor_id": actor_id}
     try:
         socketio.emit("time_update", payload, namespace="/adventure")

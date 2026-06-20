@@ -446,7 +446,7 @@ def equip_item(cid: int):
     ch.gear = _safe_json_dump(gear)
     db.session.commit()
     try:
-        advance_for("equip")
+        advance_for("equip", character_ids=[ch.id])
     except Exception:
         pass
     return jsonify({"ok": True, "slot": slot, "equipped": slug})
@@ -490,7 +490,7 @@ def unequip_item(cid: int):
     ch.gear = _safe_json_dump(gear)
     db.session.commit()
     try:
-        advance_for("unequip")
+        advance_for("unequip", character_ids=[ch.id])
     except Exception:
         pass
     return jsonify({"ok": True, "slot": slot, "unequipped": slug})
@@ -536,7 +536,7 @@ def consume_item(cid: int):
     ch.stats = _safe_json_dump(base_stats)
     db.session.commit()
     try:
-        advance_for("consume")
+        advance_for("consume", character_ids=[ch.id])
     except Exception:
         pass
     return jsonify({"ok": True, "consumed": slug, "effects": {"hp": heal, "mana": mana}})

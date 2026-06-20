@@ -134,10 +134,19 @@ def _load_regen_rates() -> Dict[str, float]:
         return dict(DEFAULT_REGEN_RATES)
 
 
-def apply_tick_decay(delta: int) -> None:
+def apply_tick_decay(delta: int, character_ids) -> None:
     """Apply ``delta`` ticks worth of persisted effect decay and passive
-    HP/MP regen to every character that has an active effect or is below
-    their max HP/mana.
+    HP/MP regen to the characters in ``character_ids``.
+
+    ``character_ids`` is required and must contain the specific
+    character(s) the triggering action belongs to (e.g. the acting
+    character for equip/consume, or the full party for movement/search) --
+    callers must resolve this themselves. An earlier version scanned every
+    Character in the database on every call, which meant one player moving
+    silently applied regen/poison decay to every other user's characters
+    too, including offline ones; that is not what "characters slowly heal
+    while exploring" was meant to do, and the full-table scan does not
+    scale with the player base.
 
     Safe to call frequently; no-ops cleanly (no DB writes) if a given
     character has nothing to update. Never raises -- failures roll back and
@@ -145,6 +154,9 @@ def apply_tick_decay(delta: int) -> None:
     a decay/regen failure never blocks the action that triggered it.
     """
     if delta <= 0:
+        return
+    character_ids = list(character_ids)
+    if not character_ids:
         return
 
     from app import db
@@ -154,17 +166,10 @@ def apply_tick_decay(delta: int) -> None:
 
     try:
         rates = _load_regen_rates()
-        effect_char_ids = {row[0] for row in db.session.query(CharacterStatusEffect.character_id).distinct().all()}
-
-        candidates = Character.query.filter(Character.id.in_(effect_char_ids)).all() if effect_char_ids else []
-        # Also consider characters with no active effect but below max --
-        # cheaper to just check every character with a stats blob than to
-        # try to pre-filter by HP/mana, since both live inside JSON.
-        all_chars = {c.id: c for c in Character.query.all()}
-        for c in candidates:
-            all_chars[c.id] = c
+        all_chars = {c.id: c for c in Character.query.filter(Character.id.in_(character_ids)).all()}
 
         changed_any = False
+        effects_touched = False
         for char in all_chars.values():
             try:
                 stats = json.loads(char.stats) if char.stats else {}
@@ -181,6 +186,8 @@ def apply_tick_decay(delta: int) -> None:
             stats_changed = False
 
             effects = CharacterStatusEffect.query.filter_by(character_id=char.id).all()
+            if effects:
+                effects_touched = True
             for effect in effects:
                 if effect.name == "poison":
                     try:
@@ -211,7 +218,7 @@ def apply_tick_decay(delta: int) -> None:
                 db.session.add(char)
                 changed_any = True
 
-        if changed_any or effect_char_ids:
+        if changed_any or effects_touched:
             db.session.commit()
     except Exception:
         try:

@@ -260,7 +260,8 @@ def search_current_tile(instance):
     names = ", ".join(i["name"] for i in items)
     msg = f"You search the area and discover: {names}."
     try:
-        advance_for("search", actor_id=None)
+        party_ids = [c.id for c in _get_party_for_current_user()]
+        advance_for("search", actor_id=None, character_ids=party_ids)
     except Exception:
         pass
     return True, {"found": True, "items": items, "message": msg}, 200

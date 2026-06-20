@@ -2085,6 +2085,13 @@ def advance_non_combat_time(instance, *, tick_amount: int = 1) -> int | None:
             db.session.commit()
         except Exception:
             db.session.rollback()
+        try:
+            from app.services.status_effects import apply_tick_decay
+
+            party_ids = [c.id for c in Character.query.filter_by(user_id=instance.user_id).all()]
+            apply_tick_decay(int(tick_amount), character_ids=party_ids)
+        except Exception:
+            pass
     except Exception:
         return None
     return clock.tick
