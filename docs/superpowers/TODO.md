@@ -394,10 +394,16 @@ already-noted `glass-theme.css` dead-code follow-up.
       the MP bar entirely for those classes. Came up while discussing whether barbarian
       needs a rage/energy-style alternate resource instead (it currently has none at all —
       not implemented in any form, confirmed by grep across the codebase).
-- [ ] **Combat log appears to reload/redraw after casting Firebolt**: not yet root-caused.
-      Worth checking whether this is specific to spell casts (vs. basic attack/defend,
-      which don't seem to trigger it) — `combat.js`'s spell-effect path
-      (`createParticles`/`doAction`'s `cast_firebolt` branch) is the obvious place to start.
+- [x] **Combat log clears and retypes after a spell cast — FIXED ✅**: every action
+      handler emits `combat_update` twice per turn (player's action + the internal emit
+      inside `monster_auto_turn()`), with no client-side ordering guarantee — if the
+      second (longer-log) emit arrived before the first, `appendLog()` saw the log
+      "shrink" and wiped + retyped everything. Not spell-exclusive in principle (matches
+      the user's own observation), just more visible during spell casts since the
+      particle-effect animation competes for the main thread, widening the race window.
+      Added a version-monotonicity guard at `combat.js`'s single `render()` entry point
+      (covers REST responses, all socket events, and the polling fallback). No automated
+      test (no JS test infra for socket-timing races) — needs live-browser confirmation.
 - [x] **Combat potions were a shared party pool — FIXED ✅**: `item_counts["potion-
       healing"]` changed from a flat int (always `chars[0]`'s count) to a per-character
       dict; `player_use_item` now deducts from the *acting* character's own row.
