@@ -21,6 +21,7 @@
     let lastLogSignature = null;
     let lastLogNode = null;
     let lastLogCount = 1;
+    let latestHighlightNode = null;
     function classifyAndTransform(msg) {
         let cls = '';
         // Order matters: more specific patterns first
@@ -132,6 +133,7 @@
                 lastLogNode.setAttribute('data-base', baseText.replace(/ \(x\d+\)$/, ''));
                 lastLogNode.textContent = baseText.replace(/ \(x\d+\)$/, '') + ' (x' + lastLogCount + ')';
                 lastLogNode.classList.add('log-duplicate');
+                setLatestHighlight(lastLogNode);
             } else {
                 lastLogSignature = signature;
                 lastLogCount = 1;
@@ -139,6 +141,7 @@
                 if (cls) div.classList.add(cls);
                 lastLogNode = div;
                 logEl.appendChild(div);
+                setLatestHighlight(div);
 
                 // Add to typewriter queue
                 typewriterQueue.push({ element: div, text: formatted });
@@ -146,6 +149,14 @@
         }
         processedLogCount = lines.length;
         processTypewriterQueue();
+    }
+
+    function setLatestHighlight(node) {
+        if (latestHighlightNode && latestHighlightNode !== node) {
+            latestHighlightNode.classList.remove('log-latest');
+        }
+        node.classList.add('log-latest');
+        latestHighlightNode = node;
     }
 
     function render(state) {

@@ -19,7 +19,20 @@ a:hover {
 }
 
 .combat-layout {
-    align-items: flex-start;
+    align-items: stretch;
+}
+
+#combat-left,
+#combat-center,
+#combat-right {
+    display: flex;
+    flex-direction: column;
+}
+
+#combat-right .monster-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 /* ========================================
@@ -315,6 +328,7 @@ a:hover {
 
 .combat-log-card {
     min-height: 600px;
+    flex: 1;
     display: flex;
     flex-direction: column;
 }
@@ -470,6 +484,14 @@ a:hover {
 /* Trim duplicate timestamp groups visually */
 .combat-log .log-duplicate {
     opacity: 0.6;
+}
+
+/* Subtle emphasis on the most recent log entry */
+.combat-log .log-latest {
+    background: color-mix(in srgb, var(--ui-accent) 12%, transparent);
+    border-left: 2px solid color-mix(in srgb, var(--ui-accent) 60%, transparent);
+    padding-left: 0.5rem;
+    margin-left: -0.5rem;
 }
 
 /* Danger group: damage, crit, death, bleed, burn */
