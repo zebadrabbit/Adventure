@@ -125,72 +125,99 @@
                                 {% endif %}
                             </div>
 
-                            <div class="mt-4">
+                            <div class="mt-3">
                                 {{ seed_widget(dungeon_seed) }}
                             </div>
-
-                            <!-- Merchant Shops -->
-                            <div class="mt-4">
-                                <div class="subtitle mb-3">{{ svg_icon('cash', 16, 'me-2') }}MERCHANTS</div>
-                                <div class="d-flex flex-column gap-2">
-                                    <button type="button"
-                                        class="tactical-btn-secondary d-flex align-items-center justify-content-between"
-                                        onclick="window.tradingSystem && tradingSystem.openMerchant('general-merchant', {{ characters[0].id if characters else 1 }})">
-                                        <span><i class="bi bi-basket me-2"></i> General Store</span>
-                                        <span class="badge"
-                                            style="background: rgba(212, 165, 116, 0.2); font-size: 0.65rem;">OPEN</span>
-                                    </button>
-                                    <button type="button"
-                                        class="tactical-btn-secondary d-flex align-items-center justify-content-between"
-                                        onclick="window.tradingSystem && tradingSystem.openMerchant('weapon-shop', {{ characters[0].id if characters else 1 }})">
-                                        <span>{{ svg_icon('bloody-sword', 16, 'me-2') }} Weapon Smith</span>
-                                        <span class="badge"
-                                            style="background: rgba(212, 165, 116, 0.2); font-size: 0.65rem;">OPEN</span>
-                                    </button>
-                                    <button type="button"
-                                        class="tactical-btn-secondary d-flex align-items-center justify-content-between"
-                                        onclick="window.tradingSystem && tradingSystem.openMerchant('armor-shop', {{ characters[0].id if characters else 1 }})">
-                                        <span><i class="bi bi-shield-fill me-2"></i> Armor Smith</span>
-                                        <span class="badge"
-                                            style="background: rgba(212, 165, 116, 0.2); font-size: 0.65rem;">OPEN</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Hoard -->
-                            <div class="mt-4">
-                                <div class="subtitle mb-3">{{ svg_icon('locked-chest', 16, 'me-2') }}HOARD</div>
-                                <div class="d-flex flex-column gap-2">
-                                    <button type="button" class="tactical-btn-secondary btn-hoard-open">
-                                        <i class="bi bi-bank2 me-2"></i> View Hoard
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Party Management -->
-                            <div class="mt-4">
-                                <div class="subtitle mb-3">{{ svg_icon('people-fill', 16, 'me-2') }}PARTY</div>
-                                <div class="d-flex flex-column gap-2">
-                                    <button type="button" class="tactical-btn-secondary"
-                                        onclick="window.partySystem && partySystem.openParty(1)">
-                                        <i class="bi bi-people-fill me-2"></i> Manage Party
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Skill Trees: opened per-character from each operative card's button -->
-
-                            <!-- Achievements -->
-                            <div class="mt-4">
-                                <div class="subtitle mb-3">{{ svg_icon('trophy-fill', 16, 'me-2') }}ACHIEVEMENTS</div>
-                                <div class="d-flex flex-column gap-2">
-                                    <button type="button" class="tactical-btn-secondary"
-                                        onclick="window.achievementSystem && achievementSystem.openAchievements({{ characters[0].id if characters else 1 }})">
-                                        <i class="bi bi-trophy-fill me-2"></i> Achievements
-                                    </button>
-                                </div>
-                            </div>
                         </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hub Actions: shops, hoard, party management, achievements -->
+    <div class="row mb-4 g-4 hub-actions-row">
+        <div class="col-12">
+            <div class="tactical-panel hub-actions-panel">
+                <div class="panel-header">
+                    <h5>{{ svg_icon('cash', 20, 'me-2') }}HUB</h5>
+                </div>
+                <div class="panel-body">
+                    <ul class="nav nav-tabs" id="hubActionsTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="hub-tab-merchants" data-bs-toggle="tab"
+                                data-bs-target="#hub-pane-merchants" type="button" role="tab"
+                                aria-controls="hub-pane-merchants" aria-selected="true">Merchants</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="hub-tab-hoard" data-bs-toggle="tab"
+                                data-bs-target="#hub-pane-hoard" type="button" role="tab"
+                                aria-controls="hub-pane-hoard" aria-selected="false">Hoard</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="hub-tab-party" data-bs-toggle="tab"
+                                data-bs-target="#hub-pane-party" type="button" role="tab"
+                                aria-controls="hub-pane-party" aria-selected="false">Party</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="hub-tab-achievements" data-bs-toggle="tab"
+                                data-bs-target="#hub-pane-achievements" type="button" role="tab"
+                                aria-controls="hub-pane-achievements" aria-selected="false">Achievements</button>
+                        </li>
+                    </ul>
+                    <div class="tab-content pt-3" id="hubActionsTabContent">
+                        <div class="tab-pane fade show active" id="hub-pane-merchants" role="tabpanel"
+                            aria-labelledby="hub-tab-merchants">
+                            <div class="d-flex flex-column gap-2">
+                                <button type="button"
+                                    class="tactical-btn-secondary d-flex align-items-center justify-content-between"
+                                    onclick="window.tradingSystem && tradingSystem.openMerchant('general-merchant', {{ characters[0].id if characters else 1 }})">
+                                    <span><i class="bi bi-basket me-2"></i> General Store</span>
+                                    <span class="badge"
+                                        style="background: rgba(212, 165, 116, 0.2); font-size: 0.65rem;">OPEN</span>
+                                </button>
+                                <button type="button"
+                                    class="tactical-btn-secondary d-flex align-items-center justify-content-between"
+                                    onclick="window.tradingSystem && tradingSystem.openMerchant('weapon-shop', {{ characters[0].id if characters else 1 }})">
+                                    <span>{{ svg_icon('bloody-sword', 16, 'me-2') }} Weapon Smith</span>
+                                    <span class="badge"
+                                        style="background: rgba(212, 165, 116, 0.2); font-size: 0.65rem;">OPEN</span>
+                                </button>
+                                <button type="button"
+                                    class="tactical-btn-secondary d-flex align-items-center justify-content-between"
+                                    onclick="window.tradingSystem && tradingSystem.openMerchant('armor-shop', {{ characters[0].id if characters else 1 }})">
+                                    <span><i class="bi bi-shield-fill me-2"></i> Armor Smith</span>
+                                    <span class="badge"
+                                        style="background: rgba(212, 165, 116, 0.2); font-size: 0.65rem;">OPEN</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="hub-pane-hoard" role="tabpanel"
+                            aria-labelledby="hub-tab-hoard">
+                            <div class="d-flex flex-column gap-2">
+                                <button type="button" class="tactical-btn-secondary btn-hoard-open">
+                                    <i class="bi bi-bank2 me-2"></i> View Hoard
+                                </button>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="hub-pane-party" role="tabpanel"
+                            aria-labelledby="hub-tab-party">
+                            <div class="d-flex flex-column gap-2">
+                                <button type="button" class="tactical-btn-secondary"
+                                    onclick="window.partySystem && partySystem.openParty(1)">
+                                    <i class="bi bi-people-fill me-2"></i> Manage Party
+                                </button>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="hub-pane-achievements" role="tabpanel"
+                            aria-labelledby="hub-tab-achievements">
+                            <div class="d-flex flex-column gap-2">
+                                <button type="button" class="tactical-btn-secondary"
+                                    onclick="window.achievementSystem && achievementSystem.openAchievements({{ characters[0].id if characters else 1 }})">
+                                    <i class="bi bi-trophy-fill me-2"></i> Achievements
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
