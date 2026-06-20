@@ -343,14 +343,28 @@ already-noted `glass-theme.css` dead-code follow-up.
       route (redirects to dashboard). Tests:
       `tests/test_party_wipe_blocks_exploration.py` (3 passed). Found during Phase 4 live
       verification — not a combat-theming issue, just noticed along the way.
-- [ ] **No random encounters while walking the dungeon**: moving around doesn't seem to
-      trigger any random encounter rolls. Need to check whether the encounter-roll-on-move
-      hook is wired up at all in the current movement path, or is just configured at too
-      low a rate to notice. Found during Phase 4 live verification.
-- [ ] **Predetermined encounters visible before being uncovered**: fixed/seeded encounter
-      markers show on the map even in tiles that haven't been explored yet — should be
-      hidden by fog-of-war/perception like everything else until the player actually
-      uncovers that tile. Found during Phase 4 live verification.
+- [ ] **No random encounters while walking the dungeon — ROOT-CAUSED, not fixed**: the
+      encounter-roll hook (`maybe_spawn_encounter`) is correctly wired into
+      `process_movement()` and rolls correctly, but `spawn_service.choose_monster()`
+      raises `ValueError: No monsters available for level N` because the
+      **`MonsterCatalog` table is completely empty** — confirmed by forcing a guaranteed
+      roll and removing the outer `except Exception: pass` that was silently swallowing
+      it. Unlike `Item`/`EnemyArchetype`/`WeaponCategory` (seeded from bundled
+      `sql/*.sql` via `reseed-items`), `MonsterCatalog` has no bundled default seed —
+      only a CSV *template* (`docs/data_templates/monster_catalog_template.csv`) and an
+      admin-UI/CLI import path (`run.py import-monsters-csv`). This is a content/data gap,
+      not a logic bug — needs either a bundled default monster CSV + seed step (mirroring
+      `reseed-items`), or for whoever owns game content to run the import. Separately:
+      the silent exception swallowing should at least log a warning so this doesn't fail
+      invisibly again. (The boss/elite mobs you *do* see come from a different system —
+      pre-placed `DungeonEntity` spawns — which is why they still appeared.)
+- [x] **Predetermined encounters visible before being uncovered — FIXED ✅**: the server's
+      `entities_update` broadcast has no visibility filtering at all (sends every
+      `spawn_manager.spawns` entry unconditionally); `dungeon-canvas.js`'s
+      `renderEntities()` only checked raw distance (`OUTER_VIS_RADIUS`), never the grid's
+      own `cell === 'unknown'` fog-of-war marker that the *tile* renderer already uses a
+      few lines below it. Mirrored that same check onto entities. No automated test (no
+      JS test infra for canvas rendering) — needs live-browser confirmation.
 - [x] **Unconscious characters could act — FIXED ✅**: `player_attack` was the only one
       of six action handlers checking `hp<=0`; `flee`/`defend`/`use_item`/`cast_spell`/
       `cast_skill` had no guard at all. Extracted a shared `_skip_if_unconscious()` helper
