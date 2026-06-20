@@ -414,6 +414,16 @@ already-noted `glass-theme.css` dead-code follow-up.
       first, only falling back to `f"{base_name}{suffix}"` once the whole pool for that
       class is taken within the same autofill batch. TDD'd via
       `tests/test_autofill_name_pools.py`; full suite green (386 passed).
+- [ ] **`app.css`'s `.card-header` rule still has a leftover amber literal**
+      (`background: rgba(212, 165, 116, 0.05)`, no `!important`) — found while fixing the
+      site-wide navbar brown (see the `f7aa067` commit). Same "Medieval Stone" leftover
+      category, just on `.card-header` instead of `.navbar-dark`, and out of scope for
+      that fix since the user only reported the navbar. Less universally visible than the
+      navbar bug was (no `!important`, so pages with their own `.card-header`/`.panel-header`
+      override — e.g. dashboard via `dashboard.css` — aren't affected), but any page relying
+      on Bootstrap's plain `.card` with no override (account/settings, admin pages, etc.)
+      will still show a faint amber tint. Same fix pattern applies: swap to `color-mix()`
+      against an existing Cold Steel `var(--ui-*)`/`var(--adv-*)`.
 - [ ] **Ambient encounters need to be a finite per-instance pool, not an infinite random
       roll (real feature, not a quick fix)**: even at the lowered 5%/move rate, the user
       is still getting attacked within 1-3 tiles routinely — but the deeper complaint is
