@@ -165,6 +165,16 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
         else:
             char_class = "cleric"  # Default fallback
 
+    from app.models import CharacterStatusEffect
+
+    try:
+        effects = [
+            {"name": row.name, "remaining": row.remaining, "data": json.loads(row.data) if row.data else {}}
+            for row in CharacterStatusEffect.query.filter_by(character_id=char.id, name="poison").all()
+        ]
+    except Exception:
+        effects = []
+
     return {
         # Controller user id retained separately from participant (character) id.
         "controller_id": char.user_id,
@@ -184,6 +194,7 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
         "resistances": {},
         "defending": False,
         "buffs": [],
+        "effects": effects,
     }
 
 
@@ -456,13 +467,20 @@ def _potion_counts_by_character(chars) -> Dict[str, int]:
 
 
 def _skip_if_unconscious(session: CombatSession, party: Dict[str, Any], char_id: int) -> Optional[Dict[str, Any]]:
-    """If the acting character is downed (hp<=0), log it, skip their turn, and
-    return the response dict the caller should return immediately.
+    """Apply start-of-turn effects (e.g. poison) to the acting character, then
+    if they're downed (hp<=0), log it, skip their turn, and return the
+    response dict the caller should return immediately.
 
     Returns None if the actor is conscious and the caller should proceed
     with its normal action handling.
     """
     actor_ref = _player_ref(party, char_id)
+    if actor_ref:
+        effect_logs = apply_start_of_turn(actor_ref)
+        if effect_logs:
+            for line in effect_logs:
+                _append_log(session, line)
+        session.party_snapshot_json = json.dumps(party)
     if actor_ref and actor_ref.get("hp", 0) <= 0:
         _append_log(session, f"{actor_ref.get('name', 'Character')} is unconscious and cannot act!")
         _advance_turn(session)
@@ -823,18 +841,22 @@ def _emit_if_completed(session: CombatSession):
 
 
 def _persist_party_resources(session: CombatSession):
-    """Persist surviving party HP and mana back into Character.stats JSON.
+    """Persist surviving party HP and mana back into Character.stats JSON,
+    and write back any remaining poison effects to CharacterStatusEffect.
 
     Assumptions / Simplifications:
     - Character.stats JSON contains (or can accept) 'hp' and 'mana' keys representing current values.
     - We do not yet track max_hp/mana persistently outside stats snapshot; we only update current.
-    - Dead characters (hp <= 0) persist with hp=0.
+    - Dead characters (hp <= 0) persist with hp=0 and do not get their effects written back
+      (a dead character's status effects are moot -- unrelated death/revival handling applies).
     - Silently ignores any character ids not found (e.g., temporary generated hero placeholder).
     """
     try:
         if not session.party_snapshot_json:
             return
         import json as _json
+
+        from app.models import CharacterStatusEffect
 
         party = _json.loads(session.party_snapshot_json) or {}
         members = party.get("members", [])
@@ -863,6 +885,25 @@ def _persist_party_resources(session: CombatSession):
             row.stats = _json.dumps(stats_obj)
             db.session.add(row)
             changed = True
+
+            # Write back remaining poison -- delete-then-recreate is simplest
+            # and avoids diffing old vs new rows. Dead characters (hp<=0)
+            # don't get effects written back.
+            try:
+                CharacterStatusEffect.query.filter_by(character_id=cid, name="poison").delete()
+                if int(m.get("hp", 0)) > 0:
+                    for eff in m.get("effects", []) or []:
+                        if eff.get("name") == "poison" and int(eff.get("remaining", 0)) > 0:
+                            db.session.add(
+                                CharacterStatusEffect(
+                                    character_id=cid,
+                                    name="poison",
+                                    remaining=int(eff["remaining"]),
+                                    data=_json.dumps(eff.get("data", {})),
+                                )
+                            )
+            except Exception:
+                pass
         if changed:
             try:
                 db.session.commit()
