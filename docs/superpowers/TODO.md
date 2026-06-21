@@ -553,19 +553,22 @@ already-noted `glass-theme.css` dead-code follow-up.
       without its own override. Swapped to `color-mix()` against `var(--adv-primary)` (and
       `--bs-primary-rgb` to the matching Cold Steel teal triple `90, 209, 201`). Also
       relabeled two stale "Medieval" comments. Full suite green (388 passed).
-- [ ] **Ambient encounters need to be a finite per-instance pool, not an infinite random
-      roll (real feature, not a quick fix)**: even at the lowered 5%/move rate, the user
-      is still getting attacked within 1-3 tiles routinely — but the deeper complaint is
-      architectural: an infinite per-move roll lets a player farm XP endlessly by walking
-      back and forth, which isn't fair. Should redesign as: each `DungeonInstance` gets a
-      fixed number of ambient encounters seeded/placed when the instance is generated
-      (similar in spirit to `DungeonLoot`'s per-seed placement — see
-      `app/dungeon/api_helpers/encounters.py` / `generate_loot_for_seed` for the existing
-      pattern), depleted as the player encounters them, never regenerating. Needs its own
-      brainstorm/spec before implementation — this changes the core exploration loop, not
-      just a rate tweak. Spec written:
-      `docs/superpowers/specs/2026-06-21-ambient-encounters-finite-pool-design.md`
-      (approved, not yet implemented).
+- [x] **Ambient encounters are now a finite per-instance pool, not an infinite random
+      roll** — implemented per
+      `docs/superpowers/specs/2026-06-21-ambient-encounters-finite-pool-design.md` across
+      5 tasks: (1) added proximity aggro to `SpawnManager`-placed monsters; (2) added a
+      shared collision-trigger helper wired into both directions of player/monster contact
+      on the grid; (3) retired the random per-move combat-encounter roll entirely — across
+      6 call sites, more than the original plan scoped, a real discovery made mid-task;
+      (4) removed the now-dead `encounter_spawn_rate` admin control; (5) fixed
+      `populate_spawn_stats` (`app/dungeon/spawn_integration.py`) so PATROL/WANDERER/GUARD/
+      AMBIENT spawns draw real monster names from `spawn_service.choose_monster` (the
+      `MonsterCatalog`) instead of generic archetype labels like "Trash (L3)", while
+      BOSS/ELITE spawns deliberately keep the existing tier/affix-driven
+      `choose_archetype_monster` system unchanged (set-piece placements, separate scaling
+      mechanic, out of scope). Final suite: 409 passed, 2 skipped, 3 deselected, 1 xpassed.
+      Play-feel tuning of `aggro_radius` and overall spawn density is explicitly out of
+      scope for this spec and is left as an easy follow-up once verified live.
 - [ ] **Dungeon enemy theming (follow-up, separate from the item above)**: dungeons should
       have a monster theme (e.g. an all-skeleton crypt, an orc warcamp, a kobold warren)
       instead of a true random spread of families per instance — `MonsterCatalog` already

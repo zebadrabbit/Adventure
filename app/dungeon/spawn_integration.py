@@ -13,6 +13,7 @@ import json
 from typing import TYPE_CHECKING, List, Optional
 
 from app import db
+from app.dungeon.spawn_manager import SpawnBehavior
 from app.models.entities import DungeonEntity
 from app.services import spawn_service
 
@@ -24,7 +25,14 @@ __all__ = ["populate_spawn_stats", "persist_spawns", "load_spawns_from_db", "spa
 
 
 def populate_spawn_stats(spawn: "SpawnEntry", party_level: int, instance: "DungeonInstance") -> "SpawnEntry":
-    """Populate a spawn with full monster stats using archetype system.
+    """Populate a spawn with full monster stats.
+
+    Ambient-tier spawns (PATROL/WANDERER/GUARD/AMBIENT) draw from the
+    real MonsterCatalog via spawn_service.choose_monster, so placed
+    monsters have real names/variety instead of a generic archetype
+    label. BOSS/ELITE spawns keep the existing tier/affix-driven
+    archetype system, unchanged -- they're deliberate set-piece
+    placements with their own scaling mechanic, not part of this scope.
 
     Args:
         spawn: SpawnEntry to populate
@@ -44,15 +52,43 @@ def populate_spawn_stats(spawn: "SpawnEntry", party_level: int, instance: "Dunge
         except Exception:
             pass
 
-    # Generate monster using archetype system
+    is_ambient_tier = spawn.behavior in (
+        SpawnBehavior.PATROL,
+        SpawnBehavior.WANDERER,
+        SpawnBehavior.GUARD,
+        SpawnBehavior.AMBIENT,
+    )
+
     try:
-        monster_dict = spawn_service.choose_archetype_monster(
-            level=spawn.level or party_level,
-            archetype_name=spawn.archetype,
-            tier=tier,
-            affix_ids=affix_ids,
-            party_size=1,  # Base stats, scale in combat as needed
-        )
+        if is_ambient_tier:
+            from app.models.dungeon_tier import DungeonAffix, DungeonTier
+
+            tier_row = DungeonTier.query.filter_by(tier=tier).first()
+            if not tier_row:
+                tier_row = DungeonTier.query.filter_by(tier=1).first()
+            modified_level = (spawn.level or party_level) + (tier_row.monster_level_modifier if tier_row else 0)
+
+            monster_dict = spawn_service.choose_monster(level=modified_level, party_size=1)
+
+            if affix_ids:
+                for affix_id in affix_ids:
+                    affix = DungeonAffix.query.filter_by(affix_id=affix_id).first()
+                    if affix:
+                        monster_dict = affix.apply_to_monster_stats(monster_dict)
+
+            if tier_row:
+                monster_dict["xp"] = int(monster_dict.get("xp", 0) * tier_row.xp_multiplier)
+                monster_dict["loot_multiplier"] = monster_dict.get("loot_multiplier", 1.0) * (
+                    1.0 + tier_row.loot_quality_bonus
+                )
+        else:
+            monster_dict = spawn_service.choose_archetype_monster(
+                level=spawn.level or party_level,
+                archetype_name=spawn.archetype,
+                tier=tier,
+                affix_ids=affix_ids,
+                party_size=1,  # Base stats, scale in combat as needed
+            )
 
         # Populate spawn with generated stats
         spawn.slug = monster_dict.get("slug")
@@ -62,7 +98,8 @@ def populate_spawn_stats(spawn: "SpawnEntry", party_level: int, instance: "Dunge
         spawn.data = monster_dict
 
     except Exception:
-        # Fallback to basic stats if archetype system fails
+        # Fallback to basic stats if monster selection fails (catalog or
+        # archetype system), same fallback shape for both paths.
         spawn.slug = f"{spawn.archetype.lower()}_monster"
         spawn.name = f"{spawn.archetype} Monster"
         spawn.hp_current = spawn.level * 20
