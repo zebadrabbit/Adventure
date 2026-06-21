@@ -467,6 +467,111 @@ body {
     letter-spacing: 0.5px;
 }
 
+.operative-summary {
+    padding: 14px 18px 10px;
+    cursor: pointer;
+}
+
+.operative-summary .operative-header {
+    padding: 0 0 10px 0;
+    border-bottom: none;
+    background: none;
+}
+
+.hp-mp-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.resource-bar-track {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.bar-label {
+    font-size: 0.7rem;
+    color: var(--dungeon-text-dim);
+    font-family: var(--ui-font);
+}
+
+.bar-track {
+    height: 6px;
+    background: color-mix(in srgb, var(--dungeon-bg) 70%, transparent);
+    border: 1px solid color-mix(in srgb, var(--dungeon-border) 40%, transparent);
+    overflow: hidden;
+}
+
+.bar-fill {
+    height: 100%;
+}
+
+.bar-fill.hp-fill {
+    background: var(--dungeon-danger);
+}
+
+.bar-fill.mp-fill {
+    background: var(--dungeon-accent);
+}
+
+.effect-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.effect-chip {
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-family: var(--ui-font);
+    border: 1px solid transparent;
+}
+
+.effect-chip.effect-buff {
+    background: color-mix(in srgb, var(--dungeon-success) 18%, transparent);
+    color: var(--dungeon-success);
+    border-color: color-mix(in srgb, var(--dungeon-success) 40%, transparent);
+}
+
+.effect-chip.effect-debuff {
+    background: color-mix(in srgb, var(--dungeon-danger) 18%, transparent);
+    color: var(--dungeon-danger);
+    border-color: color-mix(in srgb, var(--dungeon-danger) 40%, transparent);
+}
+
+.effect-chip.effect-neutral {
+    background: color-mix(in srgb, var(--dungeon-text-dim) 18%, transparent);
+    color: var(--dungeon-text-dim);
+    border-color: color-mix(in srgb, var(--dungeon-text-dim) 40%, transparent);
+}
+
+.effect-detail-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 0.85rem;
+    font-family: var(--ui-font);
+}
+
+.effect-detail-list li {
+    padding: 4px 0;
+}
+
+.effect-detail-list li.effect-buff {
+    color: var(--dungeon-success);
+}
+
+.effect-detail-list li.effect-debuff {
+    color: var(--dungeon-danger);
+}
+
+.effect-detail-list li.effect-neutral {
+    color: var(--dungeon-text-dim);
+}
+
 .resource-bar {
     display: flex;
     gap: 15px;

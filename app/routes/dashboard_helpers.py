@@ -20,6 +20,21 @@ from app.models.models import Character, User
 from app.models.xp import xp_for_level
 from app.services.progression import progression_config
 
+KNOWN_STATUS_EFFECTS: dict[str, dict[str, str]] = {
+    "poison": {"icon": "☠", "label": "Poison", "css_class": "effect-debuff"},
+    "regen_buff": {"icon": "✨", "label": "Well-Rested", "css_class": "effect-buff"},
+}
+
+
+def describe_status_effect(effect: dict[str, Any]) -> dict[str, Any]:
+    """Return display metadata for one CharacterStatusEffect dict, with a
+    generic fallback for names not in KNOWN_STATUS_EFFECTS so a future
+    effect type shows up automatically without a template change."""
+    meta = KNOWN_STATUS_EFFECTS.get(
+        effect["name"], {"icon": "◆", "label": effect["name"], "css_class": "effect-neutral"}
+    )
+    return {**meta, "remaining": effect["remaining"]}
+
 
 def _stable_current_user_id() -> int | None:
     """Return a resilient current user id (handles detached SQLAlchemy instance)."""
@@ -83,6 +98,22 @@ def serialize_character_list(user_id: int) -> list[dict[str, Any]]:
             hp_max, mana_max = compute_hp_mana_max(c)
             stats.setdefault("hp", hp_max)
             stats.setdefault("mana", mana_max)
+
+        from app.services.character_stats import compute_hp_mana_max
+
+        hp_max, mana_max = compute_hp_mana_max(c)
+
+        try:
+            from app.models import CharacterStatusEffect
+
+            effects_display = [
+                describe_status_effect(
+                    {"name": row.name, "remaining": row.remaining, "data": json.loads(row.data) if row.data else {}}
+                )
+                for row in CharacterStatusEffect.query.filter_by(character_id=c.id).all()
+            ]
+        except Exception:
+            effects_display = []
         stats_class = stats.get("class", None)
         coins = {k: stats.pop(k, 0) for k in ("gold", "silver", "copper")}
         try:
@@ -176,6 +207,9 @@ def serialize_character_list(user_id: int) -> list[dict[str, Any]]:
                 "xp_current": xp_for_level(level, mod),
                 "xp_next": xp_for_level(level + 1, mod),
                 "stat_points": getattr(c, "stat_points", 0) or 0,
+                "hp_max": hp_max,
+                "mana_max": mana_max,
+                "effects_display": effects_display,
             }
         )
     if backfilled:

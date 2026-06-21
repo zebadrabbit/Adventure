@@ -438,10 +438,33 @@ already-noted `glass-theme.css` dead-code follow-up.
             fix rounds needed); full suite green throughout (437 passed, up from a 421
             baseline, no regressions). Phase C/D (card UI redesigns) remain as the next
             steps in this series.
-      - [ ] Phase C: dashboard roster card redesign (collapsed HP/MP/buffs/debuffs,
-            expand-on-select to a context area with actions + full stats).
+      - [x] **Phase C: dashboard roster card redesign — done.** Dashboard roster
+            cards (`.operative-card`) now collapse by default and expand
+            independently per card on click (multi-expand, not an accordion) —
+            each card has its own `.operative-summary` header and a hidden
+            `.operative-detail` panel toggled in place, no shared/global expand
+            state. Collapsed summary shows HP/MP bars; expanded detail adds
+            generic buff/debuff chips (driven by Phase A/B's
+            `CharacterStatusEffect` rows — `poison` and `regen_buff` both
+            render, plus any future effect type without template changes) and
+            the existing stats/inventory/footer actions (EQUIP, etc.).
+            Live-browser-verified end-to-end with Playwright against a real
+            dev server + Postgres: collapsed-by-default, click-to-expand,
+            independent multi-expand confirmed with 2+ real roster cards
+            (registered a fresh `tester` user and used `/autofill_characters`
+            to seed 4 characters), collapse-again, and a footer-button
+            spot-check (EQUIP) with no console errors after re-expand. All
+            assertions passed on the first run — no template/CSS/JS bugs
+            found during this task's verification pass. Full suite:
+            441 passed (matching the pre-Phase-C baseline), confirmed after
+            isolating a `pytest-randomly` test-order flake (6 unrelated tests —
+            camp regen buff, cast-spell mana cost, poison persistence x3,
+            dashboard theme assignment — all pass individually and with
+            `-p no:randomly`; same category of pre-existing cross-test-order
+            flakiness already on file, not a Phase C regression).
       - [ ] Phase D: combat party card redesign (collapsed, auto-expand on that
-            character's turn) + accurate per-character spell costs.
+            character's turn) + accurate per-character spell costs. Next step
+            in this series.
 - [x] **Test isolation fix from earlier this session never actually worked —
       found and fixed while verifying Phase A.** The `_db_transaction_rollback`
       SAVEPOINT fixture committed earlier today silently did nothing:

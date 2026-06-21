@@ -81,3 +81,114 @@ def test_serialize_character_list_backfills_missing_hp_to_computed_max(test_app)
         match = next(c for c in out if c["id"] == char.id)
         assert match["stats"]["hp"] == hp_max
         assert match["stats"]["mana"] == mana_max
+
+
+def test_serialize_character_list_exposes_hp_max_and_mana_max(test_app):
+    with test_app.app_context():
+        u = User(username="hpmax-dash-checker", email="hmdc@test.local")
+        u.set_password("pw")
+        db.session.add(u)
+        db.session.commit()
+
+        from app.models.models import Character
+        from app.services.character_stats import compute_hp_mana_max
+
+        char = Character(
+            user_id=u.id,
+            name="HpMaxChecker",
+            level=2,
+            stats=json.dumps({"str": 10, "dex": 10, "int": 10, "con": 12, "wis": 10, "cha": 10}),
+        )
+        db.session.add(char)
+        db.session.commit()
+
+        hp_max, mana_max = compute_hp_mana_max(char)
+
+        out = serialize_character_list(u.id)
+        match = next(c for c in out if c["id"] == char.id)
+        assert match["hp_max"] == hp_max
+        assert match["mana_max"] == mana_max
+
+
+def test_serialize_character_list_exposes_known_effect_display(test_app):
+    with test_app.app_context():
+        u = User(username="effect-dash-checker", email="edc@test.local")
+        u.set_password("pw")
+        db.session.add(u)
+        db.session.commit()
+
+        from app.models import CharacterStatusEffect
+        from app.models.models import Character
+
+        char = Character(
+            user_id=u.id,
+            name="EffectChecker",
+            level=1,
+            stats=json.dumps({"str": 10, "dex": 10, "int": 10, "con": 10, "wis": 10, "cha": 10}),
+        )
+        db.session.add(char)
+        db.session.commit()
+        db.session.add(CharacterStatusEffect(character_id=char.id, name="poison", remaining=3, data='{"damage": 5}'))
+        db.session.commit()
+
+        out = serialize_character_list(u.id)
+        match = next(c for c in out if c["id"] == char.id)
+        assert len(match["effects_display"]) == 1
+        eff = match["effects_display"][0]
+        assert eff["icon"] == "☠"
+        assert eff["label"] == "Poison"
+        assert eff["css_class"] == "effect-debuff"
+        assert eff["remaining"] == 3
+
+
+def test_serialize_character_list_unknown_effect_falls_back_to_generic_display(test_app):
+    with test_app.app_context():
+        u = User(username="unknown-effect-dash-checker", email="uedc@test.local")
+        u.set_password("pw")
+        db.session.add(u)
+        db.session.commit()
+
+        from app.models import CharacterStatusEffect
+        from app.models.models import Character
+
+        char = Character(
+            user_id=u.id,
+            name="UnknownEffectChecker",
+            level=1,
+            stats=json.dumps({"str": 10, "dex": 10, "int": 10, "con": 10, "wis": 10, "cha": 10}),
+        )
+        db.session.add(char)
+        db.session.commit()
+        db.session.add(CharacterStatusEffect(character_id=char.id, name="future_effect_xyz", remaining=2, data="{}"))
+        db.session.commit()
+
+        out = serialize_character_list(u.id)
+        match = next(c for c in out if c["id"] == char.id)
+        assert len(match["effects_display"]) == 1
+        eff = match["effects_display"][0]
+        assert eff["label"] == "future_effect_xyz"
+        assert eff["css_class"] == "effect-neutral"
+        assert eff["remaining"] == 2
+
+
+def test_serialize_character_list_no_effects_gives_empty_list(test_app):
+    with test_app.app_context():
+        u = User(username="noeffect-dash-checker", email="nedc@test.local")
+        u.set_password("pw")
+        db.session.add(u)
+        db.session.commit()
+
+        from app.models.models import Character
+
+        char = Character(
+            user_id=u.id,
+            name="NoEffectChecker",
+            level=1,
+            stats=json.dumps({"str": 10, "dex": 10, "int": 10, "con": 10, "wis": 10, "cha": 10}),
+        )
+        db.session.add(char)
+        db.session.commit()
+
+        out = serialize_character_list(u.id)
+        match = next(c for c in out if c["id"] == char.id)
+        assert match["effects_display"] == []
