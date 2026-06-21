@@ -487,7 +487,6 @@ def game_rules():
     if request.method == "POST":
         # Define all the game rule parameters
         rules = {
-            "encounter_spawn_rate": float(request.form.get("encounter_spawn_rate", 0.15)),
             "xp_multiplier": float(request.form.get("xp_multiplier", 1.0)),
             "gold_multiplier": float(request.form.get("gold_multiplier", 1.0)),
             "loot_drop_multiplier": float(request.form.get("loot_drop_multiplier", 1.0)),
@@ -525,7 +524,6 @@ def game_rules():
         return default
 
     rules = {
-        "encounter_spawn_rate": get_rule("encounter_spawn_rate", 0.15),
         "xp_multiplier": get_rule("xp_multiplier", 1.0),
         "gold_multiplier": get_rule("gold_multiplier", 1.0),
         "loot_drop_multiplier": get_rule("loot_drop_multiplier", 1.0),
