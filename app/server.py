@@ -216,6 +216,15 @@ def seed_items():
             rarity="common",
         ),
         dict(
+            slug="potion-regen",
+            name="Potion of Regeneration",
+            type="potion",
+            description="Grants a temporary boost to natural HP/mana regeneration.",
+            value_copper=200,
+            level=0,
+            rarity="uncommon",
+        ),
+        dict(
             slug="lockpicks",
             name="Lockpicks",
             type="tool",

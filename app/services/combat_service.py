@@ -1470,6 +1470,11 @@ def player_use_item(
                 heal = 25
                 m["hp"] = min(m.get("max_hp", 100), m.get("hp", 0) + heal)
                 used = True
+            elif slug == "potion-regen":
+                from app.services.status_effects import replace_effect
+
+                m["effects"] = replace_effect(m.get("effects", []) or [], "regen_buff", 5, hp_mult=3.0, mp_mult=3.0)
+                used = True
             break
     if not used:
         return {"error": "cannot_use"}
