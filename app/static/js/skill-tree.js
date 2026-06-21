@@ -79,6 +79,7 @@ class SkillTreeSystem {
         const treeSelector = document.getElementById('treeSelector');
         treeSelector.innerHTML = this.skillTrees.map(tree => `
             <button class="tree-selector-btn ${tree.id === this.currentTreeId ? 'active' : ''}"
+                    data-tree-id="${tree.id}"
                     onclick="skillTreeSystem.switchTree(${tree.id})">
                 <div class="tree-selector-icon">🌳</div>
                 <div class="tree-selector-name">${tree.name}</div>
@@ -112,11 +113,17 @@ class SkillTreeSystem {
             if (!response.ok) throw new Error('Failed to load tree skills');
             this.skills = await response.json();
 
-            // Update active tree selector button
+            // Update active tree selector button. Looked up via data-tree-id
+            // rather than the implicit global `event` -- `event` is only valid
+            // synchronously during the original click dispatch and is gone by
+            // the time this code resumes after the `await` above (and is never
+            // set at all when switchTree() is called programmatically, e.g.
+            // the initial auto-select on modal open).
             document.querySelectorAll('.tree-selector-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
-            event.target.closest('.tree-selector-btn').classList.add('active');
+            const activeBtn = document.querySelector(`.tree-selector-btn[data-tree-id="${treeId}"]`);
+            if (activeBtn) activeBtn.classList.add('active');
 
             // Render the skill tree
             this.renderSkillTree();

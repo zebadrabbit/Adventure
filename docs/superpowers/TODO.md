@@ -495,9 +495,22 @@ already-noted `glass-theme.css` dead-code follow-up.
       worked around (did not fix, out of scope) a pre-existing bug in
       `app/static/js/skill-tree.js`'s `switchTree()`: it reads `event.target` after an
       `await fetch(...)`, by which point the browser has cleared the legacy `window.event`
-      it was relying on, so every tree-selector click throws (silently, into its own
-      try/catch) and the skill canvas never renders in real usage either, not just under
-      Playwright. Worth a real fix later.
+      it was relying on, so every tree-selector click threw (silently, into its own
+      try/catch) and the skill canvas never rendered after switching trees in real usage
+      either, not just under Playwright.
+- [x] **`skill-tree.js` tree-switching bug — FIXED ✅** (follow-up to the item above):
+      replaced the implicit-global-`event` lookup with a `data-tree-id` attribute on each
+      tree-selector button, looked up explicitly by the known `treeId` after the `await`
+      instead of relying on `event.target` (which is unreliable post-await and absent
+      entirely when `switchTree()` is called programmatically, e.g. the initial
+      auto-select on modal open — that path happened to keep working by accident via
+      Chromium's non-standard `window.event` leaking from whatever click opened the
+      modal). Root-caused and verified with a one-off Playwright repro script (no JS test
+      infra exists in this repo): confirmed RED (`TypeError: Cannot read properties of
+      undefined (reading 'target')` thrown on every tree switch, active class never
+      applied, `renderSkillTree()` never called) before the fix, and GREEN (no console
+      errors, correct active class, canvas re-renders) after. Full backend suite still
+      green (405 passed) since this is a JS-only change.
 - [x] **Dashboard hub layout & flow** — fixed the concrete complaint ("dashboard
       location of items, redesign the layout to flow better"): Merchants/Hoard/
       Party-Management/Achievements were stacked vertically inside the Party Roster
