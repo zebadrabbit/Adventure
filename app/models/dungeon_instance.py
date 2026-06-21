@@ -20,6 +20,7 @@ class DungeonInstance(db.Model):
     # Enemy scaling system
     tier = db.Column(db.Integer, default=1)
     affix_ids = db.Column(db.Text, nullable=True)  # JSON array of affix_id strings
+    monster_family = db.Column(db.String(40), nullable=True)  # Per-instance enemy theme (MonsterCatalog.family value)
     # Extraction mechanics and progress tracking
     bosses_defeated = db.Column(db.Integer, default=0)
     bosses_total = db.Column(db.Integer, default=1)  # Total bosses in dungeon
