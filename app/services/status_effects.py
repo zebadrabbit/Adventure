@@ -28,6 +28,22 @@ from typing import Any, Dict, List, Tuple
 
 DEFAULT_REGEN_RATES = {"hp_pct_per_tick": 0.5, "mp_pct_per_tick": 1.0}
 
+KNOWN_STATUS_EFFECTS: Dict[str, Dict[str, str]] = {
+    "poison": {"icon": "☠", "label": "Poison", "css_class": "effect-debuff"},
+    "regen_buff": {"icon": "✨", "label": "Well-Rested", "css_class": "effect-buff"},
+}
+
+
+def describe_status_effect(effect: Dict[str, Any]) -> Dict[str, Any]:
+    """Return display metadata for one CharacterStatusEffect dict, with a
+    generic fallback for names not in KNOWN_STATUS_EFFECTS so a future
+    effect type shows up automatically without a template change."""
+    meta = KNOWN_STATUS_EFFECTS.get(
+        effect["name"], {"icon": "◆", "label": effect["name"], "css_class": "effect-neutral"}
+    )
+    return {**meta, "remaining": effect["remaining"]}
+
+
 # Type aliases
 Effect = Dict[str, Any]
 Participant = Dict[str, Any]
@@ -282,4 +298,6 @@ __all__ = [
     "add_effect",
     "replace_effect",
     "apply_tick_decay",
+    "KNOWN_STATUS_EFFECTS",
+    "describe_status_effect",
 ]
