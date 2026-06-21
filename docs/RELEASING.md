@@ -4,7 +4,7 @@ This guide details the lightweight release process. All releases should be trace
 
 ## 1. Prerequisites
 - All tests green: `pytest -q`
-- `docs/CHANGELOG.md` updated under the UNRELEASED section with meaningful entries (Added / Changed / Fixed / Removed) referencing issues where possible.
+- `CHANGELOG.md` updated under the UNRELEASED section with meaningful entries (Added / Changed / Fixed / Removed) referencing issues where possible.
 - No TODO/FIXME items introduced for the tagged commit (unless explicitly documented in changelog).
 
 ## 2. Versioning Strategy
@@ -22,7 +22,7 @@ Where `<part>` is one of: `patch`, `minor`, `major`.
 
 The script will:
 1. Parse current version from `VERSION`.
-2. Update `VERSION` file and search `docs/CHANGELOG.md` first for matching version section.
+2. Update `VERSION` file and search `CHANGELOG.md` first for matching version section.
 3. Fail if the target version already exists.
 
 ## 4. Finalize Changelog
@@ -38,7 +38,7 @@ Example snippet:
 
 ## 5. Commit & Tag
 ```
-git add VERSION docs/CHANGELOG.md
+git add VERSION CHANGELOG.md
 git commit -m "release: vX.Y.Z"
 git tag -a vX.Y.Z -m "Adventure vX.Y.Z"
 ```

@@ -300,7 +300,7 @@ party_chars = Character.query.filter_by(user_id=current_user.id).limit(4).all()
 **Impact**: Adds one extra query per state check, but only retrieves 4 rows max.
 
 ## Related Documentation
-- [Combat System](../README.md#combat-system) - Overall combat flow
+- [Combat System](COMBAT_SYSTEM.md) - Overall combat flow
 - [Combat Effects](COMBAT_EFFECTS.md) - Visual damage/healing effects
 - [Locked Doors](LOCKED_DOORS.md) - Door unlock mechanics (related to HP/MP management during exploration)
 

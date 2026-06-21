@@ -56,7 +56,7 @@ Future movement may shift to a dedicated event (`move`) with payload `{ "dir": "
 
 ---
 ## Versioning & Stability
-- This contract is pre-1.0 and may evolve; breaking changes will be documented in `docs/CHANGELOG.md` under “Changed”.
+- This contract is pre-1.0 and may evolve; breaking changes will be documented in `CHANGELOG.md` under “Changed”.
 - Consider adding automated schema validation & TypeScript definitions once event set solidifies.
 
 ## Roadmap Ideas

@@ -22,7 +22,7 @@ graph TD
 ## Components
 - **Flask Blueprints**: Modular route grouping (auth, main site, dashboard UI, dungeon APIs, seed management, config exposure).
 - **Socket.IO**: Real-time events (lobby/gameplay expansion) sharing app context.
-- **Dungeon Generation**: Deterministic multi-phase pipeline (see README) producing cached `Dungeon` instances keyed by (seed,size).
+- **Dungeon Generation**: Deterministic multi-phase pipeline (see [Dungeon Generation](DUNGEON_GENERATION.md)) producing cached `Dungeon` instances keyed by (seed,size).
 - **Persistence**: `DungeonInstance` stores seed and player position; other models hold user & progression data.
 - **Pre-Commit Tooling**: Enforces frontend hygiene (no inline styles/scripts, cache-busting helper usage) to keep diffs clean.
 
@@ -52,4 +52,4 @@ graph TD
 - Future: rate-limit movement, sanitize user-generated content, add CSRF tokens for form endpoints.
 
 ## Testing Strategy Link
-See README "Testing & Invariants" section for invariant coverage (door rules, seed persistence) and regeneration determinism.
+See [docs/DEVELOPMENT.md](DEVELOPMENT.md) and [docs/DUNGEON_GENERATION.md](DUNGEON_GENERATION.md) for invariant coverage (door rules, seed persistence) and regeneration determinism.

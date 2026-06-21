@@ -14,7 +14,7 @@ Welcome to the Adventure project documentation. This index links all major docs 
 
 ## Core Guides
 - [Project Overview (Root README)](../README.md)
-- [Changelog](CHANGELOG.md)
+- [Changelog](../CHANGELOG.md)
 - [Release Notes](RELEASE_NOTES.md)
 - [Releasing](RELEASING.md)
 - [Contributing Guide](CONTRIBUTING.md)
@@ -23,7 +23,7 @@ Welcome to the Adventure project documentation. This index links all major docs 
 - [WebSocket Event Contracts](websocket_events.md)
 
 ## Development
-- Version bump script: `scripts/bump_version.py` (auto-inserts UNRELEASED section into `docs/CHANGELOG.md`).
+- Version bump script: `scripts/bump_version.py` (auto-inserts UNRELEASED section into `CHANGELOG.md`).
 - Pre-commit hooks configured in `.pre-commit-config.yaml` (enforce no inline styles/scripts, static asset cache busting, SVG normalization).
 
 ## Dungeon Generation
