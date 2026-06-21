@@ -79,7 +79,10 @@
             btn.className = 'btn-combat btn-combat-spell';
             btn.dataset.action = `cast_skill_${skill.skill_id}`;
             btn.dataset.skillId = String(skill.skill_id);
-            btn.innerHTML = `<i class="bi bi-stars"></i> ${skill.skill_name}`;
+            const icon = document.createElement('i');
+            icon.className = 'bi bi-stars';
+            btn.appendChild(icon);
+            btn.appendChild(document.createTextNode(' ' + skill.skill_name));
 
             if (!canAct) {
                 btn.disabled = true;
