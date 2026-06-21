@@ -62,6 +62,13 @@ class SpawnConfig:
     wander_interval_ticks: int = 3  # Ticks between wander movements
     patrol_range: int = 8  # Max distance from spawn point for patrols
 
+    # Aggro: ambient-tier spawns (PATROL/WANDERER/GUARD/AMBIENT) within
+    # this Chebyshev distance of the player move toward them every tick
+    # instead of their normal behavior, until contact or until the
+    # player moves back outside this radius. Recomputed fresh every
+    # tick -- no persisted "is aggroed" state. Bosses/Elites never aggro.
+    aggro_radius: int = 5
+
     # Level scaling
     min_spawns: int = 4  # Minimum spawns regardless of density
     max_spawns: int = 30  # Maximum spawns per dungeon
@@ -223,19 +230,25 @@ class SpawnManager:
             List of spawns that moved this update
         """
         moved_spawns = []
+        player_x = getattr(self.instance, "pos_x", None)
+        player_y = getattr(self.instance, "pos_y", None)
 
         for spawn in self.spawns:
             if spawn.in_combat:
                 continue
 
-            # Check if spawn should move
-            if not self._should_move(spawn, current_tick):
+            aggroed = self._is_aggroed(spawn, player_x, player_y)
+
+            # Aggro overrides the normal move-interval gate -- a chasing
+            # spawn moves every tick, not on its usual patrol/wander cadence.
+            if not aggroed and not self._should_move(spawn, current_tick):
                 continue
 
-            # Move based on behavior
             old_x, old_y = spawn.x, spawn.y
 
-            if spawn.behavior == SpawnBehavior.PATROL:
+            if aggroed:
+                self._move_toward_player(spawn, player_x, player_y)
+            elif spawn.behavior == SpawnBehavior.PATROL:
                 self._move_patrol(spawn)
             elif spawn.behavior == SpawnBehavior.WANDERER:
                 self._move_wanderer(spawn)
@@ -467,3 +480,57 @@ class SpawnManager:
                 if not self.get_spawn_at(new_x, new_y):
                     spawn.x = new_x
                     spawn.y = new_y
+
+    def _is_aggroed(self, spawn: SpawnEntry, player_x: Optional[int], player_y: Optional[int]) -> bool:
+        """True if this is an ambient-tier spawn within aggro_radius of the player.
+
+        Bosses/Elites never aggro -- they're deliberate set-piece placements,
+        not part of the ambient-encounters pool this behavior is scoped to.
+        """
+        if player_x is None or player_y is None:
+            return False
+        if spawn.behavior not in (
+            SpawnBehavior.PATROL,
+            SpawnBehavior.WANDERER,
+            SpawnBehavior.GUARD,
+            SpawnBehavior.AMBIENT,
+        ):
+            return False
+        return max(abs(spawn.x - player_x), abs(spawn.y - player_y)) <= self.config.aggro_radius
+
+    def _move_toward_player(self, spawn: SpawnEntry, player_x: int, player_y: int):
+        """Take one cardinal step toward the player.
+
+        Reuses the same bounds/walkable/occupied validation as
+        _move_patrol/_move_wanderer. Greedily reduces whichever axis has
+        the larger distance first (ties broken toward the x-axis); if
+        that axis's destination is blocked, tries the other axis; if
+        both are blocked, doesn't move this tick.
+        """
+        from app.dungeon.tiles import DOOR, ROOM, TUNNEL
+
+        walkable_chars = {ROOM, TUNNEL, DOOR}
+        dx_dist = player_x - spawn.x
+        dy_dist = player_y - spawn.y
+
+        def step(dx: int, dy: int) -> bool:
+            new_x, new_y = spawn.x + dx, spawn.y + dy
+            if 0 <= new_x < self.dungeon.config.width and 0 <= new_y < self.dungeon.config.height:
+                if self.dungeon.grid[new_x][new_y] in walkable_chars and not self.get_spawn_at(new_x, new_y):
+                    spawn.x = new_x
+                    spawn.y = new_y
+                    return True
+            return False
+
+        x_step = (1 if dx_dist > 0 else -1 if dx_dist < 0 else 0, 0)
+        y_step = (0, 1 if dy_dist > 0 else -1 if dy_dist < 0 else 0)
+
+        if abs(dx_dist) >= abs(dy_dist):
+            primary, secondary = x_step, y_step
+        else:
+            primary, secondary = y_step, x_step
+
+        if primary != (0, 0) and step(*primary):
+            return
+        if secondary != (0, 0):
+            step(*secondary)
