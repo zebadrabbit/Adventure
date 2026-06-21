@@ -4,7 +4,7 @@ from app import db
 from app.models import CharacterStatusEffect
 from app.models.models import Character, User
 from app.services.character_stats import compute_hp_mana_max
-from app.services.status_effects import apply_tick_decay
+from app.services.status_effects import apply_start_of_turn, apply_tick_decay, replace_effect
 
 
 def _make_character(username_suffix):
@@ -73,6 +73,70 @@ def test_compute_hp_mana_max_defaults_when_stats_missing():
     assert hp_max == 75
     # base 20 + INT(10)*2 = 40
     assert mana_max == 40
+
+
+def test_regen_buff_start_heals_and_caps_at_max_hp_and_mana():
+    participant = {
+        "name": "Hero",
+        "hp": 10,
+        "max_hp": 100,
+        "mana": 5,
+        "mana_max": 50,
+        "effects": [{"name": "regen_buff", "remaining": 2, "data": {"hp_mult": 3.0, "mp_mult": 3.0}}],
+    }
+    logs = apply_start_of_turn(participant)
+    assert participant["hp"] > 10
+    assert participant["hp"] <= 100
+    assert participant["mana"] > 5
+    assert participant["mana"] <= 50
+    assert participant["effects"][0]["remaining"] == 1
+    assert logs  # produced a log line
+
+
+def test_regen_buff_start_caps_at_max_hp_when_near_full():
+    participant = {
+        "name": "Hero",
+        "hp": 99,
+        "max_hp": 100,
+        "mana": 49,
+        "mana_max": 50,
+        "effects": [{"name": "regen_buff", "remaining": 1, "data": {"hp_mult": 3.0, "mp_mult": 3.0}}],
+    }
+    apply_start_of_turn(participant)
+    assert participant["hp"] == 100
+    assert participant["mana"] == 50
+
+
+def test_regen_buff_pruned_after_expiry():
+    participant = {
+        "name": "Hero",
+        "hp": 10,
+        "max_hp": 100,
+        "mana": 5,
+        "mana_max": 50,
+        "effects": [{"name": "regen_buff", "remaining": 1, "data": {"hp_mult": 3.0, "mp_mult": 3.0}}],
+    }
+    apply_start_of_turn(participant)
+    assert participant["effects"] == []
+
+
+def test_replace_effect_removes_existing_entry_of_same_name():
+    effects = [
+        {"name": "regen_buff", "remaining": 2, "data": {"hp_mult": 2.0, "mp_mult": 2.0}},
+        {"name": "poison", "remaining": 5, "data": {"damage": 3}},
+    ]
+    result = replace_effect(effects, "regen_buff", 5, hp_mult=3.0, mp_mult=3.0)
+    regen_entries = [e for e in result if e["name"] == "regen_buff"]
+    assert len(regen_entries) == 1
+    assert regen_entries[0]["remaining"] == 5
+    assert regen_entries[0]["data"] == {"hp_mult": 3.0, "mp_mult": 3.0}
+    # untouched poison entry still present
+    assert any(e["name"] == "poison" for e in result)
+
+
+def test_replace_effect_on_empty_list_just_appends():
+    result = replace_effect([], "regen_buff", 5, hp_mult=3.0, mp_mult=3.0)
+    assert result == [{"name": "regen_buff", "remaining": 5, "data": {"hp_mult": 3.0, "mp_mult": 3.0}}]
 
 
 def test_apply_tick_decay_applies_poison_damage_and_floors_at_one_hp():
