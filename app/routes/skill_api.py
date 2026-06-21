@@ -119,6 +119,7 @@ def get_character_skills(character_id):
                 "skill_type": skill.skill_type,
                 "tier": skill.tier,
                 "effect_json": skill.effect_json,
+                "cooldown": skill.cooldown,
                 "skill_rank": cs.skill_rank,
                 "times_used": cs.times_used,
                 "unlocked_at": cs.unlocked_at.isoformat() if cs.unlocked_at else None,
