@@ -142,6 +142,49 @@ today's unconditional call, independent of this design's other changes.
   deleted along with `maybe_spawn_encounter` (they exist only to serve
   it).
 
+### 4. Ambient-tier spawns get real monster variety
+
+**Found during review, not in the original problem statement:**
+`SpawnManager`'s placed monsters currently come from a completely
+different selection system than the random roll being retired.
+`spawn_integration.populate_spawn_stats` calls
+`spawn_service.choose_archetype_monster`, which names every result
+literally `"{archetype} (L{level})"` — e.g. `"Trash (L3)"`,
+`"Elite (L5)"` — with no connection to the real 38-monster
+`MonsterCatalog` (Brimstone Imp, etc.) that `spawn_service.choose_monster`
+already draws from for the system this design retires. Without a fix,
+retiring the random roll would mean every ambient encounter shows up
+with a generic placeholder name instead of a real monster.
+
+**Fix, scoped to ambient-tier only** (PATROL/WANDERER/GUARD/AMBIENT —
+the same boundary already drawn for aggro; BOSS/ELITE keep their
+current `choose_archetype_monster` path untouched, since their
+deliberate tier/affix-driven scaling is a separate, intentional
+mechanic, not part of the "ambient encounters" problem):
+
+In `populate_spawn_stats`, branch on `spawn.behavior`. For ambient-tier
+spawns, call `spawn_service.choose_monster(level=modified_level,
+party_size=1)` instead of `choose_archetype_monster` — `modified_level`
+computed the same way the archetype path already does
+(`level + tier_row.monster_level_modifier`). Then apply the *same*
+tier (`xp_multiplier`, `loot_quality_bonus`) and affix
+(`DungeonAffix.apply_to_monster_stats`) adjustments the archetype path
+already applies, unchanged — confirmed compatible: `choose_monster`'s
+returned dict (`Monster.scaled_instance`, `app/models/models.py:355-374`)
+has the `hp`/`damage` keys `apply_to_monster_stats` reads/writes (it
+only conditionally touches `attack_speed`, which `choose_monster`'s
+dict doesn't have, so that branch just no-ops). The one shape
+difference — `armor` (catalog) vs `armor_class` (archetype) — doesn't
+matter here since neither tier nor affix application reads that key.
+
+Mapping into `spawn.slug`/`spawn.name`/`spawn.hp_current`/`spawn.hp_max`/
+`spawn.data` stays exactly as today, just reading from whichever dict
+this spawn's branch produced. The existing exception fallback (generic
+`"{archetype} Monster"` stats if the selection call raises) is kept for
+both branches, so a catalog gap for a given level band degrades the
+same way an archetype lookup failure does today, rather than crashing
+spawn placement.
+
 ## Testing
 
 - New tests in a new `tests/test_spawn_aggro.py`:
@@ -158,6 +201,13 @@ today's unconditional call, independent of this design's other changes.
   expected dict shape when a monster is at the given position, returns
   `None` when nothing is there, and that calling it doesn't double-spend
   the same entity (it deletes the row it acts on).
+- New test for `populate_spawn_stats`: an ambient-tier spawn (e.g.
+  PATROL) gets a `slug`/`name` matching a real `MonsterCatalog` entry
+  (not the literal string `"Trash"` or a `"(L#)"`-suffixed placeholder),
+  while a BOSS/ELITE spawn's naming is unchanged from today (still the
+  archetype-label format) — locks in the scoping boundary so a future
+  change can't accidentally widen or narrow which behaviors get catalog
+  monsters without a test catching it.
 - Delete three tests that directly exercise the removed random-roll
   system: `tests/test_time_and_encounters.py::test_encounter_miss_streak_accumulates_with_gap`,
   `tests/test_encounter_config.py::test_encounter_spawn_probability_config`,
@@ -180,7 +230,9 @@ today's unconditional call, independent of this design's other changes.
   play-feel balance — ship sensible defaults (`aggro_radius=5`, matching
   existing density/min/max spawn defaults already in `SpawnConfig`), and
   treat further tuning as a separate, easy follow-up once it's playable.
-- Boss/Elite behavior changes — explicitly untouched.
+- Boss/Elite behavior changes — explicitly untouched, including their
+  monster-selection mechanism, which stays on `choose_archetype_monster`
+  (tier/affix-driven), not the real-catalog change in section 4.
 - Any UI change to the minimap/entity rendering — monsters already
   render today; this only changes whether/how they move and what
   happens on contact.
