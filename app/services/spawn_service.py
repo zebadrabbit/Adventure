@@ -47,7 +47,7 @@ def pick_monster_family(seed: int) -> str:
 # MonsterCatalog ORM objects (safe for read-only usage within request scope). A short TTL keeps
 # data fresh if seeds / dynamic injections happen later.
 # -------------------------------------------------------------------------------------------------
-_ELIGIBLE_CACHE: Dict[Tuple[int, bool], tuple[float, List[MonsterCatalog]]] = {}
+_ELIGIBLE_CACHE: Dict[Tuple[int, bool, Optional[str]], tuple[float, List[MonsterCatalog]]] = {}
 _ELIGIBLE_TTL_SECONDS = 30.0
 
 
@@ -82,15 +82,17 @@ def _load_rarity_weights() -> dict:
         return dict(RARITY_WEIGHTS)
 
 
-def _eligible_monsters(level: int, include_boss: bool = False) -> List[MonsterCatalog]:
+def _eligible_monsters(level: int, include_boss: bool = False, family: Optional[str] = None) -> List[MonsterCatalog]:
     now = time.time()
-    key = (level, include_boss)
+    key = (level, include_boss, family)
     cached = _ELIGIBLE_CACHE.get(key)
     if cached:
         ts, rows = cached
         if (now - ts) <= _ELIGIBLE_TTL_SECONDS:
             return rows
     q = MonsterCatalog.query
+    if family:
+        q = q.filter(MonsterCatalog.family == family)
     rows = q.filter(MonsterCatalog.level_min <= level, MonsterCatalog.level_max >= level).all()
     if not include_boss:
         rows = [r for r in rows if not r.boss]
@@ -104,18 +106,24 @@ def _eligible_monsters(level: int, include_boss: bool = False) -> List[MonsterCa
     return rows
 
 
-def choose_monster(level: int, party_size: int = 1, include_boss: bool = False, rng: Optional[random.Random] = None):
+def choose_monster(
+    level: int,
+    party_size: int = 1,
+    include_boss: bool = False,
+    rng: Optional[random.Random] = None,
+    family: Optional[str] = None,
+):
     """Return a scaled monster instance dict for target level.
 
     Selection steps:
-      1. Filter by level band.
+      1. Filter by level band (and by family, if given).
       2. Apply rarity weighting.
       3. Randomly choose.
       4. Scale stats for party size.
     Raises ValueError if no eligible monsters.
     """
     rng = rng or random
-    pool = _eligible_monsters(level, include_boss=include_boss)
+    pool = _eligible_monsters(level, include_boss=include_boss, family=family)
     if not pool:
         raise ValueError(f"No monsters available for level {level}")
     rarity_weights = _load_rarity_weights()
