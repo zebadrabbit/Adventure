@@ -45,6 +45,29 @@ def _poison_start(target: Participant, effect: Effect) -> List[str]:
     return [f"{target.get('name','?')} suffers {dmg} poison damage ({target.get('hp')})"]
 
 
+def _regen_buff_start(target: Participant, effect: Effect) -> List[str]:
+    """Heal a flat 2% of max HP/mana per turn, scaled by this effect's
+    hp_mult/mp_mult -- e.g. hp_mult=3.0 heals 6% of max HP this turn.
+    Capped at max, never overheals.
+    """
+    data = effect.get("data", {}) or {}
+    try:
+        hp_mult = float(data.get("hp_mult", 1.0))
+    except Exception:
+        hp_mult = 1.0
+    try:
+        mp_mult = float(data.get("mp_mult", 1.0))
+    except Exception:
+        mp_mult = 1.0
+    max_hp = int(target.get("max_hp", 0))
+    max_mana = int(target.get("mana_max", 0))
+    hp_heal = math.ceil(max_hp * 0.02 * hp_mult)
+    mp_heal = math.ceil(max_mana * 0.02 * mp_mult)
+    target["hp"] = min(max_hp, int(target.get("hp", 0)) + hp_heal) if max_hp else target.get("hp", 0)
+    target["mana"] = min(max_mana, int(target.get("mana", 0)) + mp_heal) if max_mana else target.get("mana", 0)
+    return [f"{target.get('name', '?')} is well-rested, regenerating ({target.get('hp')} hp, {target.get('mana')} mp)"]
+
+
 # stun has no start damage; handled in pre-action check
 
 
@@ -54,6 +77,7 @@ def _noop(target: Participant, effect: Effect) -> List[str]:
 
 EFFECT_START = {
     "poison": _poison_start,
+    "regen_buff": _regen_buff_start,
 }
 
 # Registry for pre-action veto: return (can_act: bool, optional log message)
@@ -111,6 +135,14 @@ def can_act(participant: Participant) -> Tuple[bool, List[str]]:
 def add_effect(participant: Participant, name: str, turns: int, **data: Any):
     effs: List[Effect] = participant.setdefault("effects", [])
     effs.append({"name": name, "remaining": int(turns), "data": data})
+
+
+def replace_effect(effects: List[Effect], name: str, remaining: int, **data: Any) -> List[Effect]:
+    """Return a new effects list with any existing entry named ``name``
+    removed and a fresh one appended -- replace, not stack."""
+    kept = [e for e in effects if e.get("name") != name]
+    kept.append({"name": name, "remaining": int(remaining), "data": data})
+    return kept
 
 
 def _load_regen_rates() -> Dict[str, float]:
@@ -188,6 +220,8 @@ def apply_tick_decay(delta: int, character_ids) -> None:
             effects = CharacterStatusEffect.query.filter_by(character_id=char.id).all()
             if effects:
                 effects_touched = True
+            hp_mult = 1.0
+            mp_mult = 1.0
             for effect in effects:
                 if effect.name == "poison":
                     try:
@@ -198,6 +232,21 @@ def apply_tick_decay(delta: int, character_ids) -> None:
                     if damage > 0:
                         hp = max(1, hp - damage)
                         stats_changed = True
+                elif effect.name == "regen_buff":
+                    try:
+                        payload = json.loads(effect.data) if effect.data else {}
+                        if not isinstance(payload, dict):
+                            payload = {}
+                    except Exception:
+                        payload = {}
+                    try:
+                        hp_mult = float(payload.get("hp_mult", 1.0))
+                    except Exception:
+                        hp_mult = 1.0
+                    try:
+                        mp_mult = float(payload.get("mp_mult", 1.0))
+                    except Exception:
+                        mp_mult = 1.0
                 effect.remaining -= delta
                 if effect.remaining <= 0:
                     db.session.delete(effect)
@@ -205,10 +254,10 @@ def apply_tick_decay(delta: int, character_ids) -> None:
                     db.session.add(effect)
 
             if hp < hp_max:
-                hp = min(hp_max, hp + math.ceil(hp_max * rates["hp_pct_per_tick"] / 100 * delta))
+                hp = min(hp_max, hp + math.ceil(hp_max * rates["hp_pct_per_tick"] * hp_mult / 100 * delta))
                 stats_changed = True
             if mana < mana_max:
-                mana = min(mana_max, mana + math.ceil(mana_max * rates["mp_pct_per_tick"] / 100 * delta))
+                mana = min(mana_max, mana + math.ceil(mana_max * rates["mp_pct_per_tick"] * mp_mult / 100 * delta))
                 stats_changed = True
 
             if stats_changed:
@@ -231,5 +280,6 @@ __all__ = [
     "apply_start_of_turn",
     "can_act",
     "add_effect",
+    "replace_effect",
     "apply_tick_decay",
 ]

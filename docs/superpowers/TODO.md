@@ -415,7 +415,29 @@ already-noted `glass-theme.css` dead-code follow-up.
       `docs/superpowers/specs/2026-06-20-character-cards-phase-a-status-effects-design.md`.
       Foundation only -- no card UI changes yet. Three more phases remain,
       each its own future brainstorm/spec:
-      - [ ] Phase B: new effect sources (potion regen-over-time buff, camp buff).
+      - [x] **Phase B: new effect sources ✅ merged** (`specs/2026-06-21-character-cards-phase-b-effect-sources-design.md`,
+            `plans/2026-06-21-character-cards-phase-b-effect-sources.md`): a new shared
+            `regen_buff` status-effect type alongside `poison`, with both an in-memory
+            combat handler (`status_effects.py::EFFECT_START["regen_buff"]`, heals %
+            of max HP/mana per turn scaled by `hp_mult`/`mp_mult`) and a persisted
+            out-of-combat counterpart (`apply_tick_decay` multiplies that tick's base
+            regen rate while a `regen_buff` row is active). A new `replace_effect`
+            helper enforces replace-not-stack semantics. `combat_service.py`'s existing
+            poison-only combat start/end round-trip was generalized to also carry
+            `regen_buff`. Three sources wired in: a new `potion-regen` item (combat via
+            `player_use_item`, out-of-combat via `inventory_api.py::consume_item`'s new
+            `"regen" in slug` branch) and `dungeon_camp()`'s instant restore now
+            additionally grants a 10-tick "well-rested" buff. Two non-obvious fixes
+            found independently by two different implementer subagents (Tasks 5 and 6):
+            `advance_for`/`advance_non_combat_time` immediately invoke
+            `apply_tick_decay`, which unconditionally decrements *every* active
+            `CharacterStatusEffect` row for that character by the tick delta -- so a
+            freshly-granted buff inserted *before* that call self-decays the instant it's
+            created. Both call sites now insert the buff *after* the time-advance call.
+            Built via 6 TDD tasks, each independently subagent-reviewed (Approved, no
+            fix rounds needed); full suite green throughout (437 passed, up from a 421
+            baseline, no regressions). Phase C/D (card UI redesigns) remain as the next
+            steps in this series.
       - [ ] Phase C: dashboard roster card redesign (collapsed HP/MP/buffs/debuffs,
             expand-on-select to a context area with actions + full stats).
       - [ ] Phase D: combat party card redesign (collapsed, auto-expand on that

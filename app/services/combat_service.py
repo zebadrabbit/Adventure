@@ -167,10 +167,15 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
 
     from app.models import CharacterStatusEffect
 
+    PERSISTED_EFFECT_NAMES = ("poison", "regen_buff")
+
     try:
         effects = [
             {"name": row.name, "remaining": row.remaining, "data": json.loads(row.data) if row.data else {}}
-            for row in CharacterStatusEffect.query.filter_by(character_id=char.id, name="poison").all()
+            for row in CharacterStatusEffect.query.filter(
+                CharacterStatusEffect.character_id == char.id,
+                CharacterStatusEffect.name.in_(PERSISTED_EFFECT_NAMES),
+            ).all()
         ]
     except Exception:
         effects = []
@@ -886,18 +891,22 @@ def _persist_party_resources(session: CombatSession):
             db.session.add(row)
             changed = True
 
-            # Write back remaining poison -- delete-then-recreate is simplest
-            # and avoids diffing old vs new rows. Dead characters (hp<=0)
-            # don't get effects written back.
+            # Write back remaining poison/regen_buff -- delete-then-recreate is
+            # simplest and avoids diffing old vs new rows. Dead characters
+            # (hp<=0) don't get effects written back.
             try:
-                CharacterStatusEffect.query.filter_by(character_id=cid, name="poison").delete()
+                PERSISTED_EFFECT_NAMES = ("poison", "regen_buff")
+                CharacterStatusEffect.query.filter(
+                    CharacterStatusEffect.character_id == cid,
+                    CharacterStatusEffect.name.in_(PERSISTED_EFFECT_NAMES),
+                ).delete(synchronize_session=False)
                 if int(m.get("hp", 0)) > 0:
                     for eff in m.get("effects", []) or []:
-                        if eff.get("name") == "poison" and int(eff.get("remaining", 0)) > 0:
+                        if eff.get("name") in PERSISTED_EFFECT_NAMES and int(eff.get("remaining", 0)) > 0:
                             db.session.add(
                                 CharacterStatusEffect(
                                     character_id=cid,
-                                    name="poison",
+                                    name=eff["name"],
                                     remaining=int(eff["remaining"]),
                                     data=_json.dumps(eff.get("data", {})),
                                 )
@@ -1460,6 +1469,11 @@ def player_use_item(
             if slug == "potion-healing":
                 heal = 25
                 m["hp"] = min(m.get("max_hp", 100), m.get("hp", 0) + heal)
+                used = True
+            elif slug == "potion-regen":
+                from app.services.status_effects import replace_effect
+
+                m["effects"] = replace_effect(m.get("effects", []) or [], "regen_buff", 5, hp_mult=3.0, mp_mult=3.0)
                 used = True
             break
     if not used:
