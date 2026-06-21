@@ -220,6 +220,8 @@ def apply_tick_decay(delta: int, character_ids) -> None:
             effects = CharacterStatusEffect.query.filter_by(character_id=char.id).all()
             if effects:
                 effects_touched = True
+            hp_mult = 1.0
+            mp_mult = 1.0
             for effect in effects:
                 if effect.name == "poison":
                     try:
@@ -230,6 +232,21 @@ def apply_tick_decay(delta: int, character_ids) -> None:
                     if damage > 0:
                         hp = max(1, hp - damage)
                         stats_changed = True
+                elif effect.name == "regen_buff":
+                    try:
+                        payload = json.loads(effect.data) if effect.data else {}
+                        if not isinstance(payload, dict):
+                            payload = {}
+                    except Exception:
+                        payload = {}
+                    try:
+                        hp_mult = float(payload.get("hp_mult", 1.0))
+                    except Exception:
+                        hp_mult = 1.0
+                    try:
+                        mp_mult = float(payload.get("mp_mult", 1.0))
+                    except Exception:
+                        mp_mult = 1.0
                 effect.remaining -= delta
                 if effect.remaining <= 0:
                     db.session.delete(effect)
@@ -237,10 +254,10 @@ def apply_tick_decay(delta: int, character_ids) -> None:
                     db.session.add(effect)
 
             if hp < hp_max:
-                hp = min(hp_max, hp + math.ceil(hp_max * rates["hp_pct_per_tick"] / 100 * delta))
+                hp = min(hp_max, hp + math.ceil(hp_max * rates["hp_pct_per_tick"] * hp_mult / 100 * delta))
                 stats_changed = True
             if mana < mana_max:
-                mana = min(mana_max, mana + math.ceil(mana_max * rates["mp_pct_per_tick"] / 100 * delta))
+                mana = min(mana_max, mana + math.ceil(mana_max * rates["mp_pct_per_tick"] * mp_mult / 100 * delta))
                 stats_changed = True
 
             if stats_changed:

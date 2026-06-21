@@ -1,4 +1,5 @@
 import json
+import math
 
 from app import db
 from app.models import CharacterStatusEffect
@@ -303,3 +304,97 @@ def test_apply_tick_decay_respects_custom_regen_rates_from_game_config():
     assert stats["hp"] > 1 + int(hp_max * 0.01)
     # mp_pct_per_tick of 0 means no mana regen at all
     assert stats["current_mana"] == 1
+
+
+def test_apply_tick_decay_regen_buff_multiplies_regen_rate():
+    from app.models import GameConfig
+
+    GameConfig.set("regen_rates", json.dumps({"hp_pct_per_tick": 1.0, "mp_pct_per_tick": 1.0}))
+    db.session.commit()
+
+    char = _make_character("regenbuffdecay")
+    char.stats = json.dumps({"con": 10, "int": 10, "hp": 1, "current_mana": 1})
+    db.session.add(char)
+    db.session.commit()
+    hp_max, mana_max = compute_hp_mana_max(char)
+    db.session.add(
+        CharacterStatusEffect(
+            character_id=char.id, name="regen_buff", remaining=5, data='{"hp_mult": 3.0, "mp_mult": 3.0}'
+        )
+    )
+    db.session.commit()
+
+    apply_tick_decay(1, character_ids=[char.id])
+
+    db.session.refresh(char)
+    stats = json.loads(char.stats)
+    base_heal = math.ceil(hp_max * 1.0 / 100)
+    buffed_heal = math.ceil(hp_max * 3.0 / 100)
+    assert stats["hp"] - 1 == buffed_heal
+    assert stats["hp"] - 1 > base_heal
+
+    remaining_effect = CharacterStatusEffect.query.filter_by(character_id=char.id, name="regen_buff").first()
+    assert remaining_effect.remaining == 4
+
+
+def test_apply_tick_decay_regen_buff_expires_and_is_pruned():
+    char = _make_character("regenbuffexpire")
+    db.session.add(
+        CharacterStatusEffect(
+            character_id=char.id, name="regen_buff", remaining=1, data='{"hp_mult": 3.0, "mp_mult": 3.0}'
+        )
+    )
+    db.session.commit()
+
+    apply_tick_decay(1, character_ids=[char.id])
+
+    assert CharacterStatusEffect.query.filter_by(character_id=char.id, name="regen_buff").count() == 0
+
+
+def test_apply_tick_decay_regen_buff_malformed_data_falls_back_to_base_rate():
+    from app.models import GameConfig
+
+    GameConfig.set("regen_rates", json.dumps({"hp_pct_per_tick": 1.0, "mp_pct_per_tick": 1.0}))
+    db.session.commit()
+
+    char = _make_character("regenbuffmalformed")
+    char.stats = json.dumps({"con": 10, "int": 10, "hp": 1, "current_mana": 1})
+    db.session.add(char)
+    db.session.commit()
+    hp_max, _ = compute_hp_mana_max(char)
+    db.session.add(CharacterStatusEffect(character_id=char.id, name="regen_buff", remaining=5, data="not json"))
+    db.session.commit()
+
+    apply_tick_decay(1, character_ids=[char.id])
+
+    db.session.refresh(char)
+    stats = json.loads(char.stats)
+    base_heal = math.ceil(hp_max * 1.0 / 100)
+    assert stats["hp"] - 1 == base_heal
+
+
+def test_apply_tick_decay_poison_and_regen_buff_combine_independently():
+    from app.models import GameConfig
+
+    GameConfig.set("regen_rates", json.dumps({"hp_pct_per_tick": 0.0, "mp_pct_per_tick": 0.0}))
+    db.session.commit()
+
+    char = _make_character("poisonplusregenbuff")
+    char.stats = json.dumps({"con": 10, "int": 10, "hp": 50, "current_mana": 20})
+    db.session.add(char)
+    db.session.commit()
+    db.session.add(CharacterStatusEffect(character_id=char.id, name="poison", remaining=5, data='{"damage": 10}'))
+    db.session.add(
+        CharacterStatusEffect(
+            character_id=char.id, name="regen_buff", remaining=5, data='{"hp_mult": 3.0, "mp_mult": 3.0}'
+        )
+    )
+    db.session.commit()
+
+    apply_tick_decay(1, character_ids=[char.id])
+
+    db.session.refresh(char)
+    stats = json.loads(char.stats)
+    # base rate is 0, so regen_buff's multiplier of 0 contributes nothing --
+    # net effect is just poison damage.
+    assert stats["hp"] == 40
