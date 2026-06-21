@@ -586,6 +586,18 @@ already-noted `glass-theme.css` dead-code follow-up.
       `None`. BOSS/ELITE spawns via `choose_archetype_monster` are deliberately left
       untouched (separate set-piece/scaling mechanic, out of scope). Final suite: 421
       passed, 2 skipped, 3 deselected, 1 xpassed.
+      Follow-up found during final review (sanctioned by the design spec's graceful-
+      degradation section, not a defect, just worth tracking): `MONSTER_THEME_FAMILIES`'
+      7 values have very uneven low-level coverage in `sql/monsters_seed.sql` -- `beast`/
+      `humanoid`/`undead` have non-boss rows from level 1, but `demon` starts at level 4
+      and `aberration`/`construct`/`elemental` start at level 7. A new low-level dungeon
+      themed as one of those three sparse families finds zero eligible ambient monsters,
+      hits `choose_monster`'s `ValueError`, and falls back to generic "Trash Monster"
+      stats for its whole ambient pool -- a visible, themed-by-luck regression in
+      encounter quality for roughly 4/7 of new low-level dungeons. Two candidate fixes,
+      neither done yet: widen low-level `MonsterCatalog` coverage for the sparse
+      families, or bias `pick_monster_family` away from families with no rows in the
+      dungeon's likely level band.
 - [x] **Combat log clears and retypes after a spell cast — FIXED ✅**: every action
       handler emits `combat_update` twice per turn (player's action + the internal emit
       inside `monster_auto_turn()`), with no client-side ordering guarantee — if the
