@@ -108,7 +108,7 @@ cmd_start() {
 cmd_stop() {
     if [ ! -f "$PID_FILE" ]; then
         log_warn "Server is not running"
-        exit 0
+        return 0
     fi
 
     PID=$(cat "$PID_FILE")

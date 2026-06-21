@@ -648,6 +648,21 @@ already-noted `glass-theme.css` dead-code follow-up.
       Removed the now-redundant post-login `hp` re-set workaround in
       `tests/conftest.py`'s `auth_client` fixture. Full suite green (402
       passed).
+- [x] **`manage.sh restart` silently did nothing when the server wasn't already
+      running — FIXED ✅.** Found while capturing help-page screenshots
+      (worked around there by starting `run.py` directly). Root cause:
+      `cmd_stop`'s "nothing to stop" early-return called `exit 0`
+      (`manage.sh:111`) rather than `return 0`; since `cmd_restart` calls
+      `cmd_stop` as a plain function call in the same shell process (not a
+      subprocess), that `exit` terminated the whole script before
+      `cmd_restart` could reach `cmd_start`. `./manage.sh restart` would log
+      "Restarting server..." → "Server is not running" → nothing — exit
+      code 0, no PID file, no server, no error surfaced. Reproduced with a
+      one-off repro script (no bash test infra in this repo) confirming RED
+      (no "Starting Adventure MUD server" line, no PID file) before the fix
+      and GREEN after. Single-line fix (`exit 0` → `return 0`); confirmed
+      `./manage.sh stop` standalone (no server running) still exits 0
+      cleanly, unaffected by the change.
 
 ## How to run the suite
 ```bash
