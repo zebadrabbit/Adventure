@@ -31,6 +31,80 @@
     let lastLogNode = null;
     let lastLogCount = 1;
     let latestHighlightNode = null;
+
+    // Cache of unlocked active skills per character, populated lazily the
+    // first time each character becomes the active turn-taker. Avoids
+    // refetching on every combat_update/poll tick (render() runs far more
+    // often than a character's skill list can change mid-combat).
+    const activeSkillsCache = new Map(); // charId -> array of skill objects (or null while loading)
+
+    async function fetchActiveSkills(charId) {
+        if (activeSkillsCache.has(charId)) return activeSkillsCache.get(charId);
+        activeSkillsCache.set(charId, []); // placeholder so concurrent calls don't double-fetch
+        try {
+            const r = await fetch(`/api/characters/${charId}/skills`);
+            const all = await r.json();
+            const active = Array.isArray(all) ? all.filter(s => s.skill_type === 'active') : [];
+            activeSkillsCache.set(charId, active);
+            return active;
+        } catch (e) {
+            activeSkillsCache.set(charId, []);
+            return [];
+        }
+    }
+
+    function renderSkillButtons(actionPanel, charId, canAct, version) {
+        const grid = actionPanel.querySelector('.d-grid.gap-2');
+        if (!grid) return;
+        const existing = grid.querySelector('.skill-buttons-group');
+        if (existing) existing.remove();
+
+        const cached = activeSkillsCache.get(charId);
+        if (cached === undefined) {
+            fetchActiveSkills(charId).then(() => {
+                // Re-render once the fetch resolves; safe even if the active
+                // character has since changed (renderSkillButtons no-ops
+                // against a panel that's been hidden/reparented since).
+                renderSkillButtons(actionPanel, charId, canAct, version);
+            });
+            return;
+        }
+
+        const group = document.createElement('div');
+        group.className = 'btn-group-combat skill-buttons-group';
+
+        cached.forEach(skill => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn-combat btn-combat-spell';
+            btn.dataset.action = `cast_skill_${skill.skill_id}`;
+            btn.dataset.skillId = String(skill.skill_id);
+            btn.innerHTML = `<i class="bi bi-stars"></i> ${skill.skill_name}`;
+
+            if (!canAct) {
+                btn.disabled = true;
+            } else if (skill.last_used && skill.cooldown) {
+                const elapsedSec = (Date.now() - Date.parse(skill.last_used)) / 1000;
+                const remaining = skill.cooldown - elapsedSec;
+                if (remaining > 0) {
+                    btn.disabled = true;
+                    btn.title = `On cooldown (${Math.ceil(remaining)}s)`;
+                }
+            }
+
+            btn.addEventListener('click', () => doSkillAction(skill.skill_id, version, charId));
+            group.appendChild(btn);
+        });
+
+        if (cached.length > 0) {
+            // Insert right before the Flee button (the grid's last child)
+            // so skills sit with the other action buttons, not after Flee.
+            const fleeBtn = grid.querySelector('[data-action="flee"]');
+            if (fleeBtn) grid.insertBefore(group, fleeBtn);
+            else grid.appendChild(group);
+        }
+    }
+
     function classifyAndTransform(msg) {
         let cls = '';
         // Order matters: more specific patterns first
@@ -359,8 +433,12 @@
                 btn.parentNode.replaceChild(newBtn, btn);
                 newBtn.addEventListener('click', () => doAction(action, state.version, activeCharId));
             });
+
+            renderSkillButtons(actionPanel, activeCharId, canAct, state.version);
         } else if (actionPanel) {
             actionPanel.style.display = 'none';
+            const stale = actionPanel.querySelector('.skill-buttons-group');
+            if (stale) stale.remove();
         }
         // If combat complete, show a return to dungeon action area (once)
         if (state.status === 'complete') {
@@ -498,6 +576,35 @@
             const j = await r.json();
             if (j.state) {
                 render(j.state);
+            }
+        } catch (e) { /* ignore */ }
+    }
+
+    function appendTransientLogLine(text) {
+        // Mirrors the plain createElement('div') + classify-class pattern
+        // appendLog() itself uses (combat.js:149-150) — 'log-system' is the
+        // same class already used for "Encounter starts"/"defeated!" lines.
+        const line = document.createElement('div');
+        line.classList.add('log-system');
+        line.textContent = text;
+        logEl.appendChild(line);
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    async function doSkillAction(skillId, version, actorId) {
+        try {
+            const r = await fetch(`/api/combat/${combatId}/cast_skill`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ version: version, actor_id: actorId, skill_id: skillId }),
+            });
+            const j = await r.json();
+            if (j.state) {
+                render(j.state);
+            } else if (j.error === 'on_cooldown') {
+                appendTransientLogLine(`Skill is on cooldown (${j.remaining_seconds}s remaining).`);
+            } else if (j.error) {
+                appendTransientLogLine(`Skill could not be used (${j.error}).`);
             }
         } catch (e) { /* ignore */ }
     }
