@@ -350,13 +350,23 @@ already-noted `glass-theme.css` dead-code follow-up.
 - [x] **Monster HP label never updates — FIXED ✅**: `render()` now updates the actual
       `#monster-hp-text` label instead of writing into `#monster-hp-bar`'s fill div.
       Found and fixed during Phase 4 live verification.
-- [ ] **Combat action panel is one static spell list for every character**
+- [x] **Combat action panel is one static spell list for every character — FIXED ✅**
       (`app/templates/combat.html`'s single `#combat-action-panel`, hardcoded Firebolt/Ice
       Shard/Lightning buttons): not class- or character-specific, so every party member
       appears to have identical abilities. The real per-character skill system already
-      exists end-to-end (`POST /api/combat/<id>/cast_skill`, Spec 5b) but has no UI button
-      wired to it — this static panel is the older "legacy hardcoded spell system" the
+      exists end-to-end (`POST /api/combat/<id>/cast_skill`, Spec 5b) but had no UI button
+      wired to it — this static panel was the older "legacy hardcoded spell system" the
       Spec 5 entry above already flags as separate. Found during Phase 4 live verification.
+      Wired via two tasks: Task 1 added a `cooldown` field to
+      `GET /api/characters/<id>/skills`'s response; Task 2 added a per-character
+      active-skills cache/fetch helper and `renderSkillButtons()` in `combat.js`, rendering
+      one button per unlocked active skill (disabled with a cooldown tooltip when
+      applicable) inserted before the Flee button, wired to the existing
+      `POST /api/combat/<id>/cast_skill` endpoint via a new `doSkillAction()` handler.
+      `node --check` confirms the JS is syntactically valid; manual browser verification
+      (start combat, confirm skill buttons appear/cooldown/disable correctly, swap active
+      character, check devtools for errors) has not yet been performed and remains
+      outstanding.
 - [x] **No run-end on full party wipe — FIXED ✅**: combat already correctly marked every
       character `is_dead=True` on a wipe, but nothing outside combat checked it. Added
       `combat_service.party_is_wiped()` and wired it into `process_movement()` (the one
