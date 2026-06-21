@@ -68,7 +68,9 @@ def populate_spawn_stats(spawn: "SpawnEntry", party_level: int, instance: "Dunge
                 tier_row = DungeonTier.query.filter_by(tier=1).first()
             modified_level = (spawn.level or party_level) + (tier_row.monster_level_modifier if tier_row else 0)
 
-            monster_dict = spawn_service.choose_monster(level=modified_level, party_size=1)
+            monster_dict = spawn_service.choose_monster(
+                level=modified_level, party_size=1, family=getattr(instance, "monster_family", None)
+            )
 
             if affix_ids:
                 for affix_id in affix_ids:

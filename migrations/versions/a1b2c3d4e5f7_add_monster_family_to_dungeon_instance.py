@@ -1,0 +1,24 @@
+"""add monster_family to dungeon_instance
+
+Revision ID: a1b2c3d4e5f7
+Revises: c7d8e9f0a1b2
+Create Date: 2026-06-21
+
+"""
+
+import sqlalchemy as sa
+from alembic import op
+
+# revision identifiers, used by Alembic.
+revision = "a1b2c3d4e5f7"
+down_revision = "c7d8e9f0a1b2"
+branch_labels = None
+depends_on = None
+
+
+def upgrade():
+    op.add_column("dungeon_instance", sa.Column("monster_family", sa.String(length=40), nullable=True))
+
+
+def downgrade():
+    op.drop_column("dungeon_instance", "monster_family")

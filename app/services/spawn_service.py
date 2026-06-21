@@ -25,6 +25,21 @@ RARITY_WEIGHTS = {
     "boss": 0.02,
 }
 
+MONSTER_THEME_FAMILIES = ["undead", "humanoid", "beast", "construct", "elemental", "aberration", "demon"]
+
+
+def pick_monster_family(seed: int) -> str:
+    """Deterministically pick a dungeon's enemy theme from its seed.
+
+    Same seed always returns the same family, for the lifetime of that
+    dungeon instance. The XOR salt mirrors SpawnManager's own
+    independent RNG stream (random.Random(instance.seed ^ 0x5341574E)
+    in app/dungeon/spawn_manager.py) -- same idea, different salt, so
+    this doesn't collide with or depend on SpawnManager's seeding.
+    """
+    return random.Random(seed ^ 0x4D4F4E53).choice(MONSTER_THEME_FAMILIES)  # ^ "MONS"
+
+
 # -------------------------------------------------------------------------------------------------
 # Lightweight in-process cache for eligible monster lists to avoid repetitive DB queries.
 # Keyed by (level, include_boss). We intentionally DO NOT include party size because the
@@ -32,7 +47,7 @@ RARITY_WEIGHTS = {
 # MonsterCatalog ORM objects (safe for read-only usage within request scope). A short TTL keeps
 # data fresh if seeds / dynamic injections happen later.
 # -------------------------------------------------------------------------------------------------
-_ELIGIBLE_CACHE: Dict[Tuple[int, bool], tuple[float, List[MonsterCatalog]]] = {}
+_ELIGIBLE_CACHE: Dict[Tuple[int, bool, Optional[str]], tuple[float, List[MonsterCatalog]]] = {}
 _ELIGIBLE_TTL_SECONDS = 30.0
 
 
@@ -67,15 +82,17 @@ def _load_rarity_weights() -> dict:
         return dict(RARITY_WEIGHTS)
 
 
-def _eligible_monsters(level: int, include_boss: bool = False) -> List[MonsterCatalog]:
+def _eligible_monsters(level: int, include_boss: bool = False, family: Optional[str] = None) -> List[MonsterCatalog]:
     now = time.time()
-    key = (level, include_boss)
+    key = (level, include_boss, family)
     cached = _ELIGIBLE_CACHE.get(key)
     if cached:
         ts, rows = cached
         if (now - ts) <= _ELIGIBLE_TTL_SECONDS:
             return rows
     q = MonsterCatalog.query
+    if family:
+        q = q.filter(MonsterCatalog.family == family)
     rows = q.filter(MonsterCatalog.level_min <= level, MonsterCatalog.level_max >= level).all()
     if not include_boss:
         rows = [r for r in rows if not r.boss]
@@ -89,18 +106,24 @@ def _eligible_monsters(level: int, include_boss: bool = False) -> List[MonsterCa
     return rows
 
 
-def choose_monster(level: int, party_size: int = 1, include_boss: bool = False, rng: Optional[random.Random] = None):
+def choose_monster(
+    level: int,
+    party_size: int = 1,
+    include_boss: bool = False,
+    rng: Optional[random.Random] = None,
+    family: Optional[str] = None,
+):
     """Return a scaled monster instance dict for target level.
 
     Selection steps:
-      1. Filter by level band.
+      1. Filter by level band (and by family, if given).
       2. Apply rarity weighting.
       3. Randomly choose.
       4. Scale stats for party size.
     Raises ValueError if no eligible monsters.
     """
     rng = rng or random
-    pool = _eligible_monsters(level, include_boss=include_boss)
+    pool = _eligible_monsters(level, include_boss=include_boss, family=family)
     if not pool:
         raise ValueError(f"No monsters available for level {level}")
     rarity_weights = _load_rarity_weights()

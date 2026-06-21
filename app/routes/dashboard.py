@@ -184,7 +184,16 @@ def dashboard():
                 import random
 
                 seed = seed or random.randint(1, 1_000_000)
-                instance = DungeonInstance(user_id=current_user_id, seed=seed, pos_x=0, pos_y=0, pos_z=0)
+                from app.services.spawn_service import pick_monster_family
+
+                instance = DungeonInstance(
+                    user_id=current_user_id,
+                    seed=seed,
+                    pos_x=0,
+                    pos_y=0,
+                    pos_z=0,
+                    monster_family=pick_monster_family(seed),
+                )
                 db.session.add(instance)
                 db.session.commit()
                 session["dungeon_instance_id"] = instance.id
@@ -207,7 +216,16 @@ def dashboard():
                 import random
 
                 seed = session.get("dungeon_seed") or random.randint(1, 1_000_000)
-                instance = DungeonInstance(user_id=current_user_id, seed=seed, pos_x=0, pos_y=0, pos_z=0)
+                from app.services.spawn_service import pick_monster_family
+
+                instance = DungeonInstance(
+                    user_id=current_user_id,
+                    seed=seed,
+                    pos_x=0,
+                    pos_y=0,
+                    pos_z=0,
+                    monster_family=pick_monster_family(seed),
+                )
                 db.session.add(instance)
                 db.session.commit()
                 session["dungeon_instance_id"] = instance.id
