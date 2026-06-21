@@ -485,13 +485,19 @@ already-noted `glass-theme.css` dead-code follow-up.
       `#` placeholders despite real routes already existing (`main.terms`/`main.privacy`)
       — wired them up. (3) hardcoded "© 2025" — now passed from the `index` route as
       `current_year`. Full suite green (388 passed).
-- [ ] **No "Support" destination exists anywhere in the app**: the landing page footer
-      (and the main site footer, `partials/footer.html`) both have a "Support" link that
-      points to `#` — confirmed via grep there's no support route, page, or even a contact
-      email anywhere in the codebase. Same gap in both places, so it's a site-wide
-      placeholder, not specific to the landing page footer fix. Needs a decision: a real
-      support page/route, a mailto: link, or a third-party link (Discord, etc.) — not
-      scoped yet.
+- [x] **No "Support" destination exists anywhere in the app**: added a self-serve `/help`
+      route + `help.html` template (no live GMs/support exist for this game, so this is a
+      wiki-style help page, not a ticket/contact form) and wired both footers' "Support"
+      links to it. Captured 5/5 reference screenshots for the page via
+      `scripts/screenshot_help.py` (Playwright-driven against the real dev app/DB):
+      dashboard overview, combat action panel, skill tree modal, extraction modal, hoard
+      modal — all captured successfully, no follow-up run needed. Along the way found and
+      worked around (did not fix, out of scope) a pre-existing bug in
+      `app/static/js/skill-tree.js`'s `switchTree()`: it reads `event.target` after an
+      `await fetch(...)`, by which point the browser has cleared the legacy `window.event`
+      it was relying on, so every tree-selector click throws (silently, into its own
+      try/catch) and the skill canvas never renders in real usage either, not just under
+      Playwright. Worth a real fix later.
 - [x] **Dashboard hub layout & flow** — fixed the concrete complaint ("dashboard
       location of items, redesign the layout to flow better"): Merchants/Hoard/
       Party-Management/Achievements were stacked vertically inside the Party Roster
