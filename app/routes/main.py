@@ -358,6 +358,11 @@ def conduct():
     return render_template("conduct.html")
 
 
+@bp.route("/help", endpoint="help")
+def help_page():
+    return render_template("help.html")
+
+
 # --- Home Page ---
 
 

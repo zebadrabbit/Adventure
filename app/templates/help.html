@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% block title %}Help - Adventure{% endblock %}
+{% block content %}
+<div class="container py-5">
+  <h1>Help &amp; Guide</h1>
+  <p class="lead">Adventure has no live game masters or support staff —
+    this page is the closest thing to one. It covers the mechanics new
+    players ask about most.</p>
+
+  <nav class="help-toc mb-4" aria-label="Help page sections">
+    <ul class="nav nav-pills">
+      <li class="nav-item"><a class="nav-link" href="#getting-started">Getting Started</a></li>
+      <li class="nav-item"><a class="nav-link" href="#combat">Dungeon Exploration &amp; Combat</a></li>
+      <li class="nav-item"><a class="nav-link" href="#hoard-extraction">Hoard &amp; Extraction</a></li>
+      <li class="nav-item"><a class="nav-link" href="#skills-progression">Skills &amp; Progression</a></li>
+    </ul>
+  </nav>
+
+  <hr>
+
+  <section id="getting-started" class="mb-5">
+    <h2>Getting Started</h2>
+    <p>Register an account, then create up to four characters from the
+      dashboard. Each character gets a class, derived from their rolled
+      stats, and starts with basic gear. Use the checkboxes on the
+      character roster to pick a party of up to four, then press
+      "Deploy" to enter the dungeon with them.</p>
+    <p>The dashboard's "Hub Actions" panel (the tabbed row below the
+      roster) holds the Merchants, Hoard, Party Management, and
+      Achievements screens — everything that isn't about an individual
+      character lives there.</p>
+    <img src="{{ url_for('static', filename='img/help/dashboard-overview.png') }}"
+         alt="The dashboard showing the character roster and Hub Actions tabs"
+         class="img-fluid border rounded mt-3">
+  </section>
+
+  <section id="combat" class="mb-5">
+    <h2>Dungeon Exploration &amp; Combat</h2>
+    <p>Moving through a dungeon floor can trigger an ambient monster
+      encounter, dropping your party into turn-based combat. Each
+      character's turn shows an action panel: Attack and Defend are
+      always available; Firebolt/Ice Shard/Lightning are universal
+      spells any sufficiently magical character can cast for mana; a
+      Potion button heals from that character's own potion stock (not a
+      shared party pool). If a character has unlocked active skills from
+      their talent tree (see Skills &amp; Progression below), those
+      appear as extra buttons here too, each on its own cooldown.</p>
+    <img src="{{ url_for('static', filename='img/help/combat-action-panel.png') }}"
+         alt="The combat screen showing the party, monster, and action panel with both spells and an unlocked skill button"
+         class="img-fluid border rounded mt-3">
+  </section>
+
+  <section id="hoard-extraction" class="mb-5">
+    <h2>Hoard &amp; Extraction</h2>
+    <p>This is the single most important thing to understand before you
+      lose something you cared about: a character's carried gold and
+      gear are <strong>at risk</strong> for the duration of a dungeon run.
+      If your whole party is wiped out, that run's gold and any unsecured
+      loot are lost. The only way to make loot permanent is to
+      <strong>extract</strong> — return to the surface — which moves
+      everything your party is carrying into your account's persistent
+      <strong>Hoard</strong>, safe from any future run.</p>
+    <p>Press the hearth/extraction button in the dungeon to see what
+      would be secured before you commit. If a party member goes down but
+      survivors remain, those survivors can loot the downed character's
+      body before extracting, recovering what would otherwise be lost.</p>
+    <img src="{{ url_for('static', filename='img/help/extraction-modal.png') }}"
+         alt="The extraction confirmation panel showing what will be secured to the Hoard"
+         class="img-fluid border rounded mt-3">
+    <img src="{{ url_for('static', filename='img/help/hoard-modal.png') }}"
+         alt="The Hoard screen showing persistent copper and items"
+         class="img-fluid border rounded mt-3">
+  </section>
+
+  <section id="skills-progression" class="mb-5">
+    <h2>Skills &amp; Progression</h2>
+    <p>Characters earn XP from combat and successful extractions, leveling
+      up over time. Each level grants stat points (spend them from the
+      character card) and, at certain levels, talent points. Open a
+      character's Skill Tree from their card to spend talent points
+      unlocking passive bonuses (applied automatically) or active skills.
+      Active skills show up as buttons in combat once unlocked — see
+      Dungeon Exploration &amp; Combat above.</p>
+    <img src="{{ url_for('static', filename='img/help/skill-tree-modal.png') }}"
+         alt="The skill tree modal showing unlockable passive and active skills"
+         class="img-fluid border rounded mt-3">
+  </section>
+</div>
+{% endblock %}
