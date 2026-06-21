@@ -154,4 +154,10 @@
     document.querySelectorAll('.xp-fill[data-xp-pct]').forEach((bar) => {
         bar.style.width = bar.dataset.xpPct + '%';
     });
+
+    // Apply server-rendered HP/MP bar fill percentages (same pattern as the
+    // XP bar above -- kept out of inline style attrs).
+    document.querySelectorAll('.bar-fill[data-bar-pct]').forEach((bar) => {
+        bar.style.width = bar.dataset.barPct + '%';
+    });
 })();

@@ -45,3 +45,24 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 });
+
+// Click-to-expand: each .operative-summary toggles its own sibling
+// .operative-detail independently (no accordion -- any number of cards
+// can be expanded at once, so two characters can be compared side by side).
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.operative-summary').forEach((summary) => {
+        summary.addEventListener('click', (e) => {
+            // Defensive guard: don't toggle if the click originated on a
+            // control that has its own handler (SELECT label, footer
+            // buttons). Under the current DOM these controls live inside
+            // .operative-detail (hidden while collapsed) so this mostly
+            // matters if that structure changes later.
+            if (e.target.closest('.select-operative-label, .operative-footer, .btn-allocate-stats')) return;
+            const card = summary.closest('.operative-card');
+            const detail = card.querySelector('.operative-detail');
+            if (!detail) return;
+            detail.hidden = !detail.hidden;
+            card.classList.toggle('expanded', !detail.hidden);
+        });
+    });
+});
