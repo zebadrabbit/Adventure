@@ -234,150 +234,191 @@
             <div class="operative-card {% if session.get('party') %}{% for p in session.get('party') %}{% if p.id == c.id %}selected{% endif %}{% endfor %}{% endif %}"
                 data-id="{{ c.id }}">
 
-                <!-- Operative Header -->
-                <div class="operative-header">
-                    <div class="operative-name">
-                        <span class="icon-28">
-                            {% set class_lower = c.class_name.lower() %}
-                            {% if class_lower == 'fighter' %}
-                            {{ svg_icon('swords-power', 24) }}
-                            {% elif class_lower == 'mage' %}
-                            {{ svg_icon('fire-silhouette', 24) }}
-                            {% elif class_lower == 'rogue' %}
-                            {{ svg_icon('rogue', 24) }}
-                            {% elif class_lower == 'druid' %}
-                            {{ svg_icon('heavy-thorny-triskelion', 24) }}
-                            {% elif class_lower == 'cleric' %}
-                            {{ svg_icon('aura', 24) }}
-                            {% elif class_lower == 'ranger' %}
-                            {{ svg_icon('bowman', 24) }}
-                            {% else %}
-                            <i class="bi bi-person-fill"></i>
-                            {% endif %}
+                <!-- Always-visible collapsed summary -- the click target for expand/collapse -->
+                <div class="operative-summary">
+                    <div class="operative-header">
+                        <div class="operative-name">
+                            <span class="icon-28">
+                                {% set class_lower = c.class_name.lower() %}
+                                {% if class_lower == 'fighter' %}
+                                {{ svg_icon('swords-power', 24) }}
+                                {% elif class_lower == 'mage' %}
+                                {{ svg_icon('fire-silhouette', 24) }}
+                                {% elif class_lower == 'rogue' %}
+                                {{ svg_icon('rogue', 24) }}
+                                {% elif class_lower == 'druid' %}
+                                {{ svg_icon('heavy-thorny-triskelion', 24) }}
+                                {% elif class_lower == 'cleric' %}
+                                {{ svg_icon('aura', 24) }}
+                                {% elif class_lower == 'ranger' %}
+                                {{ svg_icon('bowman', 24) }}
+                                {% else %}
+                                <i class="bi bi-person-fill"></i>
+                                {% endif %}
+                            </span>
+                            <span>{{ c.name }}</span>
+                        </div>
+                        <div class="operative-meta">
+                            <span class="class-badge {{ c.class_name|lower }}-badge">{{ c.class_name }}</span>
+                            <span class="badge">LV{{ c.level }}</span>
+                        </div>
+                    </div>
+
+                    {% set hp_pct = (c.stats.hp / c.hp_max * 100) if c.hp_max > 0 else 0 %}
+                    {% set hp_pct = 100 if hp_pct > 100 else (0 if hp_pct < 0 else hp_pct) %}
+                    {% set mp_pct = (c.stats.mana / c.mana_max * 100) if c.mana_max > 0 else 0 %}
+                    {% set mp_pct = 100 if mp_pct > 100 else (0 if mp_pct < 0 else mp_pct) %}
+                    <div class="hp-mp-bars">
+                        <div class="resource-bar-track">
+                            <span class="bar-label">HP {{ c.stats.hp }}/{{ c.hp_max }}</span>
+                            <div class="bar-track"><div class="bar-fill hp-fill" data-bar-pct="{{ hp_pct }}"></div></div>
+                        </div>
+                        <div class="resource-bar-track">
+                            <span class="bar-label">MP {{ c.stats.mana }}/{{ c.mana_max }}</span>
+                            <div class="bar-track"><div class="bar-fill mp-fill" data-bar-pct="{{ mp_pct }}"></div></div>
+                        </div>
+                    </div>
+
+                    {% if c.effects_display %}
+                    <div class="effect-chips">
+                        {% for eff in c.effects_display %}
+                        <span class="effect-chip {{ eff.css_class }}" title="{{ eff.label }} — {{ eff.remaining }} remaining">
+                            {{ eff.icon }} {{ eff.label }} ×{{ eff.remaining }}
                         </span>
-                        <span>{{ c.name }}</span>
+                        {% endfor %}
                     </div>
-                    <div class="operative-meta">
-                        <span class="class-badge {{ c.class_name|lower }}-badge">{{ c.class_name }}</span>
-                        <span class="badge">LV{{ c.level }}</span>
-                    </div>
+                    {% endif %}
                 </div>
 
-                <!-- Operative Body -->
-                <div class="operative-body">
+                <!-- Expanded detail -- hidden by default, toggled by dashboard-operative-cards.js -->
+                <div class="operative-detail" hidden>
 
-                    <!-- XP Progress -->
-                    {% set xp_span = c.xp_next - c.xp_current %}
-                    {% set xp_pct = ((c.xp - c.xp_current) / xp_span * 100) if xp_span > 0 else 100 %}
-                    {% set xp_pct = xp_pct if xp_pct <= 100 else 100 %}
-                    {% set xp_pct = xp_pct if xp_pct >= 0 else 0 %}
-                    <div class="xp-bar-anchor" data-char-id="{{ c.id }}">
-                        <div class="d-flex justify-content-between">
-                            <span class="xp-label-dim">EXPERIENCE:</span>
-                            <span><span class="xp-label-accent">{{ c.xp }}</span> /
-                                <span class="xp-label-dim">{{ c.xp_next }}</span></span>
+                    <div class="operative-body">
+
+                        <!-- XP Progress -->
+                        {% set xp_span = c.xp_next - c.xp_current %}
+                        {% set xp_pct = ((c.xp - c.xp_current) / xp_span * 100) if xp_span > 0 else 100 %}
+                        {% set xp_pct = xp_pct if xp_pct <= 100 else 100 %}
+                        {% set xp_pct = xp_pct if xp_pct >= 0 else 0 %}
+                        <div class="xp-bar-anchor" data-char-id="{{ c.id }}">
+                            <div class="d-flex justify-content-between">
+                                <span class="xp-label-dim">EXPERIENCE:</span>
+                                <span><span class="xp-label-accent">{{ c.xp }}</span> /
+                                    <span class="xp-label-dim">{{ c.xp_next }}</span></span>
+                            </div>
+                            <div class="progress mt-1 xp-progress-track">
+                                <div class="progress-bar xp-fill" data-xp-pct="{{ xp_pct }}"></div>
+                            </div>
+                            <span class="opacity-70">(Next: LV{{ c.level + 1 }})</span>
+                            {% if c.stat_points and c.stat_points > 0 %}
+                            <button type="button" class="tactical-btn-secondary btn-allocate-stats mt-2 btn-full-width"
+                                data-char-id="{{ c.id }}">
+                                <i class="bi bi-star-fill me-1"></i> Allocate {{ c.stat_points }} Stat Point{{ 's' if c.stat_points != 1 else '' }}
+                            </button>
+                            {% endif %}
                         </div>
-                        <div class="progress mt-1 xp-progress-track">
-                            <div class="progress-bar xp-fill" data-xp-pct="{{ xp_pct }}"></div>
-                        </div>
-                        <span class="opacity-70">(Next: LV{{ c.level + 1 }})</span>
-                        {% if c.stat_points and c.stat_points > 0 %}
-                        <button type="button" class="tactical-btn-secondary btn-allocate-stats mt-2 btn-full-width"
-                            data-char-id="{{ c.id }}">
-                            <i class="bi bi-star-fill me-1"></i> Allocate {{ c.stat_points }} Stat Point{{ 's' if c.stat_points != 1 else '' }}
-                        </button>
-                        {% endif %}
-                    </div>
 
-                    <!-- Stats Block -->
-                    <div class="stat-block">
-                        <h6>{{ svg_icon('bar-chart', 16, 'me-1') }}ATTRIBUTES</h6>
-                        <div class="stat-grid">
-                            <div><span class="fw-bold">STR</span>{{ c.stats.str }}</div>
-                            <div><span class="fw-bold">DEX</span>{{ c.stats.dex }}</div>
-                            <div><span class="fw-bold">INT</span>{{ c.stats.int }}</div>
-                            <div><span class="fw-bold">WIS</span>{{ c.stats.wis }}</div>
-                            <div><span class="fw-bold">CHA</span>{{ c.stats.cha }}</div>
-                            <div><span class="fw-bold">CON</span>{{ c.stats.con }}</div>
-                            <div><span class="fw-bold">HP</span>{{ c.stats.hp }}</div>
-                            <div><span class="fw-bold">MP</span>{{ c.stats.mana }}</div>
-                        </div>
-                    </div>
-
-                    <!-- Resources -->
-                    <div class="resource-bar">
-                        <span class="coin-gold">{{ svg_icon('cash', 18, 'me-1') }}{{ c.coins.gold }}g</span>
-                        <span class="coin-silver">{{ svg_icon('two-coins', 18, 'me-1') }}{{ c.coins.silver }}s</span>
-                        <span class="coin-copper">{{ svg_icon('token', 18, 'me-1') }}{{ c.coins.copper }}c</span>
-                    </div>
-
-                    <!-- Inventory -->
-                    <div class="stat-block flex-grow-1-block">
-                        <h6>{{ svg_icon('knapsack', 16, 'me-1') }}EQUIPMENT</h6>
-                        {% if c.inventory and c.inventory|length > 0 %}
-                        <div class="inventory-list">
-                            <ul>
-                                {% for it in c.inventory %}
-                                <li>
-                                    {% if it.type == 'weapon' %}
-                                    {{ svg_icon('bloody-sword', 16) }}
-                                    {% elif it.type == 'armor' %}
-                                    {{ svg_icon('shield', 16) }}
-                                    {% elif it.type == 'potion' %}
-                                    {{ svg_icon('potion-ball', 16) }}
-                                    {% elif it.type == 'tool' %}
-                                    {{ svg_icon('anvil', 16) }}
-                                    {% elif it.type == 'ring' %}
-                                    {{ svg_icon('ring', 16) }}
-                                    {% elif it.type == 'scroll' %}
-                                    {{ svg_icon('scroll-unfurled', 16) }}
-                                    {% else %}
-                                    {{ svg_icon('chest', 16) }}
-                                    {% endif %}
-                                    <span>{{ it.name }}</span>
-                                    <span class="item-type-tag">[{{ it.type }}]</span>
-                                </li>
+                        {% if c.effects_display %}
+                        <div class="stat-block">
+                            <h6>{{ svg_icon('aura', 16, 'me-1') }}ACTIVE EFFECTS</h6>
+                            <ul class="effect-detail-list">
+                                {% for eff in c.effects_display %}
+                                <li class="{{ eff.css_class }}">{{ eff.icon }} <strong>{{ eff.label }}</strong> — {{ eff.remaining }} remaining</li>
                                 {% endfor %}
                             </ul>
                         </div>
-                        {% else %}
-                        <div class="unarmed-placeholder">
-                            [ UNARMED ]
-                        </div>
                         {% endif %}
-                    </div>
-                </div>
 
-                <!-- Operative Footer -->
-                <div class="operative-footer">
-                    <form action="{{ url_for('dashboard.delete_character', char_id=c.id) }}" method="post"
-                        onsubmit="return confirm('⚠️ DISMISS {{ c.name }}?\n\nThis action is permanent and cannot be undone.');">
-                        <button class="tactical-btn-danger">
-                            {{ svg_icon('trash-can', 16, 'me-1') }} DISMISS
-                        </button>
-                    </form>
-                    <div class="btn-group">
-                        <button class="tactical-btn-secondary btn-equip-panel btn-icon-compact"
-                            data-char-id="{{ c.id }}" title="Equipment Panel">
-                            {{ svg_icon('anvil', 18) }}
-                        </button>
-                        <button class="tactical-btn-secondary btn-bag-panel btn-icon-compact" data-char-id="{{ c.id }}"
-                            title="Inventory">
-                            {{ svg_icon('knapsack', 18) }}
-                        </button>
-                        <button class="tactical-btn-secondary btn-skill-panel btn-icon-compact"
-                            data-char-id="{{ c.id }}" title="Skill Tree">
-                            {{ svg_icon('star-fill', 18) }}
-                        </button>
+                        <!-- Stats Block -->
+                        <div class="stat-block">
+                            <h6>{{ svg_icon('bar-chart', 16, 'me-1') }}ATTRIBUTES</h6>
+                            <div class="stat-grid">
+                                <div><span class="fw-bold">STR</span>{{ c.stats.str }}</div>
+                                <div><span class="fw-bold">DEX</span>{{ c.stats.dex }}</div>
+                                <div><span class="fw-bold">INT</span>{{ c.stats.int }}</div>
+                                <div><span class="fw-bold">WIS</span>{{ c.stats.wis }}</div>
+                                <div><span class="fw-bold">CHA</span>{{ c.stats.cha }}</div>
+                                <div><span class="fw-bold">CON</span>{{ c.stats.con }}</div>
+                                <div><span class="fw-bold">HP</span>{{ c.stats.hp }}</div>
+                                <div><span class="fw-bold">MP</span>{{ c.stats.mana }}</div>
+                            </div>
+                        </div>
+
+                        <!-- Resources -->
+                        <div class="resource-bar">
+                            <span class="coin-gold">{{ svg_icon('cash', 18, 'me-1') }}{{ c.coins.gold }}g</span>
+                            <span class="coin-silver">{{ svg_icon('two-coins', 18, 'me-1') }}{{ c.coins.silver }}s</span>
+                            <span class="coin-copper">{{ svg_icon('token', 18, 'me-1') }}{{ c.coins.copper }}c</span>
+                        </div>
+
+                        <!-- Inventory -->
+                        <div class="stat-block flex-grow-1-block">
+                            <h6>{{ svg_icon('knapsack', 16, 'me-1') }}EQUIPMENT</h6>
+                            {% if c.inventory and c.inventory|length > 0 %}
+                            <div class="inventory-list">
+                                <ul>
+                                    {% for it in c.inventory %}
+                                    <li>
+                                        {% if it.type == 'weapon' %}
+                                        {{ svg_icon('bloody-sword', 16) }}
+                                        {% elif it.type == 'armor' %}
+                                        {{ svg_icon('shield', 16) }}
+                                        {% elif it.type == 'potion' %}
+                                        {{ svg_icon('potion-ball', 16) }}
+                                        {% elif it.type == 'tool' %}
+                                        {{ svg_icon('anvil', 16) }}
+                                        {% elif it.type == 'ring' %}
+                                        {{ svg_icon('ring', 16) }}
+                                        {% elif it.type == 'scroll' %}
+                                        {{ svg_icon('scroll-unfurled', 16) }}
+                                        {% else %}
+                                        {{ svg_icon('chest', 16) }}
+                                        {% endif %}
+                                        <span>{{ it.name }}</span>
+                                        <span class="item-type-tag">[{{ it.type }}]</span>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% else %}
+                            <div class="unarmed-placeholder">
+                                [ UNARMED ]
+                            </div>
+                            {% endif %}
+                        </div>
                     </div>
-                    <input type="checkbox" class="party-select d-none" id="char-select-{{ c.id }}" data-id="{{ c.id }}"
-                        data-name="{{ c.name }}" data-class="{{ c.class_name }}" {% if session.get('party') %}{% for p
-                        in session.get('party') %}{% if p.id==c.id %}checked{% endif %}{% endfor %}{% endif %}>
-                    <label for="char-select-{{ c.id }}" class="select-operative select-operative-label">
-                        <span class="select-text">{% if session.get('party') %}{% for p in session.get('party') %}{% if
-                            p.id == c.id %}SELECTED{% else %}SELECT{% endif %}{% endfor %}{% else %}SELECT{% endif
-                            %}</span>
-                    </label>
+
+                    <!-- Operative Footer -->
+                    <div class="operative-footer">
+                        <form action="{{ url_for('dashboard.delete_character', char_id=c.id) }}" method="post"
+                            onsubmit="return confirm('⚠️ DISMISS {{ c.name }}?\n\nThis action is permanent and cannot be undone.');">
+                            <button class="tactical-btn-danger">
+                                {{ svg_icon('trash-can', 16, 'me-1') }} DISMISS
+                            </button>
+                        </form>
+                        <div class="btn-group">
+                            <button class="tactical-btn-secondary btn-equip-panel btn-icon-compact"
+                                data-char-id="{{ c.id }}" title="Equipment Panel">
+                                {{ svg_icon('anvil', 18) }}
+                            </button>
+                            <button class="tactical-btn-secondary btn-bag-panel btn-icon-compact" data-char-id="{{ c.id }}"
+                                title="Inventory">
+                                {{ svg_icon('knapsack', 18) }}
+                            </button>
+                            <button class="tactical-btn-secondary btn-skill-panel btn-icon-compact"
+                                data-char-id="{{ c.id }}" title="Skill Tree">
+                                {{ svg_icon('star-fill', 18) }}
+                            </button>
+                        </div>
+                        <input type="checkbox" class="party-select d-none" id="char-select-{{ c.id }}" data-id="{{ c.id }}"
+                            data-name="{{ c.name }}" data-class="{{ c.class_name }}" {% if session.get('party') %}{% for p
+                            in session.get('party') %}{% if p.id==c.id %}checked{% endif %}{% endfor %}{% endif %}>
+                        <label for="char-select-{{ c.id }}" class="select-operative select-operative-label">
+                            <span class="select-text">{% if session.get('party') %}{% for p in session.get('party') %}{% if
+                                p.id == c.id %}SELECTED{% else %}SELECT{% endif %}{% endfor %}{% else %}SELECT{% endif
+                                %}</span>
+                        </label>
+                    </div>
                 </div>
             </div>
         </div>
