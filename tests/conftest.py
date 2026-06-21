@@ -372,27 +372,6 @@ def auth_client(test_app, client):
         inst_id = inst.id
     # Perform actual login so flask-login manages session
     client.post("/login", data={"username": "tester", "password": "pass"}, follow_redirects=True)
-    # The login redirect lands on /dashboard, whose stat-backfill helper
-    # (dashboard_helpers.py's `for key in (...): stats.setdefault(key, 0)`)
-    # fills any missing "hp" key with 0 rather than a computed max -- a
-    # real, pre-existing bug, not something to silently work around at the
-    # source. It defeats the hp-pop above (which exists specifically so
-    # combat re-derives a full HP each test) the instant follow_redirects
-    # hits that view. Re-set hp to the character's actual computed max here,
-    # after login, so this fixture's "start every test with full HP" promise
-    # holds regardless of that backfill bug. See TODO.md.
-    with test_app.app_context():
-        import json
-
-        from app.services.character_stats import compute_hp_mana_max
-
-        fresh_char = db.session.get(_Char, new_char.id)
-        stats_obj = json.loads(fresh_char.stats) if fresh_char.stats else {}
-        hp_max, _mana_max = compute_hp_mana_max(fresh_char)
-        stats_obj["hp"] = hp_max
-        fresh_char.stats = json.dumps(stats_obj)
-        db.session.add(fresh_char)
-        db.session.commit()
     # Ensure dungeon instance id in session
     with client.session_transaction() as sess:
         sess["dungeon_instance_id"] = inst_id

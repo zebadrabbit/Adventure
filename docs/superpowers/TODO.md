@@ -609,22 +609,16 @@ already-noted `glass-theme.css` dead-code follow-up.
       register test, varies by run) surfaced twice during verification — reproduced on a
       clean stash of this work, confirming it's unrelated and already covered by the test
       isolation audit above.
-- [ ] **Dashboard stat-backfill defaults missing `hp` to 0, not a computed
-      max.** Found while diagnosing why `auth_client`'s "pop hp so combat
-      re-derives a full max each test" intent kept getting silently defeated:
-      `dashboard_helpers.py`'s stat-normalization loop (`for key in (...):
-      stats.setdefault(key, 0)`) backfills any missing `hp`/`mana`/etc. key
-      with a literal `0` rather than the character's actual computed max.
-      Since the login flow's redirect lands on `/dashboard`, any character
-      missing an `hp` key (e.g. freshly created, or deliberately reset) gets
-      permanently written to 0 HP the instant it's viewed there — previously
-      masked because the broken test-isolation fixture left enough leaked,
-      already-nonzero `hp` data around that this rarely triggered in
-      practice. Worked around in `tests/conftest.py`'s `auth_client` fixture
-      (re-sets `hp` to the computed max immediately after login) rather than
-      fixed at the source, since the actual fix belongs in
-      `dashboard_helpers.py` and deserves its own verification, not a
-      same-session patch bundled into an unrelated feature's test fixture.
+- [x] **Dashboard stat-backfill defaults missing `hp` to 0, not a computed
+      max — FIXED ✅.** `dashboard_helpers.py`'s `serialize_character_list`
+      now backfills missing `hp`/`mana` via `compute_hp_mana_max(c)` (the
+      same helper added for status-effect decay) instead of a literal `0`;
+      the other stat keys (`str`/`dex`/.../`cha`) still default to `0` since
+      those have no computed equivalent. TDD'd via
+      `tests/test_gear_party_payload.py::test_serialize_character_list_backfills_missing_hp_to_computed_max`.
+      Removed the now-redundant post-login `hp` re-set workaround in
+      `tests/conftest.py`'s `auth_client` fixture. Full suite green (402
+      passed).
 
 ## How to run the suite
 ```bash

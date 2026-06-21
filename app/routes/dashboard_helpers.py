@@ -75,8 +75,14 @@ def serialize_character_list(user_id: int) -> list[dict[str, Any]]:
 
     for c in characters:
         stats = json.loads(c.stats)
-        for key in ("str", "dex", "int", "wis", "con", "cha", "hp", "mana"):
+        for key in ("str", "dex", "int", "wis", "con", "cha"):
             stats.setdefault(key, 0)
+        if "hp" not in stats or "mana" not in stats:
+            from app.services.character_stats import compute_hp_mana_max
+
+            hp_max, mana_max = compute_hp_mana_max(c)
+            stats.setdefault("hp", hp_max)
+            stats.setdefault("mana", mana_max)
         stats_class = stats.get("class", None)
         coins = {k: stats.pop(k, 0) for k in ("gold", "silver", "copper")}
         try:
@@ -270,6 +276,7 @@ def handle_autofill(existing: list[Character], current_user_id: int):
     created: list[Character] = []
     if needed:
         classes = list(BASE_STATS.keys())
+
         def _name_taken(candidate: str) -> bool:
             return any(c.name == candidate for c in existing) or any(c.name == candidate for c in created)
 
