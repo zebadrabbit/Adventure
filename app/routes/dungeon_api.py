@@ -48,7 +48,7 @@ from app.dungeon.spawn_integration import (
 )
 from app.dungeon.spawn_manager import SpawnConfig, SpawnManager
 from app.loot.generator import LootConfig, generate_loot_for_seed
-from app.models import DungeonEntity
+from app.models import CharacterStatusEffect, DungeonEntity
 from app.models.dungeon_instance import DungeonInstance
 from app.models.models import Character, GameClock
 from app.services import spawn_service  # Still needed for encounters
@@ -1558,6 +1558,26 @@ def dungeon_camp():
         tick_val = advance_non_combat_time(instance, tick_amount=8, resp=patrol_resp)
     except Exception:
         pass
+
+    # Apply a "well-rested" regen buff on top of the instant restore above --
+    # replace-not-stack, same shape the regen potion uses, just longer/weaker.
+    # Applied after advance_non_combat_time (which decrements all active
+    # CharacterStatusEffect rows via apply_tick_decay) so the buff starts at
+    # its full remaining=10 instead of being immediately decremented.
+    try:
+        for char in party_chars:
+            CharacterStatusEffect.query.filter_by(character_id=char.id, name="regen_buff").delete()
+            db.session.add(
+                CharacterStatusEffect(
+                    character_id=char.id,
+                    name="regen_buff",
+                    remaining=10,
+                    data=json.dumps({"hp_mult": 2.0, "mp_mult": 2.0}),
+                )
+            )
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
     response = {
         "message": "Your party makes camp and rests. The fire crackles softly in the darkness.",
