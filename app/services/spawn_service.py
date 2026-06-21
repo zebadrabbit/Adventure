@@ -25,6 +25,21 @@ RARITY_WEIGHTS = {
     "boss": 0.02,
 }
 
+MONSTER_THEME_FAMILIES = ["undead", "humanoid", "beast", "construct", "elemental", "aberration", "demon"]
+
+
+def pick_monster_family(seed: int) -> str:
+    """Deterministically pick a dungeon's enemy theme from its seed.
+
+    Same seed always returns the same family, for the lifetime of that
+    dungeon instance. The XOR salt mirrors SpawnManager's own
+    independent RNG stream (random.Random(instance.seed ^ 0x5341574E)
+    in app/dungeon/spawn_manager.py) -- same idea, different salt, so
+    this doesn't collide with or depend on SpawnManager's seeding.
+    """
+    return random.Random(seed ^ 0x4D4F4E53).choice(MONSTER_THEME_FAMILIES)  # ^ "MONS"
+
+
 # -------------------------------------------------------------------------------------------------
 # Lightweight in-process cache for eligible monster lists to avoid repetitive DB queries.
 # Keyed by (level, include_boss). We intentionally DO NOT include party size because the
