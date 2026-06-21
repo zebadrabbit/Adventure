@@ -563,7 +563,18 @@ already-noted `glass-theme.css` dead-code follow-up.
       `app/dungeon/api_helpers/encounters.py` / `generate_loot_for_seed` for the existing
       pattern), depleted as the player encounters them, never regenerating. Needs its own
       brainstorm/spec before implementation — this changes the core exploration loop, not
-      just a rate tweak.
+      just a rate tweak. Spec written:
+      `docs/superpowers/specs/2026-06-21-ambient-encounters-finite-pool-design.md`
+      (approved, not yet implemented).
+- [ ] **Dungeon enemy theming (follow-up, separate from the item above)**: dungeons should
+      have a monster theme (e.g. an all-skeleton crypt, an orc warcamp, a kobold warren)
+      instead of a true random spread of families per instance — `MonsterCatalog` already
+      has a `family` field (e.g. "demon") that could back a per-instance family
+      allow-list. Deliberately sequenced *after* the finite-pool/aggro spec above ships,
+      since theming would touch every monster-selection path (ambient catalog pick added
+      there, plus the existing boss/elite `choose_archetype_monster` path) and is cleaner
+      to design against a working system than to bundle into an already-substantial spec.
+      Needs its own brainstorm/spec.
 - [x] **Combat log clears and retypes after a spell cast — FIXED ✅**: every action
       handler emits `combat_update` twice per turn (player's action + the internal emit
       inside `monster_auto_turn()`), with no client-side ordering guarantee — if the
