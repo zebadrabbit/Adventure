@@ -19,6 +19,7 @@ from app.inventory.utils import (
     load_inventory,
     remove_one,
 )
+from app.models import CharacterStatusEffect
 from app.models.models import Character, Item
 from app.models.xp import xp_for_level
 from app.services.progression import progression_config
@@ -519,8 +520,11 @@ def consume_item(cid: int):
     # Simple effects
     heal = 0
     mana = 0
+    applied_regen_buff = False
     sl = (item.slug or "").lower()
-    if "healing" in sl:
+    if "regen" in sl:
+        applied_regen_buff = True
+    elif "healing" in sl:
         heal = 5
     elif "mana" in sl:
         mana = 5
@@ -539,7 +543,28 @@ def consume_item(cid: int):
         advance_for("consume", character_ids=[ch.id])
     except Exception:
         pass
-    return jsonify({"ok": True, "consumed": slug, "effects": {"hp": heal, "mana": mana}})
+    if applied_regen_buff:
+        # Apply the persisted regen_buff after the tick-decay call above so the
+        # freshly-granted buff starts at its full duration (matching the
+        # combat-side regen_buff convention) instead of being immediately
+        # decremented by the same action's own time advancement.
+        CharacterStatusEffect.query.filter_by(character_id=ch.id, name="regen_buff").delete()
+        db.session.add(
+            CharacterStatusEffect(
+                character_id=ch.id,
+                name="regen_buff",
+                remaining=5,
+                data=json.dumps({"hp_mult": 3.0, "mp_mult": 3.0}),
+            )
+        )
+        db.session.commit()
+    return jsonify(
+        {
+            "ok": True,
+            "consumed": slug,
+            "effects": {"hp": heal, "mana": mana, "regen_buff": applied_regen_buff},
+        }
+    )
 
 
 @bp_inventory.route("/api/characters/<int:cid>/level-up", methods=["POST"])
