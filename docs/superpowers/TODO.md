@@ -569,15 +569,23 @@ already-noted `glass-theme.css` dead-code follow-up.
       mechanic, out of scope). Final suite: 409 passed, 2 skipped, 3 deselected, 1 xpassed.
       Play-feel tuning of `aggro_radius` and overall spawn density is explicitly out of
       scope for this spec and is left as an easy follow-up once verified live.
-- [ ] **Dungeon enemy theming (follow-up, separate from the item above)**: dungeons should
-      have a monster theme (e.g. an all-skeleton crypt, an orc warcamp, a kobold warren)
-      instead of a true random spread of families per instance — `MonsterCatalog` already
-      has a `family` field (e.g. "demon") that could back a per-instance family
-      allow-list. Deliberately sequenced *after* the finite-pool/aggro spec above ships,
-      since theming would touch every monster-selection path (ambient catalog pick added
-      there, plus the existing boss/elite `choose_archetype_monster` path) and is cleaner
-      to design against a working system than to bundle into an already-substantial spec.
-      Needs its own brainstorm/spec.
+- [x] **Dungeon enemy theming — DONE ✅**: each `DungeonInstance` now gets a single
+      deterministic enemy theme (one `MonsterCatalog` family, e.g. all-undead) instead of a
+      true random spread of families per instance. Added a `monster_family` column to
+      `DungeonInstance` (nullable, defaults to `None` for pre-existing rows), a
+      deterministic `pick_monster_family(seed)` picker in `spawn_service` (seeded by the
+      instance's own seed, so re-deriving the same instance always yields the same theme),
+      and an optional `family=` filter on `spawn_service.choose_monster`. Every
+      real-gameplay `DungeonInstance(...)` construction site (`dashboard.py`'s
+      `start_adventure` and `continue_adventure` fallback branches, and `seed_api.py`'s
+      instance-creation branch) now assigns the theme via `pick_monster_family(seed)` at
+      creation time. `populate_spawn_stats`'s ambient-tier branch now passes
+      `family=getattr(instance, "monster_family", None)` through to `choose_monster`, so
+      ambient (PATROL/WANDERER/GUARD/AMBIENT) spawns are restricted to the instance's theme
+      when one is set, and unrestricted (original random-family behavior) when it's
+      `None`. BOSS/ELITE spawns via `choose_archetype_monster` are deliberately left
+      untouched (separate set-piece/scaling mechanic, out of scope). Final suite: 421
+      passed, 2 skipped, 3 deselected, 1 xpassed.
 - [x] **Combat log clears and retypes after a spell cast — FIXED ✅**: every action
       handler emits `combat_update` twice per turn (player's action + the internal emit
       inside `monster_auto_turn()`), with no client-side ordering guarantee — if the
