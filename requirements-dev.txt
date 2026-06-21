@@ -4,3 +4,4 @@ requests==2.32.3
 pre-commit==3.7.0
 black==24.8.0
 ruff==0.5.7
+playwright==1.60.0
