@@ -234,8 +234,9 @@ def ws_dungeon_claim_loot(payload):  # pragma: no cover
         db.session.rollback()
         return _emit_error("db_error", code="db_error")
     tick_val = None
+    patrol_resp = {}
     try:
-        tick_val = advance_non_combat_time(instance, tick_amount=1)
+        tick_val = advance_non_combat_time(instance, tick_amount=1, resp=patrol_resp)
     except Exception:
         pass
     resp = {
@@ -245,4 +246,6 @@ def ws_dungeon_claim_loot(payload):  # pragma: no cover
     }
     if tick_val is not None:
         resp["game_tick"] = int(tick_val)
+    if "encounter" in patrol_resp:
+        resp["encounter"] = patrol_resp["encounter"]
     emit("dungeon_claim_result", resp)
