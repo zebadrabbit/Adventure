@@ -8,6 +8,8 @@ Encapsulates logic previously inline in dungeon_api.dungeon_move:
 
 Public functions:
 - maybe_spawn_encounter(instance, moved: bool, resp: dict) -> None (mutates resp)
+- trigger_collision_combat(instance) -> dict | None (starts combat when a
+  monster entity occupies the player's tile)
 - run_monster_patrols(dungeon, instance, resp: dict) -> None (adds websocket side effects)
 
 Design choices:
@@ -17,6 +19,7 @@ Design choices:
 
 from __future__ import annotations
 
+import json
 import random as _r
 
 from flask import session
@@ -26,7 +29,7 @@ from app import db
 from app.models.models import Character, GameClock
 from app.services import spawn_service
 
-__all__ = ["maybe_spawn_encounter", "run_monster_patrols"]
+__all__ = ["maybe_spawn_encounter", "trigger_collision_combat", "run_monster_patrols"]
 
 
 def _load_spawn_config():
@@ -90,6 +93,63 @@ def _debug_flag() -> bool:
         return bool(raw)
     except Exception:
         return False
+
+
+def trigger_collision_combat(instance) -> dict | None:
+    """If a monster entity occupies the player's current tile, start
+    combat and permanently remove that entity (finite pool -- it never
+    regenerates).
+
+    Used both when the player walks onto a monster
+    (movement_handler.process_movement) and when a chasing monster
+    reaches the player (run_monster_patrols, below).
+
+    Returns {"monster": <payload dict>, "combat_id": <int>} if combat
+    started, else None.
+    """
+    from app.models.entities import DungeonEntity
+
+    try:
+        monster_ent = DungeonEntity.query.filter_by(
+            instance_id=instance.id,
+            type="monster",
+            x=instance.pos_x,
+            y=instance.pos_y,
+            z=instance.pos_z,
+        ).first()
+    except Exception:
+        return None
+
+    if not monster_ent:
+        return None
+
+    mdata = {}
+    try:
+        if monster_ent.data:
+            mdata = json.loads(monster_ent.data)
+    except Exception:
+        mdata = {}
+
+    monster_payload = {
+        "slug": monster_ent.slug,
+        "name": monster_ent.name or monster_ent.slug,
+        "hp": monster_ent.hp_current or mdata.get("hp", 30),
+        "damage": mdata.get("damage", 6),
+        "speed": mdata.get("speed", 10),
+    }
+
+    from app.services import combat_service
+
+    session_row = combat_service.start_session(instance.user_id, monster_payload)
+    combat_id = session_row.id
+
+    try:
+        db.session.delete(monster_ent)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    return {"monster": monster_payload, "combat_id": combat_id}
 
 
 def maybe_spawn_encounter(instance, action_triggered: bool, resp: dict):
@@ -229,6 +289,20 @@ def run_monster_patrols(dungeon, instance, resp: dict, *, tick_amount: int = 1):
 
             except Exception:
                 db.session.rollback()
+
+        # After monsters move, check whether a chasing spawn reached the
+        # player's tile this tick -- mirrors the player-onto-monster
+        # check in movement_handler.process_movement, just triggered by
+        # monster movement instead of player movement. Runs every call,
+        # not just when something moved this tick, so a spawn that was
+        # already standing on the player's tile from a prior tick is
+        # still caught.
+        try:
+            collision = trigger_collision_combat(instance)
+            if collision:
+                resp["encounter"] = collision
+        except Exception:
+            pass
 
     except Exception:
         # Swallow exceptions to avoid blocking player actions
