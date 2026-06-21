@@ -4,13 +4,12 @@ This module consolidates the movement, encounter, and perception logic
 that was previously duplicated between dungeon_api.py and websockets/game.py.
 """
 
-import json as _json
 from typing import Any, Dict, Tuple
 
 from flask_login import current_user
 
 from app import db
-from app.dungeon.api_helpers.encounters import maybe_spawn_encounter
+from app.dungeon.api_helpers.encounters import trigger_collision_combat
 from app.dungeon.api_helpers.perception import (
     get_noticed_coords as _get_noticed_coords_helper,
 )
@@ -20,7 +19,6 @@ from app.dungeon.api_helpers.perception import (
 from app.dungeon.tiles import DOOR, ROOM, TUNNEL
 from app.logging_utils import get_logger
 from app.models.dungeon_instance import DungeonInstance
-from app.models.entities import DungeonEntity
 
 logger = get_logger(__name__)
 
@@ -107,69 +105,20 @@ def process_movement(instance: DungeonInstance, direction: str) -> Tuple[bool, D
                 db.session.rollback()
                 moved = False
 
-    # Check for collision-based encounter (monster entity on tile)
+    # Check for collision-based encounter (monster entity on player's tile)
     combat_started = False
     combat_id = None
     encounter_payload = None
 
     if moved:
         try:
-            monster_ent = DungeonEntity.query.filter_by(
-                instance_id=instance.id,
-                type="monster",
-                x=instance.pos_x,
-                y=instance.pos_y,
-                z=instance.pos_z,
-            ).first()
-
-            if monster_ent:
-                mdata = {}
-                try:
-                    if monster_ent.data:
-                        mdata = _json.loads(monster_ent.data)
-                except Exception:
-                    mdata = {}
-
-                monster_payload = {
-                    "slug": monster_ent.slug,
-                    "name": monster_ent.name or monster_ent.slug,
-                    "hp": monster_ent.hp_current or mdata.get("hp", 30),
-                    "damage": mdata.get("damage", 6),
-                    "speed": mdata.get("speed", 10),
-                }
-
-                from app.services import combat_service
-
-                session_row = combat_service.start_session(current_user.id, monster_payload)
-                combat_id = session_row.id
+            collision = trigger_collision_combat(instance)
+            if collision:
+                combat_id = collision["combat_id"]
                 combat_started = True
-                encounter_payload = {"monster": monster_payload, "combat_id": combat_id}
-
-                try:
-                    db.session.delete(monster_ent)
-                    db.session.commit()
-                except Exception:
-                    db.session.rollback()
+                encounter_payload = collision
         except Exception as e:
             logger.error(event="monster_collision_error", error=str(e))
-
-    # Roll for random encounter if no collision encounter
-    encounter_debug = {}
-    if (moved or not noop) and not combat_started:
-        maybe_spawn_encounter(instance, bool(moved or not noop), resp := {})
-        if "encounter" in resp:
-            combat_started = True
-            combat_id = resp["encounter"].get("combat_id")
-            encounter_payload = resp["encounter"]
-            if "encounter_chance" in resp:
-                encounter_debug["encounter_chance"] = resp["encounter_chance"]
-            if "encounter_roll" in resp:
-                encounter_debug["encounter_roll"] = resp["encounter_roll"]
-        else:
-            if "encounter_chance" in resp:
-                encounter_debug["encounter_chance"] = resp["encounter_chance"]
-            if "encounter_roll" in resp:
-                encounter_debug["encounter_roll"] = resp["encounter_roll"]
 
     # Get current position and build description
     x, y, z = instance.pos_x, instance.pos_y, instance.pos_z
@@ -236,10 +185,6 @@ def process_movement(instance: DungeonInstance, direction: str) -> Tuple[bool, D
         if encounter_payload:
             response["encounter"] = encounter_payload
 
-    # Add debug info if present
-    if encounter_debug:
-        response.update(encounter_debug)
-
     # Update explored tiles with visibility calculation
     if moved or not noop:
         try:
@@ -267,14 +212,23 @@ def process_movement(instance: DungeonInstance, direction: str) -> Tuple[bool, D
 
     # Advance game time for any world-advancing action (a move is a turn, whether
     # or not it triggered combat). The clock should never stall on the move that
-    # happens to bump into a monster.
-    if moved or not noop:
+    # happens to bump into a monster. Skipped entirely if combat already started
+    # this turn (player walked onto a monster) -- advancing the clock and running
+    # patrol movement on top of a combat-starting turn doesn't make sense, and
+    # would risk a chasing monster also reaching the player in the same request,
+    # starting a second combat session.
+    if (moved or not noop) and not combat_started:
         try:
             from app.routes.dungeon_api import advance_non_combat_time
 
-            tick_val = advance_non_combat_time(instance, tick_amount=1)
+            patrol_resp: Dict[str, Any] = {}
+            tick_val = advance_non_combat_time(instance, tick_amount=1, resp=patrol_resp)
             if tick_val is not None:
                 response["game_tick"] = tick_val
+            if "encounter" in patrol_resp:
+                response["combat_started"] = True
+                response["combat_id"] = patrol_resp["encounter"].get("combat_id")
+                response["encounter"] = patrol_resp["encounter"]
         except Exception as e:
             logger.error(event="time_advance_error", error=str(e))
 

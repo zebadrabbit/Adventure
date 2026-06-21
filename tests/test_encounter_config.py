@@ -66,31 +66,6 @@ def test_rarity_weight_override(auth_client, monkeypatch):
     assert boss_found
 
 
-def test_encounter_spawn_probability_config(auth_client, monkeypatch):
-    # Set encounter_spawn base=1.0 to guarantee spawn on first move
-    from app.models import GameConfig
-
-    GameConfig.set("encounter_spawn", json.dumps({"base": 1.0, "streak_bonus_max": 0.0}))
-    # Trigger movement
-    auth_client.post("/api/dungeon/move", json={"dir": ""})
-    resp = auth_client.post("/api/dungeon/move", json={"dir": "n"})
-    assert resp.status_code == 200
-    assert "encounter" in resp.json
-    assert "combat_id" in resp.json["encounter"]
-
-
-def test_encounter_spawn_probability_zero(auth_client, monkeypatch):
-    # Set encounter_spawn base=0.0 to prevent spawn
-    from app.models import GameConfig
-
-    GameConfig.set("encounter_spawn", json.dumps({"base": 0.0, "streak_bonus_max": 0.0}))
-    auth_client.post("/api/dungeon/move", json={"dir": ""})
-    resp = auth_client.post("/api/dungeon/move", json={"dir": "n"})
-    # Rare case: movement blocked; ensure absence of encounter key or empty
-    assert resp.status_code == 200
-    assert not resp.json.get("encounter")
-
-
 def test_loot_service_special_drop(auth_client):
     monster = {
         "slug": "test-mob",

@@ -19,7 +19,6 @@ from flask_login import current_user
 from flask_socketio import emit, join_room, leave_room
 
 from app import db, socketio
-from app.dungeon.api_helpers.encounters import maybe_spawn_encounter
 from app.models import DungeonEntity
 from app.models.dungeon_instance import DungeonInstance
 from app.routes.dungeon_api import advance_non_combat_time
@@ -194,23 +193,14 @@ def ws_dungeon_search_tile(_payload):  # pragma: no cover - thin wrapper over se
 
     # Advance time
     tick_val = None
-    try:
-        tick_val = advance_non_combat_time(instance, tick_amount=2)
-    except Exception:
-        pass
-
     resp = payload.copy() if isinstance(payload, dict) else {}
-    if tick_val is not None:
-        resp["game_tick"] = int(tick_val)
-
-    # Check for encounter spawn
     try:
-        maybe_spawn_encounter(instance, True, enc_dbg := {})
-        if enc_dbg.get("encounter") and "encounter" not in resp:
-            resp["encounter"] = enc_dbg["encounter"]
-        if "encounter_chance" in enc_dbg:
-            resp["encounter_chance"] = enc_dbg["encounter_chance"]
-            resp["encounter_roll"] = enc_dbg.get("encounter_roll")
+        patrol_resp = {}
+        tick_val = advance_non_combat_time(instance, tick_amount=2, resp=patrol_resp)
+        if tick_val is not None:
+            resp["game_tick"] = int(tick_val)
+        if "encounter" in patrol_resp:
+            resp["encounter"] = patrol_resp["encounter"]
     except Exception:
         pass
 

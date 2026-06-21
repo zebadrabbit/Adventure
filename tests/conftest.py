@@ -408,11 +408,8 @@ def _reset_volatile_game_config(test_app):
     restores baseline behavior without needing a full DB rebuild.
     """
     VOLATILE_KEYS = (
-        "encounter_spawn",
         "rarity_weights",
-        "game_rules.encounter_spawn_rate",
         "monster_ai",
-        "debug_encounters",
         "regen_rates",
     )
 

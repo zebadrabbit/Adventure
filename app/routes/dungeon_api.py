@@ -30,10 +30,7 @@ from flask_login import current_user, login_required
 
 from app import db
 from app.dungeon import DOOR, ROOM, TUNNEL, Dungeon
-from app.dungeon.api_helpers.encounters import (
-    maybe_spawn_encounter,
-    run_monster_patrols,
-)
+from app.dungeon.api_helpers.encounters import run_monster_patrols
 from app.dungeon.api_helpers.perception import (
     get_noticed_coords as _get_noticed_coords_helper,
 )
@@ -1169,21 +1166,14 @@ def dungeon_search_tile():
             revealed = 0
     noticed_loot = any(r.type == "treasure" for r in rows)
     tick_val = None
-    try:
-        tick_val = advance_non_combat_time(instance, tick_amount=2)
-    except Exception:
-        pass
     resp = {"revealed_caches": revealed, "noticed_loot": noticed_loot}
-    if tick_val is not None:
-        resp["game_tick"] = int(tick_val)
-    # Roll for encounter after search action (non-movement) if no combat already
     try:
-        maybe_spawn_encounter(instance, True, enc_dbg := {})
-        if enc_dbg.get("encounter") and "encounter" not in resp:
-            resp["encounter"] = enc_dbg["encounter"]
-        if "encounter_chance" in enc_dbg:
-            resp["encounter_chance"] = enc_dbg["encounter_chance"]
-            resp["encounter_roll"] = enc_dbg.get("encounter_roll")
+        patrol_resp = {}
+        tick_val = advance_non_combat_time(instance, tick_amount=2, resp=patrol_resp)
+        if tick_val is not None:
+            resp["game_tick"] = int(tick_val)
+        if "encounter" in patrol_resp:
+            resp["encounter"] = patrol_resp["encounter"]
     except Exception:
         pass
     return jsonify(resp)
@@ -1308,19 +1298,12 @@ def claim_treasure(entity_id: int):
         pass
     status, payload = _claim_treasure_entity(entity_id, instance)
     try:
-        tick_val = advance_non_combat_time(instance, tick_amount=2)
+        patrol_resp = {}
+        tick_val = advance_non_combat_time(instance, tick_amount=2, resp=patrol_resp)
         if tick_val is not None:
             payload["game_tick"] = int(tick_val)
-    except Exception:
-        pass
-    # Encounter attempt
-    try:
-        maybe_spawn_encounter(instance, True, enc_dbg := {})
-        if enc_dbg.get("encounter") and "encounter" not in payload:
-            payload["encounter"] = enc_dbg["encounter"]
-        if "encounter_chance" in enc_dbg:
-            payload["encounter_chance"] = enc_dbg["encounter_chance"]
-            payload["encounter_roll"] = enc_dbg.get("encounter_roll")
+        if "encounter" in patrol_resp:
+            payload["encounter"] = patrol_resp["encounter"]
     except Exception:
         pass
     return jsonify(payload), status
@@ -1375,18 +1358,12 @@ def open_locked_cache(entity_id: int):
             "entity_id": entity_id,
         }
     try:
-        tick_val = advance_non_combat_time(instance, tick_amount=2)
+        patrol_resp = {}
+        tick_val = advance_non_combat_time(instance, tick_amount=2, resp=patrol_resp)
         if tick_val is not None:
             payload["game_tick"] = int(tick_val)
-    except Exception:
-        pass
-    try:
-        maybe_spawn_encounter(instance, True, enc_dbg := {})
-        if enc_dbg.get("encounter") and "encounter" not in payload:
-            payload["encounter"] = enc_dbg["encounter"]
-        if "encounter_chance" in enc_dbg:
-            payload["encounter_chance"] = enc_dbg["encounter_chance"]
-            payload["encounter_roll"] = enc_dbg.get("encounter_roll")
+        if "encounter" in patrol_resp:
+            payload["encounter"] = patrol_resp["encounter"]
     except Exception:
         pass
     return jsonify(payload), status
@@ -1508,18 +1485,12 @@ def dungeon_search():
         return jsonify({"found": False, "message": "Dungeon instance not found"}), 404
     success, payload, status = _search_current_tile_helper(instance)
     try:
-        tick_val = advance_non_combat_time(instance, tick_amount=2)
+        patrol_resp = {}
+        tick_val = advance_non_combat_time(instance, tick_amount=2, resp=patrol_resp)
         if tick_val is not None and isinstance(payload, dict):
             payload["game_tick"] = int(tick_val)
-    except Exception:
-        pass
-    try:
-        maybe_spawn_encounter(instance, True, enc_dbg := {})
-        if enc_dbg.get("encounter") and isinstance(payload, dict) and "encounter" not in payload:
-            payload["encounter"] = enc_dbg["encounter"]
-        if isinstance(payload, dict) and "encounter_chance" in enc_dbg:
-            payload["encounter_chance"] = enc_dbg["encounter_chance"]
-            payload["encounter_roll"] = enc_dbg.get("encounter_roll")
+        if "encounter" in patrol_resp and isinstance(payload, dict):
+            payload["encounter"] = patrol_resp["encounter"]
     except Exception:
         pass
     return jsonify(payload), status
@@ -1582,8 +1553,9 @@ def dungeon_camp():
 
     # Advance time
     tick_val = None
+    patrol_resp = {}
     try:
-        tick_val = advance_non_combat_time(instance, tick_amount=8)
+        tick_val = advance_non_combat_time(instance, tick_amount=8, resp=patrol_resp)
     except Exception:
         pass
 
@@ -1595,17 +1567,9 @@ def dungeon_camp():
     if tick_val is not None:
         response["game_tick"] = int(tick_val)
 
-    # 30% chance of encounter while camping
-    try:
-        import random
-
-        if random.random() < 0.30:
-            maybe_spawn_encounter(instance, True, enc_resp := {})
-            if enc_resp.get("encounter"):
-                response["encounter"] = enc_resp["encounter"]
-                response["message"] += " But your rest is interrupted!"
-    except Exception:
-        pass
+    if patrol_resp.get("encounter"):
+        response["encounter"] = patrol_resp["encounter"]
+        response["message"] += " But your rest is interrupted!"
 
     return jsonify(response)
 
@@ -2059,12 +2023,16 @@ def adventure():
 # We only advance when not currently flagged in combat (future: integrate with combat->dungeon restore).
 
 
-def advance_non_combat_time(instance, *, tick_amount: int = 1) -> int | None:
+def advance_non_combat_time(instance, *, tick_amount: int = 1, resp: dict | None = None) -> int | None:
     """Advance global non-combat time and run patrol updates.
 
     Parameters:
         instance: DungeonInstance (player's current dungeon instance row)
         tick_amount: How many ticks to add for this action (default 1). Could scale for longer actions later.
+        resp: Optional dict to receive patrol side effects -- currently just
+            an "encounter" key if a chasing monster reached the player this
+            tick (see encounters.trigger_collision_combat). Callers that
+            don't care can omit it entirely; it defaults to a throwaway dict.
     Side effects:
         * Increments GameClock.tick if not in combat
         * Invokes run_monster_patrols to adjust monster positions (which can emit websocket updates)
@@ -2079,7 +2047,7 @@ def advance_non_combat_time(instance, *, tick_amount: int = 1) -> int | None:
         # Acquire dungeon object to pass into patrols (mirrors movement logic)
         MAP_SIZE = 75
         dungeon = get_cached_dungeon(instance.seed, (MAP_SIZE, MAP_SIZE, 1))
-        run_monster_patrols(dungeon, instance, resp={}, tick_amount=tick_amount)
+        run_monster_patrols(dungeon, instance, resp=resp if resp is not None else {}, tick_amount=tick_amount)
         db.session.add(clock)
         try:
             db.session.commit()
