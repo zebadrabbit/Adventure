@@ -362,6 +362,32 @@
                 }
             }
 
+            // Buff/debuff chips -- always shown, every card, regardless of turn.
+            const chipsEl = clone.querySelector('[data-field="effect-chips"]');
+            if (chipsEl) {
+                chipsEl.innerHTML = '';
+                (mem.effects_display || []).forEach(eff => {
+                    const chip = document.createElement('span');
+                    chip.className = `effect-chip ${eff.css_class}`;
+                    chip.title = `${eff.label} — ${eff.remaining} remaining`;
+                    chip.textContent = `${eff.icon} ${eff.label} ×${eff.remaining}`;
+                    chipsEl.appendChild(chip);
+                });
+            }
+
+            // Stat breakdown -- only the active character's card reveals it.
+            const statBlock = clone.querySelector('[data-field="stat-breakdown"]');
+            if (statBlock) {
+                if (isActive) {
+                    statBlock.hidden = false;
+                    statBlock.querySelector('[data-field="atk"]').textContent = 'ATK ' + (mem.attack ?? 0);
+                    statBlock.querySelector('[data-field="def"]').textContent = 'DEF ' + (mem.defense ?? 0);
+                    statBlock.querySelector('[data-field="spd"]').textContent = 'SPD ' + (mem.speed ?? 0);
+                } else {
+                    statBlock.hidden = true;
+                }
+            }
+
             partyContainer.appendChild(clone);
         });
 
