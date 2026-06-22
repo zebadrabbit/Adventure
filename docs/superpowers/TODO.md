@@ -521,11 +521,16 @@ already-noted `glass-theme.css` dead-code follow-up.
       therefore always targeted the real Postgres test schema the whole time,
       "fixed" afterward only because other tests' fixtures defensively call
       `create_all()` again.
-      - [ ] **Follow-up, not fixed:** the dead-SQLite-config pattern in those
-            two files should be removed/replaced with a real isolated SQLite
-            setup or deleted in favor of the now-working Postgres isolation --
-            currently harmless only by accident (other tests' defensive
-            `create_all()` calls happen to repair the dropped schema).
+      - [x] **Follow-up — FIXED ✅:** removed the dead
+            `SQLALCHEMY_DATABASE_URI="sqlite:///:memory:"` override from both
+            files' fixtures (`app_mem`/`legacy_app`) — confirmed it had zero
+            effect (Flask-SQLAlchemy caches the engine at `create_app()` time,
+            before the override runs), so both tests were always running
+            against the real Postgres test DB via the `db_isolation` marker's
+            full rebuild. Deleted in favor of the now-working Postgres
+            isolation per the option already logged above. Behavior
+            unchanged, confirmed by running both files (4 passed) and the
+            full suite (454 passed, 0 regressions).
 - [x] **Landing page theming literal sweep** — root cause: Phase 5a only converted
       `rgba(...)`-with-alpha literals in `home.css` to `color-mix()` and missed solid hex
       colors (`--hero-gradient-1/2/3`, the hero section's dark-brown background gradient,
