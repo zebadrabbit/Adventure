@@ -19,21 +19,7 @@ from app.models import GameClock
 from app.models.models import Character, User
 from app.models.xp import xp_for_level
 from app.services.progression import progression_config
-
-KNOWN_STATUS_EFFECTS: dict[str, dict[str, str]] = {
-    "poison": {"icon": "☠", "label": "Poison", "css_class": "effect-debuff"},
-    "regen_buff": {"icon": "✨", "label": "Well-Rested", "css_class": "effect-buff"},
-}
-
-
-def describe_status_effect(effect: dict[str, Any]) -> dict[str, Any]:
-    """Return display metadata for one CharacterStatusEffect dict, with a
-    generic fallback for names not in KNOWN_STATUS_EFFECTS so a future
-    effect type shows up automatically without a template change."""
-    meta = KNOWN_STATUS_EFFECTS.get(
-        effect["name"], {"icon": "◆", "label": effect["name"], "css_class": "effect-neutral"}
-    )
-    return {**meta, "remaining": effect["remaining"]}
+from app.services.status_effects import describe_status_effect
 
 
 def _stable_current_user_id() -> int | None:

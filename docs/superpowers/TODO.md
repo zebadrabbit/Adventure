@@ -462,9 +462,32 @@ already-noted `glass-theme.css` dead-code follow-up.
             dashboard theme assignment — all pass individually and with
             `-p no:randomly`; same category of pre-existing cross-test-order
             flakiness already on file, not a Phase C regression).
-      - [ ] Phase D: combat party card redesign (collapsed, auto-expand on that
-            character's turn) + accurate per-character spell costs. Next step
-            in this series.
+      - [x] **Phase D: combat party card redesign — done. Closes out the full
+            Character Cards series (Phases A-D).** The legacy static spell
+            panel UI was retired entirely. Every combat party card
+            (`.party-member`) now renders an `.effect-chips` container with
+            generic buff/debuff chips driven by Phase A/B's
+            `CharacterStatusEffect` rows (`poison`, `regen_buff`, and any
+            future effect type without template changes) via a shared
+            `describe_status_effect` helper that now lives in
+            `app/services/status_effects.py` (reused from the chip-rendering
+            logic Phase C introduced for the dashboard roster cards). The
+            active character's card additionally auto-reveals a `.stat-breakdown`
+            ATK/DEF/SPD panel — exactly one visible at a time, tracking whoever's
+            turn it is. Live-browser-verified end-to-end with Playwright
+            against a real dev server + Postgres: legacy spell-cast buttons
+            confirmed absent, exactly one visible stat breakdown, an
+            effect-chips container present on every party card (including a
+            real seeded `poison` effect), and no console errors. All
+            assertions passed on the first run — no template/CSS/JS bugs
+            found during this task's verification pass. Full suite: 446
+            passed (within the expected 444-446 range for this branch,
+            confirmed after isolating a `pytest-randomly`-style test-order
+            flake on one run — camp regen buff + poison persistence x3 +
+            dashboard theme assignment all passed individually and on a
+            clean re-run with `-p no:randomly`; same pre-existing
+            cross-test-order flakiness category as Phase C, not a Phase D
+            regression).
 - [x] **Test isolation fix from earlier this session never actually worked —
       found and fixed while verifying Phase A.** The `_db_transaction_rollback`
       SAVEPOINT fixture committed earlier today silently did nothing:

@@ -5,7 +5,13 @@ from app import db
 from app.models import CharacterStatusEffect
 from app.models.models import Character, User
 from app.services.character_stats import compute_hp_mana_max
-from app.services.status_effects import apply_start_of_turn, apply_tick_decay, replace_effect
+from app.services.status_effects import (
+    KNOWN_STATUS_EFFECTS,
+    apply_start_of_turn,
+    apply_tick_decay,
+    describe_status_effect,
+    replace_effect,
+)
 
 
 def _make_character(username_suffix):
@@ -371,6 +377,21 @@ def test_apply_tick_decay_regen_buff_malformed_data_falls_back_to_base_rate():
     stats = json.loads(char.stats)
     base_heal = math.ceil(hp_max * 1.0 / 100)
     assert stats["hp"] - 1 == base_heal
+
+
+def test_describe_status_effect_known_effect_uses_lookup_table():
+    result = describe_status_effect({"name": "poison", "remaining": 3, "data": {"damage": 5}})
+    assert result == {"icon": "☠", "label": "Poison", "css_class": "effect-debuff", "remaining": 3}
+
+
+def test_describe_status_effect_unknown_effect_falls_back_to_generic():
+    result = describe_status_effect({"name": "future_effect_xyz", "remaining": 2, "data": {}})
+    assert result == {"icon": "◆", "label": "future_effect_xyz", "css_class": "effect-neutral", "remaining": 2}
+
+
+def test_known_status_effects_table_has_poison_and_regen_buff():
+    assert KNOWN_STATUS_EFFECTS["poison"]["css_class"] == "effect-debuff"
+    assert KNOWN_STATUS_EFFECTS["regen_buff"]["css_class"] == "effect-buff"
 
 
 def test_apply_tick_decay_poison_and_regen_buff_combine_independently():

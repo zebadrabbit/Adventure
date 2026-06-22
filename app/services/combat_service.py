@@ -180,6 +180,10 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
     except Exception:
         effects = []
 
+    from app.services.status_effects import describe_status_effect
+
+    effects_display = [describe_status_effect(e) for e in effects]
+
     return {
         # Controller user id retained separately from participant (character) id.
         "controller_id": char.user_id,
@@ -200,6 +204,7 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
         "defending": False,
         "buffs": [],
         "effects": effects,
+        "effects_display": effects_display,
     }
 
 
