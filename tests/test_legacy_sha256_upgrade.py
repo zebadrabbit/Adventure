@@ -6,16 +6,16 @@ from werkzeug.security import check_password_hash
 from app import create_app, db
 from app.models.models import User
 
-# This file swaps the app's engine to an in-memory SQLite DB mid-test (see
-# app_mem below), which is incompatible with _db_transaction_rollback's
-# Postgres-connection pinning in conftest.py -- skip that fixture entirely.
+# db_isolation forces a full Postgres schema rebuild before this test (see
+# conftest.py's _conditional_db_isolation) -- needed because this fixture
+# does its own create_all()/drop_all() against the real test DB.
 pytestmark = pytest.mark.db_isolation
 
 
 @pytest.fixture()
 def app_mem():
     app = create_app()
-    app.config.update(TESTING=True, SQLALCHEMY_DATABASE_URI="sqlite:///:memory:")
+    app.config.update(TESTING=True)
     with app.app_context():
         db.create_all()
         # Legacy SHA256 hex password
