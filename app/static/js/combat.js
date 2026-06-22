@@ -376,32 +376,9 @@
             actionPanel.style.display = 'block';
 
             const charClass = (activeMember.char_class || 'fighter').toLowerCase();
-            const intStat = activeMember.int_stat || 10;
-            const strStat = activeMember.str_stat || 10;
-            const dexStat = activeMember.dex_stat || 10;
-
-            // Define which classes can use spells
-            const spellcastingClasses = ['mage', 'cleric', 'druid', 'sorcerer', 'warlock', 'bard', 'paladin', 'ranger'];
-            const canCastSpells = spellcastingClasses.includes(charClass) || intStat >= 12;
-
-            // Define melee-focused classes
-            const meleeFocused = ['fighter', 'barbarian', 'paladin', 'monk', 'ranger'];
-            const isPhysical = meleeFocused.includes(charClass) || strStat >= 14;
 
             // Update action buttons
             actionPanel.querySelectorAll('button[data-action]').forEach(btn => {
-                const action = btn.dataset.action;
-                let shouldHide = false;
-
-                // Hide spell buttons for non-casters
-                if (action.startsWith('cast_') && !canCastSpells) {
-                    shouldHide = true;
-                }
-
-                if (shouldHide) {
-                    btn.style.display = 'none';
-                    return;
-                }
                 btn.style.display = '';
 
                 if (!canAct) {
