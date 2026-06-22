@@ -375,8 +375,6 @@
             }
             actionPanel.style.display = 'block';
 
-            const charClass = (activeMember.char_class || 'fighter').toLowerCase();
-
             // Update action buttons
             actionPanel.querySelectorAll('button[data-action]').forEach(btn => {
                 btn.style.display = '';
