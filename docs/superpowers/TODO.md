@@ -666,6 +666,16 @@ already-noted `glass-theme.css` dead-code follow-up.
       neither done yet: widen low-level `MonsterCatalog` coverage for the sparse
       families, or bias `pick_monster_family` away from families with no rows in the
       dungeon's likely level band.
+      **Fixed ✅** (2026-06-21): added `spark_wisp_t1`/`gust_elemental_t2`
+      (elemental), `rubble_construct_t1`/`animated_armor_t2` (construct),
+      `spore_crawler_t1`/`gloom_tendril_t2` (aberration), and `imp_lesser_t1`
+      (demon) to `sql/monsters_seed.sql` -- every family now has T1 (1-3) and
+      T2 (4-6) coverage. No code changes needed (`choose_monster`/
+      `_eligible_monsters` already query generically). Tests:
+      `tests/test_monster_family_low_level_coverage.py` (8 passed, loads the
+      real seed file via the same pattern `tests/test_monsters.py` already
+      established). Spec: `specs/2026-06-21-monster-family-low-level-coverage-design.md`.
+      Re-run `python run.py reseed-items` on any running dev/prod DB to apply.
 - [x] **Combat log clears and retypes after a spell cast — FIXED ✅**: every action
       handler emits `combat_update` twice per turn (player's action + the internal emit
       inside `monster_auto_turn()`), with no client-side ordering guarantee — if the
