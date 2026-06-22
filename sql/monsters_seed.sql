@@ -48,6 +48,8 @@ VALUES
 -- Elementals (mid/high-tier scaling)
 INSERT INTO monster_catalog (slug, name, level_min, level_max, base_hp, base_damage, armor, speed, rarity, family, traits, loot_table, xp_base, boss)
 VALUES
+ ('spark_wisp_t1', 'Spark Wisp', 1, 3, 17, 4, 0, 15, 'common', 'elemental', 'shock_touch,evasive', 'elemental_basic', 16, false),
+ ('gust_elemental_t2', 'Gust Elemental', 4, 6, 65, 12, 1, 16, 'common', 'elemental', 'gust,evasive', 'elemental_basic', 60, false),
  ('fire_elemental_minor_t3', 'Minor Fire Elemental', 7, 9, 130, 24, 3, 12, 'uncommon', 'elemental', 'burn_aura,immune_fire,vulnerable_cold', 'elemental_basic', 160, false),
  ('fire_elemental_greater_t5', 'Greater Fire Elemental', 13, 15, 340, 48, 6, 12, 'rare', 'elemental', 'burn_aura,immune_fire,vulnerable_cold', 'elemental_elite', 420, false),
  ('earth_elemental_minor_t3', 'Minor Earth Elemental', 7, 9, 180, 20, 10, 8, 'uncommon', 'elemental', 'resist_slash,slow', 'elemental_basic', 170, false),
@@ -83,6 +85,8 @@ VALUES
 -- Constructs (defensive, slower)
 INSERT INTO monster_catalog (slug, name, level_min, level_max, base_hp, base_damage, armor, speed, rarity, family, traits, loot_table, xp_base, boss)
 VALUES
+ ('rubble_construct_t1','Rubble Construct',1,3,26,5,4,7,'common','construct','slam,resist_slash','construct_basic',18, false),
+ ('animated_armor_t2','Animated Armor',4,6,75,13,6,9,'common','construct','slam,resist_slash','construct_basic',65, false),
  ('golemClay_t3','Clay Golem',7,9,240,24,10,8,'uncommon','construct','slam,resist_slash','construct_basic',190, false),
  ('golemStone_t4','Stone Golem',10,12,420,38,14,7,'rare','construct','slam,resist_physical','construct_elite',320, false),
  ('golemIron_t5','Iron Golem',13,15,640,54,18,7,'rare','construct','slam,reflect_missile','construct_elite',520, false);
@@ -90,6 +94,8 @@ VALUES
 -- Aberrations (odd traits, mixed defenses)
 INSERT INTO monster_catalog (slug, name, level_min, level_max, base_hp, base_damage, armor, speed, rarity, family, traits, loot_table, xp_base, boss)
 VALUES
+ ('spore_crawler_t1','Spore Crawler',1,3,20,5,0,9,'common','aberration','psychic_bite,spores','aberration_basic',17, false),
+ ('gloom_tendril_t2','Gloom Tendril',4,6,68,13,2,10,'common','aberration','psychic_bite,aura_fear','aberration_basic',62, false),
  ('mindleech_spawn_t3','Mindleech Spawn',7,9,130,22,4,12,'uncommon','aberration','psychic_bite,aura_fear','aberration_basic',180, false),
  ('eyestalk_watcher_t4','Eyestalk Watcher',10,12,260,36,6,11,'rare','aberration','multi_beam,levitate','aberration_elite',340, false),
  ('void_carapace_t5','Void Carapace',13,15,480,48,12,9,'rare','aberration','phase_shift,psychic_blast','aberration_elite',560, false);
@@ -97,6 +103,7 @@ VALUES
 -- Demons (offensive focus, resist fire)
 INSERT INTO monster_catalog (slug, name, level_min, level_max, base_hp, base_damage, armor, speed, rarity, family, traits, loot_table, xp_base, boss)
 VALUES
+ ('imp_lesser_t1','Lesser Imp',1,3,17,4,0,13,'common','demon','flying,firebolt','demon_basic',15, false),
  ('imp_brimstone_t2','Brimstone Imp',4,6,70,14,2,14,'common','demon','flying,firebolt,immune_fire','demon_basic',66, false),
  ('fiend_fleshripper_t4','Fleshripper Fiend',10,12,300,44,6,13,'uncommon','demon','bleed_claw,immune_fire','demon_elite',360, false),
  ('demon_infernal_knight_t5','Infernal Knight',13,15,560,62,12,11,'rare','demon','flame_aura,shield','demon_elite',620, false);
