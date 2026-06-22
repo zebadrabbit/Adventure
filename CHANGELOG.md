@@ -1,3 +1,9 @@
+# [0.7.9] - UNRELEASED
+### Added
+### Changed
+### Fixed
+### Notes
+
 # [0.7.8] - UNRELEASED
 ### Added
 ### Changed
