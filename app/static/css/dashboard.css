@@ -389,3 +389,314 @@ hr {
     background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--adv-primary) 50%, transparent), transparent);
     margin: 2rem 0;
 }
+
+.seed-dial {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    align-self: center;
+    transform: rotate(-90deg);
+}
+
+.seed-dial-track {
+    fill: none;
+    stroke: rgba(255,255,255,0.08);
+    stroke-width: 3;
+}
+
+.seed-dial-fill {
+    fill: none;
+    stroke: var(--adv-primary, #f0a500);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-dasharray: 81.68; /* 2π×13 */
+    stroke-dashoffset: 0;
+    filter: drop-shadow(0 0 3px var(--adv-primary, #f0a500));
+    transition: none;
+}
+
+@keyframes seed-flash {
+    0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--adv-primary, #f0a500) 70%, transparent); }
+    25%  { box-shadow: 0 0 16px 6px color-mix(in srgb, var(--adv-primary, #f0a500) 55%, transparent); }
+    100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+@keyframes seed-dial-pulse {
+    0%   { filter: drop-shadow(0 0 3px var(--adv-primary, #f0a500)); }
+    25%  { filter: drop-shadow(0 0 8px var(--adv-primary, #f0a500)) drop-shadow(0 0 16px var(--adv-primary, #f0a500)); }
+    100% { filter: drop-shadow(0 0 3px var(--adv-primary, #f0a500)); }
+}
+
+.seed-input-group.seed-flash {
+    animation: seed-flash 0.8s ease-out forwards;
+    border-radius: 4px;
+}
+
+.seed-dial-fill.seed-flash {
+    animation: seed-dial-pulse 0.8s ease-out forwards;
+}
+
+/* ===== LOBBY TAB NAV ===================================================== */
+.lobby-nav {
+    border-bottom: 2px solid color-mix(in srgb, var(--adv-primary, #f0a500) 25%, transparent);
+    gap: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+}
+
+.lobby-nav .nav-link {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: rgba(255, 255, 255, 0.55);
+    padding: 0.85rem 1.25rem;
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: -2px;
+    white-space: nowrap;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.lobby-nav .nav-link:hover {
+    color: rgba(255, 255, 255, 0.85);
+    background: color-mix(in srgb, var(--adv-primary, #f0a500) 8%, transparent);
+}
+
+.lobby-nav .nav-link.active {
+    color: #fff;
+    border-bottom-color: var(--adv-primary, #f0a500);
+    background: color-mix(in srgb, var(--adv-primary, #f0a500) 10%, transparent);
+}
+
+.lobby-nav .lobby-dungeon-tab {
+    color: color-mix(in srgb, var(--adv-primary, #f0a500) 90%, white);
+    font-size: 0.85rem;
+    letter-spacing: 0.12em;
+}
+
+.lobby-nav .lobby-dungeon-tab.active {
+    color: var(--adv-primary, #f0a500);
+    border-bottom-color: var(--adv-primary, #f0a500);
+    text-shadow: 0 0 8px color-mix(in srgb, var(--adv-primary, #f0a500) 60%, transparent);
+}
+
+/* ===== PARTY SLOTS ======================================================= */
+.party-slot-empty {
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    gap: 0.5rem;
+    padding: 1.5rem 1rem;
+}
+
+.party-slot-empty:hover {
+    border-color: color-mix(in srgb, var(--adv-primary, #f0a500) 50%, transparent);
+    background: color-mix(in srgb, var(--adv-primary, #f0a500) 5%, transparent);
+}
+
+.party-slot-empty .slot-plus {
+    font-size: 2rem;
+    line-height: 1;
+    opacity: 0.35;
+}
+
+.party-slot-empty .slot-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.4;
+}
+
+/* ===== BARRACKS CARDS ==================================================== */
+.barracks-card {
+    cursor: pointer;
+    user-select: none;
+    transition: border-color 0.15s, background 0.15s;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+}
+
+.barracks-card.selected {
+    border-color: var(--adv-primary, #f0a500) !important;
+    background: color-mix(in srgb, var(--adv-primary, #f0a500) 12%, transparent) !important;
+}
+
+.barracks-card.in-party {
+    opacity: 0.55;
+    cursor: default;
+}
+
+.barracks-card .barracks-card-name {
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.barracks-card .barracks-card-meta {
+    font-size: 0.75rem;
+    opacity: 0.7;
+    margin-bottom: 0.4rem;
+}
+
+/* ===== CANDIDATE (RECRUIT) CARDS ========================================= */
+.candidate-card {
+    border-radius: 12px;
+}
+
+.candidate-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.2rem 0.5rem;
+    font-size: 0.78rem;
+    margin: 0.5rem 0;
+}
+
+.candidate-stat-row {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.candidate-stat-row .stat-label {
+    font-weight: 700;
+    font-size: 0.7rem;
+    opacity: 0.7;
+    min-width: 2ch;
+}
+
+.candidate-stat-row .stat-val {
+    min-width: 2ch;
+    text-align: right;
+}
+
+.stat-tweak-btn {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    font-size: 0.7rem;
+    line-height: 1;
+    border-radius: 3px;
+}
+
+.stat-points-counter {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--adv-primary, #f0a500);
+    letter-spacing: 0.05em;
+}
+
+/* ===== DUNGEON TAB OVERVIEW ============================================== */
+.dungeon-overview-slots {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+}
+
+.dungeon-slot-mini {
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 0.75rem;
+    min-height: 90px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.dungeon-slot-mini.filled {
+    border-color: rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.dungeon-slot-mini .slot-name {
+    font-weight: 700;
+    font-size: 0.88rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dungeon-slot-mini .slot-meta {
+    font-size: 0.72rem;
+    opacity: 0.65;
+    margin-bottom: 0.35rem;
+}
+
+.quick-checks {
+    display: flex;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+}
+
+.check-item {
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+}
+
+.check-item.ok   { color: #4ade80; }
+.check-item.warn { color: #f59e0b; }
+.check-item.fail { color: #f87171; }
+
+/* ===== LOBBY TAB CONTENT PANE ============================================ */
+.lobby-tab-pane {
+    padding: 1.5rem 0;
+    min-height: 400px;
+}
+
+/* ===== PARTY COMPOSITION SUMMARY ========================================= */
+.party-composition {
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    opacity: 0.65;
+    text-transform: uppercase;
+}
+
+/* ===== SORT BUTTON GROUP ================================================= */
+.sort-btn-group .sort-btn {
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    padding: 0.3rem 0.75rem;
+}
+
+.sort-btn-group .sort-btn.active {
+    background: color-mix(in srgb, var(--adv-primary, #f0a500) 25%, transparent);
+    border-color: color-mix(in srgb, var(--adv-primary, #f0a500) 60%, transparent);
+    color: var(--adv-primary, #f0a500);
+}
+
+/* ===== LOBBY UTILITY CLASSES ============================================= */
+.lobby-section-divider {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.badge-in-party {
+    background: color-mix(in srgb, var(--adv-primary, #f0a500) 25%, transparent);
+    font-size: 0.65rem;
+}
+
+.bar-label-xs {
+    font-size: 0.7rem;
+}
+
+.btn-dismiss-xs {
+    font-size: 0.7rem;
+    padding: 3px 8px;
+}
+
+.dungeon-slot-hp-caption {
+    font-size: 0.7rem;
+    opacity: 0.65;
+    margin-top: 0.2rem;
+}
+
+.mw-300 {
+    max-width: 300px;
+}
