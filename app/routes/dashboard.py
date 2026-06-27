@@ -348,10 +348,96 @@ def autofill_characters():
     return jsonify(payload), (201 if created_count > 0 else 200)
 
 
+@bp_dashboard.route("/api/recruit/candidates")
+@login_required
+def recruit_candidates():
+    from app.routes.dashboard_helpers import generate_candidate
+
+    uid = int(current_user.get_id())
+    candidates = [generate_candidate(uid) for _ in range(4)]
+    return jsonify(candidates)
+
+
+@bp_dashboard.route("/api/recruit/hire", methods=["POST"])
+@login_required
+def recruit_hire():
+    uid = int(current_user.get_id())
+    count = Character.query.filter_by(user_id=uid).count()
+    if count >= 15:
+        return jsonify({"error": "Barracks full (15/15)"}), 400
+
+    data = request.get_json(force=True) or {}
+    tweaks = data.get("stat_tweaks") or {}
+    try:
+        tweak_total = sum(int(v) for v in tweaks.values())
+        tweak_negative = any(int(v) < 0 for v in tweaks.values())
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid stat tweaks"}), 400
+    if tweak_total > 2 or tweak_negative:
+        return jsonify({"error": "Invalid stat tweaks"}), 400
+
+    stats = dict(data.get("stats") or {})
+    for stat, delta in tweaks.items():
+        if stat in stats:
+            stats[stat] = int(stats[stat]) + int(delta)
+
+    cls = data.get("cls") or "fighter"
+    gear_slugs = data.get("gear_slugs") or []
+
+    from app.services.auto_equip import auto_equip_for
+
+    gear_map = auto_equip_for(cls, gear_slugs)
+
+    ch = Character(
+        user_id=uid,
+        name=str(data.get("name") or "Adventurer")[:50],
+        stats=json.dumps({**stats, "class": cls}),
+        gear=json.dumps(gear_map),
+        items=json.dumps(gear_slugs),
+        xp=0,
+        level=1,
+    )
+    db.session.add(ch)
+    db.session.commit()
+    return jsonify({"id": ch.id, "name": ch.name, "cls": cls})
+
+
+@bp_dashboard.route("/api/party/add", methods=["POST"])
+@login_required
+def party_add():
+    uid = int(current_user.get_id())
+    data = request.get_json(force=True) or {}
+    try:
+        incoming_ids = [int(i) for i in (data.get("char_ids") or [])]
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid char_ids"}), 400
+
+    current_party = session.get("party") or []
+    current_ids = {p["id"] for p in current_party}
+    open_slots = 4 - len(current_party)
+
+    to_add = [i for i in incoming_ids if i not in current_ids][:open_slots]
+    if to_add:
+        chars = Character.query.filter(Character.id.in_(to_add), Character.user_id == uid).all()
+        new_entries = build_party_payload(chars)
+        new_party = current_party + new_entries
+        session["party"] = new_party
+        session["last_party_ids"] = [p["id"] for p in new_party]
+
+    return jsonify({"party": session.get("party") or []})
+
+
+@bp_dashboard.route("/api/party/remove/<int:char_id>", methods=["POST"])
+@login_required
+def party_remove(char_id):
+    party = [p for p in (session.get("party") or []) if p["id"] != char_id]
+    session["party"] = party
+    session["last_party_ids"] = [p["id"] for p in party]
+    return jsonify({"party": party})
+
+
 # Route to delete a character by id (POST)
 # POST /delete_character/<int:char_id>
 # Redirects to dashboard after deletion
-
-# Add other dashboard/character management routes here
 
 # Add other dashboard/character management routes here

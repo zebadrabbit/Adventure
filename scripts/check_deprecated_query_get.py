@@ -22,7 +22,7 @@ self_path = pathlib.Path(__file__).resolve()
 for path in ROOT.rglob("*.py"):
     if path.resolve() == self_path:
         continue
-    if any(part in {".venv", "__pycache__"} for part in path.parts):
+    if any(part in {".venv", "__pycache__", ".claude"} for part in path.parts):
         continue
     try:
         text = path.read_text(encoding="utf-8", errors="ignore")

@@ -222,9 +222,14 @@ def render_dashboard():
         clock = GameClock.get()
     except Exception:  # pragma: no cover
         clock = None
+    # Build ordered party chars list for the Party and Dungeon tab slots
+    party_ids_ordered = session.get("last_party_ids") or [p["id"] for p in session.get("party", [])]
+    chars_by_id = {c["id"]: c for c in char_list}
+    party_chars = [chars_by_id[pid] for pid in party_ids_ordered if pid in chars_by_id]
     return render_template(
         "dashboard.html",
         characters=char_list,
+        party_chars=party_chars,
         user_email=user_email,
         dungeon_seed=dungeon_seed,
         game_clock=clock,
@@ -356,3 +361,44 @@ def handle_autofill(existing: list[Character], current_user_id: int):
         db.session.commit()
         existing.extend(created)
     return existing, created
+
+
+def generate_candidate(current_user_id: int, cls: str | None = None) -> dict:
+    """Return an unsaved level-1 character candidate dict."""
+    import random as _random
+    from app.routes.main import BASE_STATS, NAME_POOLS, STARTER_ITEMS
+    from app.services.auto_equip import auto_equip_for
+
+    classes = list(BASE_STATS.keys())
+    if cls is None:
+        cls = _random.choice(classes)
+
+    pool = NAME_POOLS.get(cls, [])
+    base_name = _random.choice(pool) if pool else cls.capitalize()
+    name = f"{base_name}{_random.randint(100, 999)}"
+
+    stats = dict(BASE_STATS.get(cls, BASE_STATS["fighter"]))
+    stats["hp"] = 50 + int(stats.get("con", 10)) * 2 + 5
+    stats["mana"] = 20 + int(stats.get("int", 10)) * 2
+    coins = {"gold": 5, "silver": 20, "copper": 50}
+
+    raw_items = STARTER_ITEMS.get(cls, STARTER_ITEMS["fighter"])
+    expanded: list[str] = []
+    if isinstance(raw_items, list):
+        for ent in raw_items:
+            if isinstance(ent, str):
+                expanded.append(ent)
+            elif isinstance(ent, dict):
+                slug = ent.get("slug") or ent.get("name") or ent.get("id")
+                if slug:
+                    qty = max(1, int(ent.get("qty", 1)))
+                    expanded.extend([slug] * qty)
+
+    gear_map = auto_equip_for(cls, expanded)
+    return {
+        "name": name,
+        "cls": cls,
+        "stats": {**stats, **coins},
+        "gear_slugs": expanded,
+        "gear_map": gear_map,
+    }
