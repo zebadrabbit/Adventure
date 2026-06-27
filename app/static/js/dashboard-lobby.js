@@ -44,7 +44,7 @@
     btn.disabled = true;
     try {
       const resp = await fetch(`/api/party/remove/${charId}`, { method: 'POST' });
-      if (resp.ok) location.reload();
+      if (resp.ok) { sessionStorage.setItem('lobby_active_tab', 'lobby-party'); location.reload(); }
       else btn.disabled = false;
     } catch (_) { btn.disabled = false; }
   });
@@ -66,7 +66,7 @@
           method: 'POST',
           headers: { 'X-Requested-With': 'fetch', 'Accept': 'application/json' },
         });
-        if (resp.ok) location.reload();
+        if (resp.ok) { sessionStorage.setItem('lobby_active_tab', 'lobby-party'); location.reload(); }
         else { autofillBtn.disabled = false; autofillBtn.textContent = 'AUTO-FILL'; }
       } catch (_) { autofillBtn.disabled = false; autofillBtn.textContent = 'AUTO-FILL'; }
     });
