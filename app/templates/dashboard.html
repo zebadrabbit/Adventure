@@ -57,6 +57,11 @@
                 aria-controls="lobby-merchants" aria-selected="false">MERCHANTS</button>
         </li>
         <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-quests" data-bs-toggle="tab"
+                data-bs-target="#lobby-quests" type="button" role="tab"
+                aria-controls="lobby-quests" aria-selected="false">QUESTS</button>
+        </li>
+        <li class="nav-item" role="presentation">
             <button class="nav-link" id="tab-hoard" data-bs-toggle="tab"
                 data-bs-target="#lobby-hoard" type="button" role="tab"
                 aria-controls="lobby-hoard" aria-selected="false">HOARD</button>
@@ -442,28 +447,47 @@
     </div>
 
     <!-- ══════════════════════════════════════════════════════════════════
+         QUESTS TAB
+    ══════════════════════════════════════════════════════════════════════ -->
+    <div class="tab-pane fade lobby-tab-pane" id="lobby-quests" role="tabpanel"
+        aria-labelledby="tab-quests" data-default-char="{{ characters[0].id if characters else '' }}">
+        <div class="quest-tabs mb-3">
+            <div class="quest-tab active" data-tab="active" onclick="questSystem.switchTab('active')">
+                Active <span id="active-quest-count" class="badge bg-primary ms-2">0</span>
+            </div>
+            <div class="quest-tab" data-tab="completed" onclick="questSystem.switchTab('completed')">
+                Completed <span id="completed-quest-count" class="badge bg-success ms-2">0</span>
+            </div>
+            <div class="quest-tab" data-tab="available" onclick="questSystem.switchTab('available')">
+                Available <span id="available-quest-count" class="badge bg-warning ms-2">0</span>
+            </div>
+        </div>
+        <div class="quest-list" id="quest-list-container">
+            <div class="text-muted small py-3">Loading quests…</div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════
          HOARD TAB
     ══════════════════════════════════════════════════════════════════════ -->
     <div class="tab-pane fade lobby-tab-pane" id="lobby-hoard" role="tabpanel"
         aria-labelledby="tab-hoard">
-        <div class="d-flex flex-column gap-2 mw-300">
-            <button type="button" class="tactical-btn-secondary btn-hoard-open">
-                <i class="bi bi-bank2 me-2"></i> View Hoard
-            </button>
-        </div>
+        <div id="hoard-tab-body"><div class="text-muted small py-3">Loading hoard…</div></div>
     </div>
 
     <!-- ══════════════════════════════════════════════════════════════════
          ACHIEVEMENTS TAB
     ══════════════════════════════════════════════════════════════════════ -->
     <div class="tab-pane fade lobby-tab-pane" id="lobby-achievements" role="tabpanel"
-        aria-labelledby="tab-achievements">
-        <div class="d-flex flex-column gap-2 mw-300">
-            <button type="button" class="tactical-btn-secondary"
-                onclick="window.achievementSystem && achievementSystem.openAchievements({{ characters[0].id if characters else 1 }})">
-                <i class="bi bi-trophy-fill me-2"></i> Achievements
-            </button>
+        aria-labelledby="tab-achievements" data-default-char="{{ characters[0].id if characters else '' }}">
+        <div class="achievement-header mb-3">
+            <div class="achievement-stats">
+                <div class="achievement-stat"><i class="bi bi-star-fill"></i><span>Points: <span id="achievementTotalPoints" class="achievement-stat-value">—</span></span></div>
+                <div class="achievement-stat"><i class="bi bi-trophy-fill"></i><span>Unlocked: <span id="achievementUnlockedCount" class="achievement-stat-value">—</span></span></div>
+            </div>
         </div>
+        <div class="achievement-category-tabs" id="achievementCategoryTabs"></div>
+        <div class="achievement-list-container"><div class="achievement-list" id="achievementList"><div class="text-muted small py-3">Loading achievements…</div></div></div>
     </div>
 
 </div>
@@ -591,23 +615,6 @@
 </div>
 <div id="skillTooltip" class="skill-tooltip"></div>
 
-<!-- Achievement Modal (unchanged) -->
-<div id="achievementModal" class="achievement-modal">
-    <div class="achievement-modal-content">
-        <div class="achievement-header">
-            <div>
-                <h2>{{ svg_icon('trophy-fill', 28, 'me-2') }}Achievements</h2>
-                <div class="achievement-stats">
-                    <div class="achievement-stat"><i class="bi bi-star-fill"></i><span>Points: <span id="achievementTotalPoints" class="achievement-stat-value">0</span></span></div>
-                    <div class="achievement-stat"><i class="bi bi-trophy-fill"></i><span>Unlocked: <span id="achievementUnlockedCount" class="achievement-stat-value">0/0</span></span></div>
-                </div>
-            </div>
-            <button class="achievement-close-btn" onclick="achievementSystem.closeAchievements()"><i class="bi bi-x-lg"></i> Close</button>
-        </div>
-        <div class="achievement-category-tabs" id="achievementCategoryTabs"></div>
-        <div class="achievement-list-container"><div class="achievement-list" id="achievementList"></div></div>
-    </div>
-</div>
 <div id="achievementNotification" class="achievement-notification">
     <div class="achievement-notification-icon" id="achievementNotificationIcon">🏆</div>
     <div class="achievement-notification-content">

@@ -81,11 +81,42 @@
     if (initial && input) {
       input.value = initial;
     } else if (input && (!initial || initial.trim() === '')) {
-      // Generate random seed if none exists
       const randomSeed = Math.floor(Math.random() * 1000000) + 1;
       input.value = randomSeed;
-      // Set it on the server without showing status message
       postSeed(randomSeed, false);
     }
+
+    // 30s countdown dial — TOTP style
+    const PERIOD = 30;
+    const CIRCUMFERENCE = 81.68; // 2π×13
+    const dialFill = document.getElementById('seed-dial-fill');
+    const inputGroup = container.querySelector('.seed-input-group');
+
+    function tickCountdown() {
+      const now = Math.floor(Date.now() / 1000);
+      const remaining = PERIOD - (now % PERIOD);
+      const offset = CIRCUMFERENCE * (1 - remaining / PERIOD);
+
+      if (dialFill) {
+        dialFill.style.strokeDashoffset = offset;
+        dialFill.style.stroke = remaining <= 5 ? 'var(--bs-danger, #dc3545)' : '';
+      }
+      // Fire regen at the boundary (remaining flips back to PERIOD)
+      if (remaining === PERIOD) {
+        postSeed(null, true).then(() => {
+          if (inputGroup) {
+            inputGroup.classList.add('seed-flash');
+            dialFill && dialFill.classList.add('seed-flash');
+            setTimeout(() => {
+              inputGroup.classList.remove('seed-flash');
+              dialFill && dialFill.classList.remove('seed-flash');
+            }, 800);
+          }
+        });
+      }
+    }
+
+    tickCountdown();
+    setInterval(tickCountdown, 1000);
   });
 })();

@@ -42,55 +42,11 @@ class QuestSystem {
     }
 
     init() {
-        // Create quest journal modal
-        this.createJournalModal();
         this.createNPCModal();
 
-        // Listen for quest-related events
         document.addEventListener('monster-killed', (e) => this.handleMonsterKilled(e.detail));
         document.addEventListener('item-collected', (e) => this.handleItemCollected(e.detail));
         document.addEventListener('location-visited', (e) => this.handleLocationVisited(e.detail));
-
-        // Add quest journal button to UI
-        this.addJournalButton();
-    }
-
-    createJournalModal() {
-        const modalHTML = `
-<div class="modal fade" id="quest-journal-modal" tabindex="-1" aria-labelledby="quest-journal-title" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content quest-journal">
-            <div class="quest-journal-header">
-                <h2 class="quest-journal-title" id="quest-journal-title">
-                    <i class="bi bi-journal-text me-2"></i>Quest Journal
-                </h2>
-            </div>
-
-            <div class="quest-tabs">
-                <div class="quest-tab active" data-tab="active" onclick="questSystem.switchTab('active')">
-                    Active Quests <span id="active-quest-count" class="badge bg-primary ms-2">0</span>
-                </div>
-                <div class="quest-tab" data-tab="completed" onclick="questSystem.switchTab('completed')">
-                    Completed <span id="completed-quest-count" class="badge bg-success ms-2">0</span>
-                </div>
-                <div class="quest-tab" data-tab="available" onclick="questSystem.switchTab('available')">
-                    Available <span id="available-quest-count" class="badge bg-warning ms-2">0</span>
-                </div>
-            </div>
-
-            <div class="quest-list" id="quest-list-container">
-                <!-- Quests populated here -->
-            </div>
-
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>`;
-
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
-        this.journalModal = new bootstrap.Modal(document.getElementById('quest-journal-modal'));
     }
 
     createNPCModal() {
@@ -129,26 +85,12 @@ class QuestSystem {
         this.npcModal = new bootstrap.Modal(document.getElementById('npc-dialogue-modal'));
     }
 
-    addJournalButton() {
-        // Add to dashboard if it exists
-        const dashboardHeader = document.querySelector('.tactical-panel .panel-header');
-        if (dashboardHeader) {
-            const button = document.createElement('button');
-            button.className = 'btn btn-sm btn-outline-warning';
-            button.innerHTML = '<i class="bi bi-journal-text me-1"></i>Quests';
-            button.onclick = () => this.openJournal();
-            dashboardHeader.appendChild(button);
-        }
-    }
-
     async openJournal(characterId = null) {
         if (characterId) {
             this.currentCharacterId = characterId;
         }
-
         await this.loadQuests();
         this.switchTab('active');
-        this.journalModal.show();
     }
 
     switchTab(tab) {

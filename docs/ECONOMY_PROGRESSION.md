@@ -19,9 +19,12 @@ Reference for the looter-extract economy and character progression systems
 - Stored internally as **copper** (smallest unit). Display is 3-tier
   (`Xg Ys Zc`, 100 copper = 1 silver, 100 silver = 1 gold) via
   `app/economy/currency.py::format_copper`.
-- **Hoard copper** (`Hoard.copper`) is the safe, spendable balance used by town vendors.
-- **Run-purse** (`Character.gold`) is at-risk coin found during a run; banked into the
-  Hoard on extraction, lost on wipe.
+- **Party gold** (`Character.gold`, summed across the active party) is **at-risk** coin
+  carried into dungeons — lost on a party wipe, banked into the Hoard on extraction.
+- **Hoard copper** (`Hoard.copper`) is the **safe** balance that survives wipes.
+- Town vendors draw from both: **party gold is spent first**, then Hoard copper tops up
+  any shortfall. The combined available balance is exposed as `total_available` on
+  `GET /api/hoard`; the Hoard-only safe balance is still `copper`.
 
 ## The Hoard (Spec 2)
 
@@ -30,21 +33,25 @@ Reference for the looter-extract economy and character progression systems
 - Service: `app/economy/hoard_service.py` — `deposit_items`, `deposit_copper`,
   `withdraw_to_character`, `pool_run_haul`.
 - API (`app/routes/hoard_api.py`):
-  - `GET /api/hoard` — items + copper (+ `copper_display`).
+  - `GET /api/hoard` — items + copper + `copper_display` + `party_gold` +
+    `party_gold_display` + `total_available` + `total_available_display`.
   - `POST /api/hoard/withdraw` `{character_id, slug|uid}` — move an item to a character.
   - `POST /api/dungeon/loot-body` `{downed_id, survivor_id}` — loot a downed ally's bag.
 - Extraction (`app/services/extraction_service.py`) pools each extracting character's
   bag + run-purse into the Hoard; combat wires death/permadeath
   (`combat_service.sync_member_death_states` / `resolve_party_defeat_if_any`).
 
-## Trading (Specs 1–2, repointed to the Hoard)
+## Trading (Specs 1–2)
 
-- `app/routes/trading_api.py`. Town vendors transact against the **Hoard**
-  (copper + items), not the character. All endpoints are `@login_required` +
-  owner-checked.
+- `app/routes/trading_api.py`. Town vendor purchases debit **party gold first** (drained
+  across party members in session order), then Hoard copper for any remainder. Sell
+  proceeds always go to the Hoard. All endpoints are `@login_required` + owner-checked.
   - `GET /api/merchants/<slug>`, `POST /api/trade/buy`, `POST /api/trade/sell`
-    (sell by catalog `item_slug` or gear `uid`). Responses include `new_balance` +
-    `*_display`.
+    (sell by catalog `item_slug` or gear `uid`). `POST /api/trade/repair` `{uid}`.
+  - Buy/repair responses include `new_balance` (combined party+hoard), `new_balance_display`,
+    `hoard_balance`, `hoard_balance_display`.
+- `_debit_combined(cost, party_chars, hoard)` in `trading_api.py` is the shared debit
+  helper used by both buy and repair.
 - Vendors are seeded by `python run.py seed-merchants` (idempotent).
 
 ## Floor loot (Spec 3)

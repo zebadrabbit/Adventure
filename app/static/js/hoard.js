@@ -1,34 +1,11 @@
 // hoard.js - Hoard (per-user vault) viewer + withdraw-to-character
 (function () {
-  const modalId = 'hoardModal';
   let hoardState = null; // last GET /api/hoard response: {items, copper, copper_display}
   let characters = [];   // [{id, name}, ...] from /api/characters/state
   let selectedCharId = null;
   let loadError = null;
 
   function esc(s) { return (s || '').toString().replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c])); }
-
-  function ensureModal() {
-    if (document.getElementById(modalId)) return;
-    const html = `
-<div class="modal fade" id="${modalId}" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title"><i class="bi bi-bank2 me-2"></i>Hoard</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div id="hoard-modal-body"></div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
-</div>`;
-    document.body.insertAdjacentHTML('beforeend', html);
-  }
 
   async function loadHoard() {
     const r = await fetch('/api/hoard');
@@ -71,8 +48,7 @@
   }
 
   function render() {
-    ensureModal();
-    const body = document.getElementById('hoard-modal-body');
+    const body = document.getElementById('hoard-tab-body');
     if (loadError) {
       body.innerHTML = `<div class="alert alert-danger">${esc(loadError)}</div>`;
       return;
@@ -147,7 +123,6 @@ ${itemsHtml}`;
   }
 
   async function open() {
-    ensureModal();
     loadError = null;
     try {
       await Promise.all([loadHoard(), loadCharacters()]);
@@ -156,24 +131,7 @@ ${itemsHtml}`;
       loadError = 'Failed to load hoard.';
     }
     render();
-    const modalEl = document.getElementById(modalId);
-    const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
-    bsModal.show();
   }
 
   window.hoardSystem = { open };
-
-  function wireButtons() {
-    document.querySelectorAll('.btn-hoard-open').forEach(btn => {
-      if (btn.__hoardWired) return;
-      btn.__hoardWired = true;
-      btn.addEventListener('click', open);
-    });
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', wireButtons);
-  } else {
-    wireButtons();
-  }
 })();

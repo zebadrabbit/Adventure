@@ -390,6 +390,13 @@ hr {
     margin: 2rem 0;
 }
 
+.seed-dial-wrap {
+    position: relative;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+}
+
 .seed-dial {
     width: 32px;
     height: 32px;

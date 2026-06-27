@@ -4,11 +4,20 @@
     <i class="bi bi-dice-5 me-1"></i>Dungeon Seed
     <span class="text-muted ms-1">(generates unique layouts)</span>
   </label>
-  <div class="input-group input-group-sm seed-input-group seed-input-width">
-    <button class="btn btn-outline-warning" type="button" id="btn-new-seed" title="Generate new random seed"><i
-        class="bi bi-shuffle"></i> Random</button>
-    <input type="text" class="form-control" placeholder="Enter seed (auto-applies)" id="input-custom-seed"
-      aria-label="Dungeon seed value" value="{{ seed_value }}">
+  <div class="d-flex align-items-center gap-2">
+    <div class="input-group input-group-sm seed-input-group seed-input-width">
+      <button class="btn btn-outline-warning" type="button" id="btn-new-seed" title="Generate new random seed"><i
+          class="bi bi-shuffle"></i> Random</button>
+      <input type="text" class="form-control" placeholder="Enter seed (auto-applies)" id="input-custom-seed"
+        aria-label="Dungeon seed value" value="{{ seed_value }}">
+    </div>
+    <div class="seed-dial-wrap" title="Auto-regenerates every 30s">
+      <svg class="seed-dial" viewBox="0 0 36 36" width="32" height="32">
+        <circle class="seed-dial-track" cx="18" cy="18" r="13"/>
+        <circle class="seed-dial-fill" id="seed-dial-fill" cx="18" cy="18" r="13"
+          stroke-dasharray="81.68" stroke-dashoffset="0"/>
+      </svg>
+    </div>
   </div>
   <div class="small text-muted" id="seed-status" aria-live="polite"></div>
 </div>

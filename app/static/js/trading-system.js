@@ -66,7 +66,8 @@ class TradingSystem {
                     <i class="bi bi-coin gold-icon"></i>
                     <div>
                         <div class="gold-amount" id="hoard-copper-amount">0c</div>
-                        <div class="gold-label">Hoard</div>
+                        <div class="gold-label">Party + Hoard</div>
+                        <div class="gold-label text-muted" style="font-size:10px;">(<span id="hoard-only-amount">0c</span> safe)</div>
                     </div>
                 </div>
             </div>
@@ -175,12 +176,25 @@ class TradingSystem {
         }
     }
 
+    _applyBalanceResult(result) {
+        this.hoardCopper = result.new_balance ?? this.hoardCopper;
+        this.hoardCopperDisplay = result.new_balance_display || `${this.hoardCopper}c`;
+        this.hoardOnlyCopper = result.hoard_balance ?? this.hoardOnlyCopper;
+        this.hoardOnlyCopperDisplay = result.hoard_balance_display || `${this.hoardOnlyCopper}c`;
+        const el = document.getElementById('hoard-copper-amount');
+        if (el) el.textContent = this.hoardCopperDisplay;
+        const safeEl = document.getElementById('hoard-only-amount');
+        if (safeEl) safeEl.textContent = this.hoardOnlyCopperDisplay || '0c';
+    }
+
     async refreshHoard() {
         const hoardResponse = await fetch('/api/hoard');
         if (hoardResponse.ok) {
             const hoardData = await hoardResponse.json();
-            this.hoardCopper = hoardData.copper || 0;
-            this.hoardCopperDisplay = hoardData.copper_display || `${this.hoardCopper}c`;
+            this.hoardCopper = hoardData.total_available || 0;
+            this.hoardCopperDisplay = hoardData.total_available_display || `${this.hoardCopper}c`;
+            this.hoardOnlyCopper = hoardData.copper || 0;
+            this.hoardOnlyCopperDisplay = hoardData.copper_display || `${this.hoardOnlyCopper}c`;
             this.hoardItems = hoardData.items || [];
         }
     }
@@ -191,6 +205,8 @@ class TradingSystem {
         document.getElementById('merchant-type').textContent = this.currentMerchant.type || 'General Merchant';
         document.getElementById('merchant-portrait').innerHTML = this.currentMerchant.icon || '<i class="bi bi-shop"></i>';
         document.getElementById('hoard-copper-amount').textContent = this.hoardCopperDisplay;
+        const safeEl = document.getElementById('hoard-only-amount');
+        if (safeEl) safeEl.textContent = this.hoardOnlyCopperDisplay || '0c';
 
         this.switchTab(this.currentTab);
     }
@@ -380,9 +396,7 @@ class TradingSystem {
                 return;
             }
 
-            this.hoardCopper = result.new_balance;
-            this.hoardCopperDisplay = result.new_balance_display || `${this.hoardCopper}c`;
-            document.getElementById('hoard-copper-amount').textContent = this.hoardCopperDisplay;
+            this._applyBalanceResult(result);
 
             this.showToast('Repaired!', `Restored to full durability for ${result.cost_display || result.cost + 'c'}`, 'success');
 
@@ -559,10 +573,8 @@ class TradingSystem {
 
             const result = await response.json();
 
-            // Update hoard copper
-            this.hoardCopper = result.new_balance;
-            this.hoardCopperDisplay = result.new_balance_display || `${this.hoardCopper}c`;
-            document.getElementById('hoard-copper-amount').textContent = this.hoardCopperDisplay;
+            // Update balances
+            this._applyBalanceResult(result);
 
             // Show success
             const itemName = item ? item.name : (slug || uid);

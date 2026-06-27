@@ -256,7 +256,8 @@ def list_characters_state():
         inv_objs = load_inventory(ch.items)
         # gather slugs with multiplicity irrelevant for prefetch
         for obj in inv_objs:
-            slugs_needed.add(obj["slug"])
+            if "slug" in obj:
+                slugs_needed.add(obj["slug"])
         gear = _normalize_gear(_safe_json_load(ch.gear, {}))
         slugs_needed.update([s for s in gear.values() if isinstance(s, str) and s])
     items_map = {it.slug: it for it in Item.query.filter(Item.slug.in_(slugs_needed)).all()} if slugs_needed else {}
@@ -273,7 +274,9 @@ def list_characters_state():
             computed = _computed_stats(penalized_base, gear, items_map)
             bag_payload = []
             for obj in inv_objs:
-                slug = obj["slug"]
+                slug = obj.get("slug")
+                if not slug:
+                    continue
                 it = items_map.get(slug)
                 if not it:
                     continue
@@ -334,7 +337,8 @@ def get_character_state(cid: int):
     # Gather all slugs for item lookup (skip instance dicts in gear values)
     slugs_needed = set()
     for obj in inv_objs:
-        slugs_needed.add(obj["slug"])
+        if "slug" in obj:
+            slugs_needed.add(obj["slug"])
     slugs_needed.update([s for s in gear.values() if isinstance(s, str) and s])
 
     items_map = {it.slug: it for it in Item.query.filter(Item.slug.in_(slugs_needed)).all()} if slugs_needed else {}
@@ -349,7 +353,9 @@ def get_character_state(cid: int):
     # Build bag payload: legacy consumables first, then gear instances
     bag_payload = []
     for obj in inv_objs:
-        slug = obj["slug"]
+        slug = obj.get("slug")
+        if not slug:
+            continue
         it = items_map.get(slug)
         if not it:
             continue

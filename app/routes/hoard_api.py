@@ -20,11 +20,23 @@ bp_hoard = Blueprint("hoard_api", __name__)
 def get_hoard():
     hoard = Hoard.get_or_create(current_user.id)
     db.session.commit()
+    # Sum gold across the active session party (at-risk currency)
+    party = session.get("party") or []
+    party_ids = [p["id"] for p in party if isinstance(p, dict) and p.get("id")]
+    party_gold = 0
+    if party_ids:
+        chars = Character.query.filter(Character.id.in_(party_ids), Character.user_id == current_user.id).all()
+        party_gold = sum(c.gold or 0 for c in chars)
+    hoard_copper = hoard.copper or 0
     return jsonify(
         {
             "items": json.loads(hoard.items_json or "[]"),
-            "copper": hoard.copper or 0,
-            "copper_display": format_copper(hoard.copper or 0),
+            "copper": hoard_copper,
+            "copper_display": format_copper(hoard_copper),
+            "party_gold": party_gold,
+            "party_gold_display": format_copper(party_gold),
+            "total_available": hoard_copper + party_gold,
+            "total_available_display": format_copper(hoard_copper + party_gold),
         }
     )
 

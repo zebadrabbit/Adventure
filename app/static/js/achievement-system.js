@@ -39,11 +39,7 @@ class AchievementSystem {
             // Calculate stats
             this.calculateStats();
 
-            // Render modal
             this.renderModal();
-
-            // Show modal
-            document.getElementById('achievementModal').classList.add('show');
         } catch (error) {
             console.error('Error loading achievements:', error);
             alert('Failed to load achievements. Please try again.');
@@ -263,13 +259,6 @@ class AchievementSystem {
         };
 
         return iconMap[iconName] || '🏆';
-    }
-
-    /**
-     * Close achievement modal
-     */
-    closeAchievements() {
-        document.getElementById('achievementModal').classList.remove('show');
     }
 
     /**

@@ -11,7 +11,7 @@ Handles:
 
 import json
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 from flask_login import current_user, login_required
 
 from app import db
@@ -28,6 +28,36 @@ from app.models.merchant import Merchant, MerchantStock, TradeTransaction
 from app.models.models import Character
 
 bp_trading = Blueprint("trading_api", __name__)
+
+
+def _party_chars(user_id):
+    """Return Character objects for the active session party owned by user_id."""
+    party = session.get("party") or []
+    ids = [p["id"] for p in party if isinstance(p, dict) and p.get("id")]
+    if not ids:
+        return []
+    return Character.query.filter(Character.id.in_(ids), Character.user_id == user_id).all()
+
+
+def _party_gold(chars):
+    """Sum of gold across party characters."""
+    return sum(c.gold or 0 for c in chars)
+
+
+def _debit_combined(cost, party_chars, hoard):
+    """Debit `cost` copper from party gold first, then hoard. Raises ValueError if insufficient."""
+    available = _party_gold(party_chars) + (hoard.copper or 0)
+    if available < cost:
+        raise ValueError("Insufficient funds")
+    remaining = cost
+    for c in party_chars:
+        if remaining <= 0:
+            break
+        take = min(c.gold or 0, remaining)
+        c.gold -= take
+        remaining -= take
+    if remaining > 0:
+        hoard.copper -= remaining
 
 
 @bp_trading.route("/api/merchants/<slug>", methods=["GET"])
@@ -126,8 +156,8 @@ def buy_item():
     if not character or character.user_id != current_user.id:
         return jsonify({"error": "Character not found"}), 404
 
-    # Town trades draw from the per-user Hoard, not the at-risk run-purse.
     hoard = Hoard.get_or_create(character.user_id)
+    party = _party_chars(character.user_id)
 
     # Check if merchant has this item
     inventory_data = json.loads(merchant.inventory_json or "[]")
@@ -141,8 +171,8 @@ def buy_item():
     buy_price = int(base_price * merchant.buy_price_modifier)
     total_cost = buy_price * quantity
 
-    # Check if the hoard can afford
-    if (hoard.copper or 0) < total_cost:
+    # Check combined party gold + hoard
+    if _party_gold(party) + (hoard.copper or 0) < total_cost:
         return jsonify({"error": "Insufficient funds"}), 400
 
     # Check stock if limited
@@ -153,8 +183,8 @@ def buy_item():
 
     # Execute transaction
     try:
-        # Debit hoard copper and deposit the purchased items into the hoard
-        hoard.copper -= total_cost
+        # Debit party gold first, then hoard; deposit items into hoard
+        _debit_combined(total_cost, party, hoard)
         hoard_service.deposit_items(hoard, [{"slug": item_slug, "qty": quantity}])
 
         # Update stock if tracked
@@ -175,6 +205,9 @@ def buy_item():
 
         db.session.commit()
 
+        db.session.commit()
+
+        new_combined = _party_gold(party) + hoard.copper
         return jsonify(
             {
                 "success": True,
@@ -182,8 +215,10 @@ def buy_item():
                 "quantity": quantity,
                 "total_cost": total_cost,
                 "total_cost_display": format_copper(total_cost),
-                "new_balance": hoard.copper,
-                "new_balance_display": format_copper(hoard.copper),
+                "new_balance": new_combined,
+                "new_balance_display": format_copper(new_combined),
+                "hoard_balance": hoard.copper,
+                "hoard_balance_display": format_copper(hoard.copper),
             }
         )
 
@@ -361,12 +396,13 @@ def repair_item():
         return jsonify({"error": "Item not found"}), 404
 
     cost = durability.repair_cost(target)
-    if (hoard.copper or 0) < cost:
+    party = _party_chars(current_user.id)
+    if _party_gold(party) + (hoard.copper or 0) < cost:
         return jsonify({"error": "Insufficient funds"}), 400
 
     try:
         durability.apply_repair(target)
-        hoard.copper -= cost
+        _debit_combined(cost, party, hoard)
         if container[0] == "hoard":
             hoard.items_json = json.dumps(container[1])
         else:
@@ -378,6 +414,7 @@ def repair_item():
         print(f"[trading] Repair failed: {e}")
         return jsonify({"error": "Transaction failed"}), 500
 
+    new_combined = _party_gold(party) + hoard.copper
     return jsonify(
         {
             "success": True,
@@ -385,8 +422,10 @@ def repair_item():
             "durability": target.get("durability"),
             "cost": cost,
             "cost_display": format_copper(cost),
-            "new_balance": hoard.copper,
-            "new_balance_display": format_copper(hoard.copper),
+            "new_balance": new_combined,
+            "new_balance_display": format_copper(new_combined),
+            "hoard_balance": hoard.copper,
+            "hoard_balance_display": format_copper(hoard.copper),
         }
     )
 

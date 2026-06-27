@@ -4,11 +4,19 @@ Complete merchant shop system with buy/sell mechanics, gold currency, and transa
 
 ## Features
 
-### 💰 Gold Currency
-- Characters have a `gold` field for currency
-- Starting characters get 100 gold
-- Earn gold by selling items or completing quests
-- Spend gold at merchant shops
+### 💰 Currency Model
+
+Two pools contribute to spending power at town merchants:
+
+| Pool | Field | Risk |
+|---|---|---|
+| **Party gold** | `Character.gold` (summed across active party) | At-risk — lost on wipe, banked to Hoard on extraction |
+| **Hoard copper** | `Hoard.copper` | Safe — never lost in a dungeon run |
+
+**Buy and repair transactions debit party gold first, then Hoard copper** for any shortfall.
+Sell proceeds always go to the Hoard.
+`GET /api/hoard` returns both: `copper` (safe), `party_gold` (at-risk), and
+`total_available` (combined) alongside `*_display` strings.
 
 ### 🏪 Merchant Shops
 - **General Store**: Potions, tools, supplies
@@ -146,9 +154,15 @@ Purchase item from merchant.
   "item": "potion-healing",
   "quantity": 3,
   "total_cost": 150,
-  "new_gold": 850
+  "total_cost_display": "1s 50c",
+  "new_balance": 850,
+  "new_balance_display": "8s 50c",
+  "hoard_balance": 400,
+  "hoard_balance_display": "4s"
 }
 ```
+`new_balance` = combined party gold + hoard copper after the transaction.
+`hoard_balance` = safe hoard-only balance.
 
 ### Sell Item
 ```

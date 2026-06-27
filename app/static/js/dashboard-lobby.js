@@ -21,6 +21,20 @@
       if (target) sessionStorage.setItem(NAV_KEY, target.replace('#', ''));
       // Fetch candidates when Recruit tab opens
       if (target === '#lobby-recruit') loadCandidates();
+      // Load quests inline when Quests tab opens
+      if (target === '#lobby-quests') {
+        const pane = document.getElementById('lobby-quests');
+        const charId = pane && (pane.dataset.defaultChar || '');
+        if (window.questSystem) questSystem.openJournal(charId ? parseInt(charId, 10) : null);
+      }
+      // Load hoard inline when Hoard tab opens
+      if (target === '#lobby-hoard') window.hoardSystem && hoardSystem.open();
+      // Load achievements inline when Achievements tab opens
+      if (target === '#lobby-achievements') {
+        const pane = document.getElementById('lobby-achievements');
+        const charId = pane && (pane.dataset.defaultChar || '');
+        if (charId && window.achievementSystem) achievementSystem.openAchievements(parseInt(charId, 10));
+      }
     });
   });
 
