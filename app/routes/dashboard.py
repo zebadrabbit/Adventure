@@ -381,7 +381,10 @@ def recruit_hire():
         if stat in stats:
             stats[stat] = int(stats[stat]) + int(delta)
 
-    cls = data.get("cls") or "fighter"
+    from app.routes.main import BASE_STATS
+
+    valid_classes = set(BASE_STATS.keys())
+    cls = data.get("cls") if data.get("cls") in valid_classes else "fighter"
     gear_slugs = data.get("gear_slugs") or []
 
     from app.services.auto_equip import auto_equip_for
