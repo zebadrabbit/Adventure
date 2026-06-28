@@ -86,6 +86,7 @@ class QuestSystem {
     }
 
     async openJournal(characterId = null) {
+        loadDailyWeekly();
         if (characterId) {
             this.currentCharacterId = characterId;
         }
@@ -401,6 +402,91 @@ class QuestSystem {
             toast.style.transform = 'translateX(400px)';
             setTimeout(() => toast.remove(), 300);
         }, 4000);
+    }
+}
+
+// Daily / Weekly quest functions
+async function loadDailyWeekly() {
+    const [dResp, wResp] = await Promise.all([
+        fetch('/api/quests/daily'),
+        fetch('/api/quests/weekly'),
+    ]);
+    const dailyData = dResp.ok ? await dResp.json() : { quests: [] };
+    const weeklyData = wResp.ok ? await wResp.json() : { quest: null };
+
+    renderDailyQuests(dailyData.quests || []);
+    renderWeeklyQuest(weeklyData.quest);
+}
+
+function renderDailyQuests(quests) {
+    const el = document.getElementById('daily-quest-list');
+    if (!el) return;
+    if (!quests.length) { el.innerHTML = '<div class="text-muted small">No daily quests today.</div>'; return; }
+    el.innerHTML = quests.map(q => renderQuestCard(q, 'daily')).join('');
+    el.querySelectorAll('.btn-claim-quest').forEach(btn => {
+        btn.addEventListener('click', () => claimDaily(btn.dataset.questId));
+    });
+}
+
+function renderWeeklyQuest(quest) {
+    const el = document.getElementById('weekly-quest-container');
+    if (!el) return;
+    if (!quest) { el.innerHTML = '<div class="text-muted small">No weekly quest.</div>'; return; }
+    el.innerHTML = renderQuestCard(quest, 'weekly');
+    el.querySelector('.btn-claim-quest')?.addEventListener('click', claimWeekly);
+}
+
+function renderQuestCard(q, type) {
+    const obj = q.objective || {};
+    const current = obj.current || 0;
+    const target = obj.target || 1;
+    const pct = Math.min(100, Math.round(current / target * 100));
+    const claimed = q.status === 'claimed';
+    const complete = current >= target;
+    const claimBtn = complete && !claimed
+        ? `<button class="btn btn-sm btn-success btn-claim-quest" data-quest-id="${q.id}">CLAIM</button>`
+        : claimed
+        ? `<span class="badge bg-secondary">Claimed</span>`
+        : '';
+    return `
+<div class="card bg-dark border-secondary mb-2">
+  <div class="card-body py-2">
+    <div class="d-flex justify-content-between align-items-start">
+      <div>
+        <div class="fw-bold">${q.title || ''}</div>
+        <div class="text-muted small">${q.description || ''}</div>
+      </div>
+      <div class="ms-2 flex-shrink-0">${claimBtn}</div>
+    </div>
+    <div class="progress mt-2" style="height:6px">
+      <div class="progress-bar ${complete ? 'bg-success' : 'bg-primary'}" style="width:${pct}%"></div>
+    </div>
+    <div class="text-muted small mt-1">${current} / ${target}</div>
+  </div>
+</div>`;
+}
+
+async function claimDaily(questId) {
+    const resp = await fetch('/api/quests/daily/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quest_id: questId }),
+    });
+    const d = await resp.json();
+    if (resp.ok) {
+        loadDailyWeekly();
+    } else {
+        alert(d.error || 'Claim failed');
+    }
+}
+
+async function claimWeekly() {
+    const resp = await fetch('/api/quests/weekly/claim', { method: 'POST' });
+    const d = await resp.json();
+    if (resp.ok) {
+        loadDailyWeekly();
+    } else {
+        alert(d.error || 'Claim failed');
     }
 }
 

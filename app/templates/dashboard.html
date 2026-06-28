@@ -452,7 +452,11 @@
     <div class="tab-pane fade lobby-tab-pane" id="lobby-quests" role="tabpanel"
         aria-labelledby="tab-quests" data-default-char="{{ characters[0].id if characters else '' }}">
         <div class="quest-tabs mb-3">
-            <div class="quest-tab active" data-tab="active" onclick="questSystem.switchTab('active')">
+            <button class="nav-link active" id="quest-tab-daily" data-bs-toggle="tab"
+                    data-bs-target="#quest-panel-daily" type="button">Daily</button>
+            <button class="nav-link" id="quest-tab-weekly" data-bs-toggle="tab"
+                    data-bs-target="#quest-panel-weekly" type="button">Weekly</button>
+            <div class="quest-tab" data-tab="active" onclick="questSystem.switchTab('active')">
                 Active <span id="active-quest-count" class="badge bg-primary ms-2">0</span>
             </div>
             <div class="quest-tab" data-tab="completed" onclick="questSystem.switchTab('completed')">
@@ -460,6 +464,14 @@
             </div>
             <div class="quest-tab" data-tab="available" onclick="questSystem.switchTab('available')">
                 Available <span id="available-quest-count" class="badge bg-warning ms-2">0</span>
+            </div>
+        </div>
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="quest-panel-daily">
+                <div id="daily-quest-list"><div class="text-muted small py-2">Loading daily quests…</div></div>
+            </div>
+            <div class="tab-pane fade" id="quest-panel-weekly">
+                <div id="weekly-quest-container"><div class="text-muted small py-2">Loading weekly quest…</div></div>
             </div>
         </div>
         <div class="quest-list" id="quest-list-container">
