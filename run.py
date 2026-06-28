@@ -231,6 +231,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     seed_themes_parser.set_defaults(command="seed-themes")
 
+    # seed-dungeon-difficulty subcommand
+    seed_dungeon_parser = subparsers.add_parser(
+        "seed-dungeon-difficulty",
+        help="Seed Normal/Heroic/Mythic tiers and starter affixes (idempotent).",
+        formatter_class=argparse.RawTextHelpFormatter,
+        description="Upsert DungeonTier rows T1-T3 and 8 starter DungeonAffix rows.",
+    )
+    seed_dungeon_parser.set_defaults(command="seed-dungeon-difficulty")
+
     # import-items-csv
     import_items_parser = subparsers.add_parser(
         "import-items-csv",
@@ -406,6 +415,12 @@ def main(argv: list[str]) -> int:
         from app.seed_themes import seed_themes
 
         seed_themes(verbose=True)
+        return 0
+
+    elif mode == "seed-dungeon-difficulty":
+        from app.seed_dungeon_difficulty import seed_dungeon_difficulty
+
+        seed_dungeon_difficulty(verbose=True)
         return 0
 
     elif mode == "import-items-csv":
