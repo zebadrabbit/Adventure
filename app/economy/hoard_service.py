@@ -73,18 +73,19 @@ def deposit_from_character(
     char_inv = load_inventory(character.items)
     hoard_inv = load_inventory(hoard.items_json)
 
-    # Find the item in char bag
-    idx = None
     if uid:
-        idx = next((i for i, e in enumerate(char_inv) if e.get("uid") == uid), None)
+        inst = find_instance(char_inv, uid)
+        if not inst:
+            return False
+        remove_instance(char_inv, uid)
+        hoard_inv.append(inst)
     elif slug:
-        idx = next((i for i, e in enumerate(char_inv) if e.get("slug") == slug), None)
-
-    if idx is None:
+        if not remove_one(char_inv, slug):
+            return False
+        add_item(hoard_inv, slug, 1)
+    else:
         return False
 
-    item = char_inv.pop(idx)
-    hoard_inv.append(item)
     character.items = dump_inventory(char_inv)
     hoard.items_json = dump_inventory(hoard_inv)
     return True

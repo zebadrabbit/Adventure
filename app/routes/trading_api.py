@@ -205,8 +205,6 @@ def buy_item():
 
         db.session.commit()
 
-        db.session.commit()
-
         new_combined = _party_gold(party) + hoard.copper
         return jsonify(
             {
