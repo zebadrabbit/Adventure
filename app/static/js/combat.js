@@ -434,6 +434,7 @@
                 }
 
                 // Remove old listeners and add new one
+                const action = btn.dataset.action;
                 const newBtn = btn.cloneNode(true);
                 btn.parentNode.replaceChild(newBtn, btn);
                 newBtn.addEventListener('click', () => doAction(action, state.version, activeCharId));
