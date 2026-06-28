@@ -156,25 +156,6 @@
                                 <span class="coin-silver">{{ svg_icon('two-coins', 18, 'me-1') }}{{ c.coins.silver }}s</span>
                                 <span class="coin-copper">{{ svg_icon('token', 18, 'me-1') }}{{ c.coins.copper }}c</span>
                             </div>
-                            {% if c.inventory and c.inventory|length > 0 %}
-                            <div class="stat-block flex-grow-1-block">
-                                <h6>{{ svg_icon('knapsack', 16, 'me-1') }}EQUIPMENT</h6>
-                                <div class="inventory-list">
-                                    <ul>
-                                        {% for it in c.inventory %}
-                                        <li>
-                                            {% if it.type == 'weapon' %}{{ svg_icon('bloody-sword', 16) }}
-                                            {% elif it.type == 'armor' %}{{ svg_icon('shield', 16) }}
-                                            {% elif it.type == 'potion' %}{{ svg_icon('potion-ball', 16) }}
-                                            {% else %}{{ svg_icon('chest', 16) }}{% endif %}
-                                            <span>{{ it.name }}</span>
-                                            <span class="item-type-tag">[{{ it.type }}]</span>
-                                        </li>
-                                        {% endfor %}
-                                    </ul>
-                                </div>
-                            </div>
-                            {% endif %}
                         </div>
                         <div class="operative-footer">
                             <button class="tactical-btn-danger btn-party-remove" data-char-id="{{ c.id }}">
@@ -185,11 +166,7 @@
                                     data-char-id="{{ c.id }}" title="Equipment Panel">
                                     {{ svg_icon('anvil', 18) }}
                                 </button>
-                                <button class="tactical-btn-secondary btn-bag-panel btn-icon-compact"
-                                    data-char-id="{{ c.id }}" title="Inventory">
-                                    {{ svg_icon('knapsack', 18) }}
-                                </button>
-                                <button class="tactical-btn-secondary btn-skill-panel btn-icon-compact"
+<button class="tactical-btn-secondary btn-skill-panel btn-icon-compact"
                                     data-char-id="{{ c.id }}" title="Skill Tree">
                                     {{ svg_icon('star-fill', 18) }}
                                 </button>
