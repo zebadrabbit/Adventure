@@ -285,6 +285,13 @@ def list_characters_state():
                 bag_payload.append(ser)
             # Append procedural gear instances after legacy consumables
             bag_payload.extend(gear_instances)
+            try:
+                _stats_json = json.loads(ch.stats) if ch.stats else {}
+            except Exception:
+                _stats_json = {}
+            _gold = int(_stats_json.get("gold", 0) or 0)
+            _silver = int(_stats_json.get("silver", 0) or 0)
+            _copper = int(_stats_json.get("copper", 0) or 0)
             out.append(
                 {
                     "id": ch.id,
@@ -293,9 +300,9 @@ def list_characters_state():
                     "stats": {
                         "base": penalized_base,
                         "computed": computed,
-                        "gold": ch.gold or 0,
-                        "silver": 0,  # Not yet exposed on Character model
-                        "copper": 0,  # Not yet exposed on Character model
+                        "gold": _gold,
+                        "silver": _silver,
+                        "copper": _copper,
                     },
                     "gear": {slot: _serialize_gear_slot(val, items_map) for slot, val in (gear or {}).items()},
                     "bag": bag_payload,
@@ -313,6 +320,13 @@ def list_characters_state():
             except Exception:
                 pass
         except Exception:
+            try:
+                _stats_json = json.loads(ch.stats) if ch.stats else {}
+            except Exception:
+                _stats_json = {}
+            _gold = int(_stats_json.get("gold", 0) or 0)
+            _silver = int(_stats_json.get("silver", 0) or 0)
+            _copper = int(_stats_json.get("copper", 0) or 0)
             out.append(
                 {
                     "id": ch.id,
@@ -321,9 +335,9 @@ def list_characters_state():
                     "stats": {
                         "base": {},
                         "computed": {},
-                        "gold": 0,
-                        "silver": 0,
-                        "copper": 0,
+                        "gold": _gold,
+                        "silver": _silver,
+                        "copper": _copper,
                     },
                     "gear": {},
                     "bag": [],
@@ -379,6 +393,14 @@ def get_character_state(cid: int):
     # Build gear payload — handles both legacy slugs and instance dicts
     gear_payload = {slot: _serialize_gear_slot(val, items_map) for slot, val in (gear or {}).items()}
 
+    try:
+        _stats_json = json.loads(ch.stats) if ch.stats else {}
+    except Exception:
+        _stats_json = {}
+    _gold = int(_stats_json.get("gold", 0) or 0)
+    _silver = int(_stats_json.get("silver", 0) or 0)
+    _copper = int(_stats_json.get("copper", 0) or 0)
+
     return jsonify(
         {
             "id": ch.id,
@@ -388,9 +410,9 @@ def get_character_state(cid: int):
             "stats": {
                 "base": penalized_base,
                 "computed": computed,
-                "gold": ch.gold or 0,
-                "silver": 0,  # Not yet exposed on Character model
-                "copper": 0,  # Not yet exposed on Character model
+                "gold": _gold,
+                "silver": _silver,
+                "copper": _copper,
             },
             "gear": gear_payload,
             "bag": bag_payload,
