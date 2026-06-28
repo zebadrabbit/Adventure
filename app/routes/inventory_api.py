@@ -290,7 +290,13 @@ def list_characters_state():
                     "id": ch.id,
                     "name": ch.name,
                     "level": ch.level,
-                    "stats": {"base": penalized_base, "computed": computed},
+                    "stats": {
+                        "base": penalized_base,
+                        "computed": computed,
+                        "gold": ch.gold or 0,
+                        "silver": 0,  # Not yet exposed on Character model
+                        "copper": 0,  # Not yet exposed on Character model
+                    },
                     "gear": {slot: _serialize_gear_slot(val, items_map) for slot, val in (gear or {}).items()},
                     "bag": bag_payload,
                     "encumbrance": enc_state,
@@ -312,7 +318,13 @@ def list_characters_state():
                     "id": ch.id,
                     "name": ch.name,
                     "level": getattr(ch, "level", 1),
-                    "stats": {"base": {}, "computed": {}},
+                    "stats": {
+                        "base": {},
+                        "computed": {},
+                        "gold": 0,
+                        "silver": 0,
+                        "copper": 0,
+                    },
                     "gear": {},
                     "bag": [],
                     "warning": "character_state_unavailable",
@@ -373,7 +385,13 @@ def get_character_state(cid: int):
             "name": ch.name,
             "level": ch.level,
             "xp": ch.xp or 0,
-            "stats": {"base": penalized_base, "computed": computed},
+            "stats": {
+                "base": penalized_base,
+                "computed": computed,
+                "gold": ch.gold or 0,
+                "silver": 0,  # Not yet exposed on Character model
+                "copper": 0,  # Not yet exposed on Character model
+            },
             "gear": gear_payload,
             "bag": bag_payload,
             "encumbrance": enc_state,
