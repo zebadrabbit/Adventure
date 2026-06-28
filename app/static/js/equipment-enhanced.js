@@ -351,22 +351,29 @@ class EquipmentManager {
         document.querySelectorAll('.bag-grid-cell[draggable="true"]').forEach(cell => {
             cell.addEventListener('dragstart', (e) => this.onItemDragStart(e));
             cell.addEventListener('dragend', (e) => this.onItemDragEnd(e));
-
-            // Attach hover for comparison tooltip
             cell.addEventListener('mouseenter', (e) => this.showComparisonTooltip(e));
             cell.addEventListener('mouseleave', () => this.hideComparisonTooltip());
+            // Click to equip — auto-detects slot from item type
+            cell.addEventListener('click', () => {
+                const idx = parseInt(cell.dataset.itemIndex);
+                const item = this.character.bag[idx];
+                if (!item) return;
+                const slot = this.getSlotForItemType(item.type || item.slot || '');
+                this.equipItem(item, slot);
+            });
         });
     }
 
     onItemDragStart(e) {
-        const itemIndex = parseInt(e.target.dataset.itemIndex);
+        const cell = e.currentTarget;
+        const itemIndex = parseInt(cell.dataset.itemIndex);
         this.draggedItem = this.character.bag[itemIndex];
         e.dataTransfer.effectAllowed = 'move';
-        e.target.style.opacity = '0.4';
+        cell.style.opacity = '0.4';
     }
 
     onItemDragEnd(e) {
-        e.target.style.opacity = '1';
+        e.currentTarget.style.opacity = '1';
         this.draggedItem = null;
     }
 
@@ -393,7 +400,6 @@ class EquipmentManager {
     async equipItem(item, slot) {
         // Procedural gear instances carry a `uid` and self-describe their slot;
         // equip them by uid. Legacy catalog items equip by slug + target slot.
-        // `item` may also be a bare slug string for backward compatibility.
         const isInstance = item && typeof item === 'object' && item.uid;
         const body = isInstance
             ? { uid: item.uid }
@@ -407,7 +413,19 @@ class EquipmentManager {
         if (response.ok) {
             await this.loadCharacter(this.character.id);
             this.render();
+        } else {
+            const d = await response.json().catch(() => ({}));
+            this.toast(d.error || 'Could not equip item', false);
         }
+    }
+
+    toast(msg, ok = true) {
+        const el = document.createElement('div');
+        el.className = `alert alert-${ok ? 'success' : 'warning'} alert-dismissible fade show position-fixed top-0 end-0 m-3`;
+        el.style.zIndex = '10000';
+        el.innerHTML = `${this.escapeHTML(msg)}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 3000);
     }
 
     async unequipItem(slot) {
