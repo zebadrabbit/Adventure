@@ -211,41 +211,44 @@ class EquipmentManager {
 
     renderPortrait() {
         const ch = this.character;
-        const stats = this.calculateTotalStats();
-        const cls = (ch.char_class || ch.class_name || 'adventurer').toLowerCase();
+        const s = this.calculateTotalStats();
+        const cls = s.cls.toLowerCase();
 
         // Class header
         const header = document.getElementById('eq-class-header');
         header.className = `eq-class-header eq-class-bg-${cls}`;
         document.getElementById('char-name-display').textContent = ch.name;
         document.getElementById('char-class-display').textContent =
-            `Lv ${ch.level || stats.level || 1} ${ch.char_class || ch.class_name || 'Adventurer'}`;
+            `Lv ${s.level} ${s.cls.charAt(0).toUpperCase() + s.cls.slice(1)}`;
 
         // HP bar
-        const hp = stats.hp, maxHp = stats.max_hp || 1;
-        const hpPct = Math.min(100, Math.round((hp / maxHp) * 100));
-        document.getElementById('eq-hp-text').textContent = `${hp} / ${maxHp}`;
+        const hpPct = Math.min(100, Math.round((s.hp / (s.max_hp || 1)) * 100));
+        document.getElementById('eq-hp-text').textContent = `${s.hp} / ${s.max_hp}`;
         document.getElementById('eq-hp-bar').style.width = `${hpPct}%`;
 
         // MP bar
-        const mp = stats.mana, maxMp = stats.max_mana || 1;
-        const mpPct = Math.min(100, Math.round((mp / maxMp) * 100));
-        document.getElementById('eq-mp-text').textContent = `${mp} / ${maxMp}`;
+        const mpPct = Math.min(100, Math.round((s.mana / (s.max_mana || 1)) * 100));
+        document.getElementById('eq-mp-text').textContent = `${s.mana} / ${s.max_mana}`;
         document.getElementById('eq-mp-bar').style.width = `${mpPct}%`;
 
         // XP bar
-        const xp = stats.xp, xpNext = stats.xp_to_next || 100;
-        const xpPct = Math.min(100, Math.round((xp / xpNext) * 100));
-        document.getElementById('eq-xp-text').textContent = `${xp} / ${xpNext}`;
+        const xpPct = Math.min(100, Math.round((s.xp / (s.xp_to_next || 1)) * 100));
+        document.getElementById('eq-xp-text').textContent = `${s.xp} / ${s.xp_to_next}`;
         document.getElementById('eq-xp-bar').style.width = `${xpPct}%`;
 
-        // Stat grid
-        document.getElementById('eq-val-atk').textContent = stats.attack;
-        document.getElementById('eq-val-def').textContent = stats.defense;
-        document.getElementById('eq-val-hp').textContent = stats.max_hp;
-        document.getElementById('eq-val-mp').textContent = stats.max_mana;
+        // Stat grid — show core D&D-style attributes
+        document.getElementById('eq-val-atk').textContent = s.str;
+        document.getElementById('eq-val-def').textContent = s.con;
+        document.getElementById('eq-val-hp').textContent = s.dex;
+        document.getElementById('eq-val-mp').textContent = s.int;
 
-        // Gear bonus + encumbrance (moved here from left col)
+        // Update stat grid labels to match
+        const labels = document.querySelectorAll('.eq-stat-label');
+        if (labels.length === 4) {
+            labels[0].textContent = 'STR'; labels[1].textContent = 'CON';
+            labels[2].textContent = 'DEX'; labels[3].textContent = 'INT';
+        }
+
         this.renderGearBonus();
         this.renderEncumbrance();
     }
@@ -627,18 +630,25 @@ class EquipmentManager {
     }
 
     calculateTotalStats() {
-        // Read directly from the character stats returned by the API
-        const s = (this.character && this.character.stats) || {};
+        const ch = this.character || {};
+        const apiStats = ch.stats || {};
+        // API returns stats: { base: {...}, computed: {...} }
+        const base = apiStats.base || apiStats;
+        const computed = apiStats.computed || base;
+        const level = ch.level || base.level || 1;
         return {
-            hp:        s.hp        || 0,
-            max_hp:    s.max_hp    || 0,
-            mana:      s.mana      || 0,
-            max_mana:  s.max_mana  || 0,
-            attack:    s.attack    || 0,
-            defense:   s.defense   || 0,
-            level:     s.level     || this.character.level || 1,
-            xp:        s.xp        || 0,
-            xp_to_next: s.xp_to_next || 100
+            cls:       base.class || 'adventurer',
+            hp:        base.hp    || 0,
+            max_hp:    20 + level * 10,
+            mana:      base.mana  || 0,
+            max_mana:  10 + level * 5,
+            str:       computed.str || base.str || 0,
+            dex:       computed.dex || base.dex || 0,
+            con:       computed.con || base.con || 0,
+            int:       computed.int || base.int || 0,
+            level,
+            xp:        ch.xp || 0,
+            xp_to_next: ch.xp_for_next_level || 100,
         };
     }
 
