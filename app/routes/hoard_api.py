@@ -101,6 +101,87 @@ def deposit_item():
     return jsonify({"success": True, "hoard_items": hoard_items, "char_bag": char_bag})
 
 
+def _char_copper_hoard(char):
+    try:
+        stats = json.loads(char.stats) if char.stats else {}
+    except Exception:
+        stats = {}
+    return (
+        int(stats.get("gold", 0) or 0) * COPPER_PER_GOLD
+        + int(stats.get("silver", 0) or 0) * COPPER_PER_SILVER
+        + int(stats.get("copper", 0) or 0)
+    )
+
+
+def _set_char_copper_hoard(char, total_copper):
+    try:
+        stats = json.loads(char.stats) if char.stats else {}
+    except Exception:
+        stats = {}
+    total_copper = max(0, int(total_copper))
+    g, rem = divmod(total_copper, COPPER_PER_GOLD)
+    s, c = divmod(rem, COPPER_PER_SILVER)
+    stats["gold"] = g
+    stats["silver"] = s
+    stats["copper"] = c
+    char.stats = json.dumps(stats)
+
+
+@bp_hoard.route("/api/hoard/currency", methods=["POST"])
+@login_required
+def transfer_currency():
+    data = request.get_json() or {}
+    character_id = data.get("character_id")
+    direction = data.get("direction")
+    if direction not in ("deposit", "withdraw"):
+        return jsonify({"error": "direction must be deposit or withdraw"}), 400
+    try:
+        amount = (
+            int(data.get("gold", 0) or 0) * COPPER_PER_GOLD
+            + int(data.get("silver", 0) or 0) * COPPER_PER_SILVER
+            + int(data.get("copper", 0) or 0)
+        )
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid amount"}), 400
+    if amount <= 0:
+        return jsonify({"error": "Amount must be positive"}), 400
+
+    char = db.session.get(Character, character_id)
+    if not char or char.user_id != current_user.id:
+        return jsonify({"error": "Character not found"}), 404
+
+    hoard = Hoard.get_or_create(current_user.id)
+    char_copper = _char_copper_hoard(char)
+    hoard_copper = hoard.copper or 0
+
+    if direction == "deposit":
+        if char_copper < amount:
+            return jsonify({"error": "Not enough coins on character"}), 400
+        _set_char_copper_hoard(char, char_copper - amount)
+        hoard.copper = hoard_copper + amount
+    else:  # withdraw
+        if hoard_copper < amount:
+            return jsonify({"error": "Not enough copper in hoard"}), 400
+        hoard.copper = hoard_copper - amount
+        _set_char_copper_hoard(char, char_copper + amount)
+
+    db.session.commit()
+    new_char_copper = _char_copper_hoard(char)
+    g, rem = divmod(new_char_copper, COPPER_PER_GOLD)
+    s, c = divmod(rem, COPPER_PER_SILVER)
+    return jsonify(
+        {
+            "success": True,
+            "hoard_copper": hoard.copper,
+            "hoard_copper_display": format_copper(hoard.copper),
+            "char_gold": g,
+            "char_silver": s,
+            "char_copper": c,
+            "char_display": format_copper(new_char_copper),
+        }
+    )
+
+
 @bp_hoard.route("/api/dungeon/loot-body", methods=["POST"])
 @login_required
 def loot_body():

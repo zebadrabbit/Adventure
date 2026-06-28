@@ -450,3 +450,62 @@ def _ensure_db_session_cleanup(test_app):
         db.session.rollback()
     except Exception:
         pass
+
+
+@pytest.fixture()
+def logged_in_user(client):
+    """Create and log in a user."""
+    import uuid
+    from tests.factories import create_user
+
+    user = create_user("test_user_" + uuid.uuid4().hex[:8])
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(user.id)
+        sess["user_id"] = user.id
+    return user
+
+
+@pytest.fixture()
+def test_character(logged_in_user):
+    """Create a basic test character with no coins."""
+    import json
+    import uuid
+    from tests.factories import create_character
+
+    char = create_character(logged_in_user, name="TestChar_" + uuid.uuid4().hex[:8], items=[])
+    # Ensure stats have no coins
+    stats = json.loads(char.stats)
+    stats.pop("gold", None)
+    stats.pop("silver", None)
+    stats.pop("copper", None)
+    char.stats = json.dumps(stats)
+    db.session.commit()
+    return char
+
+
+@pytest.fixture()
+def test_character_with_coins(logged_in_user):
+    """Create a test character with 2 gold, 0 silver, 0 copper."""
+    import json
+    import uuid
+    from tests.factories import create_character
+
+    char = create_character(logged_in_user, name="TestCharCoins_" + uuid.uuid4().hex[:8], items=[])
+    stats = json.loads(char.stats)
+    stats["gold"] = 2
+    stats["silver"] = 0
+    stats["copper"] = 0
+    char.stats = json.dumps(stats)
+    db.session.commit()
+    return char
+
+
+@pytest.fixture()
+def test_hoard_with_copper(logged_in_user):
+    """Create a hoard for the user with 5000 copper (50 silver)."""
+    from app.models.hoard import Hoard
+
+    hoard = Hoard.get_or_create(logged_in_user.id)
+    hoard.copper = 5000
+    db.session.commit()
+    return hoard
