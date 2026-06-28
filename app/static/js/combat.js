@@ -399,7 +399,8 @@
             if (activeContainer) {
                 activeContainer.appendChild(actionPanel);
             }
-            actionPanel.style.display = 'block';
+            actionPanel.classList.remove('d-none');
+            actionPanel.style.display = '';
 
             // Update action buttons
             actionPanel.querySelectorAll('button[data-action]').forEach(btn => {
@@ -440,7 +441,7 @@
 
             renderSkillButtons(actionPanel, activeCharId, canAct, state.version);
         } else if (actionPanel) {
-            actionPanel.style.display = 'none';
+            actionPanel.classList.add('d-none');
             const stale = actionPanel.querySelector('.skill-buttons-group');
             if (stale) stale.remove();
         }
