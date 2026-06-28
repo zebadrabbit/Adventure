@@ -1,0 +1,128 @@
+/* hoard-ui.css — Three-panel hoard screen */
+
+.hoard-layout {
+    display: flex;
+    gap: 0;
+    min-height: 420px;
+}
+
+/* Panel A: Character strip */
+.hoard-char-strip {
+    width: 48px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 4px;
+    border-right: 1px solid rgba(255,255,255,0.1);
+}
+
+.hoard-char-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: box-shadow 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.hoard-char-btn.active {
+    box-shadow: 0 0 0 2px var(--adv-primary, #7c3aed);
+}
+
+/* Panel B: Character detail (slide-in) */
+.hoard-char-detail {
+    width: 0;
+    overflow: hidden;
+    transition: width 0.2s ease;
+    border-right: 1px solid rgba(255,255,255,0.1);
+}
+
+.hoard-char-detail.open {
+    width: 300px;
+}
+
+.hoard-char-detail-inner {
+    width: 300px;
+    padding: 12px;
+}
+
+/* Currency row */
+.hoard-currency-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.hoard-currency-row .currency-dir-btn {
+    padding: 2px 8px;
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+
+.hoard-currency-row input[type="number"] {
+    width: 52px;
+    text-align: center;
+    padding: 2px 4px;
+    font-size: 0.85rem;
+}
+
+.hoard-currency-row .currency-label {
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.6);
+}
+
+/* Panel C: Vault */
+.hoard-vault {
+    flex: 1;
+    padding: 12px;
+    overflow-y: auto;
+}
+
+.hoard-vault-header {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 8px;
+}
+
+/* Item lists */
+.hoard-item-list {
+    min-height: 60px;
+    border: 2px dashed transparent;
+    border-radius: 6px;
+    transition: border-color 0.15s;
+}
+
+.hoard-item-list.drag-over {
+    border-color: var(--adv-primary, #7c3aed);
+    background: rgba(124, 58, 237, 0.05);
+}
+
+.hoard-item-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: grab;
+    user-select: none;
+    transition: background 0.1s;
+}
+
+.hoard-item-row:hover {
+    background: rgba(255,255,255,0.06);
+}
+
+.hoard-item-row.dragging {
+    opacity: 0.4;
+}

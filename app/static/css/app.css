@@ -27,6 +27,8 @@
      * If a removed style is reported, search original file notes above.
 --------------------------------------------------------------------*/
 
+@import url("hoard-ui.css");
+
 /* === 1. Cold Steel Theme ================================================ */
 :root {
   --adv-bg: var(--ui-bg);
