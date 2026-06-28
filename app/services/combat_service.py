@@ -626,8 +626,20 @@ def _check_end(session: CombatSession):
                             _append_log(session, "🎉 All bosses defeated! Extraction portal is now available!")
                     elif archetype == "Elite":
                         instance.elites_defeated += 1
+                        try:
+                            from app.services import quest_progress_service
+
+                            quest_progress_service.record_kill(session.user_id, is_elite=True)
+                        except Exception:
+                            pass
                     else:
                         instance.monsters_defeated += 1
+                        try:
+                            from app.services import quest_progress_service
+
+                            quest_progress_service.record_kill(session.user_id, is_elite=False)
+                        except Exception:
+                            pass
 
                     db.session.add(instance)
         except Exception as e:

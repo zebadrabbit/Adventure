@@ -134,6 +134,13 @@ def extract_party(
 
     db.session.commit()
 
+    try:
+        from app.services import quest_progress_service
+
+        quest_progress_service.record_run_complete(user_id, extracted=True)
+    except Exception:
+        pass
+
     result = {
         "extracted": [c.name for c in extracting_chars],
         "left_behind": [c.name for c in left_behind_chars],
