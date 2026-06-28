@@ -8,6 +8,7 @@ class EquipmentManager {
         this.character = null;
         this.draggedItem = null;
         this.comparisonTooltip = null;
+        this.modal = null;
         this.init();
     }
 
@@ -135,8 +136,10 @@ class EquipmentManager {
         this.render();
 
         // Show modal
-        const modal = new bootstrap.Modal(document.getElementById('equipment-enhanced-modal'));
-        modal.show();
+        if (!this.modal) {
+            this.modal = new bootstrap.Modal(document.getElementById('equipment-enhanced-modal'));
+        }
+        this.modal.show();
     }
 
     async loadCharacter(charId) {
