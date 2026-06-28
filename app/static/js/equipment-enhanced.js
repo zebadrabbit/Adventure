@@ -403,7 +403,7 @@ class EquipmentManager {
         const isInstance = item && typeof item === 'object' && item.uid;
         const body = isInstance
             ? { uid: item.uid }
-            : { item_slug: (typeof item === 'object' ? item.slug : item), slot: slot };
+            : { slug: (typeof item === 'object' ? item.slug : item), slot: slot };
         const response = await fetch(`/api/characters/${this.character.id}/equip`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
