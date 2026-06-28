@@ -55,6 +55,9 @@ class DungeonAffix(db.Model):
         player_damage_taken_multiplier: Damage taken scaling for players
         special_effect: JSON string for special mechanics
         color: Display color for UI highlighting
+        monster_count_multiplier: Multiplier for spawn count scaling
+        xp_multiplier: XP reward multiplier
+        threat_weight: Weight for difficulty/threat calculation
     """
 
     __tablename__ = "dungeon_affix"
@@ -69,6 +72,9 @@ class DungeonAffix(db.Model):
     player_damage_taken_multiplier = db.Column(db.Float, nullable=False, default=1.0)
     special_effect = db.Column(db.Text, nullable=True)  # JSON for complex effects
     color = db.Column(db.String(20), nullable=True)  # Hex color for UI
+    monster_count_multiplier = db.Column(db.Float, nullable=True, default=1.0)
+    xp_multiplier = db.Column(db.Float, nullable=True, default=1.0)
+    threat_weight = db.Column(db.Integer, nullable=True, default=1)
 
     def apply_to_monster_stats(self, stats: dict) -> dict:
         """Apply affix modifiers to monster stats."""
