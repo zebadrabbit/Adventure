@@ -327,6 +327,141 @@ def get_npc(slug):
     )
 
 
+# ── Daily / Weekly quests (user-scoped, auto-generated) ──────────────────
+
+
+@bp_quest.route("/api/quests/daily")
+@login_required
+def get_daily_quests():
+    from app.services.quest_generator import get_or_generate_daily
+
+    quests = get_or_generate_daily(current_user.id)
+    return jsonify({"quests": quests})
+
+
+@bp_quest.route("/api/quests/weekly")
+@login_required
+def get_weekly_quest():
+    from app.services.quest_generator import get_or_generate_weekly
+
+    quest = get_or_generate_weekly(current_user.id)
+    return jsonify({"quest": quest})
+
+
+@bp_quest.route("/api/quests/daily/claim", methods=["POST"])
+@login_required
+def claim_daily_quest():
+    data = request.get_json() or {}
+    quest_id = data.get("quest_id")
+    if not quest_id:
+        return jsonify({"error": "quest_id required"}), 400
+
+    from app.models.user_quest_pool import UserQuestPool
+    from app.services.quest_generator import period_key_daily
+
+    pool = UserQuestPool.get_or_none(current_user.id, "daily", period_key_daily())
+    if not pool:
+        return jsonify({"error": "No daily quests found"}), 404
+
+    quests = json.loads(pool.quests_json)
+    quest = next((q for q in quests if q["id"] == quest_id), None)
+    if not quest:
+        return jsonify({"error": "Quest not found"}), 404
+    if quest["status"] != "active" and quest["status"] != "complete":
+        return jsonify({"error": "Quest already claimed"}), 400
+    if quest.get("claimed_at"):
+        return jsonify({"error": "Quest already claimed"}), 400
+
+    obj = quest["objective"]
+    if obj.get("current", 0) < obj.get("target", 1):
+        return jsonify({"error": "Quest not complete yet"}), 400
+
+    rewards = _grant_daily_rewards(current_user.id, quest["rewards"])
+    quest["status"] = "claimed"
+    quest["claimed_at"] = datetime.utcnow().isoformat()
+    pool.quests_json = json.dumps(quests)
+    db.session.commit()
+
+    from app.services import quest_progress_service
+
+    quest_progress_service.increment_daily_completions(current_user.id)
+
+    return jsonify({"success": True, "rewards": rewards, "quest": quest})
+
+
+@bp_quest.route("/api/quests/weekly/claim", methods=["POST"])
+@login_required
+def claim_weekly_quest():
+    from app.models.user_quest_pool import UserQuestPool
+    from app.services.quest_generator import period_key_weekly
+
+    pool = UserQuestPool.get_or_none(current_user.id, "weekly", period_key_weekly())
+    if not pool:
+        return jsonify({"error": "No weekly quest found"}), 404
+
+    quests = json.loads(pool.quests_json)
+    if not quests:
+        return jsonify({"error": "Weekly quest not found"}), 404
+    quest = quests[0]
+
+    if quest.get("claimed_at"):
+        return jsonify({"error": "Weekly already claimed"}), 400
+
+    obj = quest["objective"]
+    if obj.get("current", 0) < obj.get("target", 10):
+        return jsonify({"error": "Weekly not complete yet"}), 400
+
+    rewards = _grant_daily_rewards(current_user.id, quest["rewards"])
+    quest["status"] = "claimed"
+    quest["claimed_at"] = datetime.utcnow().isoformat()
+    pool.quests_json = json.dumps(quests)
+    db.session.commit()
+
+    return jsonify({"success": True, "rewards": rewards, "quest": quest})
+
+
+def _grant_daily_rewards(user_id: int, rewards: dict) -> dict:
+    """Grant XP to all characters, potions+copper to hoard. Returns summary."""
+    from app.models.hoard import Hoard
+    from app.models.models import Character
+
+    granted = {}
+    chars = Character.query.filter_by(user_id=user_id).all()
+
+    # XP split across all characters
+    xp = int(rewards.get("xp", 0))
+    if xp and chars:
+        share = max(1, xp // len(chars))
+        for c in chars:
+            c.xp = (c.xp or 0) + share
+        granted["xp"] = xp
+
+    # Potions to hoard
+    hoard = Hoard.get_or_create(user_id)
+    inv = load_inventory(hoard.items_json)
+    potions_granted = []
+    for potion in rewards.get("potions", []):
+        slug = potion.get("slug")
+        qty = int(potion.get("qty", 1))
+        if slug:
+            add_item(inv, slug, qty)
+            potions_granted.append({"slug": slug, "qty": qty})
+    hoard.items_json = dump_inventory(inv)
+    granted["potions"] = potions_granted
+
+    # Bonus copper
+    copper = int(rewards.get("copper", 0))
+    if copper:
+        hoard.copper = (hoard.copper or 0) + copper
+        granted["copper"] = copper
+
+    # Gear roll (TODO: wire to loot generator when rewards.get("gear_roll") is True)
+    granted["gear_roll"] = rewards.get("gear_roll", False)
+
+    db.session.commit()
+    return granted
+
+
 def _serialize_quest(quest: QuestTemplate, progress: QuestProgress | None) -> dict:
     """Serialize quest template with optional progress data."""
     try:
