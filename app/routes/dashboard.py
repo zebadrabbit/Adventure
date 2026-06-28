@@ -186,6 +186,25 @@ def dashboard():
                 seed = seed or random.randint(1, 1_000_000)
                 from app.services.spawn_service import pick_monster_family
 
+                # Read difficulty and affix config from form
+                try:
+                    difficulty_tier = max(1, min(3, int(request.form.get("difficulty_tier", 1))))
+                except (ValueError, TypeError):
+                    difficulty_tier = 1
+
+                raw_affix_ids = request.form.get("affix_ids", "[]")
+                try:
+                    submitted_affixes = json.loads(raw_affix_ids)
+                    if not isinstance(submitted_affixes, list):
+                        submitted_affixes = []
+                except Exception:
+                    submitted_affixes = []
+
+                from app.models.dungeon_tier import DungeonAffix
+
+                valid_affix_ids = {a.affix_id for a in DungeonAffix.query.all()}
+                affix_ids = [a for a in submitted_affixes if a in valid_affix_ids]
+
                 instance = DungeonInstance(
                     user_id=current_user_id,
                     seed=seed,
@@ -193,7 +212,9 @@ def dashboard():
                     pos_y=0,
                     pos_z=0,
                     monster_family=pick_monster_family(seed),
+                    tier=difficulty_tier,
                 )
+                instance.set_affixes(affix_ids)
                 db.session.add(instance)
                 db.session.commit()
                 session["dungeon_instance_id"] = instance.id
