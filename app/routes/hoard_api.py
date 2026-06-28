@@ -7,7 +7,7 @@ from flask_login import current_user, login_required
 
 from app import db
 from app.economy import hoard_service
-from app.economy.currency import format_copper
+from app.economy.currency import COPPER_PER_GOLD, COPPER_PER_SILVER, format_copper
 from app.inventory.utils import load_inventory
 from app.models.hoard import Hoard
 from app.models.models import Character
@@ -20,13 +20,26 @@ bp_hoard = Blueprint("hoard_api", __name__)
 def get_hoard():
     hoard = Hoard.get_or_create(current_user.id)
     db.session.commit()
-    # Sum gold across the active session party (at-risk currency)
+    # Sum gold across the active session party; fall back to all owned chars
     party = session.get("party") or []
     party_ids = [p["id"] for p in party if isinstance(p, dict) and p.get("id")]
-    party_gold = 0
     if party_ids:
         chars = Character.query.filter(Character.id.in_(party_ids), Character.user_id == current_user.id).all()
-        party_gold = sum(c.gold or 0 for c in chars)
+    else:
+        chars = Character.query.filter_by(user_id=current_user.id).all()
+
+    def _char_copper(char):
+        try:
+            stats = json.loads(char.stats) if char.stats else {}
+        except Exception:
+            stats = {}
+        return (
+            int(stats.get("gold", 0) or 0) * COPPER_PER_GOLD
+            + int(stats.get("silver", 0) or 0) * COPPER_PER_SILVER
+            + int(stats.get("copper", 0) or 0)
+        )
+
+    party_gold = sum(_char_copper(c) for c in chars)
     hoard_copper = hoard.copper or 0
     return jsonify(
         {
@@ -61,6 +74,31 @@ def withdraw():
         return jsonify({"error": "Item not in hoard"}), 400
     db.session.commit()
     return jsonify({"success": True})
+
+
+@bp_hoard.route("/api/hoard/deposit-item", methods=["POST"])
+@login_required
+def deposit_item():
+    data = request.get_json() or {}
+    character_id = data.get("character_id")
+    slug = data.get("slug")
+    uid = data.get("uid")
+    if not character_id or not (slug or uid):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    char = db.session.get(Character, character_id)
+    if not char or char.user_id != current_user.id:
+        return jsonify({"error": "Character not found"}), 404
+
+    hoard = Hoard.get_or_create(current_user.id)
+    ok = hoard_service.deposit_from_character(hoard, char, slug=slug, uid=uid)
+    if not ok:
+        return jsonify({"error": "Item not in character bag"}), 400
+    db.session.commit()
+
+    char_bag = json.loads(char.items or "[]")
+    hoard_items = json.loads(hoard.items_json or "[]")
+    return jsonify({"success": True, "hoard_items": hoard_items, "char_bag": char_bag})
 
 
 @bp_hoard.route("/api/dungeon/loot-body", methods=["POST"])

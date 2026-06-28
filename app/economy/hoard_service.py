@@ -67,6 +67,33 @@ def withdraw_to_character(
     return True
 
 
+def deposit_from_character(
+    hoard: Hoard, character: Character, *, slug: str | None = None, uid: str | None = None
+) -> bool:
+    """Move one stack-unit (by slug) or one instance (by uid) from character bag into hoard.
+
+    Returns False if the item is not in the character's bag.
+    """
+    char_inv = _load(character.items)
+    hoard_inv = _load(hoard.items_json)
+
+    # Find the item in char bag
+    idx = None
+    if uid:
+        idx = next((i for i, e in enumerate(char_inv) if e.get("uid") == uid), None)
+    elif slug:
+        idx = next((i for i, e in enumerate(char_inv) if e.get("slug") == slug), None)
+
+    if idx is None:
+        return False
+
+    item = char_inv.pop(idx)
+    hoard_inv.append(item)
+    character.items = json.dumps(char_inv)
+    hoard.items_json = json.dumps(hoard_inv)
+    return True
+
+
 def pool_run_haul(hoard: Hoard, character: Character) -> dict:
     """Move a character's entire bag + run-purse into the hoard, then zero them.
 
