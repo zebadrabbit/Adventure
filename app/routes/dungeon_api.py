@@ -957,6 +957,35 @@ def admin_update_monster_ai_config():
     return jsonify({"config": updated, "updated_keys": list(data.keys())})
 
 
+@bp_dungeon.route("/api/dungeon/affixes")
+@login_required
+def get_affixes():
+    """Return all available dungeon affixes.
+
+    Response: [{affix_id, name, description, threat_weight, color, monster_hp_multiplier,
+                monster_damage_multiplier, monster_count_multiplier, xp_multiplier}, ...]
+    """
+    from app.models.dungeon_tier import DungeonAffix
+
+    affixes = DungeonAffix.query.all()
+    return jsonify(
+        [
+            {
+                "affix_id": a.affix_id,
+                "name": a.name,
+                "description": a.description,
+                "threat_weight": a.threat_weight,
+                "color": a.color or "#888",
+                "monster_hp_multiplier": a.monster_hp_multiplier,
+                "monster_damage_multiplier": a.monster_damage_multiplier,
+                "monster_count_multiplier": a.monster_count_multiplier,
+                "xp_multiplier": a.xp_multiplier,
+            }
+            for a in affixes
+        ]
+    )
+
+
 @bp_dungeon.route("/api/dungeon/combat/<int:combat_id>")
 @login_required
 def get_combat_session(combat_id: int):
