@@ -375,6 +375,40 @@
             </span>
         </div>
 
+        <!-- Difficulty selector -->
+        <div class="mb-3">
+          <div class="small text-muted mb-1">DIFFICULTY</div>
+          <div class="btn-group difficulty-btn-group" role="group">
+            <button type="button" class="btn btn-primary difficulty-btn active" data-tier="1">NORMAL</button>
+            <button type="button" class="btn btn-outline-secondary difficulty-btn" data-tier="2">
+              HEROIC <small class="d-block fs-heroic-note">+1 lvl &middot; &times;1.5 XP</small>
+            </button>
+            <button type="button" class="btn btn-outline-secondary difficulty-btn" data-tier="3">
+              MYTHIC <small class="d-block fs-heroic-note">+2 lvl &middot; &times;2.0 XP</small>
+            </button>
+          </div>
+        </div>
+
+        <!-- Affix picker -->
+        <div class="mb-3">
+          <div class="small text-muted mb-1">AFFIXES <span class="text-muted">(optional &mdash; stack for more challenge)</span></div>
+          <div class="affix-grid" id="affix-grid">
+            <div class="text-muted small">Loading affixes&hellip;</div>
+          </div>
+        </div>
+
+        <!-- Checklist rows for difficulty and affixes -->
+        <div class="quick-checks">
+          <span class="check-item ok">
+            <i class="bi bi-shield-fill text-info"></i>
+            <span id="dungeon-check-difficulty">Difficulty: Normal</span>
+          </span>
+          <span class="check-item ok">
+            <i class="bi bi-lightning-fill text-warning"></i>
+            <span id="dungeon-check-affixes"><span class="text-muted">No affixes selected</span></span>
+          </span>
+        </div>
+
         <!-- Seed widget -->
         <div class="mb-4">{{ seed_widget(dungeon_seed) }}</div>
 
@@ -382,6 +416,8 @@
         <div class="d-flex gap-3 align-items-center flex-wrap">
             <form method="POST" id="dungeon-enter-form">
                 <input type="hidden" name="form" value="start_adventure">
+                <input type="hidden" id="hidden-difficulty-tier" name="difficulty_tier" value="1">
+                <input type="hidden" id="hidden-affix-ids" name="affix_ids" value="[]">
                 {% for p in session.get('party', []) %}
                 <input type="hidden" name="party_ids" value="{{ p.id }}">
                 {% endfor %}
@@ -548,6 +584,7 @@
 <script src="{{ asset_url('js/hoard.js') }}"></script>
 <script src="{{ asset_url('js/seed-widget.js') }}"></script>
 <script src="{{ asset_url('js/dashboard-lobby.js') }}"></script>
+<script src="{{ asset_url('js/dungeon-config.js') }}"></script>
 <script src="{{ asset_url('js/character.js') }}"></script>
 <script src="{{ asset_url('js/dashboard-operative-cards.js') }}"></script>
 

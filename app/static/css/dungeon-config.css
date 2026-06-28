@@ -1,0 +1,63 @@
+/* dungeon-config.css — Difficulty selector and affix picker */
+
+.difficulty-btn-group .btn {
+    min-width: 90px;
+}
+
+.fs-heroic-note {
+    font-size: 0.65rem;
+}
+
+.affix-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.affix-card {
+    border: 2px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    user-select: none;
+}
+
+.affix-card:hover {
+    border-color: rgba(255,255,255,0.3);
+}
+
+.affix-card.selected {
+    border-color: var(--affix-color, #7c3aed);
+    background: rgba(124,58,237,0.08);
+}
+
+.affix-card-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.affix-card-desc {
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.6);
+    margin-top: 2px;
+}
+
+.affix-threat-badge {
+    font-size: 0.7rem;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+
+.threat-rating-display {
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.threat-calm        { color: #6c757d; }
+.threat-troubled    { color: #0dcaf0; }
+.threat-dire        { color: #ffc107; }
+.threat-harrowing   { color: #fd7e14; }
+.threat-catastrophic{ color: #dc3545; }
+.threat-doomed      { color: #6f42c1; }
