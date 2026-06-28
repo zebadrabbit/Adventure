@@ -8,11 +8,11 @@ hoard, character bags, and trading all speak the same shape:
 
 from __future__ import annotations
 
-import json
 from typing import List
 
 from app.inventory.utils import (
     add_item,
+    dump_inventory,
     find_instance,
     load_inventory,
     remove_instance,
@@ -22,19 +22,15 @@ from app.models.hoard import Hoard
 from app.models.models import Character
 
 
-def _load(raw: str | None) -> List[dict]:
-    return load_inventory(raw)
-
-
 def deposit_items(hoard: Hoard, entries: List[dict]) -> None:
     """Merge a list of canonical entries (stacks and/or instances) into the hoard."""
-    items = _load(hoard.items_json)
+    items = load_inventory(hoard.items_json)
     for entry in entries or []:
         if entry.get("uid"):
             items.append(entry)
         elif entry.get("slug"):
             add_item(items, entry["slug"], int(entry.get("qty", 1)))
-    hoard.items_json = json.dumps(items)
+    hoard.items_json = dump_inventory(items)
 
 
 def deposit_copper(hoard: Hoard, amount: int) -> None:
@@ -48,8 +44,8 @@ def withdraw_to_character(
 
     Returns False if the item is not in the hoard.
     """
-    hoard_items = _load(hoard.items_json)
-    bag = _load(character.items)
+    hoard_items = load_inventory(hoard.items_json)
+    bag = load_inventory(character.items)
     if uid:
         inst = find_instance(hoard_items, uid)
         if not inst:
@@ -62,8 +58,8 @@ def withdraw_to_character(
         add_item(bag, slug, 1)
     else:
         return False
-    hoard.items_json = json.dumps(hoard_items)
-    character.items = json.dumps(bag)
+    hoard.items_json = dump_inventory(hoard_items)
+    character.items = dump_inventory(bag)
     return True
 
 
@@ -74,8 +70,8 @@ def deposit_from_character(
 
     Returns False if the item is not in the character's bag.
     """
-    char_inv = _load(character.items)
-    hoard_inv = _load(hoard.items_json)
+    char_inv = load_inventory(character.items)
+    hoard_inv = load_inventory(hoard.items_json)
 
     # Find the item in char bag
     idx = None
@@ -89,8 +85,8 @@ def deposit_from_character(
 
     item = char_inv.pop(idx)
     hoard_inv.append(item)
-    character.items = json.dumps(char_inv)
-    hoard.items_json = json.dumps(hoard_inv)
+    character.items = dump_inventory(char_inv)
+    hoard.items_json = dump_inventory(hoard_inv)
     return True
 
 
@@ -99,7 +95,7 @@ def pool_run_haul(hoard: Hoard, character: Character) -> dict:
 
     Returns {"copper": int, "items": int} — what was moved, for caller-side reporting.
     """
-    bag = _load(character.items)
+    bag = load_inventory(character.items)
     copper = character.gold or 0
     deposit_items(hoard, bag)
     deposit_copper(hoard, copper)

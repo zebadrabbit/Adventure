@@ -96,8 +96,8 @@ def deposit_item():
         return jsonify({"error": "Item not in character bag"}), 400
     db.session.commit()
 
-    char_bag = json.loads(char.items or "[]")
-    hoard_items = json.loads(hoard.items_json or "[]")
+    char_bag = load_inventory(char.items)
+    hoard_items = load_inventory(hoard.items_json)
     return jsonify({"success": True, "hoard_items": hoard_items, "char_bag": char_bag})
 
 
