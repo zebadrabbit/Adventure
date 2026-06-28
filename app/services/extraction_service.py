@@ -141,6 +141,57 @@ def extract_party(
     except Exception:
         pass
 
+    # Achievement hooks — dungeon difficulty & affix milestones
+    # Wrapped in a nested savepoint so any DB error here cannot taint the
+    # outer transaction (extraction already committed above).
+    try:
+        from app.models.dungeon_tier import DungeonAffix as _Affix
+        from app.services.achievement_service import check_achievements as _check_ach
+
+        affix_ids = instance.get_affixes()
+        tier = instance.tier or 1
+
+        sp = db.session.begin_nested()
+        try:
+            weights = {a.affix_id: a.threat_weight for a in _Affix.query.all()}
+            sp.commit()
+        except Exception:
+            sp.rollback()
+            weights = {}
+
+        threat_score = sum(weights.get(a, 1) for a in affix_ids) + (tier - 1) * 2
+
+        # Each event_type maps to exactly one achievement slug; fire only when
+        # the condition holds so we don't unlock the wrong achievement.
+        _events = [
+            ("dungeon_heroic", tier >= 2),
+            ("dungeon_mythic", tier >= 3),
+            ("dungeon_first_affix", len(affix_ids) >= 1),
+            ("dungeon_triple_affix", len(affix_ids) >= 3),
+            ("dungeon_harrowing", threat_score >= 6),
+            ("dungeon_doomed", threat_score >= 15),
+            ("dungeon_mythic_multi_affix", tier >= 3 and len(affix_ids) >= 2),
+            ("dungeon_death_wish", "cursed" in affix_ids and "savage" in affix_ids),
+            ("dungeon_gold_rush", "gilded" in affix_ids and "swarming" in affix_ids),
+        ]
+
+        _base_data = {
+            "tier": tier,
+            "affix_ids": affix_ids,
+            "affix_count": len(affix_ids),
+            "threat_score": threat_score,
+            "count": 1,
+        }
+
+        for char in extracting_chars:
+            for event_type, condition in _events:
+                if condition:
+                    _check_ach(char.id, event_type, _base_data)
+    except Exception:
+        import logging as _logging
+
+        _logging.getLogger(__name__).warning("achievement hooks failed", exc_info=True)
+
     result = {
         "extracted": [c.name for c in extracting_chars],
         "left_behind": [c.name for c in left_behind_chars],

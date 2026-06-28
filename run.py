@@ -240,6 +240,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     seed_dungeon_parser.set_defaults(command="seed-dungeon-difficulty")
 
+    # seed-dungeon-achievements subcommand
+    seed_dungeon_ach_parser = subparsers.add_parser(
+        "seed-dungeon-achievements",
+        help="Seed dungeon difficulty/affix achievement records (idempotent).",
+        formatter_class=argparse.RawTextHelpFormatter,
+        description="Upsert 9 Achievement rows for dungeon difficulty and affix milestones.",
+    )
+    seed_dungeon_ach_parser.set_defaults(command="seed-dungeon-achievements")
+
     # import-items-csv
     import_items_parser = subparsers.add_parser(
         "import-items-csv",
@@ -421,6 +430,12 @@ def main(argv: list[str]) -> int:
         from app.seed_dungeon_difficulty import seed_dungeon_difficulty
 
         seed_dungeon_difficulty(verbose=True)
+        return 0
+
+    elif mode == "seed-dungeon-achievements":
+        from app.seed_dungeon_achievements import seed_dungeon_achievements
+
+        seed_dungeon_achievements(verbose=True)
         return 0
 
     elif mode == "import-items-csv":
