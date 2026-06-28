@@ -22,8 +22,8 @@ class EquipmentManager {
         const modalHTML = `
 <div class="modal fade" id="equipment-enhanced-modal" tabindex="-1">
     <div class="modal-dialog modal-xl modal-dialog-scrollable equipment-modal">
-        <div class="modal-content" style="background: linear-gradient(135deg, rgba(20,20,30,0.98), rgba(30,30,40,0.98)); border: 2px solid rgba(100,100,120,0.3);">
-            <div class="modal-header" style="border-bottom: 1px solid rgba(100,100,120,0.3);">
+        <div class="modal-content eq-modal-content">
+            <div class="modal-header eq-modal-header">
                 <h5 class="modal-title">
                     <i class="bi bi-person-gear me-2"></i>
                     <span id="eq-char-name">Character</span> - Equipment & Inventory
@@ -34,39 +34,80 @@ class EquipmentManager {
                 <div class="equipment-grid">
                     <!-- Left: Equipment Slots -->
                     <div class="equipment-slots">
-                        <h6 class="text-center mb-3" style="color: rgba(255,255,255,0.8); text-transform: uppercase; letter-spacing: 1px;">
+                        <h6 class="text-center mb-3 eq-panel-heading">
                             <i class="bi bi-shield-check me-2"></i>Equipped
                         </h6>
                         <div id="equipment-slots-list"></div>
-                        <div id="gear-bonus-summary" class="small text-info mt-2"></div>
-                        <div id="encumbrance-bar" class="mt-2"></div>
-                        <div class="stats-summary mt-3">
-                            <h6>Total Stats</h6>
-                            <div id="total-stats"></div>
+                    </div>
+
+                    <!-- Center: Character Portrait -->
+                    <div class="eq-portrait-panel">
+                        <div class="eq-class-header" id="eq-class-header">
+                            <span id="char-name-display"></span>
+                            <span class="eq-class-label" id="char-class-display"></span>
+                        </div>
+                        <div class="eq-portrait-body">
+                            <div id="eq-hp-bar-wrap" class="mb-2">
+                                <div class="d-flex justify-content-between small eq-bar-label">
+                                    <span><i class="bi bi-heart-fill text-danger me-1"></i>HP</span>
+                                    <span id="eq-hp-text"></span>
+                                </div>
+                                <div class="progress eq-progress-bar">
+                                    <div class="progress-bar bg-danger" id="eq-hp-bar" role="progressbar"></div>
+                                </div>
+                            </div>
+                            <div id="eq-mp-bar-wrap" class="mb-2">
+                                <div class="d-flex justify-content-between small eq-bar-label">
+                                    <span><i class="bi bi-lightning-charge-fill text-primary me-1"></i>MP</span>
+                                    <span id="eq-mp-text"></span>
+                                </div>
+                                <div class="progress eq-progress-bar">
+                                    <div class="progress-bar bg-primary" id="eq-mp-bar" role="progressbar"></div>
+                                </div>
+                            </div>
+                            <div id="eq-xp-bar-wrap" class="mb-3">
+                                <div class="d-flex justify-content-between small eq-bar-label">
+                                    <span><i class="bi bi-star-fill text-warning me-1"></i>XP</span>
+                                    <span id="eq-xp-text"></span>
+                                </div>
+                                <div class="progress eq-progress-bar">
+                                    <div class="progress-bar eq-xp-fill" id="eq-xp-bar" role="progressbar"></div>
+                                </div>
+                            </div>
+                            <div id="gear-bonus-summary" class="small text-info mb-2"></div>
+                            <div id="encumbrance-bar" class="mb-3"></div>
+                            <div class="eq-stat-grid">
+                                <div class="eq-stat-cell" id="eq-stat-atk">
+                                    <div class="eq-stat-label"><i class="bi bi-sword text-warning"></i> ATK</div>
+                                    <div class="eq-stat-value" id="eq-val-atk">—</div>
+                                </div>
+                                <div class="eq-stat-cell" id="eq-stat-def">
+                                    <div class="eq-stat-label"><i class="bi bi-shield-fill text-info"></i> DEF</div>
+                                    <div class="eq-stat-value" id="eq-val-def">—</div>
+                                </div>
+                                <div class="eq-stat-cell" id="eq-stat-hp">
+                                    <div class="eq-stat-label"><i class="bi bi-heart-fill text-danger"></i> HP</div>
+                                    <div class="eq-stat-value" id="eq-val-hp">—</div>
+                                </div>
+                                <div class="eq-stat-cell" id="eq-stat-mp">
+                                    <div class="eq-stat-label"><i class="bi bi-lightning-charge-fill text-primary"></i> MP</div>
+                                    <div class="eq-stat-value" id="eq-val-mp">—</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Center: Paper Doll -->
-                    <div class="paper-doll">
-                        <h6 class="text-center mb-3" style="color: rgba(255,255,255,0.8); text-transform: uppercase; letter-spacing: 1px;">
-                            <span id="char-level-display">Lv 1</span>  <span id="char-class-display">Adventurer</span>
-                        </h6>
-                        <div class="doll-figure" id="paper-doll-figure">
-                            <!-- Visual slots positioned absolutely -->
-                        </div>
-                    </div>
-
-                    <!-- Right: Inventory Bag -->
+                    <!-- Right: Item Grid -->
                     <div class="inventory-bag">
-                        <h6 class="text-center mb-3" style="color: rgba(255,255,255,0.8); text-transform: uppercase; letter-spacing: 1px;">
+                        <h6 class="text-center mb-2 eq-panel-heading">
                             <i class="bi bi-backpack me-2"></i>Inventory
-                            <span class="badge bg-secondary" id="bag-count">0/50</span>
+                            <span class="badge bg-secondary ms-1" id="bag-count">0/20</span>
                         </h6>
                         <div id="inventory-items-list"></div>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer" style="border-top: 1px solid rgba(100,100,120,0.3);">
+            <div class="modal-footer eq-modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
@@ -107,22 +148,17 @@ class EquipmentManager {
     render() {
         if (!this.character) return;
 
-        // Update header
+        // Update header title
         document.getElementById('eq-char-name').textContent = this.character.name;
-        document.getElementById('char-level-display').textContent = `Lv ${this.character.level}`;
-        document.getElementById('char-class-display').textContent = this.character.char_class || 'Adventurer';
 
         // Render equipment slots
         this.renderEquipmentSlots();
 
-        // Render paper doll
-        this.renderPaperDoll();
+        // Render portrait panel (replaces paper doll + total stats)
+        this.renderPortrait();
 
-        // Render inventory
+        // Render inventory grid
         this.renderInventory();
-
-        // Render total stats
-        this.renderTotalStats();
     }
 
     renderEquipmentSlots() {
@@ -167,98 +203,51 @@ class EquipmentManager {
     </div>
     <div class="slot-info">
         <div class="slot-label">${slotLabel}</div>
-        <div class="slot-item-name" style="color: rgba(255,255,255,0.4); font-style: italic;">Empty</div>
+        <div class="slot-item-name eq-slot-empty">Empty</div>
     </div>
 </div>`;
         }
     }
 
-    renderPaperDoll() {
-        const slots = ['head', 'amulet', 'chest', 'weapon', 'offhand', 'gloves', 'ring1', 'ring2', 'legs', 'boots'];
-        const gear = this.character.gear || {};
-
-        const html = slots.map(slot => {
-            const hasItem = !!gear[slot];
-            const slotIcon = this.getSlotIcon(slot);
-            const equippedClass = hasItem ? 'equipped' : '';
-
-            return `<div class="doll-slot ${equippedClass}" data-slot="${slot}" droppable="true" title="${this.getSlotLabel(slot)}">${slotIcon}</div>`;
-        }).join('');
-
-        document.getElementById('paper-doll-figure').innerHTML = html;
-
-        // Attach drag-drop handlers
-        this.attachSlotHandlers();
-    }
-
-    renderInventory() {
-        const bag = this.character.bag || [];
-        document.getElementById('bag-count').textContent = `${bag.length}/50`;
-
-        if (bag.length === 0) {
-            document.getElementById('inventory-items-list').innerHTML = `
-                <div style="text-align: center; padding: 3rem; color: rgba(255,255,255,0.4);">
-                    <i class="bi bi-inbox" style="font-size: 3rem; margin-bottom: 1rem;"></i>
-                    <div>No items in inventory</div>
-                </div>`;
-            return;
-        }
-
-        const html = bag.map((item, index) => this.createBagItemHTML(item, index)).join('');
-        document.getElementById('inventory-items-list').innerHTML = html;
-
-        // Attach drag handlers
-        this.attachItemDragHandlers();
-    }
-
-    createBagItemHTML(item, index) {
-        const rarityClass = `rarity-${item.rarity || 'common'}`;
-        // Procedural gear instances expose `slot`/`affixes` instead of a catalog
-        // `type`/`slug`; fall back gracefully so they render in the bag too.
-        const typeLabel = item.type || item.slot || 'gear';
-        const icon = this.getItemIcon(typeLabel);
-        const stats = Array.isArray(item.affixes) && item.affixes.length
-            ? item.affixes.map(a => `+${a.val} ${String(a.stat).toUpperCase()}`).join(', ')
-            : this.getItemStats(item);
-
-        return `
-<div class="bag-item ${rarityClass}" draggable="true" data-item-index="${index}" data-item-slug="${this.escapeHTML(item.slug || '')}" data-item-uid="${this.escapeHTML(item.uid || '')}">
-    <div class="item-icon" style="color: currentColor;">
-        ${icon}
-    </div>
-    <div class="item-details">
-        <div>
-            <span class="item-name">${this.escapeHTML(item.name)}</span>
-            <span class="item-type-badge">${this.escapeHTML(typeLabel)}</span>
-        </div>
-        <div class="item-stats-preview">${stats}</div>
-    </div>
-</div>`;
-    }
-
-    renderTotalStats() {
+    renderPortrait() {
+        const ch = this.character;
         const stats = this.calculateTotalStats();
-        const html = `
-            <div class="stat-item">
-                <span class="stat-label"><i class="bi bi-heart-fill text-danger me-2"></i>HP</span>
-                <span class="stat-value">${stats.hp}</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label"><i class="bi bi-lightning-charge-fill text-primary me-2"></i>MP</span>
-                <span class="stat-value">${stats.mana}</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label"><i class="bi bi-sword text-warning me-2"></i>Attack</span>
-                <span class="stat-value">${stats.attack} ${stats.bonus_attack ? `<span class="stat-bonus">+${stats.bonus_attack}</span>` : ''}</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label"><i class="bi bi-shield-fill text-info me-2"></i>Defense</span>
-                <span class="stat-value">${stats.defense} ${stats.bonus_defense ? `<span class="stat-bonus">+${stats.bonus_defense}</span>` : ''}</span>
-            </div>
-        `;
-        document.getElementById('total-stats').innerHTML = html;
-        this.renderEncumbrance();
+        const cls = (ch.char_class || ch.class_name || 'adventurer').toLowerCase();
+
+        // Class header
+        const header = document.getElementById('eq-class-header');
+        header.className = `eq-class-header eq-class-bg-${cls}`;
+        document.getElementById('char-name-display').textContent = ch.name;
+        document.getElementById('char-class-display').textContent =
+            `Lv ${ch.level || stats.level || 1} ${ch.char_class || ch.class_name || 'Adventurer'}`;
+
+        // HP bar
+        const hp = stats.hp, maxHp = stats.max_hp || 1;
+        const hpPct = Math.min(100, Math.round((hp / maxHp) * 100));
+        document.getElementById('eq-hp-text').textContent = `${hp} / ${maxHp}`;
+        document.getElementById('eq-hp-bar').style.width = `${hpPct}%`;
+
+        // MP bar
+        const mp = stats.mana, maxMp = stats.max_mana || 1;
+        const mpPct = Math.min(100, Math.round((mp / maxMp) * 100));
+        document.getElementById('eq-mp-text').textContent = `${mp} / ${maxMp}`;
+        document.getElementById('eq-mp-bar').style.width = `${mpPct}%`;
+
+        // XP bar
+        const xp = stats.xp, xpNext = stats.xp_to_next || 100;
+        const xpPct = Math.min(100, Math.round((xp / xpNext) * 100));
+        document.getElementById('eq-xp-text').textContent = `${xp} / ${xpNext}`;
+        document.getElementById('eq-xp-bar').style.width = `${xpPct}%`;
+
+        // Stat grid
+        document.getElementById('eq-val-atk').textContent = stats.attack;
+        document.getElementById('eq-val-def').textContent = stats.defense;
+        document.getElementById('eq-val-hp').textContent = stats.max_hp;
+        document.getElementById('eq-val-mp').textContent = stats.max_mana;
+
+        // Gear bonus + encumbrance (moved here from left col)
         this.renderGearBonus();
+        this.renderEncumbrance();
     }
 
     renderEncumbrance() {
@@ -275,11 +264,11 @@ class EquipmentManager {
         const statusLabel = enc.status === 'blocked' ? 'Overloaded — cannot carry more' : (enc.status === 'encumbered' ? 'Encumbered' : '');
         const penaltyNote = (enc.status !== 'normal' && enc.dex_penalty) ? ` (-${enc.dex_penalty} DEX)` : '';
         container.innerHTML = `
-            <div class="d-flex justify-content-between small" style="color: rgba(255,255,255,0.8);">
+            <div class="d-flex justify-content-between small eq-bar-label">
                 <span>Carry Weight</span>
                 <span>${enc.weight.toFixed(1)} / ${enc.capacity.toFixed(1)}</span>
             </div>
-            <div class="progress" style="height:6px;">
+            <div class="progress eq-progress-bar">
                 <div class="progress-bar ${barClass}" style="width:${pct}%"></div>
             </div>
             ${statusLabel ? `<div class="small ${textClass} mt-1">${statusLabel}${penaltyNote}</div>` : ''}
@@ -311,9 +300,47 @@ class EquipmentManager {
         container.innerHTML = parts.length ? `Gear bonus: ${this.escapeHTML(parts.join(', '))}` : '';
     }
 
+    renderInventory() {
+        const bag = this.character.bag || [];
+        const totalSlots = Math.max(20, bag.length + 4);
+        document.getElementById('bag-count').textContent = `${bag.length} / ${totalSlots}`;
+
+        // Build grid cells
+        const cells = [];
+        bag.forEach((item, index) => {
+            const rarityClass = `rarity-${item.rarity || 'common'}`;
+            const typeLabel = item.type || item.slot || 'gear';
+            const icon = this.getItemIcon(typeLabel);
+            const qtyBadge = (item.qty && item.qty > 1)
+                ? `<span class="cell-qty">${item.qty}</span>`
+                : '';
+
+            cells.push(`
+<div class="bag-grid-cell ${rarityClass}" draggable="true"
+     data-item-index="${index}"
+     data-item-slug="${this.escapeHTML(item.slug || '')}"
+     data-item-uid="${this.escapeHTML(item.uid || '')}"
+     title="${this.escapeHTML(item.name)}">
+    ${icon}
+    ${qtyBadge}
+</div>`);
+        });
+
+        // Empty cells
+        for (let i = bag.length; i < totalSlots; i++) {
+            cells.push(`<div class="bag-grid-cell empty"></div>`);
+        }
+
+        document.getElementById('inventory-items-list').innerHTML =
+            `<div class="bag-grid">${cells.join('')}</div>`;
+
+        // Attach drag + tooltip handlers
+        this.attachItemDragHandlers();
+    }
+
     // Drag-and-drop handlers
     attachSlotHandlers() {
-        document.querySelectorAll('.equipment-slot, .doll-slot').forEach(slot => {
+        document.querySelectorAll('.equipment-slot').forEach(slot => {
             slot.addEventListener('dragover', (e) => this.onSlotDragOver(e));
             slot.addEventListener('dragleave', (e) => this.onSlotDragLeave(e));
             slot.addEventListener('drop', (e) => this.onSlotDrop(e));
@@ -321,13 +348,13 @@ class EquipmentManager {
     }
 
     attachItemDragHandlers() {
-        document.querySelectorAll('.bag-item[draggable="true"]').forEach(item => {
-            item.addEventListener('dragstart', (e) => this.onItemDragStart(e));
-            item.addEventListener('dragend', (e) => this.onItemDragEnd(e));
+        document.querySelectorAll('.bag-grid-cell[draggable="true"]').forEach(cell => {
+            cell.addEventListener('dragstart', (e) => this.onItemDragStart(e));
+            cell.addEventListener('dragend', (e) => this.onItemDragEnd(e));
 
             // Attach hover for comparison tooltip
-            item.addEventListener('mouseenter', (e) => this.showComparisonTooltip(e));
-            item.addEventListener('mouseleave', (e) => this.hideComparisonTooltip());
+            cell.addEventListener('mouseenter', (e) => this.showComparisonTooltip(e));
+            cell.addEventListener('mouseleave', () => this.hideComparisonTooltip());
         });
     }
 
@@ -400,6 +427,7 @@ class EquipmentManager {
     showComparisonTooltip(e) {
         const itemIndex = parseInt(e.currentTarget.dataset.itemIndex);
         const item = this.character.bag[itemIndex];
+        if (!item) return;
         const slot = this.getSlotForItemType(item.type);
         const equipped = this.character.gear?.[slot];
 
@@ -428,7 +456,7 @@ class EquipmentManager {
         let html = `
             <div class="tooltip-item-header">
                 <div class="tooltip-item-name ${rarityClass}">${this.escapeHTML(item.name)}</div>
-                <div class="tooltip-item-type">${this.escapeHTML(item.type)}</div>
+                <div class="tooltip-item-type">${this.escapeHTML(item.type || item.slot || '')}</div>
             </div>
             <div class="tooltip-stats">
                 ${this.renderStatsHTML(itemStats)}
@@ -488,8 +516,10 @@ class EquipmentManager {
             legs: 'Legs',
             boots: 'Boots',
             gloves: 'Gloves',
+            hands: 'Hands',
             ring1: 'Ring 1',
             ring2: 'Ring 2',
+            ring: 'Ring',
             amulet: 'Amulet'
         };
         return labels[slot] || slot;
@@ -504,8 +534,10 @@ class EquipmentManager {
             legs: '<i class="bi bi-dash-lg"></i>',
             boots: '<i class="bi bi-box"></i>',
             gloves: '<i class="bi bi-hand-index"></i>',
+            hands: '<i class="bi bi-hand-index"></i>',
             ring1: '<i class="bi bi-circle"></i>',
             ring2: '<i class="bi bi-circle"></i>',
+            ring: '<i class="bi bi-circle"></i>',
             amulet: '<i class="bi bi-gem"></i>'
         };
         return icons[slot] || '<i class="bi bi-box"></i>';
@@ -531,7 +563,9 @@ class EquipmentManager {
             shield: 'offhand',
             boots: 'boots',
             gloves: 'gloves',
-            ring: 'ring1',
+            hands: 'hands',
+            ring: 'ring',
+            ring1: 'ring1',
             amulet: 'amulet',
             legs: 'legs'
         };
@@ -539,7 +573,6 @@ class EquipmentManager {
     }
 
     getItemStats(item) {
-        // Placeholder - would parse actual item stats
         if (item.level) {
             return `Level ${item.level}`;
         }
@@ -547,7 +580,6 @@ class EquipmentManager {
     }
 
     parseItemStats(item) {
-        // Placeholder - would parse from item stats JSON
         return {
             attack: item.attack || 0,
             defense: item.defense || 0
@@ -577,14 +609,18 @@ class EquipmentManager {
     }
 
     calculateTotalStats() {
-        // Placeholder - would calculate from character + gear
+        // Read directly from the character stats returned by the API
+        const s = (this.character && this.character.stats) || {};
         return {
-            hp: 100,
-            mana: 50,
-            attack: 12,
-            defense: 8,
-            bonus_attack: 5,
-            bonus_defense: 3
+            hp:        s.hp        || 0,
+            max_hp:    s.max_hp    || 0,
+            mana:      s.mana      || 0,
+            max_mana:  s.max_mana  || 0,
+            attack:    s.attack    || 0,
+            defense:   s.defense   || 0,
+            level:     s.level     || this.character.level || 1,
+            xp:        s.xp        || 0,
+            xp_to_next: s.xp_to_next || 100
         };
     }
 

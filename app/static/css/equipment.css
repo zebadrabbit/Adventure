@@ -5,11 +5,30 @@
     max-width: 1200px;
 }
 
+.eq-modal-content {
+    background: linear-gradient(135deg, rgba(20,20,30,0.98), rgba(30,30,40,0.98));
+    border: 2px solid rgba(100,100,120,0.3);
+}
+
+.eq-modal-header {
+    border-bottom: 1px solid rgba(100,100,120,0.3);
+}
+
+.eq-modal-footer {
+    border-top: 1px solid rgba(100,100,120,0.3);
+}
+
 .equipment-grid {
     display: grid;
-    grid-template-columns: 1fr 2fr 1fr;
+    grid-template-columns: 300px 1fr 1fr;
     gap: 2rem;
     min-height: 600px;
+}
+
+.eq-panel-heading {
+    color: rgba(255,255,255,0.8);
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 /* Equipment Slots */
@@ -53,15 +72,8 @@
 }
 
 @keyframes slotPulse {
-
-    0%,
-    100% {
-        transform: scale(1);
-    }
-
-    50% {
-        transform: scale(1.02);
-    }
+    0%, 100% { transform: scale(1); }
+    50%       { transform: scale(1.02); }
 }
 
 .slot-icon {
@@ -102,6 +114,11 @@
     text-overflow: ellipsis;
 }
 
+.slot-item-name.eq-slot-empty {
+    color: rgba(255,255,255,0.4);
+    font-style: italic;
+}
+
 .slot-item-stats {
     font-size: 0.75rem;
     color: rgba(255, 255, 255, 0.6);
@@ -118,113 +135,110 @@
 }
 
 /* Rarity Colors — must match app/loot/data/rarities.py */
-.rarity-common {
-    color: #9d9d9d;
-}
+.rarity-common    { color: #9d9d9d; }
+.rarity-uncommon  { color: #1eff00; }
+.rarity-rare      { color: #0070dd; }
+.rarity-epic      { color: #a335ee; }
+.rarity-legendary { color: #ff8000; }
+.rarity-mythic    { color: #e6cc80; }
 
-.rarity-uncommon {
-    color: #1eff00;
-}
+/* Rarity border colours for bag grid cells */
+.bag-grid-cell.rarity-common    { border-color: #9d9d9d; }
+.bag-grid-cell.rarity-uncommon  { border-color: #1eff00; }
+.bag-grid-cell.rarity-rare      { border-color: #0070dd; }
+.bag-grid-cell.rarity-epic      { border-color: #a335ee; }
+.bag-grid-cell.rarity-legendary { border-color: #ff8000; }
+.bag-grid-cell.rarity-mythic    { border-color: #e6cc80; }
 
-.rarity-rare {
-    color: #0070dd;
-}
-
-.rarity-epic {
-    color: #a335ee;
-}
-
-.rarity-legendary {
-    color: #ff8000;
-}
-
-.rarity-mythic {
-    color: #e6cc80;
-}
-
-/* Character Paper Doll */
-.paper-doll {
+/* Portrait Panel (center column) */
+.eq-portrait-panel {
     background: linear-gradient(135deg, rgba(40, 40, 50, 0.95), rgba(30, 30, 40, 0.95));
     border-radius: 12px;
-    padding: 2rem;
     border: 1px solid rgba(100, 100, 120, 0.3);
-    position: relative;
-}
-
-.doll-figure {
-    width: 200px;
-    height: 350px;
-    margin: 0 auto;
-    position: relative;
-    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 350"><circle cx="100" cy="50" r="30" fill="rgba(255,255,255,0.1)"/><rect x="75" y="85" width="50" height="80" rx="8" fill="rgba(255,255,255,0.1)"/><rect x="50" y="100" width="25" height="60" rx="6" fill="rgba(255,255,255,0.05)"/><rect x="125" y="100" width="25" height="60" rx="6" fill="rgba(255,255,255,0.05)"/><rect x="75" y="170" width="20" height="90" rx="6" fill="rgba(255,255,255,0.08)"/><rect x="105" y="170" width="20" height="90" rx="6" fill="rgba(255,255,255,0.08)"/></svg>') center/contain no-repeat;
-}
-
-.doll-slot {
-    position: absolute;
-    width: 40px;
-    height: 40px;
-    background: rgba(100, 180, 255, 0.15);
-    border: 2px solid rgba(100, 180, 255, 0.3);
-    border-radius: 8px;
+    overflow: hidden;
     display: flex;
+    flex-direction: column;
+}
+
+.eq-class-header {
+    padding: 0.75rem 1rem;
+    display: flex;
+    justify-content: space-between;
     align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    cursor: pointer;
-    transition: all 0.2s;
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: 0.5px;
+    /* default fallback */
+    background: rgba(80, 80, 100, 0.6);
+    color: #fff;
 }
 
-.doll-slot:hover {
-    background: rgba(100, 180, 255, 0.3);
-    border-color: rgba(100, 180, 255, 0.6);
-    transform: scale(1.1);
+/* Per-class header colours (CSS vars fallback to manual values) */
+.eq-class-bg-fighter  { background: var(--class-fighter-bg,  #7c2d12); color: var(--class-fighter-fg,  #fed7aa); }
+.eq-class-bg-mage     { background: var(--class-mage-bg,     #1e1b4b); color: var(--class-mage-fg,     #c4b5fd); }
+.eq-class-bg-rogue    { background: var(--class-rogue-bg,    #111827); color: var(--class-rogue-fg,     #6ee7b7); }
+.eq-class-bg-cleric   { background: var(--class-cleric-bg,   #713f12); color: var(--class-cleric-fg,    #fef08a); }
+.eq-class-bg-ranger   { background: var(--class-ranger-bg,   #14532d); color: var(--class-ranger-fg,    #bbf7d0); }
+.eq-class-bg-paladin  { background: var(--class-paladin-bg,  #312e81); color: var(--class-paladin-fg,   #e9d5ff); }
+.eq-class-bg-warlock  { background: var(--class-warlock-bg,  #4c0519); color: var(--class-warlock-fg,   #fda4af); }
+.eq-class-bg-bard     { background: var(--class-bard-bg,     #4a1d96); color: var(--class-bard-fg,      #fde68a); }
+.eq-class-bg-adventurer { background: rgba(80,80,100,0.6); color: #fff; }
+
+.eq-class-label {
+    font-size: 0.75rem;
+    opacity: 0.85;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
-.doll-slot.equipped {
-    background: rgba(100, 180, 255, 0.4);
-    border-color: rgba(100, 180, 255, 0.8);
-    box-shadow: 0 0 12px rgba(100, 180, 255, 0.5);
+.eq-portrait-body {
+    padding: 1rem;
+    flex: 1;
+    overflow-y: auto;
 }
 
-/* Slot positions on paper doll */
-.doll-slot[data-slot="head"] {
-    top: 10px;
-    left: 80px;
+.eq-bar-label {
+    color: rgba(255,255,255,0.8);
+    margin-bottom: 2px;
 }
 
-.doll-slot[data-slot="amulet"] {
-    top: 55px;
-    left: 80px;
+.eq-progress-bar {
+    height: 8px;
+    background: rgba(100,100,120,0.3);
 }
 
-.doll-slot[data-slot="chest"] {
-    top: 100px;
-    left: 80px;
+.eq-xp-fill {
+    background: linear-gradient(90deg, #7c3aed, #a78bfa);
 }
 
-.doll-slot[data-slot="weapon"] {
-    top: 120px;
-    left: 10px;
+/* Stat grid (2×2) */
+.eq-stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
 }
 
-.doll-slot[data-slot="offhand"] {
-    top: 120px;
-    left: 150px;
+.eq-stat-cell {
+    background: rgba(40, 40, 50, 0.8);
+    border: 1px solid rgba(80, 80, 100, 0.4);
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    text-align: center;
 }
 
-.doll-slot[data-slot="hands"] {
-    top: 160px;
-    left: 30px;
+.eq-stat-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 2px;
 }
 
-.doll-slot[data-slot="ring"] {
-    top: 160px;
-    left: 130px;
-}
-
-.doll-slot[data-slot="feet"] {
-    top: 240px;
-    left: 80px;
+.eq-stat-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #64b4ff;
 }
 
 /* Inventory Bag */
@@ -237,85 +251,57 @@
     overflow-y: auto;
 }
 
-.bag-item {
+/* MMO-style item grid */
+.bag-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 48px);
+    gap: 4px;
+}
+
+.bag-grid-cell {
+    width: 48px;
+    height: 48px;
     background: rgba(40, 40, 50, 0.8);
     border: 2px solid rgba(80, 80, 100, 0.5);
-    border-radius: 8px;
-    padding: 0.75rem 1rem;
-    margin-bottom: 0.5rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    cursor: grab;
-    transition: all 0.2s;
-}
-
-.bag-item:hover {
-    background: rgba(50, 50, 60, 0.9);
-    border-color: rgba(120, 120, 150, 0.7);
-    transform: translateX(-4px);
-}
-
-.bag-item[draggable="true"]:active {
-    cursor: grabbing;
-    opacity: 0.6;
-}
-
-.item-icon {
-    width: 40px;
-    height: 40px;
-    background: radial-gradient(circle, rgba(100, 100, 120, 0.4), transparent);
     border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 20px;
-    flex-shrink: 0;
     position: relative;
+    cursor: grab;
+    transition: transform 0.15s, background 0.15s;
 }
 
-.item-icon::after {
-    content: '';
+.bag-grid-cell:not(.empty):hover {
+    background: rgba(60, 60, 80, 0.95);
+    transform: scale(1.08);
+}
+
+.bag-grid-cell[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+.bag-grid-cell.empty {
+    border-style: dotted;
+    border-color: rgba(80, 80, 100, 0.25);
+    background: rgba(20, 20, 30, 0.4);
+    cursor: default;
+}
+
+/* Quantity badge (bottom-right corner) */
+.cell-qty {
     position: absolute;
-    inset: -2px;
-    border-radius: 6px;
-    padding: 2px;
-    background: linear-gradient(135deg, currentColor, transparent);
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask-composite: exclude;
-    opacity: 0.4;
-}
-
-.item-details {
-    flex: 1;
-    min-width: 0;
-}
-
-.item-name {
-    font-size: 0.9rem;
-    font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.item-type-badge {
-    display: inline-block;
-    font-size: 0.65rem;
-    padding: 2px 6px;
-    background: rgba(100, 100, 120, 0.3);
-    border-radius: 4px;
-    margin-left: 0.5rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.item-stats-preview {
-    font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.5);
-    margin-top: 2px;
+    bottom: 2px;
+    right: 3px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(0,0,0,0.6);
+    border-radius: 3px;
+    padding: 0 3px;
+    line-height: 1.4;
+    pointer-events: none;
 }
 
 /* Item Comparison Tooltip */
@@ -334,15 +320,8 @@
 }
 
 @keyframes tooltipFadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(-10px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
 .tooltip-item-header {
@@ -375,17 +354,9 @@
     font-size: 0.85rem;
 }
 
-.stat-positive {
-    color: #4ade80;
-}
-
-.stat-negative {
-    color: #ef4444;
-}
-
-.stat-neutral {
-    color: rgba(255, 255, 255, 0.7);
-}
+.stat-positive { color: #4ade80; }
+.stat-negative { color: #ef4444; }
+.stat-neutral  { color: rgba(255, 255, 255, 0.7); }
 
 .tooltip-comparison {
     border-top: 1px solid rgba(100, 100, 120, 0.3);
@@ -406,13 +377,8 @@
     margin-left: 0.5rem;
 }
 
-.comparison-diff.better {
-    color: #4ade80;
-}
-
-.comparison-diff.worse {
-    color: #ef4444;
-}
+.comparison-diff.better { color: #4ade80; }
+.comparison-diff.worse  { color: #ef4444; }
 
 .tooltip-description {
     font-size: 0.8rem;
@@ -421,6 +387,12 @@
     margin-top: 0.75rem;
     padding-top: 0.75rem;
     border-top: 1px solid rgba(100, 100, 120, 0.2);
+}
+
+.tooltip-affixes {
+    font-size: 0.8rem;
+    margin-top: 0.5rem;
+    opacity: 0.9;
 }
 
 /* Set Bonus Display */
@@ -470,34 +442,11 @@
     transition: width 0.3s ease, background-color 0.3s ease;
 }
 
-.durability-fill.high {
-    background: linear-gradient(90deg, #4ade80, #22c55e);
-}
+.durability-fill.high   { background: linear-gradient(90deg, #4ade80, #22c55e); }
+.durability-fill.medium { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+.durability-fill.low    { background: linear-gradient(90deg, #ef4444, #dc2626); }
 
-.durability-fill.medium {
-    background: linear-gradient(90deg, #fbbf24, #f59e0b);
-}
-
-.durability-fill.low {
-    background: linear-gradient(90deg, #ef4444, #dc2626);
-}
-
-/* Character Stats Summary */
-.stats-summary {
-    background: rgba(40, 40, 50, 0.6);
-    border-radius: 8px;
-    padding: 1rem;
-    margin-top: 1rem;
-}
-
-.stats-summary h6 {
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: rgba(255, 255, 255, 0.5);
-    margin-bottom: 0.75rem;
-}
-
+/* Stat display (kept for any legacy uses) */
 .stat-item {
     display: flex;
     justify-content: space-between;
@@ -505,9 +454,7 @@
     border-bottom: 1px solid rgba(100, 100, 120, 0.2);
 }
 
-.stat-item:last-child {
-    border-bottom: none;
-}
+.stat-item:last-child { border-bottom: none; }
 
 .stat-label {
     font-size: 0.85rem;
@@ -524,13 +471,4 @@
     color: #4ade80;
     font-size: 0.75rem;
     margin-left: 0.25rem;
-}
-
-/* Encumbrance Indicator */
-.encumbrance-bar {
-    font-size: 0.8rem;
-}
-
-.encumbrance-bar .progress {
-    background: rgba(100, 100, 120, 0.3);
 }
