@@ -1,7 +1,7 @@
 # Production Deployment Guide
 
 ## Overview
-Adventure MUD can be deployed using Docker Compose for a complete production stack including PostgreSQL, Redis, and the web application.
+Adventure MUD can be deployed using Docker Compose for a complete production stack including PostgreSQL and the web application.
 
 ## Prerequisites
 - Docker and Docker Compose installed
@@ -35,7 +35,7 @@ POSTGRES_PASSWORD=strong-database-password-here
 # Build the Docker image
 docker-compose build
 
-# Start all services (PostgreSQL, Redis, Web)
+# Start all services (PostgreSQL, Web)
 docker-compose up -d
 
 # View logs
@@ -70,9 +70,6 @@ Key environment variables for production:
 # Database
 DATABASE_URL=postgresql://adventure:password@postgres:5432/adventure
 POSTGRES_PASSWORD=strong-password
-
-# Redis (for SocketIO scaling)
-REDIS_URL=redis://redis:6379/0
 
 # Flask
 SECRET_KEY=your-secure-random-key
@@ -351,18 +348,6 @@ environment:
   POSTGRES_SHARED_BUFFERS: 256MB
   POSTGRES_EFFECTIVE_CACHE_SIZE: 1GB
   POSTGRES_WORK_MEM: 16MB
-```
-
-### Redis Cache
-
-Configure Redis for session storage and caching:
-
-```python
-# In config.py
-CACHE_TYPE = "redis"
-CACHE_REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-SESSION_TYPE = "redis"
-SESSION_REDIS = redis.from_url(os.getenv("REDIS_URL"))
 ```
 
 ## Updates and Maintenance

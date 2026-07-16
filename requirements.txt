@@ -11,5 +11,4 @@ textual==0.63.0
 python-socketio==5.11.4
 psycopg2-binary==2.9.9
 gunicorn==21.2.0
-redis==5.0.1
 structlog==24.1.0
