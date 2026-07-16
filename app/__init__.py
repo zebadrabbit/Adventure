@@ -43,16 +43,25 @@ except OSError:
 # Load configuration from environment with sensible defaults. If DATABASE_URL
 # isn't provided, default to a SQLite file in the instance folder.
 DEFAULT_SECRET_KEY = "dev-secret-change-me"
+# Every publicly-known placeholder key shipped in this repo: the in-code
+# fallback above plus the literal in .env.example / docker-compose.yml. Booting
+# production with any of these is refused.
+INSECURE_SECRET_KEYS = frozenset(
+    {
+        DEFAULT_SECRET_KEY,
+        "dev-secret-key-change-in-production",
+    }
+)
 
 
 def _check_secret_key(secret_key: str, flask_env: str) -> None:
-    """Refuse to start with the default SECRET_KEY when FLASK_ENV=production.
+    """Refuse to start with a known-insecure SECRET_KEY when FLASK_ENV=production.
 
     FLASK_ENV=production is this project's existing production marker (see
     docker-compose.yml, Dockerfile, and .env.example), so the guard hooks
     into that convention rather than inventing a new one.
     """
-    if secret_key == DEFAULT_SECRET_KEY and (flask_env or "").lower() == "production":
+    if secret_key in INSECURE_SECRET_KEYS and (flask_env or "").lower() == "production":
         raise RuntimeError("SECRET_KEY must be set in production (see .env.example)")
 
 
@@ -303,11 +312,19 @@ def _ensure_schema():
         from sqlalchemy import inspect as sa_inspect
 
         with app.app_context():
-            db.create_all()
             cfg = AlembicConfig(_ALEMBIC_INI)
-            if not sa_inspect(db.engine).has_table("alembic_version"):
-                alembic_command.stamp(cfg, _PRE_ALEMBIC_STAMP)
-            alembic_command.upgrade(cfg, "head")
+            # A completely empty database is a fresh install: create_all builds
+            # it at current-model shape, so stamp head directly rather than
+            # replaying the baseline guards against a schema that never needed
+            # them.
+            fresh_db = not sa_inspect(db.engine).get_table_names()
+            db.create_all()
+            if fresh_db:
+                alembic_command.stamp(cfg, "head")
+            else:
+                if not sa_inspect(db.engine).has_table("alembic_version"):
+                    alembic_command.stamp(cfg, _PRE_ALEMBIC_STAMP)
+                alembic_command.upgrade(cfg, "head")
     except Exception:
         _schema_log.exception("schema_upgrade_failed")
         try:
