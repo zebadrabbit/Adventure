@@ -84,7 +84,7 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
     CHA = int(base.get("cha", base.get("CHA", 10)) or 10)
 
     # Fold equipped gear affixes into attributes + derived stats.
-    from app.loot.equip import gear_bonuses
+    from app.services.loot_service import gear_bonuses
 
     try:
         _gear = json.loads(char.gear) if getattr(char, "gear", None) else {}
@@ -699,7 +699,7 @@ def _check_end(session: CombatSession):
                 db.session.add(first)
             if rewards.get("gear"):
                 try:
-                    from app.loot.inventory import add_gear_to_character
+                    from app.services.loot_service import add_gear_to_character
 
                     first = next(iter(char_rows.values()))
                     add_gear_to_character(first, rewards["gear"])

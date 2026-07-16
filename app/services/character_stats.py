@@ -37,7 +37,7 @@ def compute_hp_mana_max(character: Character) -> Tuple[int, int]:
     hp_max = 50 + con * 2 + level * 5
     mana_max = 20 + intelligence * 2
 
-    from app.loot.equip import gear_bonuses
+    from app.services.loot_service import gear_bonuses
 
     try:
         gear = json.loads(character.gear) if getattr(character, "gear", None) else {}

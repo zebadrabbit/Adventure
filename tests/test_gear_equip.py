@@ -1,4 +1,4 @@
-from app.loot.equip import gear_bonuses
+from app.services.loot_service import gear_bonuses
 
 
 def test_sums_equipped_affixes():

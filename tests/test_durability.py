@@ -4,7 +4,7 @@ import json
 import uuid
 
 from app import db
-from app.loot.equip import gear_bonuses
+from app.services.loot_service import gear_bonuses
 from app.loot.generator import generate_item
 from app.models.models import GameConfig
 from app.services import durability

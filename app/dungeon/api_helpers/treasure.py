@@ -129,7 +129,7 @@ def claim_treasure_entity(entity_id: int, instance) -> Tuple[int, dict]:
         loot = roll_loot(faux)
         items = loot.get("items_list") or list((loot.get("items") or {}).keys())
         # Store procedural gear instances into the first party character's inventory.
-        from app.loot.inventory import add_gear_to_character
+        from app.services.loot_service import add_gear_to_character
 
         gear_instances = loot.get("gear", [])
         if gear_instances:

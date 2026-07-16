@@ -1,6 +1,6 @@
 import json
 
-from app.loot.inventory import add_gear_to_character
+from app.services.loot_service import add_gear_to_character
 
 
 class _Char:

@@ -255,7 +255,7 @@ def build_party_payload(chars: Sequence[Character]):
         # Max Mana: base 20 + INT*2 (matches combat_service.py)
         mana_max = 20 + intelligence * 2
 
-        from app.loot.equip import gear_bonuses
+        from app.services.loot_service import gear_bonuses
 
         try:
             gear = json.loads(c.gear) if getattr(c, "gear", None) else {}
