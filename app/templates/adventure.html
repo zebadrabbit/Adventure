@@ -32,15 +32,6 @@
     font-size: 16px;
   }
 
-  #dungeon-minimap-three {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    z-index: 10;
-    display: none;
-    border-radius: 4px;
-  }
-
   #hotkeys-panel {
     display: none;
     max-width: 300px;
@@ -126,7 +117,6 @@
         <div class="panel-body position-relative">
           <div class="position-relative">
             <canvas id="dungeon-map" class="map-fluid-fixed-height mb-2" width="800" height="600"></canvas>
-            <canvas id="dungeon-minimap-three" width="120" height="120"></canvas>
             <div class="map-controls" id="map-controls-panel">
               <button id="btn-zoom-in" class="btn btn-sm btn-dark" title="Zoom In">+</button>
               <button id="btn-zoom-out" class="btn btn-sm btn-dark" title="Zoom Out">−</button>
@@ -247,11 +237,6 @@
 
   {% block scripts %}
   {{ super() }}
-  <!-- Three.js (Phase 3a dungeon scene, toggle-gated via ?renderer=three).
-       dungeon-three.js imports directly from the full jsdelivr URL (no
-       import map needed) — external import maps via <script src=...>
-       failed to resolve in testing, so this avoids that entirely. -->
-  <script type="module" src="{{ asset_url('js/dungeon-three.js') }}"></script>
   <!-- Canvas-based dungeon renderer -->
   <script src="{{ asset_url('js/dungeon-canvas.js') }}"></script>
   <!-- Adventure page logic -->

@@ -911,16 +911,12 @@
             window.currentDungeonSeed = data.seed;
           }
 
-          // Initialize dungeon renderer (2D canvas by default; Three.js
-          // behind ?renderer=three for Phase 3a dev preview — see
-          // docs/superpowers/specs/2026-06-19-phase3a-threejs-dungeon-scene-design.md)
+          // Initialize dungeon renderer (2D canvas)
           if (window.dungeonCanvas) {
             // Already exists, reload map data
             window.dungeonCanvas.loadMap(data);
           } else {
-            const wantsThree = new URLSearchParams(location.search).get('renderer') === 'three';
-            const RendererClass = (wantsThree && window.DungeonCanvasThree) || window.DungeonCanvas;
-            window.dungeonCanvas = new RendererClass('dungeon-map', {
+            window.dungeonCanvas = new window.DungeonCanvas('dungeon-map', {
               tileSize: TILE_SIZE,
               innerVisRadius: activeFogConfig.innerRadius,
               outerVisRadius: activeFogConfig.fullRadius
