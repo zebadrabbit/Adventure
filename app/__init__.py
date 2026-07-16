@@ -42,7 +42,22 @@ except OSError:
 
 # Load configuration from environment with sensible defaults. If DATABASE_URL
 # isn't provided, default to a SQLite file in the instance folder.
-secret_key = os.getenv("SECRET_KEY", "dev-secret-change-me")
+DEFAULT_SECRET_KEY = "dev-secret-change-me"
+
+
+def _check_secret_key(secret_key: str, flask_env: str) -> None:
+    """Refuse to start with the default SECRET_KEY when FLASK_ENV=production.
+
+    FLASK_ENV=production is this project's existing production marker (see
+    docker-compose.yml, Dockerfile, and .env.example), so the guard hooks
+    into that convention rather than inventing a new one.
+    """
+    if secret_key == DEFAULT_SECRET_KEY and (flask_env or "").lower() == "production":
+        raise RuntimeError("SECRET_KEY must be set in production (see .env.example)")
+
+
+secret_key = os.getenv("SECRET_KEY", DEFAULT_SECRET_KEY)
+_check_secret_key(secret_key, os.getenv("FLASK_ENV", ""))
 database_url = os.getenv("DATABASE_URL")
 
 # During pytest runs, isolate to a separate test database to reduce locking

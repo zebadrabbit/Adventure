@@ -1,5 +1,7 @@
 """Lightweight in-memory rate limiter.
 
+# ponytail: in-memory, single-process only; move to a shared store if gunicorn workers > 1
+
 Provides:
   * rate_limit decorator for per-route overrides
   * should_rate_limit(key, limit, window) primitive
