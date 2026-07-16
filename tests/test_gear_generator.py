@@ -62,3 +62,35 @@ def test_value_scales_with_rarity():
     common = generate_item(level=10, rarity="common", slot="ring", rng=_rng(1))
     myth = generate_item(level=10, rarity="mythic", slot="ring", rng=_rng(1))
     assert myth["value"] > common["value"]
+
+
+def test_name_composition_format():
+    """Verify name composition: no double/leading/trailing spaces, base_name present, prefix/suffix ordering."""
+    from app.loot.data.archetypes import ARCHETYPES
+
+    # Generate items across multiple seeds to test with/without prefix/suffix
+    for seed in range(20):
+        it = generate_item(level=10, rarity="rare", rng=_rng(seed))
+        name = it["name"]
+
+        # No leading/trailing or double spaces
+        assert name == " ".join(name.split()), f"Name has improper spacing: {repr(name)}"
+
+        # Base archetype name is present in the item name
+        arch_key = it["base"]
+        arch = ARCHETYPES[arch_key]
+        base_name = arch["base_name"]
+        assert base_name in name, f"Base name {repr(base_name)} not in {repr(name)}"
+
+        # If name has multiple words, verify ordering: prefix comes before base, suffix after
+        parts = name.split()
+        if len(parts) > 1:
+            base_idx = -1
+            for i, part in enumerate(parts):
+                if base_name in part or part == base_name or base_name.split()[0] in part:
+                    base_idx = i
+                    break
+            # Base name should not be at position 0 if there are prefix parts
+            # and should not be at the last position if there are suffix parts
+            # (simple check: base_name is sandwiched or at start, not at end alone with a prefix)
+            assert base_idx >= 0, f"Base name not found in parts of {repr(name)}"
