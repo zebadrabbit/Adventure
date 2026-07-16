@@ -4,9 +4,9 @@ import json
 def test_movement_advances_ticks(auth_client):
     # Ensure migrations (combat column etc.) before interacting
     try:
-        from app.server import _run_migrations
+        from app import _ensure_schema
 
-        _run_migrations()
+        _ensure_schema()
     except Exception:
         pass
     # Hit dashboard to ensure GameClock row exists
@@ -33,9 +33,9 @@ def test_movement_advances_ticks(auth_client):
 
 def test_search_advances_by_config(auth_client):
     try:
-        from app.server import _run_migrations
+        from app import _ensure_schema
 
-        _run_migrations()
+        _ensure_schema()
     except Exception:
         pass
     from app.models import GameClock, GameConfig
@@ -62,9 +62,9 @@ def test_search_advances_by_config(auth_client):
 
 def test_combat_gating_blocks_ticks(auth_client):
     try:
-        from app.server import _run_migrations
+        from app import _ensure_schema
 
-        _run_migrations()
+        _ensure_schema()
     except Exception:
         pass
     from app.models import GameClock
@@ -84,9 +84,9 @@ def test_combat_gating_blocks_ticks(auth_client):
 
 def test_socket_event_emission(auth_client, monkeypatch):
     try:
-        from app.server import _run_migrations
+        from app import _ensure_schema
 
-        _run_migrations()
+        _ensure_schema()
     except Exception:
         pass
     from app.services import time_service

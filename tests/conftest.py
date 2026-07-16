@@ -305,9 +305,10 @@ def _conditional_db_isolation(request, test_app):
                 db.drop_all()
             db.create_all()
             try:
-                from app.server import _run_migrations, _seed_game_config, seed_items
+                from app import _ensure_schema
+                from app.server import _seed_game_config, seed_items
 
-                _run_migrations()
+                _ensure_schema()
                 seed_items()
                 _seed_game_config()
             except Exception:

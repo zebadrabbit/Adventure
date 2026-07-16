@@ -32,13 +32,14 @@ def test_admin_shell_help_and_unknown(monkeypatch):
     assert any("Unknown or malformed command" in o for o in outputs)
 
 
-def test_run_migrations_idempotent():
-    server = importlib.import_module("app.server")
-    with server.app.app_context():
-        # Ensure base tables exist first (mirrors real startup sequence)
-        server.db.create_all()
-        server._run_migrations()
-        server._run_migrations()
+def test_ensure_schema_idempotent():
+    import app as app_module
+
+    with app_module.app.app_context():
+        # _ensure_schema (create_all + alembic upgrade to head) is the single
+        # migration path; calling it repeatedly must be a safe no-op.
+        app_module._ensure_schema()
+        app_module._ensure_schema()
         # Ensure expected columns exist (role & email on user). Use SQLAlchemy's
         # dialect-agnostic inspector so this passes on both SQLite and PostgreSQL.
         from sqlalchemy import inspect as _sa_inspect

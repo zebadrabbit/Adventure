@@ -271,227 +271,79 @@ def asset_url(filename: str) -> str:
 
 app.jinja_env.globals["asset_url"] = asset_url
 
-# --- Lightweight schema version tracking (pre-Alembic compatibility) ---------
-from sqlalchemy import text  # noqa: E402
+# --- Schema management: alembic is the single migration path -----------------
+# Startup self-migration (dev/prod convenience): create any missing tables via
+# create_all, then bring the schema to alembic head programmatically. This
+# replaced four legacy guarded-DDL mechanisms (server._run_migrations,
+# app.migrations.apply_migrations, _run_lightweight_migrations, and the
+# monster_catalog fallback block). All of their DDL now lives in the
+# ``b1c2d3e4f5a6_legacy_baseline_guards`` alembic revision.
+import structlog  # noqa: E402
+
+_schema_log = structlog.get_logger("app.schema")
+
+_ALEMBIC_INI = os.path.join(os.path.dirname(__file__), "..", "alembic.ini")
+# Revision immediately preceding the legacy-baseline guard revision. A database
+# with tables but no alembic_version (a fresh create_all schema, or a legacy
+# pre-alembic deployment) is stamped here before upgrading, so the idempotent
+# baseline guards run exactly once and alembic owns versioning thereafter.
+_PRE_ALEMBIC_STAMP = "a1b2c3d4e5f9"
 
 
-def _ensure_schema_version_table():  # pragma: no cover - simple startup helper
+def _ensure_schema():
+    """Create missing tables and bring the schema to alembic head.
+
+    Wrapped in a single try/except that logs rather than raises, preserving the
+    startup resilience of the legacy mechanisms this replaced (a migration
+    failure must not crash dev/prod startup).
+    """
     try:
-        with app.app_context():
-            db.session.execute(
-                text(
-                    "CREATE TABLE IF NOT EXISTS schema_version (id INTEGER PRIMARY KEY CHECK (id=1), version INTEGER NOT NULL)"
-                )
-            )
-            row = db.session.execute(text("SELECT version FROM schema_version WHERE id=1")).fetchone()
-            if not row:
-                db.session.execute(text("INSERT INTO schema_version (id, version) VALUES (1, 1)"))
-            db.session.commit()
-    except Exception:
-        pass
-
-
-def _bump_schema_version(new_version: int):  # pragma: no cover
-    try:
-        with app.app_context():
-            db.session.execute(
-                text("UPDATE schema_version SET version=:v WHERE id=1"),
-                {"v": new_version},
-            )
-            db.session.commit()
-    except Exception:
-        pass
-
-
-def _run_lightweight_migrations():  # pragma: no cover - idempotent guard
-    _ensure_schema_version_table()
-    # Future placeholder: detect columns / add defaults. Muted column now part of model.
-    # Example pattern (kept commented for guidance):
-    # from sqlalchemy import inspect
-    # insp = inspect(db.engine)
-    # if 'user' in insp.get_table_names():
-    #     cols = [c['name'] for c in insp.get_columns('user')]
-    #     if 'muted' not in cols:
-    #         db.session.execute(text('ALTER TABLE user ADD COLUMN muted BOOLEAN NOT NULL DEFAULT 0'))
-    #         db.session.commit()
-
-
-_run_lightweight_migrations()
-
-# Ensure critical runtime/migration columns (e.g., monster_catalog optional columns) exist even
-# when tests import the app before PYTEST_CURRENT_TEST is set (so the conditional bootstrap
-# below would be skipped). This is idempotent and safe for production startup.
-try:  # pragma: no cover - defensive import-time safeguard
-    from app.migrations import apply_migrations
-    from app.server import _run_migrations, _seed_game_config, seed_items
-
-    with app.app_context():
-        db.create_all()
-        _run_migrations()
-        try:
-            apply_migrations()
-        except Exception:
-            db.session.rollback()
-        seed_items()
-        _seed_game_config()
-        # One-time self-stamp: if this DB has never been under Alembic's
-        # control (no alembic_version table yet), stamp it to head now that
-        # the bootstrap above has built a schema equivalent to head (no
-        # migration does non-additive data work). Once alembic_version
-        # exists -- whether from this stamp or a real `alembic upgrade` --
-        # this never runs again, and Alembic owns versioning from there.
-        try:
-            from sqlalchemy import inspect as _sa_inspect
-
-            if not _sa_inspect(db.engine).has_table("alembic_version"):
-                from alembic import command as _alembic_command
-                from alembic.config import Config as _AlembicConfig
-
-                _alembic_cfg = _AlembicConfig(os.path.join(os.path.dirname(__file__), "..", "alembic.ini"))
-                _alembic_command.stamp(_alembic_cfg, "head")
-        except Exception:
-            db.session.rollback()
-except Exception:
-    # A failed import-time bootstrap must not leave db.session in an aborted
-    # transaction; that would poison every later DB user (the cause of the
-    # widespread "current transaction is aborted" test errors).
-    try:
-        db.session.rollback()
-    except Exception:
-        pass
-
-# Direct fallback to guarantee monster_catalog optional columns even if the import above
-# failed due to circular imports early in initialization.
-try:  # pragma: no cover - defensive
-    from sqlalchemy import inspect as _insp_mod
-    from sqlalchemy import text as _tddl
-
-    with app.app_context():
-        _insp = _insp_mod(db.engine)
-        tables = set(_insp.get_table_names())
-        if "monster_catalog" not in tables:
-            # Create fresh table with optional columns included so later seed script won't omit them.
-            db.session.execute(
-                _tddl(
-                    """
-CREATE TABLE monster_catalog (
-    id INTEGER PRIMARY KEY,
-    slug TEXT UNIQUE NOT NULL,
-    name TEXT NOT NULL,
-    level_min INTEGER NOT NULL DEFAULT 1,
-    level_max INTEGER NOT NULL DEFAULT 1,
-    base_hp INTEGER NOT NULL,
-    base_damage INTEGER NOT NULL,
-    armor INTEGER NOT NULL DEFAULT 0,
-    speed INTEGER NOT NULL DEFAULT 10,
-    rarity TEXT NOT NULL DEFAULT 'common',
-    family TEXT NOT NULL,
-    traits TEXT,
-    loot_table TEXT,
-    special_drop_slug TEXT,
-    xp_base INTEGER NOT NULL DEFAULT 0,
-    boss INTEGER NOT NULL DEFAULT 0,
-    resistances TEXT,
-    damage_types TEXT
-)
-"""
-                )
-            )
-            db.session.commit()
-        else:
-            cols = {c["name"] for c in _insp.get_columns("monster_catalog")}
-            if not {"resistances", "damage_types"}.issubset(cols):
-                # Rebuild table (SQLite lacks easy IF NOT EXISTS add for multiple columns)
-                # Preserve existing data.
-                existing_only = "id, slug, name, level_min, level_max, base_hp, base_damage, armor, speed, rarity, family, traits, loot_table, special_drop_slug, xp_base, boss"
-                db.session.execute(_tddl("ALTER TABLE monster_catalog RENAME TO monster_catalog_old"))
-                db.session.execute(
-                    _tddl(
-                        """
-CREATE TABLE monster_catalog (
-    id INTEGER PRIMARY KEY,
-    slug TEXT UNIQUE NOT NULL,
-    name TEXT NOT NULL,
-    level_min INTEGER NOT NULL DEFAULT 1,
-    level_max INTEGER NOT NULL DEFAULT 1,
-    base_hp INTEGER NOT NULL,
-    base_damage INTEGER NOT NULL,
-    armor INTEGER NOT NULL DEFAULT 0,
-    speed INTEGER NOT NULL DEFAULT 10,
-    rarity TEXT NOT NULL DEFAULT 'common',
-    family TEXT NOT NULL,
-    traits TEXT,
-    loot_table TEXT,
-    special_drop_slug TEXT,
-    xp_base INTEGER NOT NULL DEFAULT 0,
-    boss INTEGER NOT NULL DEFAULT 0,
-    resistances TEXT,
-    damage_types TEXT
-)
-"""
-                    )
-                )
-                db.session.execute(
-                    _tddl(
-                        f"INSERT INTO monster_catalog ({existing_only}, resistances, damage_types) SELECT {existing_only}, NULL, NULL FROM monster_catalog_old"
-                    )
-                )
-                db.session.execute(_tddl("DROP TABLE monster_catalog_old"))
-                db.session.commit()
-except Exception:
-    try:
-        db.session.rollback()
-    except Exception:
-        pass
-
-# When running under pytest, ensure base item seeds and game config exist early so tests relying
-# on catalog items (e.g., short-sword) do not encounter missing rows before server.start_server().
-if os.getenv("PYTEST_CURRENT_TEST"):
-    try:  # pragma: no cover - defensive init hook
-        # Ensure model metadata is loaded
-        from app.models import models as _models  # noqa: F401
-        from app.models.hoard import Hoard  # noqa: E402,F401  # ensure table is registered
-        from app.server import _run_migrations, _seed_game_config, seed_items
+        from alembic import command as alembic_command
+        from alembic.config import Config as AlembicConfig
+        from sqlalchemy import inspect as sa_inspect
 
         with app.app_context():
             db.create_all()
-            _run_migrations()
-            seed_items()
-            _seed_game_config()
+            cfg = AlembicConfig(_ALEMBIC_INI)
+            if not sa_inspect(db.engine).has_table("alembic_version"):
+                alembic_command.stamp(cfg, _PRE_ALEMBIC_STAMP)
+            alembic_command.upgrade(cfg, "head")
     except Exception:
+        _schema_log.exception("schema_upgrade_failed")
         try:
             db.session.rollback()
         except Exception:
             pass
+
+
+def _seed_baseline():
+    """Seed the catalog/config rows required for a usable app. Idempotent."""
+    try:
+        from app.server import _seed_game_config, seed_items
+
+        with app.app_context():
+            seed_items()
+            _seed_game_config()
+    except Exception:
+        _schema_log.exception("seed_baseline_failed")
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+
+
+_ensure_schema()
+_seed_baseline()
 
 
 def create_app():
-    """Return the Flask app instance, ensuring schema/migrations are applied.
+    """Return the Flask app instance, ensuring schema + baseline seeds exist.
 
-    Pytest sets PYTEST_CURRENT_TEST late; if the module-level test bootstrap block
-    above didn't run (because the env var wasn't present yet), a fresh test DB may
-    lack newer optional columns (e.g., monster_catalog.resistances). To harden
-    against ordering differences we apply create_all + lightweight migrations
-    here as an idempotent safety net.
+    Idempotent safety net for entry points (e.g. the test suite) that build the
+    app via the factory; the module-level calls above already run on import.
     """
-    try:  # pragma: no cover - defensive
-        with app.app_context():
-            db.create_all()
-            from app.migrations import apply_migrations
-            from app.server import _run_migrations, _seed_game_config, seed_items
-
-            _run_migrations()
-            try:
-                apply_migrations()
-            except Exception:
-                db.session.rollback()
-            seed_items()
-            _seed_game_config()
-    except Exception:  # swallow; normal startup path will also attempt
-        try:
-            db.session.rollback()
-        except Exception:
-            pass
+    _ensure_schema()
+    _seed_baseline()
     return app
 
 

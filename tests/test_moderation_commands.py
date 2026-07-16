@@ -5,7 +5,7 @@ from werkzeug.security import generate_password_hash
 # This keeps coverage on admin_shell branches without blocking for stdin.
 from app import app, db
 from app.models.models import User
-from app.server import _run_migrations
+from app import _ensure_schema
 
 
 def run_cmd(cmd):
@@ -90,8 +90,7 @@ def run_cmd(cmd):
 def test_migrations_add_columns(tmp_path):
     # Ensure migrations run without error and columns exist
     with app.app_context():
-        db.create_all()
-        _run_migrations()
+        _ensure_schema()
         u = User(username="coltest", password=generate_password_hash("x"))
         db.session.add(u)
         db.session.commit()

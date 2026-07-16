@@ -3,7 +3,7 @@ from app.loot.generator import LootConfig, generate_loot_for_seed
 from app.models.dungeon_instance import DungeonInstance
 from app.models.loot import DungeonLoot
 from app.models.models import GameConfig, Item, User
-from app.server import _run_migrations
+from app import _ensure_schema
 
 
 def login(client, username="tester"):
@@ -20,7 +20,7 @@ def _ensure_instance(user, seed=123456):
     with app.app_context():
         inst = DungeonInstance.query.filter_by(user_id=user.id, seed=seed).first()
         if not inst:
-            _run_migrations()
+            _ensure_schema()
             inst = DungeonInstance(user_id=user.id, seed=seed, pos_x=0, pos_y=0, pos_z=0)
             db.session.add(inst)
             db.session.commit()
