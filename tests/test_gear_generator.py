@@ -65,32 +65,55 @@ def test_value_scales_with_rarity():
 
 
 def test_name_composition_format():
-    """Verify name composition: no double/leading/trailing spaces, base_name present, prefix/suffix ordering."""
+    """Verify name composition: no improper spacing, base_name present, and prefix/suffix ordering.
+
+    Validates that:
+    - Names have no double/leading/trailing spaces
+    - Base archetype name is present
+    - Prefix names (if present) appear BEFORE base_name
+    - Suffix names (if present) appear AFTER base_name
+    """
     from app.loot.data.archetypes import ARCHETYPES
 
-    # Generate items across multiple seeds to test with/without prefix/suffix
-    for seed in range(20):
+    saw_prefix = False
+    saw_suffix = False
+
+    # Generate items across many seeds to capture both prefixed and suffixed items
+    for seed in range(200):
         it = generate_item(level=10, rarity="rare", rng=_rng(seed))
         name = it["name"]
 
         # No leading/trailing or double spaces
-        assert name == " ".join(name.split()), f"Name has improper spacing: {repr(name)}"
+        assert name == " ".join(name.split()), f"Seed {seed}: Name has improper spacing: {repr(name)}"
 
         # Base archetype name is present in the item name
         arch_key = it["base"]
         arch = ARCHETYPES[arch_key]
         base_name = arch["base_name"]
-        assert base_name in name, f"Base name {repr(base_name)} not in {repr(name)}"
+        assert base_name in name, f"Seed {seed}: Base name {repr(base_name)} not in {repr(name)}"
 
-        # If name has multiple words, verify ordering: prefix comes before base, suffix after
-        parts = name.split()
-        if len(parts) > 1:
-            base_idx = -1
-            for i, part in enumerate(parts):
-                if base_name in part or part == base_name or base_name.split()[0] in part:
-                    base_idx = i
-                    break
-            # Base name should not be at position 0 if there are prefix parts
-            # and should not be at the last position if there are suffix parts
-            # (simple check: base_name is sandwiched or at start, not at end alone with a prefix)
-            assert base_idx >= 0, f"Base name not found in parts of {repr(name)}"
+        # Find the base_name position in the full name
+        base_idx = name.index(base_name)
+
+        # Everything before base_name is prefix (if anything)
+        prefix_part = name[:base_idx].strip()
+        if prefix_part:
+            saw_prefix = True
+            # Prefix should come before base_name (index check)
+            assert (
+                name.index(prefix_part) < base_idx
+            ), f"Seed {seed}: Prefix part {repr(prefix_part)} not before base in {repr(name)}"
+
+        # Everything after base_name is suffix (if anything)
+        suffix_start = base_idx + len(base_name)
+        suffix_part = name[suffix_start:].strip()
+        if suffix_part:
+            saw_suffix = True
+            # Suffix should come after base_name (index check)
+            assert suffix_start <= name.index(suffix_part) + len(
+                suffix_part
+            ), f"Seed {seed}: Suffix part {repr(suffix_part)} not after base in {repr(name)}"
+
+    # Ensure we actually tested both cases
+    assert saw_prefix, "Test suite did not generate any items with prefixes (bounded loop exhausted)"
+    assert saw_suffix, "Test suite did not generate any items with suffixes (bounded loop exhausted)"
