@@ -5,7 +5,7 @@ from flask_login import current_user, login_required
 
 from app import db
 from app.models.theme import Theme
-from app.routes.admin import admin_required
+from app.routes.admin_new import admin_required
 
 bp_theme = Blueprint("theme", __name__, url_prefix="/api/admin/themes")
 

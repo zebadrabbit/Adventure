@@ -2,14 +2,19 @@
 New modular admin panel routes
 """
 
+import json
 from functools import wraps
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
 
-bp_admin_new = Blueprint("admin_new", __name__, url_prefix="/admin/v2")
+# Single admin blueprint (formerly split across bp_admin `/admin` and this one).
+# No url_prefix: each route carries its full path so both the legacy `/admin/*`
+# paths (hit by JS with hardcoded URLs) and the modular `/admin/v2/*` paths live
+# under one blueprint.
+bp_admin_new = Blueprint("admin_new", __name__)
 
 
 def admin_required(f):
@@ -285,7 +290,7 @@ def save_combat_config(config_data):
 # ============================================================================
 
 
-@bp_admin_new.route("/settings/fog")
+@bp_admin_new.route("/admin/v2/settings/fog")
 @admin_required
 def fog_settings():
     """Fog & visibility settings page"""
@@ -293,7 +298,7 @@ def fog_settings():
     return render_template("admin/fog_settings.html", fog_config=fog_config)
 
 
-@bp_admin_new.route("/settings/fog/save", methods=["POST"])
+@bp_admin_new.route("/admin/v2/settings/fog/save", methods=["POST"])
 @admin_required
 def save_fog_settings():
     """Save fog configuration"""
@@ -314,7 +319,7 @@ def save_fog_settings():
         return jsonify({"error": str(e)}), 500
 
 
-@bp_admin_new.route("/settings/fog/reset", methods=["POST"])
+@bp_admin_new.route("/admin/v2/settings/fog/reset", methods=["POST"])
 @admin_required
 def reset_fog_settings():
     """Reset fog configuration to defaults"""
@@ -325,7 +330,7 @@ def reset_fog_settings():
         return jsonify({"error": str(e)}), 500
 
 
-@bp_admin_new.route("/api/fog-config", methods=["GET"])
+@bp_admin_new.route("/admin/v2/api/fog-config", methods=["GET"])
 def get_fog_config_api():
     """Public API to get current fog configuration (no auth required)"""
     try:
@@ -335,7 +340,7 @@ def get_fog_config_api():
         return jsonify({"error": str(e)}), 500
 
 
-@bp_admin_new.route("/api/server-info", methods=["GET"])
+@bp_admin_new.route("/admin/v2/api/server-info", methods=["GET"])
 @admin_required
 def get_server_info():
     """Get server information (Python version, Flask version, uptime)"""
@@ -373,7 +378,7 @@ def get_server_info():
     )
 
 
-@bp_admin_new.route("/settings/combat")
+@bp_admin_new.route("/admin/v2/settings/combat")
 @admin_required
 def combat_settings():
     """Combat rules settings page"""
@@ -381,7 +386,7 @@ def combat_settings():
     return render_template("admin/combat_settings.html", config=config)
 
 
-@bp_admin_new.route("/settings/combat/save", methods=["POST"])
+@bp_admin_new.route("/admin/v2/settings/combat/save", methods=["POST"])
 @admin_required
 def save_combat():
     """Save combat configuration"""
@@ -393,7 +398,7 @@ def save_combat():
         return jsonify({"success": False, "error": str(e)}), 400
 
 
-@bp_admin_new.route("/settings/combat/reset", methods=["POST"])
+@bp_admin_new.route("/admin/v2/settings/combat/reset", methods=["POST"])
 @admin_required
 def reset_combat():
     """Reset combat configuration to defaults"""
@@ -404,7 +409,7 @@ def reset_combat():
         return jsonify({"success": False, "error": str(e)}), 400
 
 
-@bp_admin_new.route("/settings/loot")
+@bp_admin_new.route("/admin/v2/settings/loot")
 @admin_required
 def loot_settings():
     """Loot & rewards settings page"""
@@ -412,7 +417,7 @@ def loot_settings():
     return render_template("admin/loot_settings.html", config=config)
 
 
-@bp_admin_new.route("/settings/loot/save", methods=["POST"])
+@bp_admin_new.route("/admin/v2/settings/loot/save", methods=["POST"])
 @admin_required
 def save_loot_settings():
     """Save loot configuration"""
@@ -449,7 +454,7 @@ def save_loot_settings():
         return jsonify({"error": str(e)}), 500
 
 
-@bp_admin_new.route("/settings/loot/reset", methods=["POST"])
+@bp_admin_new.route("/admin/v2/settings/loot/reset", methods=["POST"])
 @admin_required
 def reset_loot_settings():
     """Reset loot configuration to defaults"""
@@ -460,7 +465,7 @@ def reset_loot_settings():
         return jsonify({"error": str(e)}), 500
 
 
-@bp_admin_new.route("/settings/dungeon")
+@bp_admin_new.route("/admin/v2/settings/dungeon")
 @admin_required
 def dungeon_settings():
     """Dungeon generation settings page"""
@@ -468,7 +473,7 @@ def dungeon_settings():
     return render_template("admin/dungeon_settings.html", config=config)
 
 
-@bp_admin_new.route("/settings/dungeon/save", methods=["POST"])
+@bp_admin_new.route("/admin/v2/settings/dungeon/save", methods=["POST"])
 @admin_required
 def save_dungeon_settings():
     """Save dungeon configuration"""
@@ -511,7 +516,7 @@ def save_dungeon_settings():
         return jsonify({"error": str(e)}), 500
 
 
-@bp_admin_new.route("/settings/dungeon/reset", methods=["POST"])
+@bp_admin_new.route("/admin/v2/settings/dungeon/reset", methods=["POST"])
 @admin_required
 def reset_dungeon_settings():
     """Reset dungeon configuration to defaults"""
@@ -524,7 +529,7 @@ def reset_dungeon_settings():
         return jsonify({"error": str(e)}), 500
 
 
-@bp_admin_new.route("/settings/progression")
+@bp_admin_new.route("/admin/v2/settings/progression")
 @admin_required
 def progression_settings():
     """Progression & XP settings page"""
@@ -532,7 +537,7 @@ def progression_settings():
     return render_template("admin/progression_settings.html", config=config)
 
 
-@bp_admin_new.route("/settings/progression/save", methods=["POST"])
+@bp_admin_new.route("/admin/v2/settings/progression/save", methods=["POST"])
 @admin_required
 def save_progression_settings():
     """Save progression configuration"""
@@ -572,7 +577,7 @@ def save_progression_settings():
         return jsonify({"error": str(e)}), 500
 
 
-@bp_admin_new.route("/settings/progression/reset", methods=["POST"])
+@bp_admin_new.route("/admin/v2/settings/progression/reset", methods=["POST"])
 @admin_required
 def reset_progression_settings():
     """Reset progression configuration to defaults"""
@@ -590,7 +595,7 @@ def reset_progression_settings():
 # ============================================================================
 
 
-@bp_admin_new.route("/server/status")
+@bp_admin_new.route("/admin/v2/server/status")
 @admin_required
 def server_status():
     """Server status page"""
@@ -615,14 +620,14 @@ def server_status():
     return render_template("admin/server_status.html", stats=stats)
 
 
-@bp_admin_new.route("/server/logs")
+@bp_admin_new.route("/admin/v2/server/logs")
 @admin_required
 def logs():
     """Server logs page"""
     return render_template("admin/placeholder.html", page_title="Server Logs", page_description="application logs")
 
 
-@bp_admin_new.route("/server/database")
+@bp_admin_new.route("/admin/v2/server/database")
 @admin_required
 def database():
     """Database management page"""
@@ -638,7 +643,7 @@ def database():
     return render_template("admin/database.html", tables=tables, configs=configs)
 
 
-@bp_admin_new.route("/database/config", methods=["POST"])
+@bp_admin_new.route("/admin/v2/database/config", methods=["POST"])
 @admin_required
 def save_config():
     """Save or update game configuration"""
@@ -662,7 +667,7 @@ def save_config():
     return jsonify({"success": True})
 
 
-@bp_admin_new.route("/database/config/<key>", methods=["DELETE"])
+@bp_admin_new.route("/admin/v2/database/config/<key>", methods=["DELETE"])
 @admin_required
 def delete_config(key):
     """Delete game configuration"""
@@ -681,7 +686,7 @@ def delete_config(key):
 # ============================================================================
 
 
-@bp_admin_new.route("/users")
+@bp_admin_new.route("/admin/v2/users")
 @admin_required
 def users():
     """User management page"""
@@ -695,7 +700,7 @@ def users():
     return render_template("admin/users.html", users=users_list, page=page, per_page=per_page, total=total)
 
 
-@bp_admin_new.route("/users/<int:user_id>/role", methods=["POST"])
+@bp_admin_new.route("/admin/v2/users/<int:user_id>/role", methods=["POST"])
 @admin_required
 def update_user_role(user_id):
     """Update user role"""
@@ -717,7 +722,7 @@ def update_user_role(user_id):
     return jsonify({"success": True, "id": user.id, "role": user.role})
 
 
-@bp_admin_new.route("/users/<int:user_id>/ban", methods=["POST"])
+@bp_admin_new.route("/admin/v2/users/<int:user_id>/ban", methods=["POST"])
 @admin_required
 def ban_user(user_id):
     """Ban or unban a user"""
@@ -743,7 +748,7 @@ def ban_user(user_id):
     return jsonify({"success": True, "id": user.id, "banned": user.banned})
 
 
-@bp_admin_new.route("/users/characters")
+@bp_admin_new.route("/admin/v2/users/characters")
 @admin_required
 def characters():
     """Character management page"""
@@ -752,7 +757,7 @@ def characters():
     )
 
 
-@bp_admin_new.route("/users/moderation")
+@bp_admin_new.route("/admin/v2/users/moderation")
 @admin_required
 def moderation():
     """Moderation tools page"""
@@ -764,14 +769,14 @@ def moderation():
 # ============================================================================
 
 
-@bp_admin_new.route("/tools/seed")
+@bp_admin_new.route("/admin/v2/tools/seed")
 @admin_required
 def seed_data():
     """Seed data tools page"""
     return render_template("admin/seed_data.html")
 
 
-@bp_admin_new.route("/tools/seed/<seed_type>", methods=["POST"])
+@bp_admin_new.route("/admin/v2/tools/seed/<seed_type>", methods=["POST"])
 @admin_required
 def run_seed(seed_type):
     """Run SQL seed scripts"""
@@ -802,8 +807,406 @@ def run_seed(seed_type):
         return jsonify({"error": str(e)}), 500
 
 
-@bp_admin_new.route("/tools/debug")
+@bp_admin_new.route("/admin/v2/tools/debug")
 @admin_required
 def debug():
     """Debug tools page"""
     return render_template("admin/placeholder.html", page_title="Debug Tools", page_description="debugging utilities")
+
+
+# ============================================================================
+# LEGACY ADMIN ROUTES (folded in from the former bp_admin `/admin` blueprint).
+# Paths are preserved exactly (JS posts to /admin/items & /admin/monsters by
+# hardcoded URL; templates use url_for with the new admin_new.* endpoint names).
+# ============================================================================
+
+
+@bp_admin_new.route("/admin/")
+@admin_required
+def dashboard():
+    """Admin landing page - redirect to modular admin panel."""
+    return redirect(url_for("admin_new.fog_settings"))
+
+
+@bp_admin_new.route("/admin/themes")
+@admin_required
+def themes():
+    """Theme management page."""
+    return render_template("admin_themes.html")
+
+
+# ----------------------------- Items --------------------------------------
+
+REQUIRED_ITEM_COLUMNS = [
+    "slug",
+    "name",
+    "type",
+    "description",
+    "value_copper",
+    "level",
+    "rarity",
+]
+
+
+def _parse_csv(stream, required_cols):
+    """Parse a CSV file-like object into list[dict].
+
+    Returns (rows, errors:list[str]). Ensures headers contain required columns.
+    """
+    import csv
+    import io
+
+    errors = []
+    # Read raw bytes, decode as utf-8 with replacement to avoid hard failure
+    raw = stream.read()
+    MAX_CSV_BYTES = 500_000  # ~500 KB safety guard
+    if isinstance(raw, (bytes, bytearray)) and len(raw) > MAX_CSV_BYTES:
+        errors.append(f"File too large ({len(raw)} bytes > {MAX_CSV_BYTES} byte limit)")
+        return [], errors
+    if isinstance(raw, bytes):
+        try:
+            text = raw.decode("utf-8", "replace")
+        except Exception:
+            text = raw.decode("utf-8", "ignore")
+    else:
+        text = raw
+    # Normalize newlines
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    sio = io.StringIO(text)
+    # Sniff dialect optionally (fallback to excel)
+    try:
+        sample = text[:1024]
+        dialect = csv.Sniffer().sniff(sample)
+    except Exception:
+        dialect = csv.excel
+    reader = csv.DictReader(sio, dialect=dialect)
+    headers = [h.strip() for h in (reader.fieldnames or []) if h]
+    missing = [c for c in required_cols if c not in headers]
+    if missing:
+        errors.append(f"Missing required columns: {', '.join(missing)}")
+        return [], errors
+    rows = []
+    for idx, row in enumerate(reader, start=2):  # header line = 1
+        # Skip empty row (all values blank)
+        if not any((v or "").strip() for v in row.values()):
+            continue
+        norm = {k.strip(): (v.strip() if isinstance(v, str) else v) for k, v in row.items()}
+        norm["__line__"] = idx
+        rows.append(norm)
+        if len(rows) > 5000:  # hard cap to prevent accidental huge imports
+            errors.append("Row limit exceeded (5000). Trim file and retry.")
+            break
+    if not rows:
+        errors.append("No data rows found in CSV")
+    return rows, errors
+
+
+def _validate_item_rows(rows):
+    """Return list[str] of validation errors for item rows."""
+    errors = []
+    seen_slugs = set()
+    allowed_rarity = {"common", "uncommon", "rare", "epic", "legendary", "mythic"}
+    for r in rows:
+        line = r.get("__line__", "?")
+        slug = r.get("slug") or ""
+        name = r.get("name") or ""
+        itype = r.get("type") or ""
+        rarity = (r.get("rarity") or "").lower()
+        # Required basics
+        if not slug:
+            errors.append(f"Line {line}: slug is required")
+        else:
+            if " " in slug:
+                errors.append(f"Line {line}: slug must not contain spaces")
+            if slug in seen_slugs:
+                errors.append(f"Line {line}: duplicate slug '{slug}' in file")
+            seen_slugs.add(slug)
+        if not name:
+            errors.append(f"Line {line}: name is required")
+        if not itype:
+            errors.append(f"Line {line}: type is required")
+        # Numeric fields
+        for fld in ("value_copper", "level"):
+            raw = r.get(fld)
+            if raw in (None, ""):
+                errors.append(f"Line {line}: {fld} is required")
+                continue
+            try:
+                val = int(raw)
+            except Exception:
+                errors.append(f"Line {line}: {fld} must be integer (got '{raw}')")
+                continue
+            if val < 0:
+                errors.append(f"Line {line}: {fld} must be >= 0")
+        if rarity not in allowed_rarity:
+            errors.append(f"Line {line}: rarity '{rarity}' not in {sorted(allowed_rarity)}")
+        # Optional weight
+        w_raw = r.get("weight")
+        if w_raw not in (None, ""):
+            try:
+                float(w_raw)
+            except Exception:
+                errors.append(f"Line {line}: weight must be numeric if provided")
+    return errors
+
+
+@bp_admin_new.route("/admin/items", methods=["GET", "POST"])
+@admin_required
+def items():
+    """List items; on POST handle CSV upload with validation & atomic upsert."""
+    from app.models.models import Item
+
+    if request.method == "POST":
+        file = request.files.get("file")
+        if not file:
+            return render_template("admin_items.html", errors=["No file uploaded"], imported=None, rows=[])
+        rows, parse_errors = _parse_csv(file, REQUIRED_ITEM_COLUMNS)
+        if parse_errors:
+            return render_template("admin_items.html", errors=parse_errors, imported=None, rows=[])
+        val_errors = _validate_item_rows(rows)
+        if val_errors:
+            return render_template("admin_items.html", errors=val_errors, imported=None, rows=rows)
+        # Apply transaction
+        changed = 0
+        try:
+            for r in rows:
+                slug = r["slug"]
+                obj = Item.query.filter_by(slug=slug).first()
+                if not obj:
+                    obj = Item(slug=slug)
+                    db.session.add(obj)
+                obj.name = r["name"]
+                obj.type = r["type"]
+                obj.description = r.get("description") or ""
+                obj.value_copper = int(r["value_copper"])
+                obj.level = int(r["level"])
+                obj.rarity = (r.get("rarity") or "common").lower()
+                w_raw = r.get("weight")
+                if w_raw not in (None, ""):
+                    try:
+                        obj.weight = float(w_raw)
+                    except Exception:
+                        pass
+                changed += 1
+            db.session.commit()
+            return render_template("admin_items.html", errors=[], imported=changed, rows=[])
+        except Exception as e:  # pragma: no cover - defensive
+            db.session.rollback()
+            return render_template("admin_items.html", errors=[f"Database error: {e}"], imported=None, rows=rows)
+    # GET
+    page = max(1, int(request.args.get("page", 1)))
+    per_page = 50
+    items_query = Item.query.order_by(Item.id.asc())
+    total = items_query.count()
+    rows = items_query.offset((page - 1) * per_page).limit(per_page).all()
+    return render_template(
+        "admin_items.html",
+        errors=[],
+        imported=None,
+        rows=[],  # only show preview rows after failed validation; normal listing separate var
+        items=rows,
+        page=page,
+        per_page=per_page,
+        total=total,
+    )
+
+
+# ----------------------------- Monsters -----------------------------------
+
+REQUIRED_MONSTER_COLUMNS = [
+    "slug",
+    "name",
+    "level_min",
+    "level_max",
+    "base_hp",
+    "base_damage",
+    "armor",
+    "speed",
+    "rarity",
+    "family",
+    "xp_base",
+]
+
+
+def _validate_monster_rows(rows):
+    errors = []
+    seen = set()
+    allowed_rarity = {"common", "uncommon", "rare", "elite", "boss", "epic", "legendary", "mythic"}
+    for r in rows:
+        line = r.get("__line__", "?")
+        slug = r.get("slug") or ""
+        if not slug:
+            errors.append(f"Line {line}: slug required")
+        else:
+            if slug in seen:
+                errors.append(f"Line {line}: duplicate slug '{slug}' in file")
+            seen.add(slug)
+        name = r.get("name") or ""
+        if not name:
+            errors.append(f"Line {line}: name required")
+        rarity = (r.get("rarity") or "").lower()
+        if rarity not in allowed_rarity:
+            errors.append(f"Line {line}: rarity '{rarity}' invalid (allowed {sorted(allowed_rarity)})")
+        fam = r.get("family") or ""
+        if not fam:
+            errors.append(f"Line {line}: family required")
+        # Numeric ints
+        for fld in ("level_min", "level_max", "base_hp", "base_damage", "armor", "speed", "xp_base"):
+            raw = r.get(fld)
+            if raw in (None, ""):
+                errors.append(f"Line {line}: {fld} required")
+                continue
+            try:
+                val = int(raw)
+            except Exception:
+                errors.append(f"Line {line}: {fld} must be integer (got '{raw}')")
+                continue
+            if val < 0:
+                errors.append(f"Line {line}: {fld} must be >= 0")
+        try:
+            lmin = int(r.get("level_min", 1))
+            lmax = int(r.get("level_max", 1))
+            if lmax < lmin:
+                errors.append(f"Line {line}: level_max < level_min")
+        except Exception:
+            pass
+        # Optional boolean boss
+        b_raw = (r.get("boss") or "").strip().lower()
+        if b_raw and b_raw not in ("0", "1", "true", "false", "yes", "no"):
+            errors.append(f"Line {line}: boss must be boolean-ish (0/1/true/false/yes/no)")
+    return errors
+
+
+@bp_admin_new.route("/admin/monsters", methods=["GET", "POST"])
+@admin_required
+def monsters():
+    from app.models.models import MonsterCatalog
+
+    if request.method == "POST":
+        file = request.files.get("file")
+        if not file:
+            return render_template("admin_monsters.html", errors=["No file uploaded"], imported=None, rows=[])
+        rows, parse_errors = _parse_csv(file, REQUIRED_MONSTER_COLUMNS)
+        if parse_errors:
+            return render_template("admin_monsters.html", errors=parse_errors, imported=None, rows=[])
+        val_errors = _validate_monster_rows(rows)
+        if val_errors:
+            return render_template("admin_monsters.html", errors=val_errors, imported=None, rows=rows)
+        changed = 0
+        try:
+            for r in rows:
+                slug = r["slug"]
+                obj = MonsterCatalog.query.filter_by(slug=slug).first()
+                if not obj:
+                    obj = MonsterCatalog(slug=slug)
+                    db.session.add(obj)
+                obj.name = r["name"]
+                obj.level_min = int(r["level_min"])
+                obj.level_max = int(r["level_max"])
+                obj.base_hp = int(r["base_hp"])
+                obj.base_damage = int(r["base_damage"])
+                obj.armor = int(r["armor"])
+                obj.speed = int(r["speed"])
+                obj.rarity = (r.get("rarity") or "common").lower()
+                obj.family = r.get("family") or "neutral"
+                obj.traits = r.get("traits") or None
+                obj.loot_table = r.get("loot_table") or None
+                obj.special_drop_slug = r.get("special_drop_slug") or None
+                obj.xp_base = int(r["xp_base"])
+                b_raw = (r.get("boss") or "").strip().lower()
+                if b_raw in ("1", "true", "yes"):
+                    obj.boss = True
+                elif b_raw in ("0", "false", "no"):
+                    obj.boss = False
+                # Optional resistances/damage_types columns
+                if r.get("resistances"):
+                    obj.resistances = r.get("resistances")
+                if r.get("damage_types"):
+                    obj.damage_types = r.get("damage_types")
+                changed += 1
+            db.session.commit()
+            return render_template("admin_monsters.html", errors=[], imported=changed, rows=[])
+        except Exception as e:  # pragma: no cover
+            db.session.rollback()
+            return render_template("admin_monsters.html", errors=[f"Database error: {e}"], imported=None, rows=rows)
+    # GET listing
+    page = max(1, int(request.args.get("page", 1)))
+    per_page = 50
+    q = MonsterCatalog.query.order_by(MonsterCatalog.id.asc())
+    total = q.count()
+    monsters = q.offset((page - 1) * per_page).limit(per_page).all()
+    return render_template(
+        "admin_monsters.html",
+        errors=[],
+        imported=None,
+        rows=[],
+        monsters=monsters,
+        page=page,
+        per_page=per_page,
+        total=total,
+    )
+
+
+# ----------------------------- Game Rules ---------------------------------
+
+
+@bp_admin_new.route("/admin/game-rules", methods=["GET", "POST"])
+@admin_required
+def game_rules():
+    """Manage gameplay modifiers and difficulty settings."""
+    from app.models.models import GameConfig
+
+    if request.method == "POST":
+        # Define all the game rule parameters
+        rules = {
+            "xp_multiplier": float(request.form.get("xp_multiplier", 1.0)),
+            "gold_multiplier": float(request.form.get("gold_multiplier", 1.0)),
+            "loot_drop_multiplier": float(request.form.get("loot_drop_multiplier", 1.0)),
+            "monster_hp_multiplier": float(request.form.get("monster_hp_multiplier", 1.0)),
+            "monster_damage_multiplier": float(request.form.get("monster_damage_multiplier", 1.0)),
+            "fog_density": float(request.form.get("fog_density", 0.0)),
+            "vision_range": int(request.form.get("vision_range", 10)),
+            "rest_heal_percent": float(request.form.get("rest_heal_percent", 50.0)),
+            "skill_check_difficulty": int(request.form.get("skill_check_difficulty", 13)),
+            "critical_hit_multiplier": float(request.form.get("critical_hit_multiplier", 2.0)),
+            "death_penalty_percent": float(request.form.get("death_penalty_percent", 10.0)),
+        }
+
+        # Save to database
+        for key, value in rules.items():
+            row = GameConfig.query.filter_by(key=f"game_rules.{key}").first()
+            if not row:
+                row = GameConfig(key=f"game_rules.{key}", value=json.dumps(value))
+                db.session.add(row)
+            else:
+                row.value = json.dumps(value)
+
+        db.session.commit()
+        flash("Game rules updated successfully!", "success")
+        return redirect(url_for("admin_new.game_rules"))
+
+    # Load current values from database
+    def get_rule(key, default):
+        row = GameConfig.query.filter_by(key=f"game_rules.{key}").first()
+        if row:
+            try:
+                return json.loads(row.value)
+            except (json.JSONDecodeError, ValueError):
+                return default
+        return default
+
+    rules = {
+        "xp_multiplier": get_rule("xp_multiplier", 1.0),
+        "gold_multiplier": get_rule("gold_multiplier", 1.0),
+        "loot_drop_multiplier": get_rule("loot_drop_multiplier", 1.0),
+        "monster_hp_multiplier": get_rule("monster_hp_multiplier", 1.0),
+        "monster_damage_multiplier": get_rule("monster_damage_multiplier", 1.0),
+        "fog_density": get_rule("fog_density", 0.0),
+        "vision_range": get_rule("vision_range", 10),
+        "rest_heal_percent": get_rule("rest_heal_percent", 50.0),
+        "skill_check_difficulty": get_rule("skill_check_difficulty", 13),
+        "critical_hit_multiplier": get_rule("critical_hit_multiplier", 2.0),
+        "death_penalty_percent": get_rule("death_penalty_percent", 10.0),
+    }
+
+    return render_template("admin_game_rules.html", rules=rules)

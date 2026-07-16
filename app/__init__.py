@@ -140,7 +140,6 @@ from app.services import rate_limiter as _rl  # noqa: E402
 
 # Blueprint imports intentionally placed after app/db initialization (runtime dependency ordering).
 from app.routes import auth, main  # noqa: E402  # isort: skip
-from app.routes.admin import bp_admin  # noqa: E402  # isort: skip
 from app.routes.admin_new import bp_admin_new  # noqa: E402  # isort: skip
 from app.routes.combat_api import bp_combat  # new combat blueprint  # noqa: E402  # isort: skip
 from app.routes.config_api import bp_config  # noqa: E402  # isort: skip
@@ -175,8 +174,7 @@ app.register_blueprint(bp_skill)
 app.register_blueprint(bp_achievement)
 app.register_blueprint(bp_inventory)
 app.register_blueprint(bp_user_prefs)
-app.register_blueprint(bp_admin)
-app.register_blueprint(bp_admin_new)  # New modular admin panel
+app.register_blueprint(bp_admin_new)  # Single consolidated admin panel
 app.register_blueprint(bp_combat)
 app.register_blueprint(bp_client_log)
 app.register_blueprint(bp_account)
