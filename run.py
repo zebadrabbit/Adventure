@@ -382,9 +382,10 @@ def main(argv: list[str]) -> int:
     ]
     print("\n".join(lines))
     try:
-        from app.logging_utils import log
+        import structlog
 
-        log.info(event="startup", mode=mode, host=host, port=port, db=db_banner)
+        log = structlog.get_logger(__name__)
+        log.info("startup", mode=mode, host=host, port=port, db=db_banner)
     except Exception:
         pass
 
@@ -626,9 +627,10 @@ def main(argv: list[str]) -> int:
         # Determine debug flag before logging
         debug = bool(getattr(args, "debug", False) or os.getenv("FLASK_DEBUG") == "1")
         try:
-            from app.logging_utils import log
+            import structlog
 
-            log.info(event="listen", host=host, port=port, debug=debug)
+            log = structlog.get_logger(__name__)
+            log.info("listen", host=host, port=port, debug=debug)
         except Exception:
             pass
         # Note: db_uri is read by the Flask app on import via app config/env
