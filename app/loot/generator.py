@@ -202,7 +202,6 @@ from app.loot.data.archetypes import ARCHETYPES, SLOTS, archetypes_for_slot  # n
 from app.loot.data.prefixes import prefixes_for  # noqa: E402
 from app.loot.data.suffixes import suffixes_for  # noqa: E402
 from app.loot.data.rarities import RARITIES, RARITY_ORDER, rarity_affix_range  # noqa: E402
-from app.loot.naming import compose_name  # noqa: E402
 
 # default rarity weighting when none requested
 _DEFAULT_RARITY_WEIGHTS = {
@@ -305,7 +304,13 @@ def generate_item(
         affixes.append(extra)
         remaining -= 1
 
-    name = compose_name(prefix_name, arch["base_name"], suffix_name)
+    _name_parts = []
+    if prefix_name:
+        _name_parts.append(prefix_name)
+    _name_parts.append(arch["base_name"])
+    name = " ".join(_name_parts)
+    if suffix_name:
+        name = f"{name} {suffix_name}"
     base_value = 8 + level * 4
     value = int((base_value + sum(a["val"] for a in affixes) * 3) * RARITIES[rarity]["value_mult"])
 
