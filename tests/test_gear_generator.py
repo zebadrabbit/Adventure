@@ -65,15 +65,21 @@ def test_value_scales_with_rarity():
 
 
 def test_name_composition_format():
-    """Verify name composition: no improper spacing, base_name present, and prefix/suffix ordering.
+    """Verify name composition against independent ground truth (the affix data pools).
 
     Validates that:
     - Names have no double/leading/trailing spaces
-    - Base archetype name is present
-    - Prefix names (if present) appear BEFORE base_name
-    - Suffix names (if present) appear AFTER base_name
+    - The name is (optional prefix + " ") + base_name + (" " + optional suffix), where
+      the prefix/suffix substrings are checked against the actual PREFIXES/SUFFIXES
+      pools rather than derived from the name itself. This catches, e.g., a reversed
+      prefix/suffix composition order.
     """
     from app.loot.data.archetypes import ARCHETYPES
+    from app.loot.data.prefixes import PREFIXES
+    from app.loot.data.suffixes import SUFFIXES
+
+    prefix_names = {p["name"] for p in PREFIXES}
+    suffix_names = {s["name"] for s in SUFFIXES}
 
     saw_prefix = False
     saw_suffix = False
@@ -82,38 +88,27 @@ def test_name_composition_format():
     for seed in range(200):
         it = generate_item(level=10, rarity="rare", rng=_rng(seed))
         name = it["name"]
+        arch_key = it["base"]
+        base_name = ARCHETYPES[arch_key]["base_name"]
 
         # No leading/trailing or double spaces
         assert name == " ".join(name.split()), f"Seed {seed}: Name has improper spacing: {repr(name)}"
 
-        # Base archetype name is present in the item name
-        arch_key = it["base"]
-        arch = ARCHETYPES[arch_key]
-        base_name = arch["base_name"]
-        assert base_name in name, f"Seed {seed}: Base name {repr(base_name)} not in {repr(name)}"
+        rest = name
+        for p in prefix_names:
+            if rest == p + " " + base_name or rest.startswith(p + " " + base_name + " "):
+                rest = rest[len(p) + 1 :]
+                saw_prefix = True
+                break
 
-        # Find the base_name position in the full name
-        base_idx = name.index(base_name)
+        assert rest == base_name or rest.startswith(
+            base_name + " "
+        ), f"Seed {seed}: {name!r} does not start with (prefix +) base {base_name!r}"
 
-        # Everything before base_name is prefix (if anything)
-        prefix_part = name[:base_idx].strip()
-        if prefix_part:
-            saw_prefix = True
-            # Prefix should come before base_name (index check)
-            assert (
-                name.index(prefix_part) < base_idx
-            ), f"Seed {seed}: Prefix part {repr(prefix_part)} not before base in {repr(name)}"
-
-        # Everything after base_name is suffix (if anything)
-        suffix_start = base_idx + len(base_name)
-        suffix_part = name[suffix_start:].strip()
-        if suffix_part:
+        rest = rest[len(base_name) :]
+        if rest:
+            assert rest[1:] in suffix_names, f"Seed {seed}: trailing {rest[1:]!r} in {name!r} is not a known suffix"
             saw_suffix = True
-            # Suffix should come after base_name (index check)
-            assert suffix_start <= name.index(suffix_part) + len(
-                suffix_part
-            ), f"Seed {seed}: Suffix part {repr(suffix_part)} not after base in {repr(name)}"
 
     # Ensure we actually tested both cases
-    assert saw_prefix, "Test suite did not generate any items with prefixes (bounded loop exhausted)"
-    assert saw_suffix, "Test suite did not generate any items with suffixes (bounded loop exhausted)"
+    assert saw_prefix and saw_suffix, "sweep must cover both a prefixed and a suffixed item"
