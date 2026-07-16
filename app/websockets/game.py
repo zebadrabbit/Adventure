@@ -30,15 +30,9 @@ from .validation import (
     validate,
 )
 
-try:
-    from app.logging_utils import log as _log
-except Exception:  # pragma: no cover
+import structlog
 
-    class _NoLog:  # fallback
-        def info(self, **k):
-            pass
-
-    _log = _NoLog()
+_log = structlog.get_logger(__name__)
 active_games = {}
 
 
@@ -68,7 +62,7 @@ def handle_join_game(data):
     info = active_games.setdefault(room, {"members": set(), "created": time.time()})
     info["members"].add(sid)
     emit("status", {"msg": f"{user} has joined the game."}, room=room)
-    _log.info(event="join_game", room=room, user=user, members=len(info["members"]))
+    _log.info("join_game", room=room, user=user, members=len(info["members"]))
 
 
 @socketio.on("leave_game")
@@ -101,7 +95,7 @@ def handle_leave_game(data):
             active_games.pop(room, None)
     emit("status", {"msg": f"{user} has left the game."}, room=room)
     _log.info(
-        event="leave_game",
+        "leave_game",
         room=room,
         user=user,
         remaining=len(info["members"]) if info else 0,
@@ -125,7 +119,7 @@ def handle_game_action(data):
     action = result["action"]
     # Placeholder for future game logic
     emit("game_update", {"msg": f"Action processed: {action}"}, room=room)
-    _log.info(event="game_action", room=room, action=action)
+    _log.info("game_action", room=room, action=action)
 
 
 # ------------------ Adventure Real-Time Events ------------------
@@ -170,10 +164,10 @@ def ws_dungeon_move(payload):  # pragma: no cover - exercised via integration, t
         moved, resp = process_movement(instance, direction)
         emit("dungeon_move_result", resp)
     except Exception as e:
-        from app.logging_utils import get_logger
+        import structlog
 
-        logger = get_logger(__name__)
-        logger.error(event="movement_failed", error=str(e))
+        logger = structlog.get_logger(__name__)
+        logger.error("movement_failed", error=str(e))
         return _emit_error("movement_failed", code="error")
 
 

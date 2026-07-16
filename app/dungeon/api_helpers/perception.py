@@ -121,16 +121,16 @@ def roll_perception_for_user():
 
 
 def maybe_perceive_and_mark_loot(instance, x: int, y: int) -> Tuple[bool, str, dict | None]:
-    from app.logging_utils import get_logger
+    import structlog
 
-    logger = get_logger(__name__)
+    logger = structlog.get_logger(__name__)
 
     seed = instance.seed
     rows = _loot_rows_at(seed, x, y)
     if not rows:
         return False, "", None
 
-    logger.info(event="perception_check", x=x, y=y, loot_count=len(rows))
+    logger.info("perception_check", x=x, y=y, loot_count=len(rows))
 
     key = _session_noticed_key(seed)
     noticed_map = session.get(key) or {}
@@ -149,20 +149,20 @@ def maybe_perceive_and_mark_loot(instance, x: int, y: int) -> Tuple[bool, str, d
                 session.modified = True
             except Exception:
                 pass
-            logger.info(event="perception_stale_notice_cleared", x=x, y=y)
+            logger.info("perception_stale_notice_cleared", x=x, y=y)
             return False, "", None
-        logger.info(event="perception_already_noticed", x=x, y=y)
+        logger.info("perception_already_noticed", x=x, y=y)
         return True, "You recall a suspicious spot here.", None
     elif status == "failed":
         # Already failed perception here, don't allow retries
-        logger.info(event="perception_already_failed", x=x, y=y)
+        logger.info("perception_already_failed", x=x, y=y)
         return False, "", None
 
     # Single perception check based on party's highest Wisdom + buffs
     roll_info = roll_perception_for_user()
     total = roll_info["total"]
     DC = 13
-    logger.info(event="perception_roll", x=x, y=y, roll=roll_info["roll"], mod=roll_info["mod"], total=total, dc=DC)
+    logger.info("perception_roll", x=x, y=y, roll=roll_info["roll"], mod=roll_info["mod"], total=total, dc=DC)
 
     if total >= DC:
         # Success - mark as noticed
@@ -172,11 +172,11 @@ def maybe_perceive_and_mark_loot(instance, x: int, y: int) -> Tuple[bool, str, d
             session.modified = True
         except Exception:
             pass
-        logger.info(event="perception_success", x=x, y=y)
+        logger.info("perception_success", x=x, y=y)
         return True, "You notice a glint of something hidden. You can Search this area.", roll_info
 
     # Failed perception check - mark as failed and delete non-container loot immediately
-    logger.info(event="perception_failed", x=x, y=y, action="deleting_non_containers")
+    logger.info("perception_failed", x=x, y=y, action="deleting_non_containers")
     noticed_map[ck] = "failed"
     session[key] = noticed_map
     try:

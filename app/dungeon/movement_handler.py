@@ -17,10 +17,11 @@ from app.dungeon.api_helpers.perception import (
     maybe_perceive_and_mark_loot,
 )
 from app.dungeon.tiles import DOOR, ROOM, TUNNEL
-from app.logging_utils import get_logger
+import structlog
+
 from app.models.dungeon_instance import DungeonInstance
 
-logger = get_logger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def get_cached_dungeon(seed: int, size_tuple: tuple[int, int, int]):
@@ -101,7 +102,7 @@ def process_movement(instance: DungeonInstance, direction: str) -> Tuple[bool, D
             try:
                 db.session.commit()
             except Exception as e:
-                logger.error(event="movement_commit_failed", user_id=current_user.id, error=str(e))
+                logger.error("movement_commit_failed", user_id=current_user.id, error=str(e))
                 db.session.rollback()
                 moved = False
 
@@ -118,7 +119,7 @@ def process_movement(instance: DungeonInstance, direction: str) -> Tuple[bool, D
                 combat_started = True
                 encounter_payload = collision
         except Exception as e:
-            logger.error(event="monster_collision_error", error=str(e))
+            logger.error("monster_collision_error", error=str(e))
 
     # Get current position and build description
     x, y, z = instance.pos_x, instance.pos_y, instance.pos_z
@@ -149,7 +150,7 @@ def process_movement(instance: DungeonInstance, direction: str) -> Tuple[bool, D
             elif msg:
                 perception_msg = msg
         except Exception as e:
-            logger.error(event="perception_error", x=x, y=y, error=str(e))
+            logger.error("perception_error", x=x, y=y, error=str(e))
 
     # Also check previously noticed coords
     if not noticed_flag:
@@ -208,7 +209,7 @@ def process_movement(instance: DungeonInstance, direction: str) -> Tuple[bool, D
 
             response["revealed_tiles"] = new_tiles
         except Exception as e:
-            logger.error(event="visibility_update_error", error=str(e))
+            logger.error("visibility_update_error", error=str(e))
 
     # Advance game time for any world-advancing action (a move is a turn, whether
     # or not it triggered combat). The clock should never stall on the move that
@@ -230,6 +231,6 @@ def process_movement(instance: DungeonInstance, direction: str) -> Tuple[bool, D
                 response["combat_id"] = patrol_resp["encounter"].get("combat_id")
                 response["encounter"] = patrol_resp["encounter"]
         except Exception as e:
-            logger.error(event="time_advance_error", error=str(e))
+            logger.error("time_advance_error", error=str(e))
 
     return moved, response
