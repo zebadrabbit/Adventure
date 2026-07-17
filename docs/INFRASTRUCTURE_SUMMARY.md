@@ -9,7 +9,7 @@
 - ✅ Multi-container setup (PostgreSQL, Web, Adminer)
 - ✅ Health checks for all services
 - ✅ Non-root user execution for security
-- ✅ Gunicorn with 4 eventlet workers
+- ✅ Gunicorn with 4 gevent workers
 - ✅ Persistent volumes for data
 
 **Environment Configuration**
@@ -205,7 +205,7 @@ python scripts/fix_exception_handling.py --report
 
 ## Performance Improvements
 
-✅ Gunicorn with eventlet workers (async support)
+✅ Gunicorn with gevent workers (async support)
 ✅ PostgreSQL connection pooling
 ✅ Health checks for all services
 ✅ Log rotation configuration

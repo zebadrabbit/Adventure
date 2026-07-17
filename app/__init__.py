@@ -109,7 +109,7 @@ def load_user(user_id):  # pragma: no cover - simple loader
         return None
 
 
-# Let Flask-SocketIO select best async_mode based on installed deps (eventlet/gevent/threading)
+# Let Flask-SocketIO select best async_mode based on installed deps (gevent/threading)
 socketio = SocketIO(
     app,
     async_mode=os.getenv("SOCKETIO_ASYNC_MODE") or None,

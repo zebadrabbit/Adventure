@@ -68,7 +68,7 @@ def start_server(host="0.0.0.0", port=5000, debug: bool = False):  # pragma: no 
             pass
     try:
         print(f"[INFO] Starting Socket.IO server on {host}:{port} (async_mode={socketio.async_mode})")
-        # Let Flask-SocketIO choose appropriate server (eventlet/gevent/werkzeug)
+        # Let Flask-SocketIO choose appropriate server (gevent/werkzeug)
         socketio.run(app, host=host, port=port, debug=debug)
     except KeyboardInterrupt:
         print("\n[INFO] Server stopped by user (Ctrl+C)")

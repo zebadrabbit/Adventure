@@ -9,7 +9,7 @@ Provides:
 
 Design:
   - Fixed window counters (epoch // window) stored in dict.
-  - Thread-safe via Lock (sufficient for eventlet/gevent monkey-patched threads in this project).
+  - Thread-safe via Lock (sufficient for gevent monkey-patched threads in this project).
   - Not persistent; resets on process restart (acceptable for abuse throttling baseline).
   - Keys include user id (if authenticated) else remote addr to reduce cross-user impact.
 """

@@ -86,7 +86,7 @@ docker-compose exec web pytest -v
 **CORS_ALLOWED_ORIGINS** - CORS configuration (default: `*`)
 
 **SOCKETIO_ASYNC_MODE** - SocketIO mode (default: auto-detect)
-- Options: `eventlet`, `gevent`, `threading`
+- Options: `gevent`, `threading`
 
 **ENGINEIO_LOGGER** - Enable SocketIO logging (default: `1`)
 

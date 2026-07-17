@@ -84,7 +84,7 @@ def admin_required(fn):
     return wrapper
 
 
-# Simple in-process cache (seed,size)->Dungeon instance. Thread-safe with a lock because Flask-SocketIO/eventlet may interleave greenlets.
+# Simple in-process cache (seed,size)->Dungeon instance. Thread-safe with a lock because Flask-SocketIO/gevent may interleave greenlets.
 _dungeon_cache = {}
 _dungeon_cache_lock = threading.Lock()
 _DUNGEON_CACHE_MAX = 8  # small LRU-ish manual cap
