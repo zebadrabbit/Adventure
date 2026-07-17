@@ -809,10 +809,10 @@ already-noted `glass-theme.css` dead-code follow-up.
   (`combat.js`, `57573b6`): stale `activeSkillsCache` after a cast meant the cooldown branch
   never fired, and naive-UTC `last_used` parsed as browser-local skewed a 5s cooldown to ~5h
   on a UTC-5 host. Report: `.superpowers/sdd/browser-verify-report.md` (screenshots alongside).
-- **New known issue found during that pass: `run.py reseed-items` is broken** — its item-clear
-  step violates `dungeon_loot_item_id_fkey` now that `DungeonLoot` rows reference items
-  (Spec 3). Workaround used: load `sql/monsters_seed.sql` directly. Needs a proper fix
-  (clear/cascade dungeon_loot first, or upsert instead of delete).
+- **`run.py reseed-items` FK regression — FIXED ✅** (`5136680`, TDD): `clear_item_categories()`
+  now deletes the referencing `dungeon_loot` rows (run-scoped floor loot, not player property)
+  in the same transaction before clearing items. FK inventory confirmed dungeon_loot is the
+  only `item.id` FK-holder — player inventory and hoard store slugs in JSON, untouched.
 - Still open from the lists above: `glass-theme.css` dead body-class rules, no mana-potion
   action, aggro/spawn-density play-feel tuning, multi-worker Socket.IO (sticky sessions +
   message queue) if `--workers > 1` is ever real.
