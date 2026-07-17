@@ -6,7 +6,7 @@
 - ✅ Added `structlog==24.1.0` to requirements.txt
 - ✅ Installed structlog in environment
 - ✅ Created `app/logging_config.py` with Flask integration
-- ✅ Updated Docker Compose for production PostgreSQL + Redis
+- ✅ Updated Docker Compose for production PostgreSQL
 - ✅ Updated `.env.example` with all production variables
 - ✅ Enhanced `manage.sh` with exception checking commands
 - ✅ Created exception handling scanner (`scripts/fix_exception_handling.py`)

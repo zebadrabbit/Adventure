@@ -1248,56 +1248,6 @@ def dungeon_entities():
     return jsonify({"entities": visible_entities, "count": len(visible_entities)})
 
 
-@bp_dungeon.route("/api/dungeon/debug/loot-locations")
-@login_required
-def debug_loot_locations():
-    """Return all loot locations for admin debug mode.
-
-    Only works if user is admin and debug mode is enabled.
-    Response: { loot_locations: [{x, y, z, item_name, claimed}], debug_mode: bool }
-    """
-    # Check if user is admin
-    if not current_user.is_authenticated or getattr(current_user, "role", "user") != "admin":
-        return jsonify({"error": "forbidden"}), 403
-
-    # Check if debug mode is enabled
-    debug_mode = session.get("admin_debug_mode", False)
-    if not debug_mode:
-        return jsonify({"debug_mode": False, "loot_locations": []})
-
-    dungeon_instance_id = session.get("dungeon_instance_id")
-    if not dungeon_instance_id:
-        return jsonify({"error": "No dungeon instance found"}), 404
-
-    instance = db.session.get(DungeonInstance, dungeon_instance_id)
-    if not instance:
-        return jsonify({"error": "Dungeon instance not found"}), 404
-
-    # Get all loot from DungeonLoot table
-    from app.models.loot import DungeonLoot
-    from app.models.models import Item
-
-    loot_rows = DungeonLoot.query.filter_by(seed=instance.seed).all()
-    locations = []
-
-    for loot in loot_rows:
-        item = db.session.get(Item, loot.item_id)
-        locations.append(
-            {
-                "x": loot.x,
-                "y": loot.y,
-                "z": loot.z,
-                "item_name": item.name if item else "Unknown",
-                "item_slug": item.slug if item else "",
-                "rarity": item.rarity if item else "common",
-                "claimed": loot.claimed,
-                "loot_id": loot.id,
-            }
-        )
-
-    return jsonify({"debug_mode": True, "loot_locations": locations, "count": len(locations)})
-
-
 @bp_dungeon.route("/api/dungeon/treasure/claim/<int:entity_id>", methods=["POST"])
 @login_required
 def claim_treasure(entity_id: int):

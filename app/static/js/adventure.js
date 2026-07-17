@@ -56,16 +56,8 @@
     setTimeout(() => {
       try {
         refreshEntities(true);
-        refreshDebugLoot(); // Also refresh debug loot markers
       } catch (e) { }
     }, 150);
-
-    // Listen for debug mode changes
-    window.addEventListener('storage', (e) => {
-      if (e.key === 'admin_debug_mode_changed') {
-        refreshDebugLoot();
-      }
-    });
 
     // --- WebSocket: subscribe to /game for monster patrol updates ---
     (function initGameSocket() {
@@ -306,34 +298,6 @@
 
     // ---------------- Canvas-based Entity Rendering -----------------
     // (Leaflet layer functions removed - entities now rendered via DungeonCanvas)
-
-    function renderDebugLoot(lootLocations) {
-      // Canvas version - stub for now (debug loot rendering not yet implemented in Canvas)
-      // TODO: Implement debug loot markers in DungeonCanvas if needed
-      if (!window.dungeonCanvas) return;
-      console.debug('[Canvas] Debug loot rendering not yet implemented', lootLocations);
-    }
-
-    function refreshDebugLoot() {
-      // Check if debug mode is enabled
-      const debugMode = sessionStorage.getItem('admin_debug_mode') === 'true';
-      if (!debugMode) {
-        // Canvas version - nothing to clear
-        return;
-      }
-
-      // Fetch all loot locations from server
-      fetch('/api/dungeon/debug/loot-locations')
-        .then(r => r.ok ? r.json() : null)
-        .then(data => {
-          if (data && data.debug_mode && Array.isArray(data.loot_locations)) {
-            renderDebugLoot(data.loot_locations);
-          }
-        })
-        .catch(err => {
-          console.debug('[debug] loot fetch failed:', err);
-        });
-    }
 
     function iconForMonster(mon) {
       const slug = mon.icon_slug || mon.slug || mon.name || 'monster';

@@ -305,7 +305,7 @@ The Adventure MUD project now has production-grade infrastructure including:
 
 1. **Containerization**: Complete Docker setup with multi-service orchestration
 2. **Database**: PostgreSQL with migration support
-3. **Caching**: Redis for sessions and SocketIO scaling
+3. **Sessions**: Signed cookie sessions (no external cache dependency)
 4. **Logging**: Structured logging with context injection
 5. **Management**: Comprehensive CLI tools for all operations
 6. **CI/CD**: Automated testing and quality checks

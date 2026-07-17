@@ -6,9 +6,18 @@ def test_continue_adventure_flow(auth_client):
     # Need at least one character id (fixtures create one with name Hero)
     # Fetch dashboard to extract characters indirectly not required; we know id=1 may not be reliable, so query state via movement (ensures instance set)
     # Instead query characters through a lightweight API? Reuse DB model import inside test context.
-    from app.models.models import Character
+    # Scope to the logged-in "tester" user rather than an unscoped .first(): a stray
+    # character left in the shared Postgres test DB by another session could otherwise
+    # be picked, since /dashboard's start_adventure/continue_adventure forms operate
+    # on characters belonging to current_user (see commit 3d655b3 for the same fix
+    # applied to test_camp_regen_buff.py).
+    from app.models.models import Character, User
 
-    char = Character.query.filter_by(name="Hero").first() or Character.query.first()
+    user = User.query.filter_by(username="tester").first()
+    char = (
+        Character.query.filter_by(user_id=user.id, name="Hero").first()
+        or Character.query.filter_by(user_id=user.id).first()
+    )
     assert char is not None, "Expected at least one character"
     # Post start_adventure with this character id
     resp = auth_client.post(

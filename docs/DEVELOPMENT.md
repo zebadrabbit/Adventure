@@ -238,7 +238,6 @@ Fail fast and fix in the same PR. If a deliberate behavior change breaks a balan
 | `scripts/setup_adventure.py` | Bootstrap `.env`, ensure admin, run migrations (optional) |
 | `scripts/bump_version.py` | Semantic version bump & CHANGELOG insertion |
 | `scripts/diagnose_seeds.py` | Analyze generation metrics across a seed sample |
-| `scripts/upgrade_explored_tiles.py` | Migrate explored-tiles persistence format |
 | `scripts/profile_doors.py` | Inspect door placement behaviors (legacy interest) |
 
 ## Database Migrations
