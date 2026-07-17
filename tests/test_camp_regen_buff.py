@@ -5,12 +5,27 @@ import json
 
 from app import db
 from app.models import CharacterStatusEffect
-from app.models.models import Character
+from app.models.models import Character, User
+
+
+def _tester_character():
+    """Return the character the camp route will actually operate on.
+
+    The /api/dungeon/camp route restores/buffs Character rows scoped to
+    ``current_user`` (the logged-in ``tester`` user from the auth_client
+    fixture). Selecting the character with a bare ``Character.query.first()``
+    is order-dependent: any stray character left in the shared Postgres test
+    DB by another test (or a prior session) can be returned instead, so the
+    test would set stats on / assert about a character the route never
+    touches. Scope explicitly to the tester user to match the route.
+    """
+    user = User.query.filter_by(username="tester").first()
+    return Character.query.filter_by(user_id=user.id).first()
 
 
 def test_camp_applies_regen_buff_alongside_existing_restore(test_app, auth_client):
     with test_app.app_context():
-        char = Character.query.first()
+        char = _tester_character()
         char.stats = json.dumps({"hp": 10, "max_hp": 100, "mana": 5, "max_mana": 50})
         db.session.commit()
         char_id = char.id
@@ -41,7 +56,7 @@ def test_camp_applies_regen_buff_alongside_existing_restore(test_app, auth_clien
 
 def test_camp_regen_buff_replaces_not_stacks(test_app, auth_client):
     with test_app.app_context():
-        char = Character.query.first()
+        char = _tester_character()
         char.stats = json.dumps({"hp": 10, "max_hp": 100, "mana": 5, "max_mana": 50})
         db.session.commit()
         char_id = char.id
