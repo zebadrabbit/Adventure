@@ -27,6 +27,8 @@ _DEFAULT_PROGRESSION = {
     "talent_points_per_level": 1,
     "stat_points_per_level": 2,
     "extraction_xp": 50,
+    "full_clear_copper_mult": 1.25,
+    "full_clear_xp_bonus": 0.5,
 }
 
 # Upper bound for level search; the xp table extrapolates beyond 20.

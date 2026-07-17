@@ -113,6 +113,18 @@ DUNGEON_ACHIEVEMENTS = [
         "requirement_value": 1,
         "reward_gold": 0,
     },
+    {
+        "slug": "dungeon-full-clear",
+        "name": "Leave Nothing Standing",
+        "description": "Extract after slaying every monster and the boss in a single run.",
+        "category": "combat",
+        "icon": "skull",
+        "points": 25,
+        "hidden": False,
+        "requirement_type": "dungeon_full_clear",
+        "requirement_value": 1,
+        "reward_gold": 0,
+    },
 ]
 
 

@@ -50,6 +50,22 @@ def calculate_extraction_penalties(instance: DungeonInstance, early: bool = True
     return {"xp_multiplier": 0.7, "loot_quality_multiplier": 0.8}
 
 
+def is_full_clear(instance: DungeonInstance) -> bool:
+    """Boss(es) dead AND no monster entities left on the map.
+
+    ponytail: entities are deleted when combat *starts* (finite pool), so a
+    fled encounter still counts toward the clear; upgrade path is a real
+    kill counter on the instance if flee-abuse ever matters.
+    """
+    total = int(getattr(instance, "bosses_total", 0) or 0)
+    if total <= 0 or int(instance.bosses_defeated or 0) < total:
+        return False
+    from app.models.entities import DungeonEntity  # match trigger_collision_combat's import path
+
+    remaining = DungeonEntity.query.filter_by(instance_id=instance.id, type="monster").count()
+    return remaining == 0
+
+
 def extract_party(
     instance: DungeonInstance, character_ids: List[int], user_id: int
 ) -> Tuple[bool, str, Dict[str, any]]:
@@ -90,6 +106,12 @@ def extract_party(
     secured_copper = 0
     secured_items = 0
 
+    from app.services import progression
+
+    cfg = progression.progression_config()
+    # Whole-run bonus: every monster + the boss slain this run.
+    full_clear = is_full_clear(instance)
+
     # Apply penalties to extracting characters
     for char in extracting_chars:
         # Apply XP penalty
@@ -115,9 +137,9 @@ def extract_party(
 
         # Award extraction XP (scaled by the same early-extraction multiplier),
         # applying any resulting level-ups + talent points.
-        from app.services import progression
-
-        extraction_xp = int(progression.progression_config().get("extraction_xp", 0))
+        extraction_xp = int(cfg.get("extraction_xp", 0))
+        if full_clear:
+            extraction_xp = int(extraction_xp * (1 + float(cfg.get("full_clear_xp_bonus", 0.5))))
         if extraction_xp > 0:
             progression.grant_xp(char, int(extraction_xp * penalties["xp_multiplier"]))
 
@@ -125,6 +147,14 @@ def extract_party(
         moved = hoard_service.pool_run_haul(hoard, char)
         secured_copper += moved["copper"]
         secured_items += moved["items"]
+
+    # Full-clear copper multiplier: apply to what actually lands in the hoard,
+    # not just the reported number -- pool_run_haul already deposited the base
+    # copper, so top up the hoard by the bonus delta and report the total.
+    if full_clear and not early_extraction and secured_copper > 0:
+        boosted = int(secured_copper * float(cfg.get("full_clear_copper_mult", 1.25)))
+        hoard_service.deposit_copper(hoard, boosted - secured_copper)
+        secured_copper = boosted
 
     # Mark left behind characters as permadeath
     for char in left_behind_chars:
@@ -187,6 +217,8 @@ def extract_party(
             for event_type, condition in _events:
                 if condition:
                     _check_ach(char.id, event_type, _base_data)
+            if full_clear:
+                _check_ach(char.id, "dungeon_full_clear", {"count": 1})
     except Exception:
         import logging as _logging
 
@@ -197,6 +229,7 @@ def extract_party(
         "left_behind": [c.name for c in left_behind_chars],
         "penalties": penalties,
         "early_extraction": early_extraction,
+        "full_clear": full_clear,
         "secured": {
             "copper": secured_copper,
             "copper_display": format_copper(secured_copper),
