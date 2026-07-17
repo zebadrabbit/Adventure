@@ -87,12 +87,27 @@ def clear_item_categories() -> int:
     """Delete all Item rows whose type matches seeded categories.
 
     Returns number of rows deleted (best-effort; SQLite rowcount applies).
+
+    Before deleting, clears DungeonLoot rows referencing the items about to
+    be removed: dungeon_loot.item_id has a FK to item.id, and DungeonLoot is
+    per-run, ephemeral floor loot (not player-owned property) -- it's stale
+    by definition once the underlying catalog item is replaced, so deleting
+    it here is safe. This is the only table in app/models with a FK to
+    item.id (grepped `ForeignKey("item.id")` across app/models/); player
+    inventory (Character.items) and the account-level Hoard (Hoard.items_json)
+    store items by slug in JSON blobs, not FK, so they are untouched by this
+    delete and player property is never destroyed.
     """
     # NOTE: rely on simple type match; if schema evolves adjust accordingly.
     categories = ("weapon", "armor", "potion", "misc")
     # SQLAlchemy / SQLite requires expanding the IN; use tuple positional style
-    stmt = text("DELETE FROM item WHERE type IN (%s)" % ",".join([f":c{i}" for i, _ in enumerate(categories)]))
+    in_clause = ",".join([f":c{i}" for i, _ in enumerate(categories)])
     params = {f"c{i}": cat for i, cat in enumerate(categories)}
+
+    loot_stmt = text("DELETE FROM dungeon_loot WHERE item_id IN (SELECT id FROM item WHERE type IN (%s))" % in_clause)
+    db.session.execute(loot_stmt, params)
+
+    stmt = text("DELETE FROM item WHERE type IN (%s)" % in_clause)
     result = db.session.execute(stmt, params)
     db.session.commit()
     return int(result.rowcount or 0)
