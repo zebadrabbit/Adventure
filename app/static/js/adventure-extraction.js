@@ -133,6 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const summary = secured
                         ? `Secured ${secured.copper_display} and ${secured.items} item(s) to the Hoard.`
                         : '';
+                    const fullClear = !!(data.result && data.result.full_clear);
                     const statusDiv = document.getElementById('extraction-status');
                     statusDiv.classList.remove('d-none');
                     document.getElementById('extraction-characters').classList.add('d-none');
@@ -141,6 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // raw today. If any of them ever incorporate a player-chosen string, escape it first.
                     statusDiv.innerHTML = `
                 <div class="alert alert-success">
+                  ${fullClear ? '<div><strong class="text-warning">FULL CLEAR — bonus loot and XP secured!</strong></div>' : ''}
                   <strong>${data.message}</strong>
                   ${summary ? `<div class="mt-1">${summary}</div>` : ''}
                 </div>`;
