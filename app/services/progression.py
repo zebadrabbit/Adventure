@@ -110,3 +110,40 @@ def grant_xp(character, amount: int) -> Dict[str, int]:
         "talent_points_awarded": talent_awarded,
         "stat_points_awarded": stat_awarded,
     }
+
+
+def grant_starting_skill(character):
+    """Give a freshly created character its class's tier-1 active, cost-free.
+
+    Chooses the first active tier-1 skill in a class-gated tree that allows
+    the character's class (archetype trees are the only class-gated ones);
+    falls back to the universal Combat tree. Idempotent; never spends points.
+
+    Returns the granted Skill, or None if a skill was already granted or no
+    matching skills are seeded.
+    """
+    from app.models.skill import CharacterSkill, Skill, SkillTree
+
+    try:
+        char_class = (json.loads(character.stats) or {}).get("class")
+    except Exception:
+        char_class = None
+
+    trees = SkillTree.query.filter_by(is_active=True).all()
+    gated = [t for t in trees if t.class_requirement and t.allows_class(char_class)]
+    universal = [t for t in trees if not t.class_requirement]
+    for tree in gated + universal:
+        skill = (
+            Skill.query.filter_by(tree_id=tree.id, tier=1, skill_type="active", is_active=True)
+            .order_by(Skill.id)
+            .first()
+        )
+        if not skill:
+            continue
+        existing = CharacterSkill.query.filter_by(character_id=character.id, skill_id=skill.id).first()
+        if existing:
+            return None
+        db.session.add(CharacterSkill(character_id=character.id, skill_id=skill.id, skill_rank=1))
+        db.session.commit()
+        return skill
+    return None

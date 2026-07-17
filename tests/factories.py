@@ -92,7 +92,8 @@ def create_character(
     char_class: str = "fighter",
     items: Optional[list[str]] = None,
 ) -> Character:
-    stats = BASE_STATS.get(char_class, BASE_STATS["fighter"])
+    stats = dict(BASE_STATS.get(char_class, BASE_STATS["fighter"]))
+    stats["class"] = char_class
     bag = items if items is not None else STARTER_ITEMS.get(char_class, [])
     c = Character(
         user_id=user.id,

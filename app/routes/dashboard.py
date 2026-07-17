@@ -280,6 +280,14 @@ def dashboard():
         )
         db.session.add(character)
         db.session.commit()
+        try:
+            from app.services.progression import grant_starting_skill
+
+            grant_starting_skill(character)
+        except Exception:
+            from flask import current_app
+
+            current_app.logger.warning("grant_starting_skill failed for char %s", character.id, exc_info=True)
         flash(f"Character {name} the {char_class} created!")
         return redirect(url_for("dashboard.dashboard"))
     # GET: delegate to helper renderer
@@ -423,6 +431,14 @@ def recruit_hire():
     )
     db.session.add(ch)
     db.session.commit()
+    try:
+        from app.services.progression import grant_starting_skill
+
+        grant_starting_skill(ch)
+    except Exception:
+        from flask import current_app
+
+        current_app.logger.warning("grant_starting_skill failed for char %s", ch.id, exc_info=True)
     return jsonify({"id": ch.id, "name": ch.name, "cls": cls})
 
 

@@ -91,3 +91,21 @@ def test_autofill_requires_auth(client):
     # Ensure truly unauthenticated (fresh client fixture provides that)
     r = client.post("/autofill_characters", follow_redirects=False)
     assert r.status_code in (302, 401)
+
+
+def test_autofill_grants_one_starting_skill_per_character(auto_client, test_app):
+    from app.models.skill import CharacterSkill
+    from app.seed_skills import seed_skills
+
+    with test_app.app_context():
+        seed_skills(verbose=False)
+
+    r = auto_client.post("/autofill_characters")
+    assert r.status_code in (200, 201)
+    data = r.get_json()
+    assert data["created"] == 4
+
+    with test_app.app_context():
+        for ch in data["characters"]:
+            skills = CharacterSkill.query.filter_by(character_id=ch["id"]).all()
+            assert len(skills) == 1, f"character {ch['id']} has {len(skills)} skills"

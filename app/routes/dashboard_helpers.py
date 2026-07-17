@@ -359,6 +359,15 @@ def handle_autofill(existing: list[Character], current_user_id: int):
             db.session.add(ch)
             created.append(ch)
         db.session.commit()
+        from app.services.progression import grant_starting_skill
+
+        for ch in created:
+            try:
+                grant_starting_skill(ch)
+            except Exception:
+                from flask import current_app
+
+                current_app.logger.warning("grant_starting_skill failed for char %s", ch.id, exc_info=True)
         existing.extend(created)
     return existing, created
 
