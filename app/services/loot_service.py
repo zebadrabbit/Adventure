@@ -167,6 +167,40 @@ def roll_loot(monster: Dict[str, Any], rng: random.Random | None = None) -> Dict
     return {"items": qty_map, "items_list": drops, "gear": gear_drops, "rolls": rolls_meta}
 
 
+def _item_display_name(slug: str) -> str:
+    """Look up an item's catalog display name; fall back to a title-cased slug."""
+    from app.models.models import Item
+
+    item = Item.query.filter_by(slug=slug).first()
+    if item and item.name:
+        return item.name
+    return slug.replace("-", " ").replace("_", " ").title()
+
+
+def _loot_summary(rewards: Dict[str, Any] | None) -> str:
+    """Render a human-readable combat-log summary of a loot roll.
+
+    ``rewards`` is the dict returned by :func:`roll_loot` (or ``{}``): quantity
+    items under "items" as "N× Display Name", gear instances under "gear" as
+    "Name (rarity)". Returns "no loot" when both are empty.
+    """
+    rewards = rewards or {}
+    parts: List[str] = []
+
+    items = rewards.get("items") or {}
+    for slug, qty in items.items():
+        parts.append(f"{qty}× {_item_display_name(slug)}")
+
+    for inst in rewards.get("gear") or []:
+        if not isinstance(inst, dict):
+            continue
+        name = inst.get("name") or _item_display_name(inst.get("base", "item"))
+        rarity = inst.get("rarity") or "common"
+        parts.append(f"{name} ({rarity})")
+
+    return ", ".join(parts) if parts else "no loot"
+
+
 def gear_bonuses(gear: dict | None) -> dict:
     """Sum affix values across all equipped instances -> {stat: total}.
 

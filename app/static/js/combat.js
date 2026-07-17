@@ -140,16 +140,7 @@
         return { cls, msg };
     }
     function formatMessage(l) {
-        let rawMsg = l.m || '';
-        if (/Loot:\s*{/.test(rawMsg)) {
-            try {
-                const idx = rawMsg.indexOf('Loot:');
-                const raw = rawMsg.slice(idx + 5).trim();
-                const itemMatches = [...raw.matchAll(/'([A-Za-z0-9_-]+)'/g)].map(m => m[1]).filter(k => !['items', 'items_list', 'rolls', 'base_pool', 'weights', 'special'].includes(k));
-                if (itemMatches.length === 0) rawMsg = rawMsg.replace(/Loot:.*/, 'Loot: (no items)');
-                else rawMsg = rawMsg.replace(/Loot:.*/, 'Loot: ' + itemMatches.join(', '));
-            } catch (e) { /* ignore */ }
-        }
+        const rawMsg = l.m || '';
         return { text: rawMsg, bare: rawMsg };
     }
     let processedLogCount = 0;

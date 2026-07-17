@@ -52,7 +52,7 @@ from .combat_constants import (
     PLAYER_USE_ITEM,
 )
 from .combat_utils import apply_resistances
-from .loot_service import roll_loot
+from .loot_service import _loot_summary, roll_loot
 from .monster_ai import select_action
 from .status_effects import apply_start_of_turn, can_act
 from .time_service import set_combat_state
@@ -600,7 +600,8 @@ def _check_end(session: CombatSession):
         monster = session.monster()
         rewards = roll_loot(monster) if monster else {}
         session.status = "complete"
-        _append_log(session, f"{monster.get('name')} defeated! Loot: {rewards}", code=COMBAT_COMPLETE)
+        loot_text = _loot_summary(rewards)
+        _append_log(session, f"{monster.get('name')} defeated! Loot: {loot_text}", code=COMBAT_COMPLETE)
 
         # Track boss kills and progress
         try:
