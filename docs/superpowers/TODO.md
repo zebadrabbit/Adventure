@@ -817,6 +817,32 @@ already-noted `glass-theme.css` dead-code follow-up.
   action, aggro/spawn-density play-feel tuning, multi-worker Socket.IO (sticky sessions +
   message queue) if `--workers > 1` is ever real.
 
+## 2026-07-17 — Class archetype skill trees + full-clear extraction bonus
+- **Class archetype trees shipped** (plan: `plans/2026-07-17-class-skills-fullclear.md`): 6
+  new class-gated `SkillTree` rows (Martial/Arcana/Divine/Nature/Shadow/Occult, each
+  `class_requirement` a comma-separated class list) covering all 12 classes, 30 skills total
+  (5 per tree, including the 2 pre-existing Arcana skills Focus/Firebolt — only 3 new rows
+  needed there) seeded idempotently via `app/seed_skills.py`/`python run.py seed-skills`.
+  Server-side class gating (`SkillTree.allows_class`, enforced in `unlock_skill`, 403 on a
+  wrong-class unlock attempt) plus client-side tree-list filtering in `skill-tree.js`. Every
+  new character now gets a cost-free tier-1 active starting skill matching their class
+  (`progression.grant_starting_skill`, wired at all three character-creation sites),
+  fixing the "sorcerer starts with no spells" gap.
+- **Full-clear extraction bonus + achievement**: `extraction_service.is_full_clear` (boss(es)
+  dead AND zero remaining monster entities) drives a copper multiplier and XP bonus on
+  `extract_party`, plus a new `dungeon-full-clear` ("Leave Nothing Standing") achievement row
+  in `app/seed_dungeon_achievements.py`'s existing list. The extraction confirmation panel
+  (`app/static/js/adventure-extraction.js`) now shows a `FULL CLEAR — bonus loot and XP
+  secured!` line (reusing the existing `text-warning`/`alert-success` classes) when
+  `data.result.full_clear` is true.
+- **Deploy note**: run both `python run.py seed-skills` and
+  `python run.py seed-dungeon-achievements` on dev/prod after this lands. Both verified
+  idempotent by running each twice against the test DB (`seed-skills`: "7 trees, 33 skills
+  seeded" both runs; `seed-dungeon-achievements`: `created=10 updated=0` then
+  `created=0 updated=10` on the second run — no wiring change needed, the new achievement
+  row was already in the list the existing `run.py seed-dungeon-achievements` subcommand
+  seeds).
+
 ## How to run the suite
 ```bash
 export TEST_DATABASE_URL=postgresql://adventure:changeme@localhost:5433/adventure_test

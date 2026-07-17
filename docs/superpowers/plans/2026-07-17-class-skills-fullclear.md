@@ -78,7 +78,7 @@ Starting-skill map (class → tree T1 active): fighter/barbarian/monk → Crushi
 
 **Interfaces:**
 - Consumes: existing `seed_skills()` upsert machinery (unchanged).
-- Produces: DB rows for the 6 trees / 27 skills above. Later tasks look up trees by exact `name` and skills by exact `name` within a tree — spelling in the canonical table is binding.
+- Produces: DB rows for the 6 trees / 30 skills above. Later tasks look up trees by exact `name` and skills by exact `name` within a tree — spelling in the canonical table is binding.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -141,7 +141,7 @@ def test_seed_is_idempotent(test_app):
 - [ ] **Step 2: Run it, confirm it fails** (`pytest tests/test_seed_skills_archetypes.py -q` → trees missing)
 - [ ] **Step 3: Add the content** — extend `TREES` and `SKILLS` in `app/seed_skills.py` with exactly the canonical tables above (Arcana tree entry's `class_requirement` becomes `"mage,sorcerer"`; keep its existing two skills; append the other 25 skill dicts using the existing dict shape: `tree/name/description/tier/required_level/cost/skill_type/cooldown/effect/required_skill`). Write one-line flavor descriptions for each new skill.
 - [ ] **Step 4: Run the test file → PASS; run full suite → green**
-- [ ] **Step 5: Commit** — `feat(skills): seed six class-archetype skill trees (27 skills)`
+- [ ] **Step 5: Commit** — `feat(skills): seed six class-archetype skill trees (30 skills)`
 
 ---
 
@@ -379,5 +379,5 @@ Add to `app/seed_dungeon_achievements.py`'s list:
 - Test: run the two seed commands against the test DB once to prove they work end-to-end.
 
 - [ ] **Step 1:** Verify `python run.py seed-skills` and the dungeon-achievements seeding path (find how `seed_dungeon_achievements` is invoked — `run.py` subcommand or admin reseed; if the new achievement isn't reachable by an existing command, wire it into whichever command already runs that seeder) both apply the new content idempotently. Evidence: run each twice against the test DB, second run changes nothing.
-- [ ] **Step 2:** TODO.md: add a dated entry — class archetype trees (6 trees / 27 skills), starting actives per class, server-side class gating, full-clear bonus + achievement; deploy note: run `python run.py seed-skills` and the achievements seeder on the dev/prod DB.
+- [ ] **Step 2:** TODO.md: add a dated entry — class archetype trees (6 trees / 30 skills), starting actives per class, server-side class gating, full-clear bonus + achievement; deploy note: run `python run.py seed-skills` and the achievements seeder on the dev/prod DB.
 - [ ] **Step 3: Commit** — `docs(todo): class skill trees + full-clear bonus shipped; deploy seed steps`
