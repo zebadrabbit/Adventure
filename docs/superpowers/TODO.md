@@ -801,8 +801,19 @@ already-noted `glass-theme.css` dead-code follow-up.
 - **eventlet → gevent**: Socket.IO async backend migrated (eventlet is in maintenance mode
   upstream); gunicorn uses the `geventwebsocket` worker. Also fixed Dockerfile's CMD, which
   targeted a nonexistent `run:app` (standalone image would crash on boot; compose was fine).
-- Still open from the lists above: live-browser confirmations (combat skill buttons, entity
-  fog-of-war, combat-log race), `glass-theme.css` dead body-class rules, no mana-potion
+- **Live-browser verification pass done ✅ (Playwright vs real dev server):** all three
+  outstanding confirmations PASS — combat skill buttons (render/cast/cooldown/character-swap),
+  entities hidden on `unknown` fog cells (verified deterministically incl. an injected probe),
+  combat log append-only across ~13 casts (MutationObserver, 0 full-clears). Zero console
+  errors. Along the way found and fixed two real client bugs in the cooldown display
+  (`combat.js`, `57573b6`): stale `activeSkillsCache` after a cast meant the cooldown branch
+  never fired, and naive-UTC `last_used` parsed as browser-local skewed a 5s cooldown to ~5h
+  on a UTC-5 host. Report: `.superpowers/sdd/browser-verify-report.md` (screenshots alongside).
+- **New known issue found during that pass: `run.py reseed-items` is broken** — its item-clear
+  step violates `dungeon_loot_item_id_fkey` now that `DungeonLoot` rows reference items
+  (Spec 3). Workaround used: load `sql/monsters_seed.sql` directly. Needs a proper fix
+  (clear/cascade dungeon_loot first, or upsert instead of delete).
+- Still open from the lists above: `glass-theme.css` dead body-class rules, no mana-potion
   action, aggro/spawn-density play-feel tuning, multi-worker Socket.IO (sticky sessions +
   message queue) if `--workers > 1` is ever real.
 
