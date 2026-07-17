@@ -7,6 +7,7 @@
 class SkillTreeSystem {
     constructor() {
         this.currentCharacterId = null;
+        this.currentCharacterClass = '';
         this.currentTreeId = null;
         this.skillTrees = [];
         this.skills = [];
@@ -33,11 +34,21 @@ class SkillTreeSystem {
     async openSkillTree(characterId) {
         this.currentCharacterId = characterId;
 
+        // The character's class lives on the party card's data-class attribute
+        // (dashboard.html renders it there for the same character.id used by
+        // data-char-id on the .btn-skill-panel that opens this modal).
+        const card = document.querySelector(`.operative-card[data-id="${characterId}"]`);
+        this.currentCharacterClass = (card && card.dataset.class ? card.dataset.class : '').trim().toLowerCase();
+
         try {
             // Load skill trees
             const treesResponse = await fetch('/api/skill-trees');
             if (!treesResponse.ok) throw new Error('Failed to load skill trees');
-            this.skillTrees = await treesResponse.json();
+            const allTrees = await treesResponse.json();
+            this.skillTrees = allTrees.filter(tree =>
+                !tree.class_requirement ||
+                tree.class_requirement.split(',').map(s => s.trim().toLowerCase()).includes(this.currentCharacterClass)
+            );
 
             // Load character's talent points
             const pointsResponse = await fetch(`/api/characters/${characterId}/talent-points`);

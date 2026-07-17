@@ -148,6 +148,15 @@ def unlock_skill(character_id):
     if not skill:
         return jsonify({"error": "Skill not found"}), 404
 
+    # Check class gating (comma-separated class_requirement on the tree)
+    tree = db.session.get(SkillTree, skill.tree_id)
+    try:
+        char_class = (json.loads(character.stats) or {}).get("class")
+    except Exception:
+        char_class = None
+    if tree and not tree.allows_class(char_class):
+        return jsonify({"error": f"{tree.name} requires class: {tree.class_requirement}"}), 403
+
     # Check if already unlocked
     existing = CharacterSkill.query.filter_by(character_id=character_id, skill_id=skill_id).first()
 

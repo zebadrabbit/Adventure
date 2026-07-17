@@ -92,7 +92,7 @@
                 {% set hp_pct = [0, [100, hp_pct]|min]|max %}
                 {% set mp_pct = (c.stats.mana / c.mana_max * 100)|int if c.mana_max > 0 else 0 %}
                 {% set mp_pct = [0, [100, mp_pct]|min]|max %}
-                <div class="operative-card selected" data-id="{{ c.id }}">
+                <div class="operative-card selected" data-id="{{ c.id }}" data-class="{{ c.class_name }}">
                     <div class="operative-summary">
                         <div class="operative-header">
                             <div class="operative-name">

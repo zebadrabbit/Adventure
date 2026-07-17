@@ -35,6 +35,15 @@ class SkillTree(db.Model):
     # Relationships
     skills = db.relationship("Skill", backref="skill_tree", lazy=True, cascade="all, delete-orphan")
 
+    def allows_class(self, char_class: str | None) -> bool:
+        """True if this tree is universal or char_class is in the comma list."""
+        if not self.class_requirement:
+            return True
+        if not char_class:
+            return False
+        allowed = {c.strip().lower() for c in self.class_requirement.split(",")}
+        return char_class.strip().lower() in allowed
+
 
 class Skill(db.Model):
     """Individual skill/talent in a tree.
