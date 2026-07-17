@@ -64,9 +64,12 @@ def combat_state(combat_id: int):
 
                 try:
                     chars = _Ch.query.filter_by(user_id=current_user.id).all()
-                    data["party"]["item_counts"] = {"potion-healing": _potion_counts_by_character(chars)}
+                    data["party"]["item_counts"] = {
+                        "potion-healing": _potion_counts_by_character(chars, "potion-healing"),
+                        "potion-mana": _potion_counts_by_character(chars, "potion-mana"),
+                    }
                 except Exception:
-                    data["party"]["item_counts"] = {"potion-healing": {}}
+                    data["party"]["item_counts"] = {"potion-healing": {}, "potion-mana": {}}
         if data.get("monster_hp") is not None and data.get("monster_max_hp"):
             mhp = data["monster_hp"]
             mmax = data["monster_max_hp"] or 1

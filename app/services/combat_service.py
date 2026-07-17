@@ -235,11 +235,16 @@ def _base_player_snapshot(user_id: int) -> Dict[str, Any]:
     # Per-character inventory counts surfaced for UI gating (e.g. potion button
     # visibility) — each character's potions are their own, not a shared pool.
     try:
-        potion_counts = _potion_counts_by_character(chars)
+        potion_counts = _potion_counts_by_character(chars, "potion-healing")
+        mana_potion_counts = _potion_counts_by_character(chars, "potion-mana")
     except Exception as e:
         logger.warning("Failed to parse inventory", exc_info=e)
         potion_counts = {}
-    return {"members": members, "item_counts": {"potion-healing": potion_counts}}
+        mana_potion_counts = {}
+    return {
+        "members": members,
+        "item_counts": {"potion-healing": potion_counts, "potion-mana": mana_potion_counts},
+    }
 
 
 def _calc_initiative(party: Dict[str, Any], monster: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -449,17 +454,17 @@ def _player_ref(party: Dict[str, Any], char_id: int):
     return None
 
 
-def _count_potion_healing(character) -> int:
-    """Count potion-healing units in a single character's own inventory."""
+def _count_potion(character, slug: str) -> int:
+    """Count units of a given potion slug in a single character's own inventory."""
     count = 0
     try:
         if character and character.items:
             inv_raw = json.loads(character.items)
             if isinstance(inv_raw, list):
                 for entry in inv_raw:
-                    if isinstance(entry, str) and entry == "potion-healing":
+                    if isinstance(entry, str) and entry == slug:
                         count += 1
-                    elif isinstance(entry, dict) and entry.get("slug") == "potion-healing":
+                    elif isinstance(entry, dict) and entry.get("slug") == slug:
                         try:
                             count += int(entry.get("qty", 1))
                         except Exception:
@@ -469,11 +474,11 @@ def _count_potion_healing(character) -> int:
     return count
 
 
-def _potion_counts_by_character(chars) -> Dict[str, int]:
-    """Per-character healing-potion counts, keyed by character id (string,
-    for JSON round-tripping). Each character's potions are their own —
-    there is no shared/party-wide potion pool."""
-    return {str(c.id): _count_potion_healing(c) for c in chars}
+def _potion_counts_by_character(chars, slug: str) -> Dict[str, int]:
+    """Per-character potion counts for a given slug, keyed by character id
+    (string, for JSON round-tripping). Each character's potions are their
+    own — there is no shared/party-wide potion pool."""
+    return {str(c.id): _count_potion(c, slug) for c in chars}
 
 
 def _skip_if_unconscious(session: CombatSession, party: Dict[str, Any], char_id: int) -> Optional[Dict[str, Any]]:
@@ -721,7 +726,8 @@ def _check_end(session: CombatSession):
                 # receive the loot) — each character's potions are their own.
                 reward_chars = Character.query.filter_by(user_id=session.user_id).all()
                 counts = party.setdefault("item_counts", {})
-                counts["potion-healing"] = _potion_counts_by_character(reward_chars)
+                counts["potion-healing"] = _potion_counts_by_character(reward_chars, "potion-healing")
+                counts["potion-mana"] = _potion_counts_by_character(reward_chars, "potion-mana")
                 session.party_snapshot_json = json.dumps(party)
         except Exception:
             pass
@@ -1450,7 +1456,7 @@ def player_defend(combat_id: int, user_id: int, version: int, actor_id: Optional
 def player_use_item(
     combat_id: int, user_id: int, version: int, slug: str, actor_id: Optional[int] = None
 ) -> Dict[str, Any]:
-    """Consume / apply a combat item (currently only healing potion) for actor.
+    """Consume / apply a combat item (healing potion, mana potion, regen potion) for actor.
 
     Removes one instance of the item from first character inventory if present
     (supports legacy & stacked formats) and updates HP. Advances turn whether
@@ -1487,6 +1493,12 @@ def player_use_item(
             if slug == "potion-healing":
                 heal = 25
                 m["hp"] = min(m.get("max_hp", 100), m.get("hp", 0) + heal)
+                used = True
+            elif slug == "potion-mana":
+                # Mirrors the flat restore amount inventory_api.consume_item applies
+                # out of combat, so the potion behaves consistently in both contexts.
+                mana_restore = 5
+                m["mana"] = min(m.get("mana_max", 0), m.get("mana", 0) + mana_restore)
                 used = True
             elif slug == "potion-regen":
                 from app.services.status_effects import replace_effect
@@ -1545,8 +1557,8 @@ def player_use_item(
     try:
         if removed_successfully:
             all_counts = party.setdefault("item_counts", {})
-            if slug == "potion-healing":
-                per_char = all_counts.setdefault("potion-healing", {})
+            if slug in ("potion-healing", "potion-mana"):
+                per_char = all_counts.setdefault(slug, {})
                 current = int(per_char.get(str(actor_id), 0))
                 per_char[str(actor_id)] = max(0, current - 1)
     except Exception:

@@ -399,7 +399,14 @@
             actionPanel.style.display = '';
 
             // Update action buttons
+            const activeCharClass = (activeMember.char_class || 'fighter').toLowerCase();
             actionPanel.querySelectorAll('button[data-action]').forEach(btn => {
+                // Mana potion button is irrelevant for manaless classes (e.g. barbarian),
+                // same as the mana bar itself.
+                if (btn.dataset.needsManaPotion && MANALESS_CLASSES.has(activeCharClass)) {
+                    btn.style.display = 'none';
+                    return;
+                }
                 btn.style.display = '';
 
                 if (!canAct) {
@@ -417,6 +424,18 @@
                         btn.title = 'No potions available';
                     } else {
                         btn.title = potCount + ' potion' + (potCount === 1 ? '' : 's') + ' remaining';
+                    }
+                }
+
+                // Mana potion availability — per-character, not a shared party pool.
+                if (btn.dataset.needsManaPotion) {
+                    const manaPotionsByChar = itemCounts['potion-mana'] || {};
+                    const manaPotCount = manaPotionsByChar[String(activeCharId)] || 0;
+                    if (manaPotCount <= 0) {
+                        btn.disabled = true;
+                        btn.title = 'No mana potions available';
+                    } else {
+                        btn.title = manaPotCount + ' mana potion' + (manaPotCount === 1 ? '' : 's') + ' remaining';
                     }
                 }
 
@@ -539,6 +558,11 @@
         else if (action === 'use_potion') {
             endpoint = '/api/combat/' + combatId + '/use_item';
             payload.slug = 'potion-healing';
+            spellType = 'heal';
+        }
+        else if (action === 'use_mana_potion') {
+            endpoint = '/api/combat/' + combatId + '/use_item';
+            payload.slug = 'potion-mana';
             spellType = 'heal';
         }
         else if (action === 'flee') endpoint = '/api/combat/' + combatId + '/flee';

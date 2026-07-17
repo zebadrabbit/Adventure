@@ -98,3 +98,95 @@ def test_using_potion_deducts_from_the_actors_own_inventory_only(test_app, monke
         else:
             assert second_qty == 0, "the acting character's own potion should be consumed"
             assert first_qty == 3, "the non-acting character's potions must be untouched"
+
+
+def _two_character_mana_session(monkeypatch):
+    user = User(username=f"mana-potions-{random.randint(1, 10**9)}", email=None)
+    user.set_password("pw")
+    db.session.add(user)
+    db.session.commit()
+
+    stats = json.dumps({"str": 12, "dex": 10, "int": 10, "con": 12})
+    first = Character(
+        user_id=user.id, name="Front", stats=stats, gear="{}", items=json.dumps([{"slug": "potion-mana", "qty": 3}])
+    )
+    second = Character(
+        user_id=user.id, name="Back", stats=stats, gear="{}", items=json.dumps([{"slug": "potion-mana", "qty": 1}])
+    )
+    db.session.add_all([first, second])
+    db.session.commit()
+
+    init_seq = iter([1, 20, 5])
+    monkeypatch.setattr(random, "randint", lambda a, b: next(init_seq, 10))
+    session = combat_service.start_session(user.id, _simple_monster())
+    return session, user, first, second
+
+
+def test_mana_potion_counts_are_per_character_at_session_start(test_app, monkeypatch):
+    with test_app.app_context():
+        session, _user, first, second = _two_character_mana_session(monkeypatch)
+        party = json.loads(session.party_snapshot_json)
+        counts = party["item_counts"]["potion-mana"]
+        assert counts[str(first.id)] == 3, counts
+        assert counts[str(second.id)] == 1, counts
+
+
+def test_using_mana_potion_deducts_from_the_actors_own_inventory_only_and_restores_mana(test_app, monkeypatch):
+    with test_app.app_context():
+        session, user, first, second = _two_character_mana_session(monkeypatch)
+        party = json.loads(session.party_snapshot_json)
+        initiative = json.loads(session.initiative_json)
+        active = initiative[session.active_index]
+        actor_id = active["id"]
+
+        # Drain the actor's mana below max so the restore is observable, and cap
+        # the restore's ceiling below max_mana too (asserted below).
+        for m in party["members"]:
+            if m.get("char_id") == actor_id:
+                m["mana"] = 0
+                mana_max = m.get("mana_max", 0)
+        session.party_snapshot_json = json.dumps(party)
+        db.session.commit()
+
+        result = combat_service.player_use_item(session.id, user.id, session.version, "potion-mana", actor_id=actor_id)
+        assert result.get("ok") is True, result
+
+        new_party = result["state"]["party"]
+        actor_member = next(m for m in new_party["members"] if m.get("char_id") == actor_id)
+        assert actor_member["mana"] == min(mana_max, 5), actor_member
+
+        db.session.refresh(first)
+        db.session.refresh(second)
+        first_qty = next((e.get("qty", 1) for e in json.loads(first.items) if e.get("slug") == "potion-mana"), 0)
+        second_qty = next((e.get("qty", 1) for e in json.loads(second.items) if e.get("slug") == "potion-mana"), 0)
+
+        if actor_id == first.id:
+            assert first_qty == 2, "the acting character's own mana potion should be consumed"
+            assert second_qty == 1, "the non-acting character's mana potions must be untouched"
+        else:
+            assert second_qty == 0, "the acting character's own mana potion should be consumed"
+            assert first_qty == 3, "the non-acting character's mana potions must be untouched"
+
+
+def test_using_mana_potion_caps_restore_at_mana_max(test_app, monkeypatch):
+    with test_app.app_context():
+        session, user, first, second = _two_character_mana_session(monkeypatch)
+        party = json.loads(session.party_snapshot_json)
+        initiative = json.loads(session.initiative_json)
+        active = initiative[session.active_index]
+        actor_id = active["id"]
+
+        # Set mana to 1 below max so a flat restore of 5 would overshoot without a cap.
+        for m in party["members"]:
+            if m.get("char_id") == actor_id:
+                mana_max = m.get("mana_max", 0)
+                m["mana"] = max(0, mana_max - 1)
+        session.party_snapshot_json = json.dumps(party)
+        db.session.commit()
+
+        result = combat_service.player_use_item(session.id, user.id, session.version, "potion-mana", actor_id=actor_id)
+        assert result.get("ok") is True, result
+
+        new_party = result["state"]["party"]
+        actor_member = next(m for m in new_party["members"] if m.get("char_id") == actor_id)
+        assert actor_member["mana"] == mana_max, actor_member
