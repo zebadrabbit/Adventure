@@ -2,17 +2,6 @@
 /* Consolidated from dashboard.html, profile.html, settings.html, and admin_themes.html */
 
 /* ========================================
-   PURPLE GRADIENT BACKGROUNDS
-   ======================================== */
-
-/* Background applied by theme system */
-.theme-purple-gradient body,
-body.purple-gradient {
-    min-height: 100vh;
-    color: #fff;
-}
-
-/* ========================================
    GLASS-MORPHISM CARDS
    ======================================== */
 

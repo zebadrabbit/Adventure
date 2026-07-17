@@ -138,7 +138,10 @@ def extract_party(
         # Award extraction XP (scaled by the same early-extraction multiplier),
         # applying any resulting level-ups + talent points.
         extraction_xp = int(cfg.get("extraction_xp", 0))
-        if full_clear:
+        # Same gate as the copper bonus below — full clear implies the boss fell,
+        # which sets extraction_available, so these coincide today; keep the
+        # guards identical so they can't drift apart.
+        if full_clear and not early_extraction:
             extraction_xp = int(extraction_xp * (1 + float(cfg.get("full_clear_xp_bonus", 0.5))))
         if extraction_xp > 0:
             progression.grant_xp(char, int(extraction_xp * penalties["xp_multiplier"]))
