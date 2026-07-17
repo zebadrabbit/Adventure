@@ -87,7 +87,12 @@
             if (!canAct) {
                 btn.disabled = true;
             } else if (skill.last_used && skill.cooldown) {
-                const elapsedSec = (Date.now() - Date.parse(skill.last_used)) / 1000;
+                // The server serializes last_used as naive UTC (datetime.utcnow().isoformat(),
+                // no timezone designator); Date.parse() would otherwise read it as browser-
+                // local time and skew the cooldown by the local UTC offset. Append 'Z' unless
+                // the string already carries an offset/Z so it's parsed as UTC.
+                const ts = /[zZ]|[+-]\d\d:?\d\d$/.test(skill.last_used) ? skill.last_used : skill.last_used + 'Z';
+                const elapsedSec = (Date.now() - Date.parse(ts)) / 1000;
                 const remaining = skill.cooldown - elapsedSec;
                 if (remaining > 0) {
                     btn.disabled = true;
@@ -606,6 +611,12 @@
             });
             const j = await r.json();
             if (j.state) {
+                // The cached skill list for this caster still carries the
+                // pre-cast last_used, so its cooldown branch in
+                // renderSkillButtons would never fire. Drop the cache entry so
+                // the next render for this character re-fetches fresh
+                // last_used/cooldown and disables the button with its tooltip.
+                activeSkillsCache.delete(actorId);
                 render(j.state);
             } else if (j.error === 'on_cooldown') {
                 appendTransientLogLine(`Skill is on cooldown (${j.remaining_seconds}s remaining).`);
