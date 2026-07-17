@@ -416,9 +416,24 @@ def main(argv: list[str]) -> int:
         return 0
 
     elif mode == "seed-skills":
+        from app import app as flask_app
         from app.seed_skills import seed_skills
 
         seed_skills(verbose=True)
+        # Backfill: characters created before starting skills existed have no
+        # unlocked skills — give them their class's tier-1 active too.
+        with flask_app.app_context():
+            from app.models.models import Character
+            from app.models.skill import CharacterSkill
+            from app.services.progression import grant_starting_skill
+
+            granted = 0
+            for ch in Character.query.all():
+                if CharacterSkill.query.filter_by(character_id=ch.id).first():
+                    continue
+                if grant_starting_skill(ch):
+                    granted += 1
+            print(f"[seed-skills] Backfilled starting skills for {granted} existing character(s).")
         return 0
 
     elif mode == "seed-themes":
