@@ -781,13 +781,33 @@ already-noted `glass-theme.css` dead-code follow-up.
       `./manage.sh stop` standalone (no server running) still exits 0
       cleanly, unaffected by the change.
 
+## 2026-07-16 maintenance pass (ponytail audit cleanup + follow-ups)
+- **Whole-repo cleanup merged** (plan: `plans/2026-06-26-ponytail-audit-cleanup.md`, 10 tasks,
+  net ~-1,400 lines): dead files/JS deleted, logging unified on structlog, loot micro-modules
+  consolidated into `loot_service`, redis fully removed (dep/compose/env), SECRET_KEY
+  production guard (rejects both shipped placeholder keys), the two admin blueprints merged
+  into one (`admin.py` deleted), and **alembic is now the only migration system** (all guarded
+  DDL ported into the idempotent `legacy_baseline_guards` revision; startup = create_all +
+  programmatic upgrade; fresh DBs stamp to head, pre-alembic DBs stamp then upgrade).
+- **⚠️ Three.js renderer (UI Redesign Phases 3a-3d) deleted from the tree** as part of the
+  audit (`dungeon-three.js` + `?renderer=three` toggle plumbing, commit `f6ae0c1`). Decision
+  confirmed with the user 2026-07-16: the 2D canvas renderer is the shipped default; the
+  completed Phase 3 work remains recoverable from git history (revert `f6ae0c1`) if the
+  Three.js direction is ever resumed. Phase 4 (combat visuals) was done as Cold Steel theming
+  and did not depend on it.
+- **Suite is fully green for the first time** — the camp-regen flake was root-caused (unscoped
+  `Character.query.first()` picking up cross-session stray rows) and fixed; same hardening
+  applied to `test_continue_adventure.py`.
+- **eventlet → gevent**: Socket.IO async backend migrated (eventlet is in maintenance mode
+  upstream); gunicorn uses the `geventwebsocket` worker. Also fixed Dockerfile's CMD, which
+  targeted a nonexistent `run:app` (standalone image would crash on boot; compose was fine).
+- Still open from the lists above: live-browser confirmations (combat skill buttons, entity
+  fog-of-war, combat-log race), `glass-theme.css` dead body-class rules, no mana-potion
+  action, aggro/spawn-density play-feel tuning, multi-worker Socket.IO (sticky sessions +
+  message queue) if `--workers > 1` is ever real.
+
 ## How to run the suite
 ```bash
-export DATABASE_URL=postgresql://adventure:changeme@localhost:5433/adventure_test
-export TEST_DATABASE_URL=$DATABASE_URL
-# fresh schema (mimics CI):
-.venv/bin/python -c "from app import create_app, db; app=create_app()
-with app.app_context():
-    db.drop_all(); db.create_all()"
-.venv/bin/python -m pytest tests/ -q --deselect tests/test_combat_persistence.py
+export TEST_DATABASE_URL=postgresql://adventure:changeme@localhost:5433/adventure_test
+.venv/bin/python -m pytest tests/ -q   # full suite, no deselects needed (511 passed)
 ```
