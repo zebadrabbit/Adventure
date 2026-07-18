@@ -79,6 +79,7 @@ class Skill(db.Model):
     cost = db.Column(db.Integer, nullable=False, default=1)
     effect_json = db.Column(db.Text, nullable=False)
     cooldown = db.Column(db.Integer)  # Seconds
+    mana_cost = db.Column(db.Integer, nullable=False, server_default="0", default=0)
     skill_type = db.Column(db.String(20), nullable=False, default="passive")
     icon = db.Column(db.String(50))
     is_active = db.Column(db.Boolean, nullable=False, default=True)

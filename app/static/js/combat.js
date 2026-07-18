@@ -53,7 +53,7 @@
         }
     }
 
-    function renderSkillButtons(actionPanel, charId, canAct, version) {
+    function renderSkillButtons(actionPanel, charId, canAct, version, currentMana) {
         const grid = actionPanel.querySelector('.d-grid.gap-2');
         if (!grid) return;
         const existing = grid.querySelector('.skill-buttons-group');
@@ -65,7 +65,7 @@
                 // Re-render once the fetch resolves; safe even if the active
                 // character has since changed (renderSkillButtons no-ops
                 // against a panel that's been hidden/reparented since).
-                renderSkillButtons(actionPanel, charId, canAct, version);
+                renderSkillButtons(actionPanel, charId, canAct, version, currentMana);
             });
             return;
         }
@@ -82,10 +82,16 @@
             const icon = document.createElement('i');
             icon.className = 'bi bi-stars';
             btn.appendChild(icon);
-            btn.appendChild(document.createTextNode(' ' + skill.skill_name));
+            const manaCost = parseInt(skill.mana_cost) || 0;
+            const label = manaCost > 0 ? `${skill.skill_name} (${manaCost} mana)` : skill.skill_name;
+            btn.appendChild(document.createTextNode(' ' + label));
 
             if (!canAct) {
                 btn.disabled = true;
+            } else if (manaCost > 0 && typeof currentMana === 'number' && currentMana < manaCost) {
+                // Mirror the cooldown-disable pattern for insufficient mana.
+                btn.disabled = true;
+                btn.title = `Needs ${manaCost} mana`;
             } else if (skill.last_used && skill.cooldown) {
                 // The server serializes last_used as naive UTC (datetime.utcnow().isoformat(),
                 // no timezone designator); Date.parse() would otherwise read it as browser-
@@ -455,7 +461,7 @@
                 newBtn.addEventListener('click', () => doAction(action, state.version, activeCharId));
             });
 
-            renderSkillButtons(actionPanel, activeCharId, canAct, state.version);
+            renderSkillButtons(actionPanel, activeCharId, canAct, state.version, activeMember ? activeMember.mana : undefined);
         } else if (actionPanel) {
             actionPanel.classList.add('d-none');
             const stale = actionPanel.querySelector('.skill-buttons-group');

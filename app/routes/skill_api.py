@@ -61,6 +61,7 @@ def get_tree_skills(tree_id):
                 "cost": skill.cost,
                 "effect_json": skill.effect_json,
                 "cooldown": skill.cooldown,
+                "mana_cost": skill.mana_cost,
                 "skill_type": skill.skill_type,
                 "icon": skill.icon,
             }
@@ -120,6 +121,7 @@ def get_character_skills(character_id):
                 "tier": skill.tier,
                 "effect_json": skill.effect_json,
                 "cooldown": skill.cooldown,
+                "mana_cost": skill.mana_cost,
                 "skill_rank": cs.skill_rank,
                 "times_used": cs.times_used,
                 "unlocked_at": cs.unlocked_at.isoformat() if cs.unlocked_at else None,
@@ -369,6 +371,7 @@ def get_skill_details(skill_id):
             "cost": skill.cost,
             "effects": json.loads(skill.effect_json),
             "cooldown": skill.cooldown,
+            "mana_cost": skill.mana_cost,
             "skill_type": skill.skill_type,
             "icon": skill.icon,
         }

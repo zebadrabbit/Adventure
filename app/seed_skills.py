@@ -20,6 +20,10 @@ from app import app as flask_app
 from app import db
 from app.models.skill import Skill, SkillTree
 
+# Caster trees whose active skills consume mana (spell_damage / heal effects).
+# Physical trees (Combat, Martial, Shadow) and all passives cost 0.
+CASTER_TREES = {"Arcana", "Divine", "Nature", "Occult"}
+
 # Tree definitions: name -> metadata. class_requirement None = available to all.
 TREES = [
     {"name": "Combat", "class_requirement": None, "description": "Martial fundamentals.", "max_tier": 3},
@@ -434,6 +438,12 @@ def seed_skills(verbose: bool = True) -> int:
             skill.cost = spec.get("cost", 1)
             skill.skill_type = spec.get("skill_type", "passive")
             skill.cooldown = spec.get("cooldown")
+            # Caster-tree actives cost mana scaled by tier (t1=4, t2=8, t3=12).
+            # Physical actives and all passives are free.
+            if skill.skill_type == "active" and spec["tree"] in CASTER_TREES:
+                skill.mana_cost = spec.get("tier", 1) * 4
+            else:
+                skill.mana_cost = 0
             skill.effect_json = json.dumps(spec.get("effect", {}))
             skill.is_active = True
             skill.required_skill_id = None  # reset; resolved below

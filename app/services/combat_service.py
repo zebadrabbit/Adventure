@@ -1751,18 +1751,26 @@ def player_cast_skill(
     if not caster:
         return {"error": "no_caster"}
 
+    # Mana cost (parallels skill_api / spell casting). Reject before applying
+    # effects if the caster can't afford it; deduct otherwise.
+    mana_cost = int(skill.mana_cost or 0)
+    mana_available = caster.get("mana") if "mana" in caster else caster.get("current_mana", 0)
+    if mana_cost > 0 and mana_available < mana_cost:
+        return {"error": "not_enough_mana", "mana": mana_available, "required": mana_cost}
+
     dmg = int(eff.get("damage", 0) or 0) + int(eff.get("spell_damage", 0) or 0)
     heal = int(eff.get("heal", 0) or 0)
     if dmg <= 0 and heal <= 0:
         return {"error": "no_effect"}
 
+    mana_suffix = f" (-{mana_cost} mana)" if mana_cost > 0 else ""
     extra: Dict[str, Any] = {}
     if dmg > 0:
         session.monster_hp = max(0, (session.monster_hp or 0) - dmg)
         session.last_damage_json = json.dumps({"to_monster": {"amount": dmg, "is_miss": False, "is_critical": False}})
         _append_log(
             session,
-            f"{caster.get('name', 'Player')} uses {skill.name} for {dmg} damage (HP {session.monster_hp})",
+            f"{caster.get('name', 'Player')} uses {skill.name} for {dmg} damage (HP {session.monster_hp}){mana_suffix}",
             code=PLAYER_SKILL,
         )
         extra["damage"] = dmg
@@ -1774,10 +1782,17 @@ def player_cast_skill(
         caster["hp"] = new_hp
         _append_log(
             session,
-            f"{caster.get('name', 'Player')} uses {skill.name}, healing {healed} (HP {new_hp})",
+            f"{caster.get('name', 'Player')} uses {skill.name}, healing {healed} (HP {new_hp}){mana_suffix}",
             code=PLAYER_SKILL,
         )
         extra["heal"] = healed
+
+    if mana_cost > 0:
+        remaining_mana = mana_available - mana_cost
+        # Normalize back into both keys for backward compatibility (matches spell casting).
+        caster["mana"] = remaining_mana
+        caster["current_mana"] = remaining_mana
+        extra["mana"] = remaining_mana
 
     session.party_snapshot_json = json.dumps(party)
     cs.times_used = (cs.times_used or 0) + 1
