@@ -323,9 +323,10 @@
         icon: iconForMonster(mon)
       })).filter(e => Number.isFinite(e.x) && Number.isFinite(e.y));
 
-      // Combine with any existing treasures
+      // Combine with any existing treasures/shrines
       const treasures = window._currentTreasures || [];
-      window.dungeonCanvas.setEntities([...window._currentMonsters, ...treasures]);
+      const shrines = window._currentShrines || [];
+      window.dungeonCanvas.setEntities([...window._currentMonsters, ...treasures, ...shrines]);
     }
 
     function renderTreasures(treasures) {
@@ -341,9 +342,32 @@
         icon: '/static/iconography/locked-chest.svg'
       })).filter(e => Number.isFinite(e.x) && Number.isFinite(e.y));
 
-      // Combine with any existing monsters
+      // Combine with any existing monsters/shrines
       const monsters = window._currentMonsters || [];
-      window.dungeonCanvas.setEntities([...monsters, ...window._currentTreasures]);
+      const shrines = window._currentShrines || [];
+      window.dungeonCanvas.setEntities([...monsters, ...window._currentTreasures, ...shrines]);
+    }
+
+    function renderShrines(shrines) {
+      // Canvas version - shrines are rendered as entities. Persisted client-side
+      // like treasures: the entities_update websocket broadcast only carries
+      // monsters, so without this bucket a patrol broadcast would wipe shrines
+      // from the canvas via renderMonsters' setEntities([..monsters, ..treasures]) call.
+      if (!window.dungeonCanvas) return;
+      if (!Array.isArray(shrines)) return;
+
+      window._currentShrines = shrines.map(s => ({
+        x: s.x,
+        y: s.y,
+        type: 'shrine',
+        name: s.name || 'Shrine',
+        icon: '/static/iconography/aura.svg'
+      })).filter(e => Number.isFinite(e.x) && Number.isFinite(e.y));
+
+      // Combine with any existing monsters/treasures
+      const monsters = window._currentMonsters || [];
+      const treasures = window._currentTreasures || [];
+      window.dungeonCanvas.setEntities([...monsters, ...treasures, ...window._currentShrines]);
     }
 
     function refreshEntities(force = false) {
@@ -370,8 +394,10 @@
           const ents = Array.isArray(data.entities) ? data.entities : [];
           const monsters = ents.filter(e => e.type === 'monster');
           const treasures = ents.filter(e => e.type === 'treasure');
+          const shrines = ents.filter(e => e.type === 'shrine');
           try { renderMonsters(monsters); } catch (e) { }
           try { renderTreasures(treasures); } catch (e) { }
+          try { renderShrines(shrines); } catch (e) { }
           if (entityBackoffMs) { entityBackoffMs = Math.max(0, Math.floor(entityBackoffMs * 0.5) - 250); }
         })
         .catch(err => {
