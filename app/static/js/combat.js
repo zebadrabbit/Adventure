@@ -189,7 +189,15 @@
                 existingCursor.remove();
             }
 
-            await typewriterEffect(element, text);
+            // When a burst of lines lands at once (multi-hit turns), render the
+            // backlog instantly and only typewrite the final line — a slow
+            // character-by-character crawl across many lines makes the log lag
+            // the action and is the main "hard to follow" complaint.
+            if (typewriterQueue.length > 0) {
+                element.textContent = text;
+            } else {
+                await typewriterEffect(element, text);
+            }
             logEl.scrollTop = logEl.scrollHeight;
         }
 

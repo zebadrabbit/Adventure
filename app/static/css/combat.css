@@ -577,6 +577,18 @@ a:hover {
 .combat-log .log-turn {
     color: var(--ui-accent);
     font-weight: 600;
+    /* Render turn lines as section separators so rounds are scannable */
+    margin-top: 0.6rem;
+    padding-top: 0.35rem;
+    border-top: 1px solid color-mix(in srgb, var(--ui-accent) 35%, transparent);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.85em;
+}
+
+/* Indent action lines under their turn header so the log reads as grouped rounds */
+.combat-log > div:not(.log-turn) {
+    padding-left: 0.75rem;
 }
 
 /* Neutral/dim group: system, miss, flee */
