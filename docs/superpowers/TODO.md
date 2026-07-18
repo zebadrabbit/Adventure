@@ -867,8 +867,29 @@ already-noted `glass-theme.css` dead-code follow-up.
   trap message on step, ambush pack appearing nearby, and the respawn trickle over time were
   not visually verified in a browser this session — belongs to the user's next playtest.
 
+## 2026-07-17 — Playtest follow-ups: mana economy, potions, combat log, misc fixes
+- **Active skills now cost mana** (`Skill.mana_cost`, alembic `c8f1a2b3d4e5` — inspector-guarded;
+  see the revision docstring: ALL future revisions in this repo must guard their DDL, because
+  `create_all` pre-creates model columns and `db_isolation` tests rebuild schema mid-suite).
+  Caster-tree actives cost 4/8/12 by tier; physical actives and passives are free.
+  `player_cast_skill` rejects with `not_enough_mana`, deducts, and logs the cost; skill
+  payloads expose `mana_cost`; combat.js disables unaffordable buttons.
+- **Mana Potion combat action** mirroring the healing potion (per-character inventory,
+  +5 mana matching the out-of-combat amount, button hidden for manaless classes).
+- **Combat log**: raw loot-dict dump replaced by a human summary (`_loot_summary`); turn
+  lines render as section separators with action lines indented; multi-line bursts render
+  instantly with typewriter only on the final line. Zoom controls moved below the minimap.
+- **`run.py seed-skills` backfills starting skills** for characters that predate the
+  starting-skill grant (run on deploy).
+- **Open, waiting on playtest verdicts**: event tuning numbers (EVENT_TUNING), mana costs
+  4/8/12 vs potion +5 (potion likely wants a buff now that casting drains), spawn density /
+  aggro radius, and the combat-screen visual redesign (deliberately deferred to a live
+  session with the user). Also parked: shrine/camp write `stats["mana"]` not `current_mana`
+  (pre-existing camp convention — post-combat characters may not see the restore; cleanup
+  candidate), multi-worker Socket.IO if `--workers > 1` ever becomes real.
+
 ## How to run the suite
 ```bash
 export TEST_DATABASE_URL=postgresql://adventure:changeme@localhost:5433/adventure_test
-.venv/bin/python -m pytest tests/ -q   # full suite, no deselects needed (511 passed)
+.venv/bin/python -m pytest tests/ -q   # full suite, no deselects needed (570 passed as of 2026-07-17)
 ```
