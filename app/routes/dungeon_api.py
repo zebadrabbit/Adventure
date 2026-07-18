@@ -38,6 +38,7 @@ from app.dungeon.api_helpers.perception import (
     search_current_tile as _search_current_tile_helper,
 )
 from app.dungeon.api_helpers.tiles import char_to_type
+from app.dungeon.room_events import HIDDEN_ROOM_EVENT_TYPES, seed_room_events
 from app.dungeon.api_helpers.treasure import (
     claim_treasure_entity as _claim_treasure_entity,
 )
@@ -651,6 +652,12 @@ def dungeon_map():
                 # Also seed treasure caches (separate from monster spawns)
                 _seed_treasure_caches()
 
+                # Also seed shrine/trap/ambush room events (idempotent, deterministic per instance)
+                try:
+                    seed_room_events(instance, dungeon)
+                except Exception:
+                    db.session.rollback()
+
                 return spawn_manager
 
             def _seed_treasure_caches():
@@ -745,11 +752,13 @@ def dungeon_map():
                         entities_rows = DungeonEntity.query.filter_by(instance_id=instance.id, seed=instance.seed).all()
                 except Exception:
                     pass
-            entities_json = [e.to_dict() for e in entities_rows]
+            # trap/ambush entities must never be serialized to clients.
+            client_entities_rows = [e for e in entities_rows if e.type not in HIDDEN_ROOM_EVENT_TYPES]
+            entities_json = [e.to_dict() for e in client_entities_rows]
             # Build a light-weight overlay grid (same height/width) marking entity types for client iconography.
             # To avoid large payload bloat, use single letters and only for tiles that contain an entity.
             overlay = [[None for _ in range(MAP_SIZE)] for _ in range(MAP_SIZE)]
-            for ent in entities_rows:
+            for ent in client_entities_rows:
                 try:
                     if 0 <= ent.x < MAP_SIZE and 0 <= ent.y < MAP_SIZE:
                         if ent.type == "monster":
@@ -1225,9 +1234,11 @@ def dungeon_entities():
         return jsonify({"error": "Dungeon instance not found"}), 404
     rows = DungeonEntity.query.filter_by(instance_id=instance.id).all()
 
-    # Filter out hidden treasures
+    # Filter out hidden treasures and hidden room-event types (trap/ambush must never reach clients)
     visible_entities = []
     for r in rows:
+        if r.type in HIDDEN_ROOM_EVENT_TYPES:
+            continue
         # Include all non-treasure entities
         if r.type != "treasure":
             visible_entities.append(r.to_dict())
