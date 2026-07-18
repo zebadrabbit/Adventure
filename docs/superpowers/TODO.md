@@ -843,6 +843,30 @@ already-noted `glass-theme.css` dead-code follow-up.
   row was already in the list the existing `run.py seed-dungeon-achievements` subcommand
   seeds).
 
+## 2026-07-17 — Room events & pacing: shrines, traps, ambushes, bounded respawns
+- **Shipped** (plan: `plans/2026-07-17-room-events-pacing.md`): each dungeon instance now
+  seeds a deterministic set of `shrine`/`trap`/`ambush` `DungeonEntity` rows
+  (`app/dungeon/room_events.py::seed_room_events`) alongside the existing monster/treasure
+  spawns. `trap`/`ambush` rows are hidden types (`HIDDEN_ROOM_EVENT_TYPES`) filtered from
+  every client-facing entity list; only `shrine` (slug `shrine`, type `shrine`) is visible.
+  Stepping onto one of these tiles resolves it via `resolve_events_at` in the shared movement
+  path (`app/dungeon/movement_handler.py`) and the move response carries an `"events"` list
+  of `{kind, message}` dicts (`kind` one of `shrine`, `trap_avoided`, `trap_hit`, `ambush`).
+  A bounded respawn trickle for ambient spawns rides the same tuning block.
+- **Client rendering**: `dungeon-canvas.js` renders `shrine` entities with
+  `app/static/iconography/aura.svg` (falls back to the generic monster icon otherwise — there
+  was no pre-existing slug→icon convention to hook into, so this is a small explicit branch,
+  not zero-code). `adventure.js` appends each move response's `events[].message` as its own
+  line in the existing movement-output log (`renderLogFromDesc`'s target element), color-coded
+  by `kind` (`text-info` shrine, `text-warning` trap_avoided, `text-danger` trap_hit/ambush) —
+  no new UI widget.
+- **All tuning constants** (counts per instance, shrine mana-restore %, trap damage/perception
+  DC, ambush pack size, respawn interval/cap/min-distance) live in one place:
+  `app/dungeon/room_events.py::EVENT_TUNING`.
+- **Manual live-browser verification still open**: shrine icon actually rendering on canvas,
+  trap message on step, ambush pack appearing nearby, and the respawn trickle over time were
+  not visually verified in a browser this session — belongs to the user's next playtest.
+
 ## How to run the suite
 ```bash
 export TEST_DATABASE_URL=postgresql://adventure:changeme@localhost:5433/adventure_test

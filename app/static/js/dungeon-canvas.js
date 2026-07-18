@@ -767,8 +767,11 @@
                 const ey = ((this.height - 1 - entity.y) + 0.5) * TILE_SIZE;
                 const size = TILE_SIZE * 0.7;
 
-                // Load entity icon or use fallback
-                const iconSrc = entity.icon || '/static/iconography/goblin-scout-t1.svg';
+                // Load entity icon or use fallback (shrines get a dedicated icon; everything
+                // else falls back to the generic monster icon unless the server supplies one).
+                const iconSrc = entity.icon
+                    || (entity.type === 'shrine' ? '/static/iconography/aura.svg' : null)
+                    || '/static/iconography/goblin-scout-t1.svg';
                 if (this.imageCache.has(iconSrc)) {
                     const img = this.imageCache.get(iconSrc);
                     this.ctx.drawImage(img, ex - size / 2, ey - size / 2, size, size);

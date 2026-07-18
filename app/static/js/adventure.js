@@ -523,6 +523,25 @@
           }
         }
 
+        // Room events (shrine/trap/ambush) resolved on the tile just entered.
+        // Reuse the same output log used for movement descriptions -- append
+        // each event's message as its own line, color-coded by severity.
+        if (data && Array.isArray(data.events) && output) {
+          const eventClass = {
+            shrine: 'text-info',
+            trap_avoided: 'text-warning',
+            trap_hit: 'text-danger',
+            ambush: 'text-danger'
+          };
+          data.events.forEach(evt => {
+            if (!evt || !evt.message) return;
+            const line = document.createElement('div');
+            line.className = eventClass[evt.kind] || 'text-warning';
+            line.textContent = evt.message;
+            output.appendChild(line);
+          });
+        }
+
         // Handle revealed tiles (fog of war updates)
         if (data && Array.isArray(data.revealed_tiles) && data.revealed_tiles.length > 0) {
           try {
