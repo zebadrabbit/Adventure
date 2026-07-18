@@ -89,23 +89,59 @@ def run_monster_patrols(dungeon, instance, resp: dict, *, tick_amount: int = 1):
         tick_amount: Number of ticks elapsed
     """
     try:
-        from app.dungeon.spawn_integration import load_spawns_from_db
+        from app.dungeon.spawn_integration import (
+            load_spawns_from_db,
+            populate_spawn_stats,
+            spawn_to_entity,
+        )
         from app.dungeon.spawn_manager import SpawnManager
         from app.models.entities import DungeonEntity as _DE
         from app.models.models import GameClock
 
         clock = GameClock.get()
 
-        # Load spawn manager for this instance
-        spawn_manager = SpawnManager(dungeon, instance)
+        # Load spawn manager for this instance. SpawnManager is rebuilt
+        # fresh every request -- the two respawn counters aren't durable
+        # on the object itself, so they're restored from the instance's
+        # JSON metadata column (see dungeon_api.py's _initialize_spawn_system,
+        # which writes spawn_initial_ambient_count there once at generation
+        # time; spawn_respawns_done is updated below whenever a respawn fires).
+        meta = instance.dungeon_metadata or {}
+        spawn_manager = SpawnManager(
+            dungeon,
+            instance,
+            initial_ambient_count=meta.get("spawn_initial_ambient_count", 0),
+            respawns_done=meta.get("spawn_respawns_done", 0),
+        )
         spawns = load_spawns_from_db(instance, spawn_manager)
 
         if not spawns:
             # No spawns loaded, skip patrol
             return
 
+        levels = [s.level for s in spawns if s.level]
+        if levels:
+            spawn_manager.party_level = max(1, sum(levels) // len(levels))
+
         # Update spawn positions based on game clock
         moved_spawns = spawn_manager.update_spawns(clock.tick)
+
+        # A bounded wandering respawn fired this tick -- give it real
+        # monster stats via the same creation path ambush rooms use
+        # (populate_spawn_stats + spawn_to_entity), persist its
+        # DungeonEntity row, and save the incremented counter.
+        if spawn_manager.last_respawn is not None:
+            try:
+                populate_spawn_stats(spawn_manager.last_respawn, spawn_manager.party_level, instance)
+                db.session.add(spawn_to_entity(spawn_manager.last_respawn, instance, instance.user_id))
+                new_meta = dict(instance.dungeon_metadata or {})
+                new_meta["spawn_respawns_done"] = spawn_manager.respawns_done
+                new_meta.setdefault("spawn_initial_ambient_count", spawn_manager.initial_ambient_count)
+                instance.dungeon_metadata = new_meta
+                db.session.add(instance)
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
 
         # Persist changes to database
         if moved_spawns:

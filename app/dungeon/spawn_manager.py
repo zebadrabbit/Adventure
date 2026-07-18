@@ -172,6 +172,8 @@ class SpawnManager:
         instance: "DungeonInstance",
         config: Optional[SpawnConfig] = None,
         rng: Optional[random.Random] = None,
+        initial_ambient_count: int = 0,
+        respawns_done: int = 0,
     ):
         """Initialize spawn manager.
 
@@ -180,6 +182,13 @@ class SpawnManager:
             instance: DungeonInstance for persistence
             config: Spawn configuration (uses defaults if None)
             rng: Random number generator (deterministic with seed)
+            initial_ambient_count: Ambient-tier spawn count at generation
+                time -- recorded by initialize_spawns() the first time it
+                runs, or passed in by a caller restoring it from wherever
+                it's durably stored (SpawnManager itself is rebuilt fresh
+                every request; see spawn_integration.py).
+            respawns_done: Wandering respawns granted so far this instance,
+                same persistence caveat as initial_ambient_count.
         """
         self.dungeon = dungeon
         self.instance = instance
@@ -188,6 +197,14 @@ class SpawnManager:
 
         self.spawns: List[SpawnEntry] = []
         self._initialized = False
+
+        # Bounded wandering respawns (see app/dungeon/room_events.py EVENT_TUNING).
+        self.initial_ambient_count = initial_ambient_count
+        self.respawns_done = respawns_done
+        self.party_level = 1
+        # Set by update_spawns() each call: the SpawnEntry it just created
+        # via a wandering respawn, or None if no respawn happened this tick.
+        self.last_respawn: Optional[SpawnEntry] = None
 
     def initialize_spawns(self, party_level: int = 1) -> List[SpawnEntry]:
         """Generate all spawns for the dungeon.
@@ -202,6 +219,7 @@ class SpawnManager:
             return self.spawns
 
         self.spawns = []
+        self.party_level = party_level
 
         # Calculate spawn counts
         walkable_tiles = self._get_walkable_tiles()
@@ -215,7 +233,9 @@ class SpawnManager:
         # Generate spawns
         self._generate_boss_spawns(party_level, boss_count)
         self._generate_elite_spawns(party_level, elite_count)
+        before_ambient = len(self.spawns)
         self._generate_ambient_spawns(party_level, ambient_count, walkable_tiles)
+        self.initial_ambient_count = len(self.spawns) - before_ambient
 
         self._initialized = True
         return self.spawns
@@ -232,6 +252,8 @@ class SpawnManager:
         moved_spawns = []
         player_x = getattr(self.instance, "pos_x", None)
         player_y = getattr(self.instance, "pos_y", None)
+
+        self.last_respawn = self._maybe_respawn(current_tick, player_x, player_y)
 
         for spawn in self.spawns:
             if spawn.in_combat:
@@ -260,6 +282,85 @@ class SpawnManager:
 
         return moved_spawns
 
+    def _maybe_respawn(
+        self, current_tick: int, player_x: Optional[int], player_y: Optional[int]
+    ) -> Optional[SpawnEntry]:
+        """Bounded wandering respawns (EVENT_TUNING in app/dungeon/room_events.py).
+
+        On an interval tick, if living ambient-tier spawns have fallen
+        below 40% of the initial ambient count, the respawn cap hasn't
+        been hit, and the instance's boss(es) aren't all dead yet, adds
+        one WANDERER ambient spawn on a walkable tile at least
+        respawn_min_player_distance away from the player and increments
+        respawns_done. Returns the new SpawnEntry, or None if nothing
+        was spawned this tick.
+
+        Lazy import of EVENT_TUNING avoids a circular import --
+        room_events.py imports SpawnManager from this module.
+        """
+        from app.dungeon.room_events import EVENT_TUNING
+
+        interval = EVENT_TUNING["respawn_interval_ticks"]
+        if interval <= 0 or current_tick % interval != 0:
+            return None
+        if self.initial_ambient_count <= 0:
+            return None
+
+        cap = int(self.initial_ambient_count * EVENT_TUNING["respawn_cap_fraction"])
+        if self.respawns_done >= cap:
+            return None
+
+        bosses_defeated = getattr(self.instance, "bosses_defeated", 0) or 0
+        bosses_total = getattr(self.instance, "bosses_total", 1) or 1
+        if bosses_defeated >= bosses_total:
+            return None
+
+        ambient_tier = (
+            SpawnBehavior.PATROL,
+            SpawnBehavior.WANDERER,
+            SpawnBehavior.GUARD,
+            SpawnBehavior.AMBIENT,
+        )
+        living_ambient = sum(1 for s in self.spawns if s.behavior in ambient_tier)
+        if living_ambient >= 0.4 * self.initial_ambient_count:
+            return None
+
+        tile = self._pick_respawn_tile(player_x, player_y, EVENT_TUNING["respawn_min_player_distance"])
+        if tile is None:
+            return None
+
+        x, y = tile
+        spawn = SpawnEntry(
+            x=x,
+            y=y,
+            behavior=SpawnBehavior.WANDERER,
+            archetype="Trash",
+            level=self.party_level,
+            move_interval=self.config.wander_interval_ticks,
+            last_move_tick=current_tick,
+        )
+        self.spawns.append(spawn)
+        self.respawns_done += 1
+        return spawn
+
+    def _pick_respawn_tile(
+        self, player_x: Optional[int], player_y: Optional[int], min_dist: int
+    ) -> Optional[Tuple[int, int]]:
+        """A random walkable, unoccupied tile at least min_dist (Chebyshev)
+        from the player -- or None if no such tile exists."""
+        candidates = []
+        for x, y in self._get_walkable_tiles():
+            if self.get_spawn_at(x, y):
+                continue
+            if player_x is not None and player_y is not None:
+                if max(abs(x - player_x), abs(y - player_y)) < min_dist:
+                    continue
+            candidates.append((x, y))
+
+        if not candidates:
+            return None
+        return self.rng.choice(candidates)
+
     def get_spawn_at(self, x: int, y: int, z: int = 0) -> Optional[SpawnEntry]:
         """Find spawn at coordinates."""
         for spawn in self.spawns:
@@ -280,12 +381,19 @@ class SpawnManager:
         return {
             "spawns": [s.to_dict() for s in self.spawns],
             "initialized": self._initialized,
+            "initial_ambient_count": self.initial_ambient_count,
+            "respawns_done": self.respawns_done,
         }
 
     @classmethod
     def from_dict(cls, dungeon: "Dungeon", instance: "DungeonInstance", data: Dict[str, Any]) -> "SpawnManager":
         """Deserialize spawn manager state."""
-        manager = cls(dungeon, instance)
+        manager = cls(
+            dungeon,
+            instance,
+            initial_ambient_count=data.get("initial_ambient_count", 0),
+            respawns_done=data.get("respawns_done", 0),
+        )
         manager._initialized = data.get("initialized", False)
         manager.spawns = [SpawnEntry.from_dict(s) for s in data.get("spawns", [])]
         return manager

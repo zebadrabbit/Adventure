@@ -646,6 +646,17 @@ def dungeon_map():
                     for spawn in spawn_manager.spawns:
                         populate_spawn_stats(spawn, avg_level, instance)
 
+                    # Record the initial ambient-tier spawn count for bounded
+                    # wandering respawns (see room_events.EVENT_TUNING). The
+                    # SpawnManager object itself doesn't survive past this
+                    # request, so persist the counter on the instance's JSON
+                    # metadata column alongside everything else here.
+                    meta = dict(instance.dungeon_metadata or {})
+                    meta["spawn_initial_ambient_count"] = spawn_manager.initial_ambient_count
+                    meta.setdefault("spawn_respawns_done", 0)
+                    instance.dungeon_metadata = meta
+                    db.session.add(instance)
+
                     # Persist to database
                     persist_spawns(spawn_manager, instance, current_user.id)
 
