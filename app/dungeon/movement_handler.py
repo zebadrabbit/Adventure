@@ -233,4 +233,18 @@ def process_movement(instance: DungeonInstance, direction: str) -> Tuple[bool, D
         except Exception as e:
             logger.error("time_advance_error", error=str(e))
 
+    # Resolve any room event (shrine/trap/ambush) on the tile just entered.
+    # Placed after the time-advance block so a shrine's regen_buff isn't
+    # immediately decremented by this turn's tick decay -- mirrors the
+    # insert-after-advance ordering dungeon_camp uses.
+    if moved:
+        try:
+            from app.dungeon.room_events import resolve_events_at
+
+            events = resolve_events_at(instance, x, y, dungeon=dungeon)
+            if events:
+                response["events"] = events
+        except Exception as e:
+            logger.error("room_event_error", x=x, y=y, error=str(e))
+
     return moved, response
