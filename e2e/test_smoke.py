@@ -65,13 +65,13 @@ def test_register_and_reach_dashboard(page):
 def test_autofill_and_deploy_party(page):
     page.goto(f"{BASE_URL}/dashboard")
     page.wait_for_load_state("networkidle")
-    if page.locator("input.party-select").count() == 0:
+    if page.locator(".barracks-card[data-id]").count() == 0:
         resp = page.request.post(f"{BASE_URL}/autofill_characters")
         assert resp.ok, f"autofill_characters failed: {resp.status}"
         page.goto(f"{BASE_URL}/dashboard")
         page.wait_for_load_state("networkidle")
     ids = page.evaluate(
-        "() => Array.from(document.querySelectorAll('input.party-select'))"
+        "() => Array.from(document.querySelectorAll('.barracks-card[data-id]'))"
         ".slice(0,4).map(el => el.getAttribute('data-id')).filter(Boolean)"
     )
     assert ids, "no party-selectable characters after autofill"
