@@ -16,7 +16,7 @@ from app.dungeon.api_helpers.perception import (
 from app.dungeon.api_helpers.perception import (
     maybe_perceive_and_mark_loot,
 )
-from app.dungeon.tiles import DOOR, ROOM, TUNNEL
+from app.dungeon.tiles import DOOR, ROOM, STAIRS_DOWN, STAIRS_UP, TUNNEL
 import structlog
 
 from app.models.dungeon_instance import DungeonInstance
@@ -39,7 +39,13 @@ def char_to_type(c: str) -> str:
         return "tunnel"
     if c == DOOR:
         return "doorway"
-    if c in ("P", "T"):
+    if c == STAIRS_DOWN:
+        return "stairway leading down"
+    if c == STAIRS_UP:
+        return "stairway leading up"
+    if c == "P":
+        return "portal chamber"
+    if c == "T":
         return "teleporter"
     return "area"
 
@@ -69,21 +75,24 @@ def process_movement(instance: DungeonInstance, direction: str) -> Tuple[bool, D
     if party_is_wiped(instance.user_id):
         return False, {"ok": False, "moved": False, "error": "party_defeated"}
 
-    MAP_SIZE = 75
-    dungeon = get_cached_dungeon(instance.seed, (MAP_SIZE, MAP_SIZE, 1))
-    walkable_chars = {ROOM, TUNNEL, DOOR, getattr(dungeon, "TELEPORT", "P"), "P"}
+    from app.dungeon.api_helpers.movement import effective_unlocked_doors
+    from app.routes.dungeon_api import get_instance_dungeon
+
+    dungeon = get_instance_dungeon(instance)
+    unlocked = effective_unlocked_doors(instance, dungeon)
 
     # Determine if this is a no-op
     noop = direction == "" or direction not in ("n", "s", "e", "w")
 
     # Attempt movement
     moved = False
+    floor_changed = False
     if not noop:
         deltas = {"n": (0, 1), "s": (0, -1), "e": (1, 0), "w": (-1, 0)}
         dx, dy = deltas[direction]
         nx, ny = instance.pos_x + dx, instance.pos_y + dy
 
-        if 0 <= nx < MAP_SIZE and 0 <= ny < MAP_SIZE and dungeon.grid[nx][ny] in walkable_chars:
+        if dungeon.is_walkable(nx, ny, unlocked):
             instance.pos_x, instance.pos_y = nx, ny
             moved = True
         else:
@@ -93,10 +102,24 @@ def process_movement(instance: DungeonInstance, direction: str) -> Tuple[bool, D
                     continue
                 adx, ady = deltas[alt]
                 tx, ty = instance.pos_x + adx, instance.pos_y + ady
-                if 0 <= tx < MAP_SIZE and 0 <= ty < MAP_SIZE and dungeon.grid[tx][ty] in walkable_chars:
+                if dungeon.is_walkable(tx, ty, unlocked):
                     instance.pos_x, instance.pos_y = tx, ty
                     moved = True
                     break
+
+        # Stairs: stepping on them moves the party a floor and lands it on the
+        # matching opposite stairs of the destination floor.
+        if moved:
+            tile = dungeon.grid[instance.pos_x][instance.pos_y]
+            if tile in (STAIRS_DOWN, STAIRS_UP):
+                new_z = int(instance.pos_z or 0) + (1 if tile == STAIRS_DOWN else -1)
+                target = get_instance_dungeon(instance, floor=new_z)
+                landing = (target.stairs_up if tile == STAIRS_DOWN else target.stairs_down) or target.entry_point
+                instance.pos_z = target.config.floor
+                instance.pos_x, instance.pos_y = landing
+                dungeon = target
+                unlocked = effective_unlocked_doors(instance, dungeon)
+                floor_changed = True
 
         if moved:
             try:
@@ -130,7 +153,7 @@ def process_movement(instance: DungeonInstance, direction: str) -> Tuple[bool, D
     exits_map = []
     for d, (dx2, dy2) in {"n": (0, 1), "s": (0, -1), "e": (1, 0), "w": (-1, 0)}.items():
         tx, ty = x + dx2, y + dy2
-        if 0 <= tx < MAP_SIZE and 0 <= ty < MAP_SIZE and dungeon.grid[tx][ty] in walkable_chars:
+        if dungeon.is_walkable(tx, ty, unlocked):
             exits_map.append(d)
 
     if exits_map:
@@ -178,6 +201,13 @@ def process_movement(instance: DungeonInstance, direction: str) -> Tuple[bool, D
         "exits": exits_map,
         "noticed_loot": noticed_flag,
     }
+    if floor_changed:
+        response["floor_changed"] = True
+        response["floor"] = z
+    if tile_char == "P":
+        # Standing on the loot-room portal: the client offers the trip home.
+        response["portal"] = True
+        response["extraction_available"] = bool(getattr(instance, "extraction_available", False))
 
     # Add encounter info if combat started
     if combat_started and combat_id is not None:
@@ -194,11 +224,13 @@ def process_movement(instance: DungeonInstance, direction: str) -> Tuple[bool, D
             from app.dungeon.explored_tiles import update_explored_tiles
             from app.dungeon.visibility import calculate_visible_tiles
 
+            from app.dungeon.dungeon import floor_seed
+
             # Calculate what the player can now see
             visible_tiles = calculate_visible_tiles(dungeon.grid, instance.pos_x, instance.pos_y)
 
-            # Update explored tiles in database
-            update_explored_tiles(instance.seed, visible_tiles)
+            # Update explored tiles in database (keyed per floor)
+            update_explored_tiles(floor_seed(instance.seed, int(instance.pos_z or 0)), visible_tiles)
 
             # Return newly visible tiles so client can render them
             # Format: [{x, y, type}, ...]

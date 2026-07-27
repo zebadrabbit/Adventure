@@ -15,7 +15,16 @@ from typing import List
 from app import db
 from app.models.dungeon_instance import DungeonInstance
 
-WALKABLE_EXTRA = {"P"}  # Teleport placeholder char
+WALKABLE_EXTRA = {"P"}  # Portal char
+
+
+def effective_unlocked_doors(instance: DungeonInstance, dungeon) -> set:
+    """Doors passable for this party: individually unlocked ones, plus the
+    loot room's sealed doors once the final boss is down (extraction)."""
+    unlocked = instance.get_unlocked_doors()
+    if getattr(instance, "extraction_available", False):
+        unlocked = unlocked | getattr(dungeon, "loot_room_doors", set())
+    return unlocked
 
 
 def normalize_position(dungeon, instance: DungeonInstance, map_size: int) -> tuple[int, int, int]:
@@ -27,12 +36,12 @@ def normalize_position(dungeon, instance: DungeonInstance, map_size: int) -> tup
     entrance = None
     if getattr(dungeon, "rooms", None):
         try:
-            r0 = dungeon.rooms[0]
-            entrance = (r0.center[0], r0.center[1], 0)
+            ex, ey = dungeon.entry_point
+            entrance = (ex, ey, z)
         except Exception:
             entrance = None
 
-    unlocked_doors = instance.get_unlocked_doors()
+    unlocked_doors = effective_unlocked_doors(instance, dungeon)
 
     def _is_walkable(px, py):
         return dungeon.is_walkable(px, py, unlocked_doors)
@@ -50,7 +59,7 @@ def normalize_position(dungeon, instance: DungeonInstance, map_size: int) -> tup
 
 def attempt_move(dungeon, instance: DungeonInstance, direction: str, map_size: int) -> tuple[int, int, bool]:
     """Attempt to move in direction; returns (x,y,moved). Handles teleport pads."""
-    unlocked_doors = instance.get_unlocked_doors()
+    unlocked_doors = effective_unlocked_doors(instance, dungeon)
     deltas = {"n": (0, 1), "s": (0, -1), "e": (1, 0), "w": (-1, 0)}
     x, y = instance.pos_x, instance.pos_y
     moved = False
@@ -82,7 +91,7 @@ def attempt_move(dungeon, instance: DungeonInstance, direction: str, map_size: i
 
 def describe_cell_and_exits(dungeon, instance: DungeonInstance, x: int, y: int, map_size: int) -> tuple[str, List[str]]:
     """Return (description, exits_list) for current coordinates."""
-    unlocked_doors = instance.get_unlocked_doors()
+    unlocked_doors = effective_unlocked_doors(instance, dungeon)
     tile_char = dungeon.grid[x][y]
     from app.dungeon.api_helpers.tiles import char_to_type
 

@@ -1,122 +1,229 @@
-"""Carve-floor-first connectivity: MST graph + corridor carving + door derivation.
+"""Rooms-and-mazes connectivity (Nystrom style).
 
-Pure functions operating on the column-major grid (grid[x][y]). No teleports:
-the MST spans every room, so corridors guarantee full reachability.
+Pure functions over the column-major grid (grid[x][y]):
+
+    fill_maze       -- flood every uncarved odd-aligned cell with winding TUNNEL
+                       mazes (hard cap on straight runs).
+    connect_regions -- open one connector between every pair of adjacent
+                       walkable regions (union-find) plus a few loop
+                       connectors; room<->corridor connectors become DOORs.
+    cull_dead_ends  -- retract most maze dead ends so remaining corridors all
+                       lead somewhere.
+    derive_walls    -- CAVE orthogonally adjacent to ROOM becomes WALL.
+
+Connectivity is guaranteed by construction: union-find runs until a single
+region remains, and dead-end culling only ever removes degree-1 cells.
 """
 
 from __future__ import annotations
 
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 from .tiles import CAVE, DOOR, ROOM, TUNNEL, WALL
 
 Point = Tuple[int, int]
-Edge = Tuple[int, int]
+_DIRS = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
 
-def _dist(a: Point, b: Point) -> int:
-    return abs(a[0] - b[0]) + abs(a[1] - b[1])
-
-
-def mst_edges(centers: List[Point]) -> List[Edge]:
-    """Prim's algorithm over room-center points; returns list of (i, j) index edges."""
-    n = len(centers)
-    if n <= 1:
-        return []
-    in_tree = {0}
-    edges: List[Edge] = []
-    while len(in_tree) < n:
-        best = None
-        for i in in_tree:
-            for j in range(n):
-                if j in in_tree:
-                    continue
-                d = _dist(centers[i], centers[j])
-                if best is None or d < best[0]:
-                    best = (d, i, j)
-        _, i, j = best
-        in_tree.add(j)
-        edges.append((i, j))
-    return edges
-
-
-def extra_edges(centers: List[Point], base: List[Edge], rng, chance: float) -> List[Edge]:
-    """Add up to len(centers) extra short edges (loops) not already in base."""
-    n = len(centers)
-    base_set = {tuple(sorted(e)) for e in base}
-    candidates = []
-    for i in range(n):
-        for j in range(i + 1, n):
-            if tuple(sorted((i, j))) in base_set:
-                continue
-            candidates.append((_dist(centers[i], centers[j]), i, j))
-    candidates.sort()
-    out: List[Edge] = []
-    for _, i, j in candidates:
-        if rng.random() < chance:
-            out.append((i, j))
-        if len(out) >= n:
-            break
-    return out
-
-
-def _l_path(src: Point, dst: Point, rng) -> List[Point]:
-    """Ortho-stepped L-shaped path from src to dst (inclusive)."""
-    (sx, sy), (dx, dy) = src, dst
-    horizontal_first = rng.random() < 0.5
-    path: List[Point] = [(sx, sy)]
-    x, y = sx, sy
-    if horizontal_first:
-        step = 1 if dx > sx else -1
-        while x != dx:
-            x += step
-            path.append((x, y))
-        step = 1 if dy > sy else -1
-        while y != dy:
-            y += step
-            path.append((x, y))
-    else:
-        step = 1 if dy > sy else -1
-        while y != dy:
-            y += step
-            path.append((x, y))
-        step = 1 if dx > sx else -1
-        while x != dx:
-            x += step
-            path.append((x, y))
-    return path
-
-
-def carve_corridor(grid, src: Point, dst: Point, rng) -> None:
-    """Carve a tunnel between two room centers. Cells already ROOM are left intact;
-    CAVE cells become TUNNEL. Doors are derived later in derive_doors()."""
-    for x, y in _l_path(src, dst, rng):
-        if grid[x][y] == CAVE:
-            grid[x][y] = TUNNEL
-
-
-def _ortho_neighbors(x: int, y: int):
+def _ortho(x: int, y: int):
     return ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1))
 
 
-def derive_doors(grid) -> None:
-    """Label tunnel cells that meet a room as DOOR, preserving:
-      * each door has EXACTLY ONE room neighbor (single door per approach),
-      * each door has a tunnel neighbor (a walkable approach),
-      * no two doors are orthogonally adjacent.
-    Tunnel cells touching two rooms (a corner) stay walkable tunnels rather than
-    becoming a door with two room sides. Deterministic top-left scan."""
+def fill_maze(grid, rng, straight_max: int = 10) -> None:
+    """Carve winding mazes through every uncarved odd-aligned cell.
+
+    Growing-tree carver stepping 2 cells at a time. A straight run longer than
+    `straight_max` tiles is forbidden: the carver must turn or backtrack.
+    """
     w, h = len(grid), len(grid[0])
+    for sx in range(1, w - 1, 2):
+        for sy in range(1, h - 1, 2):
+            if grid[sx][sy] == CAVE:
+                _grow_maze(grid, sx, sy, rng, straight_max)
+
+
+def _run_behind(grid, x: int, y: int, d: Tuple[int, int]) -> int:
+    """Length of the existing straight TUNNEL run ending at (x, y) along axis d
+    (looking backwards). Measured from the grid, not the carve path, so
+    backtracked re-extensions can't sneak past the straight cap."""
+    n = 0
+    while grid[x][y] == TUNNEL:
+        n += 1
+        x, y = x - d[0], y - d[1]
+        if not (0 <= x < len(grid) and 0 <= y < len(grid[0])):
+            break
+    return n
+
+
+def _grow_maze(grid, sx: int, sy: int, rng, straight_max: int) -> None:
+    w, h = len(grid), len(grid[0])
+    grid[sx][sy] = TUNNEL
+    # stack entries: (x, y, dir_in)
+    stack: List[Tuple[int, int, Tuple[int, int] | None]] = [(sx, sy, None)]
+    while stack:
+        x, y, dir_in = stack[-1]
+        options = []
+        for d in _DIRS:
+            nx, ny = x + 2 * d[0], y + 2 * d[1]
+            if (
+                1 <= nx < w - 1
+                and 1 <= ny < h - 1
+                and grid[nx][ny] == CAVE
+                and _run_behind(grid, x, y, d) + 2 <= straight_max
+            ):
+                options.append(d)
+        if not options:
+            stack.pop()
+            continue
+        if dir_in in options and rng.random() < 0.35:
+            d = dir_in  # mild straight bias; capped above
+        else:
+            d = rng.choice(options)
+        grid[x + d[0]][y + d[1]] = TUNNEL
+        grid[x + 2 * d[0]][y + 2 * d[1]] = TUNNEL
+        stack.append((x + 2 * d[0], y + 2 * d[1], d))
+
+
+def _label_regions(grid) -> Dict[Point, int]:
+    """Flood-fill contiguous walkable (ROOM/TUNNEL) areas into region ids."""
+    w, h = len(grid), len(grid[0])
+    region: Dict[Point, int] = {}
+    rid = 0
     for x in range(w):
         for y in range(h):
-            if grid[x][y] != TUNNEL:
+            if grid[x][y] not in (ROOM, TUNNEL) or (x, y) in region:
                 continue
-            neigh = [(nx, ny) for nx, ny in _ortho_neighbors(x, y) if 0 <= nx < w and 0 <= ny < h]
-            room_count = sum(1 for nx, ny in neigh if grid[nx][ny] == ROOM)
-            has_tunnel = any(grid[nx][ny] == TUNNEL for nx, ny in neigh)
-            adj_door = any(grid[nx][ny] == DOOR for nx, ny in neigh)
-            if room_count == 1 and has_tunnel and not adj_door:
-                grid[x][y] = DOOR
+            stack = [(x, y)]
+            region[(x, y)] = rid
+            while stack:
+                cx, cy = stack.pop()
+                for nx, ny in _ortho(cx, cy):
+                    if 0 <= nx < w and 0 <= ny < h and grid[nx][ny] in (ROOM, TUNNEL) and (nx, ny) not in region:
+                        region[(nx, ny)] = rid
+                        stack.append((nx, ny))
+            rid += 1
+    return region
+
+
+def _straight_through(grid, x: int, y: int) -> int:
+    """Longest straight TUNNEL run that would pass through (x, y) if it were
+    carved as TUNNEL."""
+    w, h = len(grid), len(grid[0])
+    best = 0
+    for dx, dy in ((1, 0), (0, 1)):
+        n = 1
+        for s in (1, -1):
+            k = 1
+            while (
+                0 <= x + s * k * dx < w and 0 <= y + s * k * dy < h and grid[x + s * k * dx][y + s * k * dy] == TUNNEL
+            ):
+                n += 1
+                k += 1
+        best = max(best, n)
+    return best
+
+
+def connect_regions(grid, rng, loop_chance: float = 0.04, straight_max: int = 10) -> None:
+    """Open connectors between adjacent regions until the map is one region.
+
+    A connector is a CAVE cell whose opposite orthogonal neighbors are walkable
+    cells of different regions. Room<->corridor connectors open as DOOR (unless
+    that would create adjacent doors); everything else opens as TUNNEL.
+    Already-merged pairs may still open with `loop_chance` to create loops.
+
+    Connectors whose TUNNEL opening would splice two collinear corridors into a
+    straight run longer than `straight_max` are deferred; they open only if no
+    other connector merges their regions (connectivity beats aesthetics).
+    """
+    w, h = len(grid), len(grid[0])
+    region = _label_regions(grid)
+    if not region:
+        return
+    connectors = []
+    for x in range(1, w - 1):
+        for y in range(1, h - 1):
+            if grid[x][y] != CAVE:
+                continue
+            for (ax, ay), (bx, by) in (((x - 1, y), (x + 1, y)), ((x, y - 1), (x, y + 1))):
+                ra, rb = region.get((ax, ay)), region.get((bx, by))
+                if ra is not None and rb is not None and ra != rb:
+                    connectors.append((x, y, ra, rb))
+                    break
+    rng.shuffle(connectors)
+
+    parent = list(range(max(region.values()) + 1))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    def would_be_door(x: int, y: int) -> bool:
+        room_adj = sum(1 for nx, ny in _ortho(x, y) if 0 <= nx < w and 0 <= ny < h and grid[nx][ny] == ROOM)
+        return room_adj == 1
+
+    deferred = []
+    for x, y, ra, rb in connectors:
+        fa, fb = find(ra), find(rb)
+        if fa == fb:
+            if rng.random() < loop_chance and (would_be_door(x, y) or _straight_through(grid, x, y) <= straight_max):
+                _open_connector(grid, x, y)
+            continue
+        if not would_be_door(x, y) and _straight_through(grid, x, y) > straight_max:
+            deferred.append((x, y, ra, rb))
+            continue
+        _open_connector(grid, x, y)
+        parent[fa] = fb
+    for x, y, ra, rb in deferred:
+        fa, fb = find(ra), find(rb)
+        if fa != fb:
+            _open_connector(grid, x, y)
+            parent[fa] = fb
+
+
+def _open_connector(grid, x: int, y: int) -> None:
+    w, h = len(grid), len(grid[0])
+    room_adj = sum(1 for nx, ny in _ortho(x, y) if 0 <= nx < w and 0 <= ny < h and grid[nx][ny] == ROOM)
+    door_adj = any(0 <= nx < w and 0 <= ny < h and grid[nx][ny] == DOOR for nx, ny in _ortho(x, y))
+    # DOOR only for a clean room<->corridor junction; room<->room and
+    # corridor<->corridor openings stay TUNNEL, as does anything that would
+    # violate the no-adjacent-doors invariant.
+    grid[x][y] = DOOR if room_adj == 1 and not door_adj else TUNNEL
+
+
+def cull_dead_ends(grid, rng, keep_chance: float = 0.2) -> None:
+    """Retract maze dead ends; each dead-end cell survives with `keep_chance`.
+
+    Only TUNNEL cells with at most one walkable neighbor are removed, so
+    connectivity of everything else is preserved. Cells adjacent to a DOOR are
+    never removed (a door must keep its corridor approach).
+    """
+    w, h = len(grid), len(grid[0])
+    walkable = (ROOM, TUNNEL, DOOR)
+    protected = set()
+    changed = True
+    while changed:
+        changed = False
+        for x in range(1, w - 1):
+            for y in range(1, h - 1):
+                if grid[x][y] != TUNNEL or (x, y) in protected:
+                    continue
+                deg = 0
+                door_adj = False
+                for nx, ny in _ortho(x, y):
+                    t = grid[nx][ny]
+                    if t in walkable:
+                        deg += 1
+                    if t == DOOR:
+                        door_adj = True
+                if deg > 1 or door_adj:
+                    continue
+                if rng.random() < keep_chance:
+                    protected.add((x, y))
+                else:
+                    grid[x][y] = CAVE
+                    changed = True
 
 
 def derive_walls(grid) -> None:
@@ -128,7 +235,7 @@ def derive_walls(grid) -> None:
         for y in range(h):
             if grid[x][y] != CAVE:
                 continue
-            for nx, ny in _ortho_neighbors(x, y):
+            for nx, ny in _ortho(x, y):
                 if 0 <= nx < w and 0 <= ny < h and grid[nx][ny] == ROOM:
                     to_wall.append((x, y))
                     break

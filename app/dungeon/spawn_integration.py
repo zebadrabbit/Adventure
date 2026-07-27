@@ -153,9 +153,11 @@ def persist_spawns(manager: "SpawnManager", instance: "DungeonInstance", user_id
     Returns:
         Number of entities persisted
     """
-    # Clear existing monster entities for this instance
+    # Clear existing monster entities for this instance on the manager's floor
     try:
-        DungeonEntity.query.filter_by(instance_id=instance.id, type="monster").delete(synchronize_session=False)
+        DungeonEntity.query.filter_by(
+            instance_id=instance.id, type="monster", z=int(getattr(manager, "z", 0) or 0)
+        ).delete(synchronize_session=False)
     except Exception:
         pass
 
@@ -190,7 +192,9 @@ def load_spawns_from_db(instance: "DungeonInstance", manager: "SpawnManager") ->
     """
     from app.dungeon.spawn_manager import SpawnBehavior, SpawnEntry
 
-    entities = DungeonEntity.query.filter_by(instance_id=instance.id, type="monster").all()
+    entities = DungeonEntity.query.filter_by(
+        instance_id=instance.id, type="monster", z=int(getattr(manager, "z", 0) or 0)
+    ).all()
 
     if not entities:
         return None

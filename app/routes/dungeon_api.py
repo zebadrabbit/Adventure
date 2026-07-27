@@ -29,7 +29,7 @@ from flask import (
 from flask_login import current_user, login_required
 
 from app import db
-from app.dungeon import DOOR, ROOM, TUNNEL, Dungeon
+from app.dungeon import DOOR, ROOM, STAIRS_DOWN, STAIRS_UP, TELEPORT, TUNNEL, Dungeon, floor_seed
 from app.dungeon.api_helpers.encounters import run_monster_patrols
 from app.dungeon.api_helpers.perception import (
     get_noticed_coords as _get_noticed_coords_helper,
@@ -94,12 +94,12 @@ _DUNGEON_CACHE_MAX = 8  # small LRU-ish manual cap
 bp_dungeon = Blueprint("dungeon", __name__)
 
 
-def get_cached_dungeon(seed: int, size_tuple: tuple[int, int, int]):
+def get_cached_dungeon(seed: int, size_tuple: tuple[int, int, int], floor: int = 0, num_floors: int = 1):
     import os
 
     if os.environ.get("DUNGEON_DISABLE_CACHE") == "1":
-        return Dungeon(seed=seed, size=size_tuple)
-    key = (seed, size_tuple)
+        return Dungeon(seed=seed, size=size_tuple, floor=floor, num_floors=num_floors)
+    key = (seed, size_tuple, floor, num_floors)
     with _dungeon_cache_lock:
         dungeon = _dungeon_cache.get(key)
         if dungeon is not None:
@@ -109,7 +109,7 @@ def get_cached_dungeon(seed: int, size_tuple: tuple[int, int, int]):
                 # are required they can be injected here. For now just mark cleaned.
                 dungeon.structural_cleaned = True
             return dungeon
-    dungeon = Dungeon(seed=seed, size=size_tuple)
+    dungeon = Dungeon(seed=seed, size=size_tuple, floor=floor, num_floors=num_floors)
     dungeon.structural_cleaned = True
     with _dungeon_cache_lock:
         _dungeon_cache[key] = dungeon
@@ -118,6 +118,22 @@ def get_cached_dungeon(seed: int, size_tuple: tuple[int, int, int]):
             if first_key != key:
                 _dungeon_cache.pop(first_key, None)
     return dungeon
+
+
+MAP_SIZE = 75
+
+
+def num_floors_for_tier(tier: int) -> int:
+    """Dungeon depth scales with difficulty: T1-2: 2, T3-4: 3, T5-6: 4, T7: 5."""
+    return min(1 + (int(tier or 1) + 1) // 2, 5)
+
+
+def get_instance_dungeon(instance, floor: int | None = None):
+    """Return the Dungeon for the instance's current floor (or an explicit one)."""
+    num_floors = num_floors_for_tier(getattr(instance, "tier", 1))
+    z = int(instance.pos_z or 0) if floor is None else floor
+    z = max(0, min(z, num_floors - 1))
+    return get_cached_dungeon(instance.seed, (75, 75, num_floors), floor=z, num_floors=num_floors)
 
 
 @bp_dungeon.route("/api/dungeon/move", methods=["POST"])
@@ -230,8 +246,7 @@ def dungeon_reveal_secret():
     instance = db.session.get(DungeonInstance, inst_id)
     if not instance:
         return jsonify({"error": "no_instance"}), 404
-    MAP_SIZE = 75
-    dungeon = get_cached_dungeon(instance.seed, (MAP_SIZE, MAP_SIZE, 1))
+    dungeon = get_instance_dungeon(instance)
     if not (0 <= x < MAP_SIZE and 0 <= y < MAP_SIZE):
         return jsonify({"error": "Bad coords"}), 400
     dist = max(abs(x - instance.pos_x), abs(y - instance.pos_y))
@@ -272,8 +287,7 @@ def dungeon_unlock_door():
     if not instance:
         return jsonify({"error": "no_instance"}), 404
 
-    MAP_SIZE = 75
-    dungeon = get_cached_dungeon(instance.seed, (MAP_SIZE, MAP_SIZE, 1))
+    dungeon = get_instance_dungeon(instance)
 
     if not (0 <= x < MAP_SIZE and 0 <= y < MAP_SIZE):
         return jsonify({"error": "Bad coords"}), 400
@@ -438,9 +452,10 @@ def dungeon_map():
     if dungeon_instance_id:
         instance = db.session.get(DungeonInstance, dungeon_instance_id)
         if instance:
-            MAP_SIZE = 75  # 75x75 grid
-            dungeon = get_cached_dungeon(instance.seed, (MAP_SIZE, MAP_SIZE, 1))
-            # Loot generation (idempotent). Collect walkable tiles.
+            dungeon = get_instance_dungeon(instance)
+            z = dungeon.config.floor
+            floor_key = floor_seed(instance.seed, z)
+            # Loot generation (idempotent, per floor via floor_key). Collect walkable tiles.
             walkable_chars = {ROOM, TUNNEL, DOOR}
             walkables = [
                 (x, y) for x in range(MAP_SIZE) for y in range(MAP_SIZE) if dungeon.grid[x][y] in walkable_chars
@@ -463,24 +478,27 @@ def dungeon_map():
                 avg_party_level=avg_level,
                 width=MAP_SIZE,
                 height=MAP_SIZE,
-                seed=instance.seed,
+                seed=floor_key,
             )
             try:
                 generate_loot_for_seed(cfg, walkables)
             except Exception:
                 db.session.rollback()
                 logger.warning("dungeon_map: failed to generate loot for seed", seed=instance.seed, exc_info=True)
-            # Simplified entrance: first room center (if any)
+            # Entrance for this floor: start room center on floor 0, up-stairs below
             entrance = None
             if getattr(dungeon, "rooms", None):
-                r0 = dungeon.rooms[0]
-                entrance = (r0.center[0], r0.center[1], 0)
-            walkable_chars = {ROOM, TUNNEL, DOOR}
+                ex, ey = dungeon.entry_point
+                entrance = (ex, ey, z)
+            walkable_chars = {ROOM, TUNNEL, DOOR, TELEPORT, STAIRS_UP, STAIRS_DOWN}
             player_pos = [instance.pos_x, instance.pos_y, instance.pos_z]
             # Check if player's current position is valid (walkable and connected to entrance)
             px, py, pz = player_pos
             is_valid = (
-                0 <= px < MAP_SIZE and 0 <= py < MAP_SIZE and 0 <= pz < 1 and dungeon.grid[px][py] in walkable_chars
+                0 <= px < MAP_SIZE
+                and 0 <= py < MAP_SIZE
+                and 0 <= pz < dungeon.config.num_floors
+                and dungeon.grid[px][py] in walkable_chars
             )
             # Flood fill from entrance to get all connected tiles
             connected = set()
@@ -511,15 +529,15 @@ def dungeon_map():
             )
             from app.dungeon.visibility import calculate_visible_tiles
 
-            # Get previously explored tiles
-            explored = load_explored_tiles(instance.seed)
+            # Get previously explored tiles (keyed per floor)
+            explored = load_explored_tiles(floor_key)
 
             # Calculate currently visible tiles
             visible = calculate_visible_tiles(dungeon.grid, player_pos[0], player_pos[1])
 
             # Merge visible tiles into explored set
             explored.update(visible)
-            update_explored_tiles(instance.seed, explored)
+            update_explored_tiles(floor_key, explored)
 
             # Build grid with fog of war: only return explored tiles
             # For unexplored tiles, return None or 'unknown'
@@ -602,7 +620,7 @@ def dungeon_map():
                 return raw_rows, changed
 
             # New spawn system: Use SpawnManager for deterministic, configurable spawns
-            entities_rows = DungeonEntity.query.filter_by(instance_id=instance.id, seed=instance.seed).all()
+            entities_rows = DungeonEntity.query.filter_by(instance_id=instance.id, seed=instance.seed, z=z).all()
 
             def _initialize_spawn_system():
                 """Initialize or load spawn system for dungeon."""
@@ -610,12 +628,10 @@ def dungeon_map():
                 config = SpawnConfig()
                 spawn_manager = SpawnManager(dungeon, instance, config=config)
 
-                # Update instance with total boss count
-                if instance.bosses_total == 1:  # Default value, update it
-                    # Calculate actual boss count from config
-                    base = config.boss_per_dungeon
-                    tier = instance.tier or 1
-                    instance.bosses_total = max(1, base + (tier - 1) // 2)  # Scale with tier
+                # One boss guards the loot room on the deepest floor; extraction
+                # unlocks when it dies.
+                if instance.bosses_total != 1:
+                    instance.bosses_total = 1
                     db.session.add(instance)
 
                 # Check if spawns already exist in DB
@@ -673,9 +689,9 @@ def dungeon_map():
 
             def _seed_treasure_caches():
                 """Seed treasure caches separately from spawn manager."""
-                # Check if treasure already exists
+                # Check if treasure already exists on this floor
                 existing_treasure = DungeonEntity.query.filter_by(
-                    instance_id=instance.id, seed=instance.seed, type="treasure"
+                    instance_id=instance.id, seed=instance.seed, type="treasure", z=z
                 ).first()
 
                 if existing_treasure:
@@ -716,7 +732,7 @@ def dungeon_map():
                             name="Hidden Cache",
                             x=tx,
                             y=ty,
-                            z=0,
+                            z=z,
                             data=json.dumps(meta),
                         )
                         db.session.add(ent)
@@ -749,7 +765,9 @@ def dungeon_map():
                 try:
                     _initialize_spawn_system()
                     # Reload entities after initialization
-                    entities_rows = DungeonEntity.query.filter_by(instance_id=instance.id, seed=instance.seed).all()
+                    entities_rows = DungeonEntity.query.filter_by(
+                        instance_id=instance.id, seed=instance.seed, z=z
+                    ).all()
                 except Exception:
                     db.session.rollback()
                     entities_rows = []
@@ -760,11 +778,16 @@ def dungeon_map():
                     if not entities_rows:
                         # All invalid, reinitialize
                         _initialize_spawn_system()
-                        entities_rows = DungeonEntity.query.filter_by(instance_id=instance.id, seed=instance.seed).all()
+                        entities_rows = DungeonEntity.query.filter_by(
+                            instance_id=instance.id, seed=instance.seed, z=z
+                        ).all()
                 except Exception:
                     logger.debug("suppressed_exception", where="dungeon_map", exc_info=True)
-            # trap/ambush entities must never be serialized to clients.
-            client_entities_rows = [e for e in entities_rows if e.type not in HIDDEN_ROOM_EVENT_TYPES]
+            # trap/ambush entities must never be serialized to clients; other
+            # floors' entities are invisible on this floor's map.
+            client_entities_rows = [
+                e for e in entities_rows if e.type not in HIDDEN_ROOM_EVENT_TYPES and int(e.z or 0) == z
+            ]
             entities_json = [e.to_dict() for e in client_entities_rows]
             # Build a light-weight overlay grid (same height/width) marking entity types for client iconography.
             # To avoid large payload bloat, use single letters and only for tiles that contain an entity.
@@ -1088,10 +1111,11 @@ def dungeon_state():
     instance = db.session.get(DungeonInstance, dungeon_instance_id)
     if not instance:
         return jsonify({"error": "Dungeon instance not found"}), 404
-    MAP_SIZE = 75
-    dungeon = get_cached_dungeon(instance.seed, (MAP_SIZE, MAP_SIZE, 1))
+    dungeon = get_instance_dungeon(instance)
 
-    unlocked_doors = instance.get_unlocked_doors()
+    from app.dungeon.api_helpers.movement import effective_unlocked_doors
+
+    unlocked_doors = effective_unlocked_doors(instance, dungeon)
     x, y, z = instance.pos_x, instance.pos_y, instance.pos_z
     deltas = {"n": (0, 1), "s": (0, -1), "e": (1, 0), "w": (-1, 0)}
     tile_char = dungeon.grid[x][y]
@@ -1243,7 +1267,7 @@ def dungeon_entities():
     instance = db.session.get(DungeonInstance, dungeon_instance_id)
     if not instance:
         return jsonify({"error": "Dungeon instance not found"}), 404
-    rows = DungeonEntity.query.filter_by(instance_id=instance.id).all()
+    rows = DungeonEntity.query.filter_by(instance_id=instance.id, z=int(instance.pos_z or 0)).all()
 
     # Filter out hidden treasures and hidden room-event types (trap/ambush must never reach clients)
     visible_entities = []
@@ -2066,8 +2090,7 @@ def advance_non_combat_time(instance, *, tick_amount: int = 1, resp: dict | None
         clock.tick += int(tick_amount)
 
         # Acquire dungeon object to pass into patrols (mirrors movement logic)
-        MAP_SIZE = 75
-        dungeon = get_cached_dungeon(instance.seed, (MAP_SIZE, MAP_SIZE, 1))
+        dungeon = get_instance_dungeon(instance)
         run_monster_patrols(dungeon, instance, resp=resp if resp is not None else {}, tick_amount=tick_amount)
         db.session.add(clock)
         try:
@@ -2109,8 +2132,7 @@ def dungeon_generation_metrics():
     inst = db.session.get(DungeonInstance, dungeon_instance_id)
     if not inst:
         return jsonify({"error": "instance not found"}), 404
-    MAP_SIZE = 75
-    dungeon = get_cached_dungeon(inst.seed, (MAP_SIZE, MAP_SIZE, 1))
+    dungeon = get_instance_dungeon(inst)
     metrics = dungeon.metrics if getattr(dungeon, "enable_metrics", True) else {}
     return jsonify(
         {

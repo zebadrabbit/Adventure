@@ -6,6 +6,7 @@ Backward-compatible import surface plus new door variants & helper constants.
 from .dungeon import (
     Dungeon,
     DungeonConfig,
+    floor_seed,
     CAVE,
     ROOM,
     WALL,
@@ -14,11 +15,14 @@ from .dungeon import (
     SECRET_DOOR,
     LOCKED_DOOR,
     TELEPORT,
+    STAIRS_UP,
+    STAIRS_DOWN,
 )  # noqa: F401
 
 __all__ = [
     "Dungeon",
     "DungeonConfig",
+    "floor_seed",
     "CAVE",
     "ROOM",
     "WALL",
@@ -27,4 +31,6 @@ __all__ = [
     "SECRET_DOOR",
     "LOCKED_DOOR",
     "TELEPORT",
+    "STAIRS_UP",
+    "STAIRS_DOWN",
 ]

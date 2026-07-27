@@ -568,6 +568,26 @@
           });
         }
 
+        // Changing floors invalidates the whole rendered grid - reload the map.
+        if (data && data.floor_changed) {
+          if (output) {
+            const line = document.createElement('div');
+            line.className = 'text-info';
+            const prevZ = (Array.isArray(window.currentPos) && window.currentPos.length > 2) ? window.currentPos[2] : 0;
+            line.textContent = data.floor > prevZ ? `You descend to floor ${data.floor + 1}.` : `You climb up to floor ${data.floor + 1}.`;
+            output.appendChild(line);
+          }
+          try { loadDungeonMap(); } catch (e) { console.error('[dungeon] floor change reload failed:', e); }
+        }
+
+        // Standing on the exit portal after the final boss: offer the way home.
+        if (data && data.portal && data.extraction_available && output) {
+          const line = document.createElement('div');
+          line.className = 'text-success';
+          line.textContent = 'A portal hums here, ready to carry you back to the lobby. Use Extract to leave with your spoils.';
+          output.appendChild(line);
+        }
+
         // Handle revealed tiles (fog of war updates)
         if (data && Array.isArray(data.revealed_tiles) && data.revealed_tiles.length > 0) {
           try {

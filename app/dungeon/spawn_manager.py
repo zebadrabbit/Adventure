@@ -193,7 +193,12 @@ class SpawnManager:
         self.dungeon = dungeon
         self.instance = instance
         self.config = config or SpawnConfig()
-        self.rng = rng or random.Random(instance.seed ^ 0x5341574E)  # ^ "SPAWN"
+        # Spawns are floor-scoped: entities carry z and the manager only ever
+        # holds the current floor's spawns (see spawn_integration filters).
+        self.z = int(getattr(instance, "pos_z", 0) or 0)
+        from app.dungeon.dungeon import floor_seed
+
+        self.rng = rng or random.Random(floor_seed(instance.seed, self.z) ^ 0x5341574E)  # ^ "SPAWN"
 
         self.spawns: List[SpawnEntry] = []
         self._initialized = False
@@ -236,6 +241,9 @@ class SpawnManager:
         before_ambient = len(self.spawns)
         self._generate_ambient_spawns(party_level, ambient_count, walkable_tiles)
         self.initial_ambient_count = len(self.spawns) - before_ambient
+
+        for spawn in self.spawns:
+            spawn.z = self.z
 
         self._initialized = True
         return self.spawns
@@ -333,6 +341,7 @@ class SpawnManager:
         spawn = SpawnEntry(
             x=x,
             y=y,
+            z=self.z,
             behavior=SpawnBehavior.WANDERER,
             archetype="Trash",
             level=self.party_level,
@@ -361,10 +370,11 @@ class SpawnManager:
             return None
         return self.rng.choice(candidates)
 
-    def get_spawn_at(self, x: int, y: int, z: int = 0) -> Optional[SpawnEntry]:
-        """Find spawn at coordinates."""
+    def get_spawn_at(self, x: int, y: int, z: Optional[int] = None) -> Optional[SpawnEntry]:
+        """Find spawn at coordinates. The manager only holds the current
+        floor's spawns, so z is optional and matches any when omitted."""
         for spawn in self.spawns:
-            if spawn.x == x and spawn.y == y and spawn.z == z:
+            if spawn.x == x and spawn.y == y and (z is None or spawn.z == z):
                 return spawn
         return None
 

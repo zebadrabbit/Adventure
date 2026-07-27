@@ -15,6 +15,13 @@ from app.models.models import Character, CombatSession, Item
 bp_loot = Blueprint("loot", __name__)
 
 
+def _fkey(inst) -> int:
+    """Loot rows are keyed per floor via the floor seed."""
+    from app.dungeon import floor_seed
+
+    return floor_seed(inst.seed, int(getattr(inst, "pos_z", 0) or 0))
+
+
 @bp_loot.route("/api/dungeon/loot")
 @login_required
 def list_loot():
@@ -24,16 +31,16 @@ def list_loot():
     inst = db.session.get(DungeonInstance, dungeon_instance_id)
     if not inst:
         return jsonify({"loot": []})
-    rows = DungeonLoot.query.filter_by(seed=inst.seed, claimed=False).all()
+    rows = DungeonLoot.query.filter_by(seed=_fkey(inst), claimed=False).all()
     if not rows:
         # Lazy fallback generation: small synthetic area if no placements yet
         try:
             from app.loot.generator import LootConfig, generate_loot_for_seed
 
             walkables = [(x, y) for x in range(1, 12) for y in range(1, 12)]
-            cfg = LootConfig(avg_party_level=1, width=10, height=10, seed=inst.seed)
+            cfg = LootConfig(avg_party_level=1, width=10, height=10, seed=_fkey(inst))
             generate_loot_for_seed(cfg, walkables)
-            rows = DungeonLoot.query.filter_by(seed=inst.seed, claimed=False).all()
+            rows = DungeonLoot.query.filter_by(seed=_fkey(inst), claimed=False).all()
         except Exception:
             pass
     loot = []
@@ -73,12 +80,12 @@ def claim_loot(loot_id: int):
         return jsonify({"error": "not found", "where": "row check", "loot_id": loot_id}), 404
     inst_id = session.get("dungeon_instance_id")
     inst = db.session.get(DungeonInstance, inst_id) if inst_id else None
-    if not inst or row.seed != inst.seed:
+    if not inst or row.seed != _fkey(inst):
         return (
             jsonify(
                 {
                     "error": "wrong dungeon",
-                    "expected_seed": (inst.seed if inst else None),
+                    "expected_seed": (_fkey(inst) if inst else None),
                     "row_seed": row.seed,
                     "inst_id": inst_id,
                 }

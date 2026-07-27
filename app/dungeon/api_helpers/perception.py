@@ -69,6 +69,13 @@ def _perception_mod_from_stats(stats_json: str) -> int:
     return 0
 
 
+def _floor_key(instance) -> int:
+    """Loot and noticed-coords are keyed per floor via the floor seed."""
+    from app.dungeon import floor_seed
+
+    return floor_seed(instance.seed, int(getattr(instance, "pos_z", 0) or 0))
+
+
 def _loot_rows_at(seed: int, x: int, y: int) -> List[DungeonLoot]:
     return DungeonLoot.query.filter_by(seed=seed, x=x, y=y, z=0, claimed=False).all()
 
@@ -125,7 +132,7 @@ def maybe_perceive_and_mark_loot(instance, x: int, y: int) -> Tuple[bool, str, d
 
     logger = structlog.get_logger(__name__)
 
-    seed = instance.seed
+    seed = _floor_key(instance)
     rows = _loot_rows_at(seed, x, y)
     if not rows:
         return False, "", None
@@ -203,7 +210,7 @@ def maybe_perceive_and_mark_loot(instance, x: int, y: int) -> Tuple[bool, str, d
 
 
 def get_noticed_coords(instance) -> List[List[int]]:
-    key = _session_noticed_key(instance.seed)
+    key = _session_noticed_key(_floor_key(instance))
     noticed_map = session.get(key) or {}
     coords: List[List[int]] = []
     for ck, val in noticed_map.items():
@@ -215,7 +222,7 @@ def get_noticed_coords(instance) -> List[List[int]]:
             y = int(ys)
         except Exception:
             continue
-        rows = _loot_rows_at(instance.seed, x, y)
+        rows = _loot_rows_at(_floor_key(instance), x, y)
         if rows:
             coords.append([x, y])
     return coords
@@ -223,12 +230,12 @@ def get_noticed_coords(instance) -> List[List[int]]:
 
 def search_current_tile(instance):
     x, y, _ = instance.pos_x, instance.pos_y, instance.pos_z
-    key = _session_noticed_key(instance.seed)
+    key = _session_noticed_key(_floor_key(instance))
     noticed_map = session.get(key) or {}
     ck = _coord_key(x, y)
     if not noticed_map.get(ck):
         return False, {"found": False, "message": "You see nothing here to search."}, 403
-    rows = _loot_rows_at(instance.seed, x, y)
+    rows = _loot_rows_at(_floor_key(instance), x, y)
     if not rows:
         # Clean up stale notice marker
         noticed_map.pop(ck, None)

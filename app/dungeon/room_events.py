@@ -65,9 +65,11 @@ def seed_room_events(instance, dungeon) -> int:
 
     Returns the number of entities created.
     """
+    z = int(getattr(instance, "pos_z", 0) or 0)
     existing = DungeonEntity.query.filter(
         DungeonEntity.instance_id == instance.id,
         DungeonEntity.type.in_(ROOM_EVENT_TYPES),
+        DungeonEntity.z == z,
     ).first()
     if existing:
         return 0
@@ -77,7 +79,7 @@ def seed_room_events(instance, dungeon) -> int:
     walkable = SpawnManager(dungeon, instance)._get_walkable_tiles()
     entrance = _entrance(dungeon)
 
-    occupied = {(e.x, e.y) for e in DungeonEntity.query.filter_by(instance_id=instance.id).all()}
+    occupied = {(e.x, e.y) for e in DungeonEntity.query.filter_by(instance_id=instance.id, z=z).all()}
 
     candidates = []
     for x, y in walkable:
@@ -89,7 +91,9 @@ def seed_room_events(instance, dungeon) -> int:
                 continue
         candidates.append((x, y))
 
-    rng = random.Random(instance.seed ^ _SEED_XOR)
+    from app.dungeon.dungeon import floor_seed
+
+    rng = random.Random(floor_seed(instance.seed, z) ^ _SEED_XOR)
     rng.shuffle(candidates)
 
     plan = (
@@ -109,7 +113,7 @@ def seed_room_events(instance, dungeon) -> int:
             name=name,
             x=x,
             y=y,
-            z=0,
+            z=z,
         )
         db.session.add(ent)
         created += 1
@@ -231,9 +235,9 @@ def _resolve_ambush(instance, ent, x, y, dungeon) -> dict:
     from app.dungeon.spawn_manager import SpawnBehavior, SpawnEntry
 
     if dungeon is None:
-        from app.dungeon.movement_handler import get_cached_dungeon
+        from app.routes.dungeon_api import get_instance_dungeon
 
-        dungeon = get_cached_dungeon(instance.seed, (75, 75, 1))
+        dungeon = get_instance_dungeon(instance)
 
     from app.dungeon.tiles import DOOR, ROOM, TUNNEL
 
@@ -269,7 +273,14 @@ def _resolve_ambush(instance, ent, x, y, dungeon) -> dict:
 
     spawned = 0
     for nx, ny in tiles:
-        spawn = SpawnEntry(x=nx, y=ny, behavior=SpawnBehavior.AMBIENT, archetype="Trash", level=party_level)
+        spawn = SpawnEntry(
+            x=nx,
+            y=ny,
+            z=int(getattr(instance, "pos_z", 0) or 0),
+            behavior=SpawnBehavior.AMBIENT,
+            archetype="Trash",
+            level=party_level,
+        )
         populate_spawn_stats(spawn, party_level, instance)
         db.session.add(spawn_to_entity(spawn, instance, instance.user_id))
         spawned += 1
@@ -289,6 +300,7 @@ def resolve_events_at(instance, x, y, dungeon=None) -> list[dict]:
         DungeonEntity.type.in_(ROOM_EVENT_TYPES),
         DungeonEntity.x == x,
         DungeonEntity.y == y,
+        DungeonEntity.z == int(getattr(instance, "pos_z", 0) or 0),
     ).all()
 
     if not ents:

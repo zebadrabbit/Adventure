@@ -1,5 +1,15 @@
-from app.dungeon.config import DungeonConfig
-from app.dungeon.dungeon import DOOR, TUNNEL, WALL, Dungeon
+import pytest
+
+pytest.skip(
+    "Legacy test: validated the old carve-floor gap-repair heuristic. The rooms-and-mazes "
+    "generator has no repair pass, and a wall flanked by two tunnels is a normal corridor "
+    "corner there. Door and connectivity invariants live in test_dungeon_carve_floor.py, "
+    "test_no_orphan_doors.py and test_multiple_doors_exception.py.",
+    allow_module_level=True,
+)
+
+from app.dungeon.config import DungeonConfig  # noqa: E402
+from app.dungeon.dungeon import DOOR, TUNNEL, WALL, Dungeon  # noqa: E402
 
 
 def test_gap_repair_preserves_invariants_and_continuity():

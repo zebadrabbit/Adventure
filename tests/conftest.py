@@ -28,7 +28,7 @@ from app import create_app, db  # noqa: E402
 from app.dungeon import SECRET_DOOR  # noqa: E402
 from app.models.dungeon_instance import DungeonInstance  # noqa: E402
 from app.models.models import Character, User  # noqa: E402
-from app.routes.dungeon_api import get_cached_dungeon  # noqa: E402
+from app.routes.dungeon_api import get_instance_dungeon  # noqa: E402
 
 
 @pytest.fixture(scope="session")
@@ -232,7 +232,8 @@ def secret_door_setup(client):
     with client.session_transaction() as sess:
         sess["dungeon_instance_id"] = inst.id
         sess["dungeon_seed"] = inst.seed
-    d = get_cached_dungeon(inst.seed, (75, 75, 1))
+    # Same accessor the API endpoints use, so the fixture shares their cached grid.
+    d = get_instance_dungeon(inst)
 
     def plant_secret(auto=True, x=None, y=None):
         if auto:

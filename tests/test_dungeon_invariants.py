@@ -139,7 +139,7 @@ def test_unreachable_room_metric_consistency():
             if all((ix, iy) not in seen for ix, iy in cells):
                 # If any cell hosts a teleport, treat as logically reachable via teleport system
                 if any(d.grid[ix][iy] == "P" for ix, iy in cells):
-                    teleported.add(r)
+                    teleported.add((r.x, r.y))  # Room is unhashable; identify by position
                 else:
                     unreachable += 1
         metric_val = d.metrics.get("unreachable_rooms", 0)

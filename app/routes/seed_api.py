@@ -79,8 +79,13 @@ def set_seed():
                 from app.models import DungeonEntity, DungeonLoot
 
                 DungeonEntity.query.filter_by(instance_id=instance.id).delete(synchronize_session=False)
-                # Remove loot rows for old seed only (avoid nuking other seeds from other instances in multi-user future)
-                DungeonLoot.query.filter_by(seed=old_seed).delete(synchronize_session=False)
+                # Remove loot rows for the old seed only (avoid nuking other seeds
+                # from other instances in multi-user future). Loot is keyed per
+                # floor via floor_seed, so purge every possible floor key.
+                from app.dungeon import floor_seed
+
+                for old_z in range(5):
+                    DungeonLoot.query.filter_by(seed=floor_seed(old_seed, old_z)).delete(synchronize_session=False)
             except Exception:
                 pass
         instance.seed = seed

@@ -49,6 +49,8 @@
         locked_door: '#964a4a',
         cave: '#0a0b0f',
         teleporter: '#6B46C1',
+        stairs_up: '#3f8f5f',
+        stairs_down: '#8f7a3f',
         default: '#1a1d24'
     };
 
@@ -61,6 +63,8 @@
         secret_door: { kind: 'wall', base: '#39414f', hi: '#515b6e', lo: '#232932' },
         door: { kind: 'door', floor: '#2d3340', wood: '#9a6b35', plank: '#6f4a22' },
         locked_door: { kind: 'door', floor: '#2d3340', wood: '#964a4a', plank: '#602a2a' },
+        stairs_up: { kind: 'floor', base: '#2b4636', alt: '#3f8f5f', edge: 'rgba(0,0,0,0.32)' },
+        stairs_down: { kind: 'floor', base: '#463e2b', alt: '#8f7a3f', edge: 'rgba(0,0,0,0.32)' },
         default: { kind: 'void', base: '#1a1d24' }
     };
 
