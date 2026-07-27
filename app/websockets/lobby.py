@@ -144,7 +144,7 @@ def handle_lobby_chat_message(data):
                     room="admins",
                 )
         except Exception:
-            pass
+            logger.debug("suppressed_exception", where="handle_lobby_chat_message", exc_info=True)
     if user in muted_usernames:
         exp = None
         try:
@@ -186,7 +186,7 @@ def handle_connect():
                     if u.muted:
                         muted_usernames.add(username)
             except Exception:
-                pass
+                logger.debug("suppressed_exception", where="handle_connect", exc_info=True)
         else:
             # Synchronize stale in-memory bans/mutes with DB state (test isolation aid)
             try:
@@ -200,7 +200,7 @@ def handle_connect():
                     if username in muted_usernames and not u.muted:
                         muted_usernames.discard(username)
             except Exception:
-                pass
+                logger.debug("suppressed_exception", where="handle_connect", exc_info=True)
         # Reject banned users immediately
         # Allow admins to always connect in test mode to avoid cascading test failures if a prior test banned them.
         allow_admin_override = False
@@ -217,7 +217,7 @@ def handle_connect():
                     banned_usernames.discard(username)
                     allow_admin_override = True
         except Exception:
-            pass
+            logger.debug("suppressed_exception", where="handle_connect", exc_info=True)
         if username in banned_usernames and not allow_admin_override:
             try:
                 disconnect()
@@ -255,10 +255,10 @@ def handle_connect():
                 namespace="/",  # root namespace
             )
         except Exception:
-            pass
+            logger.debug("suppressed_exception", where="handle_connect", exc_info=True)
     except Exception:
         # Silently ignore connect bookkeeping errors
-        pass
+        logger.debug("suppressed_exception", where="handle_connect", exc_info=True)
 
 
 @socketio.on("disconnect")
@@ -271,7 +271,7 @@ def handle_disconnect():
 
         _ss.on_disconnect(sid)
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="handle_disconnect", exc_info=True)
 
 
 @socketio.on("admin_online_users")
@@ -311,7 +311,7 @@ def handle_admin_online_users():
         if entry.get("legacy_ok"):
             emit("admin_online_users", payload, room=sid, namespace="/")
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="handle_admin_online_users", exc_info=True)
 
 
 @socketio.on("admin_status")
@@ -338,7 +338,7 @@ def handle_admin_status():
             if entry and entry.get("role") == "admin":
                 allow = True
         except Exception:
-            pass
+            logger.debug("suppressed_exception", where="handle_admin_status", exc_info=True)
     # Removed permissive test bypass and DB lookup fallback to ensure non-admins never receive admin_status.
     if not allow:
         return
@@ -438,9 +438,9 @@ def handle_admin_direct_message(data):
                     if dyn_username:
                         entry["username"] = dyn_username
                 except Exception:
-                    pass
+                    logger.debug("suppressed_exception", where="handle_admin_direct_message", exc_info=True)
         except Exception:
-            pass
+            logger.debug("suppressed_exception", where="handle_admin_direct_message", exc_info=True)
     # Additional guard: if monkeypatched current_user claims admin but username mismatch, deny
     try:
         dyn_username = getattr(current_user, "username", None)
@@ -459,7 +459,7 @@ def handle_admin_direct_message(data):
             )
             return
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="handle_admin_direct_message", exc_info=True)
     # Final strict check: must have admin role, authenticated entry, and active session user id
     try:
         from flask import session as _sess
@@ -476,7 +476,7 @@ def handle_admin_direct_message(data):
                 is_auth=(entry or {}).get("is_auth"),
             )
         except Exception:
-            pass
+            logger.debug("suppressed_exception", where="handle_admin_direct_message", exc_info=True)
         return
     target = (data or {}).get("to")
     message = (data or {}).get("message")
@@ -488,7 +488,7 @@ def handle_admin_direct_message(data):
                 length=(len(message) if message else 0),
             )
         except Exception:
-            pass
+            logger.debug("suppressed_exception", where="handle_admin_direct_message", exc_info=True)
         return
     sid = _sid_for_username(target)
     if not sid:
@@ -496,7 +496,7 @@ def handle_admin_direct_message(data):
         try:
             logger.warn(event="admin_direct_message_target_missing", target=target)
         except Exception:
-            pass
+            logger.debug("suppressed_exception", where="handle_admin_direct_message", exc_info=True)
         return
     try:
         from_user = entry.get("username", "Admin")
@@ -510,7 +510,7 @@ def handle_admin_direct_message(data):
             length=len(message),
         )
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="handle_admin_direct_message", exc_info=True)
     emit(
         "admin_direct_message",
         {"from": from_user, "to": target, "message": message},
@@ -541,7 +541,7 @@ def handle_admin_kick_user(data):
             online_size=len(online),
         )
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="handle_admin_kick_user", exc_info=True)
     if sid:
         try:
             from flask_socketio import disconnect as _disconnect
@@ -556,7 +556,7 @@ def handle_admin_kick_user(data):
             try:
                 logger.warn(event="admin_kick_disconnect_error", error=str(e))
             except Exception:
-                pass
+                logger.debug("suppressed_exception", where="handle_admin_kick_user", exc_info=True)
     else:
         # Emit notice best-effort even if sid not resolved yet (race) by iterating entries
         for _sid, info in online.items():
@@ -568,7 +568,7 @@ def handle_admin_kick_user(data):
                         room=_sid,
                     )
                 except Exception:
-                    pass
+                    logger.debug("suppressed_exception", where="handle_admin_kick_user", exc_info=True)
     # Aggressive removal: drop any online entries matching username (even if SID lookup failed)
     try:
         if sid:
@@ -581,7 +581,7 @@ def handle_admin_kick_user(data):
             remaining=[v.get("username") for v in online.values()],
         )
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="handle_admin_kick_user", exc_info=True)
 
 
 @socketio.on("admin_ban_user")
@@ -603,7 +603,7 @@ def handle_admin_ban_user(data):
             u.banned = True
             db.session.commit()
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="handle_admin_ban_user", exc_info=True)
     # Disconnect if currently online
     sid = _sid_for_username(target)
     if sid:
@@ -615,7 +615,7 @@ def handle_admin_ban_user(data):
             )
             disconnect(sid=sid)
         except Exception:
-            pass
+            logger.debug("suppressed_exception", where="handle_admin_ban_user", exc_info=True)
 
 
 @socketio.on("admin_unban_user")
@@ -636,7 +636,7 @@ def handle_admin_unban_user(data):
             u.banned = False
             db.session.commit()
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="handle_admin_unban_user", exc_info=True)
 
 
 @socketio.on("admin_mute_user")
@@ -671,7 +671,7 @@ def handle_admin_mute_user(data):
             u.muted = True
             db.session.commit()
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="handle_admin_mute_user", exc_info=True)
 
 
 @socketio.on("admin_unmute_user")
@@ -693,7 +693,7 @@ def handle_admin_unmute_user(data):
             u.muted = False
             db.session.commit()
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="handle_admin_unmute_user", exc_info=True)
 
 
 @socketio.on("admin_broadcast")
@@ -751,11 +751,11 @@ def _test_force_kick(username: str):  # pragma: no cover (invoked explicitly in 
                 room=sid,
             )
         except Exception:
-            pass
+            logger.debug("suppressed_exception", where="_test_force_kick", exc_info=True)
         try:
             disconnect(sid=sid)
         except Exception:
-            pass
+            logger.debug("suppressed_exception", where="_test_force_kick", exc_info=True)
     # Hard prune any remaining entries for that username
     for _sid, info in list(online.items()):
         if info.get("username") == username:

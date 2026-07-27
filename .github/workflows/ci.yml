@@ -50,7 +50,7 @@ jobs:
           pip-audit -r requirements.txt
 
       - name: Check exception handling (ratchet — lower --max-count as cleanup progresses, never raise)
-        run: python scripts/fix_exception_handling.py --check --max-count 147
+        run: python scripts/fix_exception_handling.py --check --max-count 63
 
       - name: Run tests (single run, coverage gate included)
         env:

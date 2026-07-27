@@ -762,7 +762,7 @@ def dungeon_map():
                         _initialize_spawn_system()
                         entities_rows = DungeonEntity.query.filter_by(instance_id=instance.id, seed=instance.seed).all()
                 except Exception:
-                    pass
+                    logger.debug("suppressed_exception", where="dungeon_map", exc_info=True)
             # trap/ambush entities must never be serialized to clients.
             client_entities_rows = [e for e in entities_rows if e.type not in HIDDEN_ROOM_EVENT_TYPES]
             entities_json = [e.to_dict() for e in client_entities_rows]
@@ -1136,7 +1136,7 @@ def dungeon_state():
             "tier": instance.tier or 1,
         }
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="dungeon_state", exc_info=True)
 
     # Add party HP/MP for UI display during exploration
     try:
@@ -1173,7 +1173,7 @@ def dungeon_state():
                 continue
         resp["party"] = party_data
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="dungeon_state", exc_info=True)
 
     return jsonify(resp)
 
@@ -1224,7 +1224,7 @@ def dungeon_search_tile():
         if "encounter" in patrol_resp:
             resp["encounter"] = patrol_resp["encounter"]
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="dungeon_search_tile", exc_info=True)
     return jsonify(resp)
 
 
@@ -1262,7 +1262,7 @@ def dungeon_entities():
                     if isinstance(meta, dict):
                         hidden = bool(meta.get("hidden", False))
                 except Exception:
-                    pass
+                    logger.debug("suppressed_exception", where="dungeon_entities", exc_info=True)
             # Only include if not hidden
             if not hidden:
                 visible_entities.append(r.to_dict())
@@ -1296,7 +1296,7 @@ def claim_treasure(entity_id: int):
     try:
         db.session.refresh(instance)
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="claim_treasure", exc_info=True)
     status, payload = _claim_treasure_entity(entity_id, instance)
     try:
         patrol_resp = {}
@@ -1306,7 +1306,7 @@ def claim_treasure(entity_id: int):
         if "encounter" in patrol_resp:
             payload["encounter"] = patrol_resp["encounter"]
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="claim_treasure", exc_info=True)
     return jsonify(payload), status
 
 
@@ -1366,7 +1366,7 @@ def open_locked_cache(entity_id: int):
         if "encounter" in patrol_resp:
             payload["encounter"] = patrol_resp["encounter"]
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="open_locked_cache", exc_info=True)
     return jsonify(payload), status
 
 
@@ -1493,7 +1493,7 @@ def dungeon_search():
         if "encounter" in patrol_resp and isinstance(payload, dict):
             payload["encounter"] = patrol_resp["encounter"]
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="dungeon_search", exc_info=True)
     return jsonify(payload), status
 
 
@@ -1558,7 +1558,7 @@ def dungeon_camp():
     try:
         tick_val = advance_non_combat_time(instance, tick_amount=8, resp=patrol_resp)
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="dungeon_camp", exc_info=True)
 
     # Apply a "well-rested" regen buff on top of the instant restore above --
     # replace-not-stack, same shape the regen potion uses, just longer/weaker.
@@ -1828,7 +1828,7 @@ def clear_perception_markers():  # pragma: no cover - test/debug helper
     try:
         session.modified = True
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="clear_perception_markers", exc_info=True)
 
     # Note: We don't delete loot here anymore - the new perception logic
     # will handle failed checks properly going forward. Clearing markers
@@ -1859,13 +1859,13 @@ def adventure():
                 if isinstance(loaded, list):
                     party = loaded
             except Exception:
-                pass
+                logger.debug("suppressed_exception", where="adventure", exc_info=True)
         if isinstance(party, tuple):
             party = list(party)
         if isinstance(party, (set,)):  # pragma: no cover - defensive
             party = list(party)
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="adventure", exc_info=True)
     reconstructed = False
     # If party is a list of non-dicts (likely ids) attempt DB reconstruction
     if isinstance(party, list) and party and not any(isinstance(m, dict) for m in party):
@@ -1907,7 +1907,7 @@ def adventure():
                     party = norm
                     reconstructed = True
         except Exception:
-            pass
+            logger.debug("suppressed_exception", where="adventure", exc_info=True)
     # If party is missing or empty, redirect back to dashboard to select party
     if not party:
         flash("Please select a party before starting your adventure.", "warning")
@@ -1931,7 +1931,7 @@ def adventure():
                 session["dungeon_instance_id"] = inst.id
                 dungeon_instance_id = inst.id
         except Exception:
-            pass
+            logger.debug("suppressed_exception", where="adventure", exc_info=True)
     if dungeon_instance_id:
         instance = db.session.get(DungeonInstance, dungeon_instance_id)
         if instance and instance.user_id == current_user.id:
@@ -2034,7 +2034,7 @@ def adventure():
             f"[adventure] raw_party_type={type(raw_party).__name__} reconstructed={reconstructed} raw_len={len(raw_party) if isinstance(raw_party, list) else 'n/a'} enriched_len={len(enriched_party) if isinstance(enriched_party, list) else 'n/a'}"
         )
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="adventure", exc_info=True)
     return render_template("adventure.html", party=enriched_party, seed=seed, pos=pos, game_clock=clock)
 
 
@@ -2080,7 +2080,7 @@ def advance_non_combat_time(instance, *, tick_amount: int = 1, resp: dict | None
             party_ids = [c.id for c in Character.query.filter_by(user_id=instance.user_id).all()]
             apply_tick_decay(int(tick_amount), character_ids=party_ids)
         except Exception:
-            pass
+            logger.debug("suppressed_exception", where="advance_non_combat_time", exc_info=True)
     except Exception:
         return None
     return clock.tick

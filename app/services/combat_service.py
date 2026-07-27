@@ -98,7 +98,7 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
         for _k, _v in passive_bonuses(char.id).items():
             _gb[_k] = _gb.get(_k, 0) + _v
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="_derive_stats", exc_info=True)
     STR += int(_gb.get("str", 0))
     DEX += int(_gb.get("dex", 0))
     INT += int(_gb.get("int", 0))
@@ -314,7 +314,7 @@ def _capture_dungeon_snapshot(user_id: int) -> Dict[str, Any]:
                     snap["explored_sample"] = coords[:50]
                     snap["explored_count"] = len(coords)
         except Exception:
-            pass
+            logger.debug("suppressed_exception", where="_capture_dungeon_snapshot", exc_info=True)
         return snap
     except Exception:
         return {}
@@ -377,7 +377,7 @@ def start_session(user_id: int, monster: Dict[str, Any]) -> CombatSession:
                     if isinstance(cfg_obj, dict):
                         ambush_chance = float(cfg_obj.get("ambush_chance", ambush_chance))
             except Exception:
-                pass
+                logger.debug("suppressed_exception", where="start_session", exc_info=True)
             if random.random() < ambush_chance:
                 logs = json.loads(session.log_json)
                 logs.append({"ts": _now().isoformat(), "m": f"{monster.get('name')} ambushes the party!"})
@@ -401,7 +401,7 @@ def start_session(user_id: int, monster: Dict[str, Any]) -> CombatSession:
                         try:
                             dmg = int(apply_resistances(dmg, ["physical"], resistances))
                         except Exception:
-                            pass
+                            logger.debug("suppressed_exception", where="start_session", exc_info=True)
                         if tgt.get("defending"):
                             dmg = max(1, dmg // 2)
                             tgt["defending"] = False
@@ -420,7 +420,7 @@ def start_session(user_id: int, monster: Dict[str, Any]) -> CombatSession:
                 db.session.add(session)
                 db.session.commit()
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="start_session", exc_info=True)
     set_combat_state(True)
     return session
 
@@ -470,7 +470,7 @@ def _count_potion(character, slug: str) -> int:
                         except Exception:
                             count += 1
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="_count_potion", exc_info=True)
     return count
 
 
@@ -548,7 +548,7 @@ def _advance_turn(session: CombatSession):
                 session, f"Turn {session.combat_turn}: {actor.get('name','Monster')}'s turn.", code=COMBAT_TURN_START
             )
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="_advance_turn", exc_info=True)
     # Emit lightweight turn_change event (non-critical). Clients may ignore if unimplemented.
     try:
         socketio.emit(
@@ -562,7 +562,7 @@ def _advance_turn(session: CombatSession):
             namespace="/adventure",
         )
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="_advance_turn", exc_info=True)
 
 
 def _progress_phase(session: CombatSession):
@@ -589,7 +589,7 @@ def _progress_phase(session: CombatSession):
             else:
                 _append_log(session, f"{actor.get('name','Monster')} is acting (AI).", code=ACTOR_START_ACTION)
         except Exception:
-            pass
+            logger.debug("suppressed_exception", where="_progress_phase", exc_info=True)
     elif session.phase == "action":
         session.phase = "end"
     elif session.phase == "end":
@@ -637,7 +637,7 @@ def _check_end(session: CombatSession):
 
                             quest_progress_service.record_kill(session.user_id, is_elite=True)
                         except Exception:
-                            pass
+                            logger.debug("suppressed_exception", where="_check_end", exc_info=True)
                     else:
                         instance.monsters_defeated += 1
                         try:
@@ -645,7 +645,7 @@ def _check_end(session: CombatSession):
 
                             quest_progress_service.record_kill(session.user_id, is_elite=False)
                         except Exception:
-                            pass
+                            logger.debug("suppressed_exception", where="_check_end", exc_info=True)
 
                     db.session.add(instance)
         except Exception as e:
@@ -676,7 +676,7 @@ def _check_end(session: CombatSession):
                     try:
                         xp_map[str(m.get("char_id") or m.get("id"))] = share
                     except Exception:
-                        pass
+                        logger.debug("suppressed_exception", where="_check_end", exc_info=True)
             if rewards.get("items") and char_rows:
                 first = next(iter(char_rows.values()))
                 inv_items: list = []
@@ -711,11 +711,11 @@ def _check_end(session: CombatSession):
                     add_gear_to_character(first, rewards["gear"])
                     db.session.add(first)
                 except Exception:
-                    pass
+                    logger.debug("suppressed_exception", where="_check_end", exc_info=True)
             try:
                 rewards["xp"] = {"total": xp_total, "per_member": xp_map}
             except Exception:
-                pass
+                logger.debug("suppressed_exception", where="_check_end", exc_info=True)
         except Exception:
             db.session.rollback()
         session.rewards_json = json.dumps(rewards)
@@ -730,7 +730,7 @@ def _check_end(session: CombatSession):
                 counts["potion-mana"] = _potion_counts_by_character(reward_chars, "potion-mana")
                 session.party_snapshot_json = json.dumps(party)
         except Exception:
-            pass
+            logger.debug("suppressed_exception", where="_check_end", exc_info=True)
         sync_member_death_states(session)
         _persist_party_resources(session)
         set_combat_state(False)
@@ -767,7 +767,7 @@ def _current_instance_for_user(user_id: int):
             if instance is not None and instance.user_id == user_id:
                 return instance
     except RuntimeError:
-        pass
+        logger.debug("suppressed_exception", where="_current_instance_for_user", exc_info=True)
     return DungeonInstance.query.filter_by(user_id=user_id).order_by(DungeonInstance.id.desc()).first()
 
 
@@ -849,7 +849,7 @@ def _emit_session(event: str, session: CombatSession):  # safe emit wrapper
     try:
         socketio.emit(event, session.to_dict(), namespace="/adventure")
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="_emit_session", exc_info=True)
 
 
 def _emit_if_completed(session: CombatSession):
@@ -866,7 +866,7 @@ def _emit_if_completed(session: CombatSession):
         try:
             _emit_session("combat_complete", session)
         except Exception:
-            pass
+            logger.debug("suppressed_exception", where="_emit_if_completed", exc_info=True)
 
 
 def _persist_party_resources(session: CombatSession):
@@ -906,11 +906,11 @@ def _persist_party_resources(session: CombatSession):
             try:
                 stats_obj["hp"] = int(m.get("hp", stats_obj.get("hp", 0)))
             except Exception:
-                pass
+                logger.debug("suppressed_exception", where="_persist_party_resources", exc_info=True)
             try:
                 stats_obj["current_mana"] = int(m.get("mana", stats_obj.get("current_mana", stats_obj.get("mana", 0))))
             except Exception:
-                pass
+                logger.debug("suppressed_exception", where="_persist_party_resources", exc_info=True)
             row.stats = _json.dumps(stats_obj)
             db.session.add(row)
             changed = True
@@ -936,14 +936,14 @@ def _persist_party_resources(session: CombatSession):
                                 )
                             )
             except Exception:
-                pass
+                logger.debug("suppressed_exception", where="_persist_party_resources", exc_info=True)
         if changed:
             try:
                 db.session.commit()
             except Exception:
                 db.session.rollback()
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="_persist_party_resources", exc_info=True)
 
 
 def player_attack(combat_id: int, user_id: int, version: int, actor_id: Optional[int] = None) -> Dict[str, Any]:
@@ -1115,7 +1115,7 @@ def monster_auto_turn(session: CombatSession):
                     _emit_session("combat_end", session)
                 return
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="monster_auto_turn", exc_info=True)
     members = party.get("members", [])
     if not members:
         # No viable targets; log an explicit wait so client sees monster acted
@@ -1127,7 +1127,7 @@ def monster_auto_turn(session: CombatSession):
             db.session.commit()
             _emit_session("combat_update", session)
         except Exception:
-            pass
+            logger.debug("suppressed_exception", where="monster_auto_turn", exc_info=True)
         return
     # Ensure effects list presence for each member to simplify later additions
     for m in members:
@@ -1140,7 +1140,7 @@ def monster_auto_turn(session: CombatSession):
     try:
         start_logs.extend(apply_start_of_turn(monster))
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="monster_auto_turn", exc_info=True)
     for msg in start_logs:
         _append_log(session, msg)
     # If monster died to DoT before acting
@@ -1156,7 +1156,7 @@ def monster_auto_turn(session: CombatSession):
     try:
         can_act_flag, veto_logs = can_act(monster)
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="monster_auto_turn", exc_info=True)
     for msg in veto_logs:
         _append_log(session, msg)
     if not can_act_flag:
@@ -1165,7 +1165,7 @@ def monster_auto_turn(session: CombatSession):
             try:
                 _append_log(session, f"{monster.get('name')} waits (incapacitated).", code=MONSTER_INCAPACITATED_WAIT)
             except Exception:
-                pass
+                logger.debug("suppressed_exception", where="monster_auto_turn", exc_info=True)
         _advance_turn(session)
         _check_end(session)
         db.session.commit()
@@ -1180,7 +1180,7 @@ def monster_auto_turn(session: CombatSession):
         if boss_abilities.is_boss(monster):
             boss_action = boss_abilities.select_boss_ability(monster, party, session.combat_turn)
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="monster_auto_turn", exc_info=True)
 
     # If boss uses ability, execute it
     if boss_action:
@@ -1233,7 +1233,7 @@ def monster_auto_turn(session: CombatSession):
                 _emit_if_completed(session)
                 return
         except Exception:
-            pass  # Fall through to normal AI
+            logger.debug("suppressed_exception", where="monster_auto_turn", exc_info=True)  # Fall through to normal AI
 
     # AI delegation (still only basic attack). If monster has flag ai_enabled use selector.
     action = {"type": "attack", "target_index": 0}
@@ -1241,7 +1241,7 @@ def monster_auto_turn(session: CombatSession):
         if monster.get("ai_enabled"):
             action = select_action(monster, party, {"turn": session.combat_turn}) or action
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="monster_auto_turn", exc_info=True)
     if action.get("type") == "spell" and action.get("spell") == "firebolt":
         idx = int(action.get("target_index", 0))
         if idx < 0 or idx >= len(members):
@@ -1273,7 +1273,7 @@ def monster_auto_turn(session: CombatSession):
                 try:
                     dmg = int(apply_resistances(dmg, ["fire"], resistances))
                 except Exception:
-                    pass
+                    logger.debug("suppressed_exception", where="monster_auto_turn", exc_info=True)
                 if target.get("defending"):
                     dmg = max(1, dmg // 2)
                     target["defending"] = False
@@ -1329,7 +1329,7 @@ def monster_auto_turn(session: CombatSession):
                 monster_data["last_turn"] = session.combat_turn
                 session.monster_json = json.dumps(monster_data)
             except Exception:
-                pass
+                logger.debug("suppressed_exception", where="monster_auto_turn", exc_info=True)
             _advance_turn(session)
             _check_end(session)
             db.session.commit()
@@ -1349,7 +1349,7 @@ def monster_auto_turn(session: CombatSession):
                 monster_data["last_turn"] = session.combat_turn
                 session.monster_json = json.dumps(monster_data)
             except Exception:
-                pass
+                logger.debug("suppressed_exception", where="monster_auto_turn", exc_info=True)
             _advance_turn(session)
             _check_end(session)
             db.session.commit()
@@ -1387,7 +1387,7 @@ def monster_auto_turn(session: CombatSession):
         monster_data["last_turn"] = session.combat_turn
         session.monster_json = json.dumps(monster_data)
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="monster_auto_turn", exc_info=True)
     # Monster completes its action; advance to next turn via end phase progression
     session.phase = "end"
     _progress_phase(session)
@@ -1551,7 +1551,7 @@ def player_use_item(
                 char_row.items = json.dumps(new_inv)
                 db.session.add(char_row)
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="player_use_item", exc_info=True)
     # Decrement the acting character's own surfaced item count (per-character,
     # not a shared party pool).
     try:
@@ -1562,7 +1562,7 @@ def player_use_item(
                 current = int(per_char.get(str(actor_id), 0))
                 per_char[str(actor_id)] = max(0, current - 1)
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="player_use_item", exc_info=True)
     session.party_snapshot_json = json.dumps(party)
     user_ref = _player_ref(party, actor_id)
     user_name = user_ref.get("name", "Player") if user_ref else "Player"
@@ -1673,7 +1673,7 @@ def player_cast_spell(
     try:
         dmg = int(apply_resistances(dmg, [config["element"]], resistances))
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="player_cast_spell", exc_info=True)
     session.monster_hp = max(0, (session.monster_hp or 0) - dmg)
     session.party_snapshot_json = json.dumps(party)
     # Track damage for visual effects
@@ -1830,5 +1830,5 @@ def _auto_progress_monster_after_player(session: CombatSession) -> CombatSession
             if refreshed:
                 return refreshed
     except Exception:
-        pass
+        logger.debug("suppressed_exception", where="_auto_progress_monster_after_player", exc_info=True)
     return session
