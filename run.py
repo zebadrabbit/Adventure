@@ -74,7 +74,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         Environment variables:
           HOST            Bind address for the web server (default: 0.0.0.0)
           PORT            Port for the web server (default: 5000)
-          DATABASE_URL    SQLAlchemy database URI (default: sqlite:///instance/mud.db)
+          DATABASE_URL    SQLAlchemy database URI (required, PostgreSQL)
 
         Examples:
           # Run the server on the default host and port
@@ -84,7 +84,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
           python run.py server --port 8080
 
           # Bind to localhost only and use a different database
-          python run.py server --host 127.0.0.1 --db sqlite:///instance/dev.db
+          python run.py server --host 127.0.0.1 --db postgresql://user:pass@localhost/adventure_dev
 
           # Load variables from .env then run the server
           python run.py --env-file .env server
@@ -145,7 +145,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--db",
         dest="db_uri",
         default=None,
-        help="Database URI (default: env DATABASE_URL or sqlite:///instance/mud.db)",
+        help="Database URI (default: env DATABASE_URL; PostgreSQL required)",
     )
     server_parser.add_argument(
         "--debug",

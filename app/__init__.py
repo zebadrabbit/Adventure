@@ -10,14 +10,13 @@ Flask application factory and core extensions setup.
 This module wires together the Flask app, SQLAlchemy, Flask-Login, and
 Flask-SocketIO. Configuration is sourced from environment variables with
 reasonable defaults for development. A local `instance/` directory is used
-for SQLite and other runtime data.
+for runtime data. PostgreSQL is required (DATABASE_URL must be set).
 """
 
 import logging
 import os
 import pathlib  # moved up (cache bust helper)  # noqa: E402
 import uuid
-from pathlib import Path
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
@@ -30,18 +29,17 @@ from flask_sqlalchemy import SQLAlchemy
 load_dotenv()
 
 # Create the Flask app with instance-relative config so we can use ./instance
-# for local data (e.g., SQLite database at ./instance/mud.db)
+# for local runtime data (logs, PID files, etc.)
 app = Flask(__name__, instance_relative_config=True)
 
-# Ensure instance directory exists for SQLite and other runtime files
+# Ensure instance directory exists for runtime files
 try:
     os.makedirs(app.instance_path, exist_ok=True)
 except OSError:
     # In some constrained environments this might fail; ignore
     pass
 
-# Load configuration from environment with sensible defaults. If DATABASE_URL
-# isn't provided, default to a SQLite file in the instance folder.
+# Load configuration from environment with sensible defaults.
 DEFAULT_SECRET_KEY = "dev-secret-change-me"
 # Every publicly-known placeholder key shipped in this repo: the in-code
 # fallback above plus the literal in .env.example / docker-compose.yml. Booting
@@ -70,20 +68,30 @@ _IS_PRODUCTION = (os.getenv("FLASK_ENV", "") or "").lower() == "production"
 _check_secret_key(secret_key, os.getenv("FLASK_ENV", ""))
 database_url = os.getenv("DATABASE_URL")
 
-# During pytest runs, isolate to a separate test database to reduce locking
+# PostgreSQL is required (README). The old silent SQLite fallback meant a
+# missing DATABASE_URL in prod produced an empty throwaway database instead
+# of an error, and was the root of the historic pytest-wiped-the-dev-DB
+# incident. Fail fast instead.
 if not database_url:
-    is_pytest = bool(os.getenv("PYTEST_CURRENT_TEST"))
-    db_filename = "mud_test.db" if is_pytest else "mud.db"
-    db_path = Path(app.instance_path) / db_filename
-    # Use POSIX path for SQLAlchemy URI compatibility across OS
-    database_url = f"sqlite:///{db_path.as_posix()}"
+    raise RuntimeError(
+        "DATABASE_URL is not set. Adventure requires PostgreSQL (see README / .env.example). "
+        "For the test suite, set TEST_DATABASE_URL — tests/conftest.py maps it to DATABASE_URL."
+    )
+if database_url.startswith("sqlite") and os.getenv("ADVENTURE_ALLOW_SQLITE") != "1":
+    raise RuntimeError(
+        "SQLite is not supported (PostgreSQL 13+ required). "
+        "Set ADVENTURE_ALLOW_SQLITE=1 to override for throwaway experiments only."
+    )
 
 app.config.update(
     SECRET_KEY=secret_key,
     SQLALCHEMY_DATABASE_URI=database_url,
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
-    TEMPLATES_AUTO_RELOAD=True,
-    SEND_FILE_MAX_AGE_DEFAULT=0,
+    # Dev conveniences, disabled in production: auto-reload stats every
+    # template render; max-age 0 defeats static caching (assets are already
+    # cache-busted via asset_url's ?v=mtime, so prod can cache for a day).
+    TEMPLATES_AUTO_RELOAD=not _IS_PRODUCTION,
+    SEND_FILE_MAX_AGE_DEFAULT=86400 if _IS_PRODUCTION else 0,
     # Session-cookie hardening: Lax blocks the classic cross-site POST CSRF
     # vector; Secure is enabled in production (override with
     # SESSION_COOKIE_SECURE=0 only if terminating TLS is truly impossible).
@@ -133,33 +141,11 @@ socketio = SocketIO(
     app,
     async_mode=os.getenv("SOCKETIO_ASYNC_MODE") or None,
     cors_allowed_origins=_cors_allowed,
-    engineio_logger=bool(os.getenv("ENGINEIO_LOGGER", "1") == "1"),
+    engineio_logger=bool(os.getenv("ENGINEIO_LOGGER", "0") == "1"),
     ping_interval=20,
     ping_timeout=10,
     transports=["websocket", "polling"],
 )
-
-# Apply SQLite pragmatic tuning (WAL + busy timeout) once the engine is created.
-try:  # pragma: no cover - lightweight, defensive
-    from sqlalchemy import event
-    from sqlalchemy.engine import Engine
-
-    @event.listens_for(Engine, "connect")
-    def _set_sqlite_pragma(dbapi_connection, connection_record):  # noqa: D401
-        # Only apply PRAGMA commands to SQLite connections
-        if hasattr(dbapi_connection, "cursor") and "sqlite" in str(type(dbapi_connection)).lower():
-            try:
-                cursor = dbapi_connection.cursor()
-                cursor.execute("PRAGMA journal_mode=WAL")
-                cursor.execute("PRAGMA synchronous=NORMAL")
-                cursor.execute("PRAGMA busy_timeout=10000")  # 10 seconds
-                cursor.close()
-            except Exception:
-                pass
-
-except Exception:
-    pass
-
 
 # Register HTTP blueprints (import after app/db created but keep near top for clarity)
 from flask_login import current_user  # noqa: E402
