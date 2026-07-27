@@ -39,6 +39,6 @@ def test_autofill_uses_unsuffixed_pool_names(client, test_app):
         # (e.g. "Brakus735") means the bug is still present.
         stripped = re.sub(r"\d+$", "", name)
         if stripped != name:
-            assert stripped not in all_pool_names, (
-                f"name {name!r} suffixed a pool name {stripped!r} instead of using it directly"
-            )
+            assert (
+                stripped not in all_pool_names
+            ), f"name {name!r} suffixed a pool name {stripped!r} instead of using it directly"

@@ -44,6 +44,11 @@ jobs:
       - name: Run pre-commit
         run: pre-commit run --all-files
 
+      - name: Audit dependencies for known vulnerabilities
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt
+
       - name: Check exception handling
         run: |
           python scripts/fix_exception_handling.py --check || true

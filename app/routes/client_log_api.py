@@ -8,11 +8,13 @@ issues.
 from __future__ import annotations
 
 from flask import Blueprint, current_app, jsonify, request
+from flask_login import login_required
 
 bp_client_log = Blueprint("client_log", __name__)
 
 
 @bp_client_log.route("/api/client/log", methods=["POST"])
+@login_required
 def client_log():  # pragma: no cover - side-effect logging
     try:
         data = request.get_json(force=True, silent=True) or {}
