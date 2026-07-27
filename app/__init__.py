@@ -66,6 +66,7 @@ def _check_secret_key(secret_key: str, flask_env: str) -> None:
 
 
 secret_key = os.getenv("SECRET_KEY", DEFAULT_SECRET_KEY)
+_IS_PRODUCTION = (os.getenv("FLASK_ENV", "") or "").lower() == "production"
 _check_secret_key(secret_key, os.getenv("FLASK_ENV", ""))
 database_url = os.getenv("DATABASE_URL")
 
@@ -83,6 +84,12 @@ app.config.update(
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     TEMPLATES_AUTO_RELOAD=True,
     SEND_FILE_MAX_AGE_DEFAULT=0,
+    # Session-cookie hardening: Lax blocks the classic cross-site POST CSRF
+    # vector; Secure is enabled in production (override with
+    # SESSION_COOKIE_SECURE=0 only if terminating TLS is truly impossible).
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=bool(os.getenv("SESSION_COOKIE_SECURE", "1" if _IS_PRODUCTION else "0") == "1"),
     # Dungeon generation feature flags / metrics
     DUNGEON_ALLOW_HIDDEN_AREAS=bool(os.getenv("DUNGEON_ALLOW_HIDDEN_AREAS", "0") == "1"),
     DUNGEON_ENABLE_GENERATION_METRICS=bool(os.getenv("DUNGEON_ENABLE_GENERATION_METRICS", "1") == "1"),
@@ -109,11 +116,23 @@ def load_user(user_id):  # pragma: no cover - simple loader
         return None
 
 
+# Socket.IO cross-origin policy: same-origin only unless CORS_ALLOWED_ORIGINS
+# is set (comma-separated list, or "*" to disable the check entirely — dev only).
+# The previous default of "*" allowed any website to open an authenticated
+# WebSocket with the player's session cookie attached.
+_cors_env = os.getenv("CORS_ALLOWED_ORIGINS", "").strip()
+if _cors_env == "*":
+    _cors_allowed = "*"
+elif _cors_env:
+    _cors_allowed = [o.strip() for o in _cors_env.split(",") if o.strip()]
+else:
+    _cors_allowed = None  # python-socketio default: same-origin only
+
 # Let Flask-SocketIO select best async_mode based on installed deps (gevent/threading)
 socketio = SocketIO(
     app,
     async_mode=os.getenv("SOCKETIO_ASYNC_MODE") or None,
-    cors_allowed_origins=os.getenv("CORS_ALLOWED_ORIGINS", "*"),
+    cors_allowed_origins=_cors_allowed,
     engineio_logger=bool(os.getenv("ENGINEIO_LOGGER", "1") == "1"),
     ping_interval=20,
     ping_timeout=10,
@@ -193,6 +212,40 @@ app.register_blueprint(bp_hoard)
 
 _DEFAULT_LIMIT = 120  # requests
 _DEFAULT_WINDOW = 60  # seconds
+
+_CSRF_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+
+@app.before_request
+def _require_api_header():  # pragma: no cover - integration side-effect
+    """CSRF guard for the JSON API: mutating /api/ requests must carry
+    `X-Requested-With: XMLHttpRequest`.
+
+    Browsers refuse to attach custom headers to cross-site requests without a
+    CORS preflight (which fails same-origin policy here), so a forged form or
+    fetch from another site can never satisfy this check. The client stamps
+    the header globally in static/js/api-guard.js. Complements
+    SESSION_COOKIE_SAMESITE=Lax as defense in depth.
+
+    Exempt when TESTING (the pytest suite drives endpoints directly, not
+    through a browser); the Playwright e2e suite exercises the real path.
+    """
+    if app.config.get("TESTING"):
+        return None
+    path = request.path or ""
+    if not path.startswith("/api/") or request.method in _CSRF_SAFE_METHODS:
+        return None
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return None
+    return (
+        jsonify(
+            {
+                "error": "csrf_rejected",
+                "message": "Missing X-Requested-With header (see static/js/api-guard.js)",
+            }
+        ),
+        403,
+    )
 
 
 @app.before_request

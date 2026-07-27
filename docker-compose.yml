@@ -25,6 +25,9 @@ services:
       - DATABASE_URL=postgresql://adventure:${POSTGRES_PASSWORD:-changeme}@postgres:5432/adventure
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
       - FLASK_ENV=production
+      # Local compose serves plain HTTP on localhost:5001; set to 1 when
+      # fronted by TLS (the app defaults Secure cookies ON in production).
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-0}
     volumes:
       - ./instance:/app/instance
       - ./logs:/app/logs
