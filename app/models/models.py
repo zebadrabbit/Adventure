@@ -412,6 +412,10 @@ class CombatSession(db.Model):
     last_damage_json = db.Column(db.Text, nullable=True)  # JSON dict of damage events for current turn
     # Soft delete / archival marker
     archived = db.Column(db.Boolean, nullable=False, default=False, index=True)
+    # Where the party was when combat started: {instance_id, seed, pos:{x,y,z}}.
+    # Kill tracking (bosses/elites/monsters) and /restore_from_combat both read
+    # the instance id back out of here.
+    dungeon_snapshot_json = db.Column(db.Text, nullable=True)
 
     def monster(self):  # pragma: no cover - thin helper
         import json

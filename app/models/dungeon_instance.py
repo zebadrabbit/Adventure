@@ -29,6 +29,15 @@ class DungeonInstance(db.Model):
     extraction_available = db.Column(db.Boolean, default=False)
     # Track unlocked doors by coordinate "x,y"
     unlocked_doors_json = db.Column(db.Text, nullable=True)
+    # Ending a run deletes the instance (extract / hearthstone / wipe). Its
+    # spawns and treasure go with it -- without the cascade that DELETE fails
+    # on dungeon_entity's foreign key.
+    entities = db.relationship(
+        "DungeonEntity",
+        backref="instance",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+    )
 
     def get_unlocked_doors(self):
         """Parse unlocked_doors_json into set of (x,y) tuples."""

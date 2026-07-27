@@ -1,8 +1,38 @@
 # [0.7.25] - UNRELEASED
 ### Added
+- `tests/test_full_run_e2e.py`: end-to-end runs driven through the real HTTP API
+  (enter, explore, fight, stairs both ways, boss, loot, portal, extract) plus a
+  party-wipe run and a hearthstone-abandon run.
+- Separate **Extract** button (hotkey `E`) on the adventure screen; it and
+  **Hearth** used to share one button.
+- `CombatSession.dungeon_snapshot_json` column (migration `d9e2f3a4b5c6`).
+
 ### Changed
+- Hearthstone is now a no-fault abandon: the party is released, keeps everything
+  it found, and the dungeon instance is destroyed. It no longer halves each
+  character's lifetime XP.
+- A party wipe now resets the run: characters are permadeathed and unlocked, the
+  dungeon instance is deleted and the session pointer cleared.
+- Starting an adventure locks the selected party to the instance
+  (`locked_dungeon_id`), which is what extraction selects on.
+
 ### Fixed
+- Kill tracking never ran: `start_session` skipped writing the dungeon snapshot
+  because the column did not exist, so `bosses_defeated`, `elites_defeated`,
+  `monsters_defeated`, the extraction unlock and quest kill progress were all
+  silently dead.
+- Boss kills were not recognised: `trigger_collision_combat` dropped `archetype`
+  (and xp/loot_table/resistances) when building the combat payload.
+- Extraction was impossible in a real run: nothing set `locked_dungeon_id`, so
+  `extract_party` always reported "No characters in this dungeon".
+- Deleting a dungeon instance always failed on `dungeon_entity`'s foreign key,
+  breaking both `/api/dungeon/hearth` and `/api/dungeon/extract`.
+- `_level_window` inverted past party level 18, raising an empty-range
+  `randrange` and silently generating no floor loot.
+
 ### Notes
+- Reward-granting failures in `_check_end` now log instead of rolling back
+  silently — that rollback also discards kill-tracking increments.
 
 # [0.7.24] - UNRELEASED
 ### Added

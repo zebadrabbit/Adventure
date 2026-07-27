@@ -41,6 +41,41 @@ Complete extraction mechanics service with:
 - Permadeath characters cannot be revived
 - Full party wipe = all characters lost
 
+## Ways a Run Ends
+
+A run starts when the dashboard's `start_adventure` form creates the
+`DungeonInstance`; every selected character gets `locked_dungeon_id = instance.id`
+there. `extraction_service` selects the party by that column, so the lock is what
+makes any of the three exits below possible.
+
+| Exit | Endpoint | Characters | Haul | Dungeon |
+|------|----------|-----------|------|---------|
+| **Extract** | `POST /api/dungeon/extraction/extract` | Released; left-behind members permadeath | Pooled into the Hoard (full-clear bonus if the run was cleared) | Instance kept until deleted by the caller |
+| **Hearthstone (abandon)** | `POST /api/dungeon/hearth` | All released, no deaths, no penalty | Kept as-is in their bags | Instance **deleted** — the next trip is a fresh dungeon |
+| **Wipe** | (no endpoint — resolved in combat) | All dead + `permadeath`, locks cleared | Lost with them; never pooled | Instance **deleted**, session pointer cleared |
+
+Hearthstone is no-fault: the player had to stop, not lose. It applies no XP or
+loot penalty. (It used to halve each character's *lifetime* XP, which was both
+punitive and a bug — the penalty was never scoped to the run.)
+
+A wipe is terminal and resets the world: `combat_service.resolve_party_defeat_if_any`
+permadeaths every member, clears their dungeon locks, deletes the instance and
+drops `session['dungeon_instance_id']`. The player must create or recruit new
+characters, and starts a brand-new dungeon when they do.
+
+Deleting an instance cascades to its `DungeonEntity` rows via the
+`DungeonInstance.entities` relationship — without that cascade the DELETE fails on
+`dungeon_entity`'s foreign key.
+
+## Kill Tracking
+
+`bosses_defeated` / `elites_defeated` / `monsters_defeated` are incremented in
+`combat_service._check_end` when a monster dies. It finds the instance through the
+combat session's `dungeon_snapshot_json` (written by `start_session`), and reads
+the archetype off the monster payload — which `trigger_collision_combat` copies
+wholesale from the spawn's stored `data`. Break either link and kill tracking
+silently stops: no extraction unlock, no quest progress.
+
 ## New API Endpoints
 
 ### `app/routes/extraction_api.py`
@@ -111,7 +146,9 @@ Mark a boss as defeated (triggers extraction availability check):
 ## UI Components
 
 ### Extraction Modal (`adventure.html`)
-- **Trigger**: "Hearth" button on adventure screen
+- **Trigger**: "Extract" button (hotkey `E`) on the adventure screen. The "Hearth"
+  button (hotkey `H`) sits next to it and abandons the run instead — the two used
+  to share `#btn-hearth`, so opening the modal also fired the abandon request.
 - **Features**:
   - Displays all characters in current dungeon
   - Shows dead/alive status for each character
@@ -137,17 +174,19 @@ Mark a boss as defeated (triggers extraction availability check):
 4. If party extracts without character → `permadeath=True`
 
 ### Boss Defeat Flow
-1. Boss defeated in combat → POST `/api/dungeon/extraction/boss_defeated`
-2. `bosses_defeated` incremented
-3. If `bosses_defeated >= required` → `extraction_available=True`
-4. Hearthstone Portal activates (no penalties for extraction)
+1. Boss defeated in combat → `combat_service._check_end` increments
+   `bosses_defeated` (see Kill Tracking above). `POST /api/dungeon/extraction/boss_defeated`
+   does the same thing and exists for clients that resolve a boss out of band.
+2. If `bosses_defeated >= bosses_total` → `extraction_available=True`
+3. The sealed loot room's locked doors open (`effective_unlocked_doors`) and the
+   exit portal at its center becomes reachable
 
 ### Extraction Flow
-1. Player clicks "Hearth" button
+1. Player clicks "Extract" (hotkey `E`)
 2. Modal shows extraction status and character list
 3. Player selects characters to extract
 4. Server applies penalties (if early)
-5. Extracted characters: unlocked, revived, XP reduced
+5. Extracted characters: unlocked, revived, haul pooled into the Hoard
 6. Left behind characters: `permadeath=True`
 7. Page reloads to reflect changes
 
@@ -219,6 +258,19 @@ def get_affixes(self):
 def set_affixes(self, affix_list):
     """Set affix_ids from a list of affix_id strings."""
 ```
+
+## Testing
+
+`tests/test_full_run_e2e.py` plays whole runs through the real HTTP endpoints —
+entry, exploration, collision combat, stairs both ways, boss kill, loot claim,
+portal, extraction, plus a wipe run and a hearthstone run. It exists because the
+unit-level tests around extraction all fabricate the win state on the instance row
+(`bosses_defeated = 1`, `extraction_available = True`) and call the service
+directly, which meant nothing exercised kill tracking, the party lock, or instance
+deletion. Every one of those was broken.
+
+Keep at least one test that reaches the win state by *playing* rather than by
+setting columns.
 
 ## Testing Recommendations
 

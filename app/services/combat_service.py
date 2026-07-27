@@ -618,7 +618,7 @@ def _check_end(session: CombatSession):
             from app.models.dungeon_instance import DungeonInstance
             from app.services import boss_abilities
 
-            instance_snapshot = session.dungeon_snapshot or {}
+            instance_snapshot = json.loads(getattr(session, "dungeon_snapshot_json", None) or "{}") or {}
             instance_id = instance_snapshot.get("instance_id")
 
             if instance_id and monster:
@@ -721,7 +721,10 @@ def _check_end(session: CombatSession):
                 rewards["xp"] = {"total": xp_total, "per_member": xp_map}
             except Exception:
                 logger.debug("suppressed_exception", where="_check_end", exc_info=True)
-        except Exception:
+        except Exception as e:
+            # This rollback also discards the kill-tracking increments above, so
+            # never let it fail silently.
+            logger.warning("combat_reward_grant_failed", error=str(e), exc_info=True)
             db.session.rollback()
         session.rewards_json = json.dumps(rewards)
         try:
@@ -826,7 +829,10 @@ def resolve_party_defeat_if_any(session) -> bool:
     """If every party member is at 0 HP, permadeath the run.
 
     Marks each member's Character dead + permadeath (a wipe loses the run: the haul
-    is simply never pooled into the hoard). Returns True if a wipe occurred.
+    is simply never pooled into the hoard, and whatever they carried in dies with
+    them) and resets the dungeon: the instance is deleted and the session pointer
+    cleared, so the player starts a fresh run once they have new characters.
+    Returns True if a wipe occurred.
     """
     party = json.loads(session.party_snapshot_json or "{}") or {}
     members = party.get("members", [])
@@ -845,9 +851,28 @@ def resolve_party_defeat_if_any(session) -> bool:
                 char.is_dead = True
                 char.death_count = (char.death_count or 0) + 1
             char.permadeath = True
+            # The run is over and the instance is about to go: leave no lock
+            # pointing at a dungeon that no longer exists.
+            char.locked_in_dungeon = False
+            char.locked_dungeon_id = None
+        if instance is not None:
+            db.session.delete(instance)
         db.session.commit()
+        _clear_session_instance()
         return True
     return False
+
+
+def _clear_session_instance():
+    """Drop the current-instance pointer from the flask session, if there is one."""
+    try:
+        from flask import has_request_context
+        from flask import session as _session
+
+        if has_request_context():
+            _session.pop("dungeon_instance_id", None)
+    except Exception:
+        logger.debug("suppressed_exception", where="_clear_session_instance", exc_info=True)
 
 
 def _emit_session(event: str, session: CombatSession):  # safe emit wrapper

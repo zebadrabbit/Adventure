@@ -61,8 +61,10 @@ def _choose_items(item_pool: Sequence[Item], count: int, rng: random.Random) -> 
 
 
 def _level_window(avg_level: int) -> tuple[int, int]:
-    lo = max(1, avg_level - 2)
     hi = min(20, avg_level + 2)
+    # Clamp lo under hi: a party past level 18 would otherwise get an inverted
+    # window (e.g. 28..20), no candidate items, and an empty-range randrange.
+    lo = max(1, min(avg_level - 2, hi))
     return lo, hi
 
 

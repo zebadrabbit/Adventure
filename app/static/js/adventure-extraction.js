@@ -1,10 +1,13 @@
 // Extraction Modal Handler
+// Bound to #btn-extract, not #btn-hearth: hearthing abandons the run
+// (adventure-controls.js), extracting banks the haul. They used to share a
+// button, so opening this modal also fired the abandon request.
 document.addEventListener('DOMContentLoaded', () => {
-    const hearthBtn = document.getElementById('btn-hearth');
+    const extractBtn = document.getElementById('btn-extract');
     const extractionModal = new bootstrap.Modal(document.getElementById('extractionModal'));
 
-    if (hearthBtn) {
-        hearthBtn.addEventListener('click', async () => {
+    if (extractBtn) {
+        extractBtn.addEventListener('click', async () => {
             // Load extraction status
             try {
                 const resp = await fetch('/api/dungeon/extraction/status');

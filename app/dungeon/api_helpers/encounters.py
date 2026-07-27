@@ -57,7 +57,11 @@ def trigger_collision_combat(instance) -> dict | None:
     except Exception:
         mdata = {}
 
+    # Carry the whole spawn payload into combat: archetype drives boss/elite
+    # kill tracking (and with it the extraction unlock), and xp/loot_table/
+    # resistances all live here too. Only the live entity fields override it.
     monster_payload = {
+        **mdata,
         "slug": monster_ent.slug,
         "name": monster_ent.name or monster_ent.slug,
         "hp": monster_ent.hp_current or mdata.get("hp", 30),

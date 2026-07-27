@@ -22,6 +22,15 @@ Create + migrate the test DB once:
 
     .venv/bin/python -m pytest -q
 
+## Full-run end-to-end tests
+`tests/test_full_run_e2e.py` plays complete dungeon runs through the real HTTP
+endpoints (entry → exploration → combat → stairs → boss → loot → extract, plus a
+wipe run and a hearthstone abandon). It is slower than the rest of the suite
+(~60s) and is the only coverage that reaches a run's end state by playing rather
+than by setting columns — keep it that way.
+
+    .venv/bin/python -m pytest tests/test_full_run_e2e.py -q
+
 ## Pure-generator tests (no DB needed)
 Dungeon generation is pure Python and can run without a database:
 

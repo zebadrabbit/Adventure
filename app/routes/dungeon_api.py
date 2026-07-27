@@ -1622,14 +1622,15 @@ def dungeon_camp():
 @bp_dungeon.route("/api/dungeon/hearth", methods=["POST"])
 @login_required
 def dungeon_hearth():
-    """Use hearthstone to extract from dungeon early.
+    """Use hearthstone to abandon the run.
 
-    Applies penalties for incomplete run:
-    - 50% XP penalty
-    - Clears the dungeon instance
+    Abandoning is no-fault (the player had to stop, not lose): the party walks
+    out with everything they found and everyone they walked in with. The run
+    itself is forfeit -- the instance is deleted, so the next trip is a fresh
+    dungeon rather than a resume.
 
     Returns:
-        200: {message: str, penalty_applied: bool}
+        200: {message: str, characters_released: int}
         404: no dungeon instance
     """
     dungeon_instance_id = session.get("dungeon_instance_id")
@@ -1639,21 +1640,13 @@ def dungeon_hearth():
     if not instance:
         return jsonify({"error": "no_instance"}), 404
 
-    # Apply XP penalty to all party characters
-    party_chars = Character.query.filter_by(user_id=current_user.id).all()
+    # Release the party from this run. Their bags/coins are left exactly as
+    # they are -- what they found is theirs.
+    party_chars = Character.query.filter_by(user_id=current_user.id, locked_dungeon_id=instance.id).all()
     for char in party_chars:
-        if not char.stats:
-            continue
-        try:
-            stats = json.loads(char.stats)
-            current_xp = int(stats.get("xp", 0))
-            # Reduce XP by 50% as penalty
-            penalty_xp = int(current_xp * 0.5)
-            stats["xp"] = max(0, current_xp - penalty_xp)
-            char.stats = json.dumps(stats)
-            db.session.add(char)
-        except Exception:
-            continue
+        char.locked_in_dungeon = False
+        char.locked_dungeon_id = None
+        db.session.add(char)
 
     # Delete the dungeon instance to end the run
     try:
@@ -1668,8 +1661,8 @@ def dungeon_hearth():
 
     return jsonify(
         {
-            "message": "You activate your hearthstone and escape the dungeon. The early extraction cost you dearly.",
-            "penalty_applied": True,
+            "message": "You activate your hearthstone and step out of the dungeon. The way back in is gone.",
+            "characters_released": len(party_chars),
         }
     )
 

@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         if (hearthBtn) {
             hearthBtn.addEventListener('click', () => {
-                if (!confirm('Hearth and abandon this dungeon run? Penalties will apply.')) return;
+                if (!confirm('Hearth and abandon this dungeon run? You keep what you found, but this dungeon is gone.')) return;
                 hearthBtn.disabled = true;
                 fetch('/api/dungeon/hearth', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
                     .then(r => r.json().catch(() => ({ error: 'bad json' })))
@@ -131,6 +131,9 @@ document.addEventListener('DOMContentLoaded', function () {
             } else if (key === 'c') {
                 const campBtn = document.getElementById('btn-camp');
                 if (campBtn && !campBtn.disabled) campBtn.click();
+            } else if (key === 'e') {
+                const extractBtn = document.getElementById('btn-extract');
+                if (extractBtn && !extractBtn.disabled) extractBtn.click();
             } else if (key === 'h') {
                 const hearthBtn = document.getElementById('btn-hearth');
                 if (hearthBtn && !hearthBtn.disabled) hearthBtn.click();

@@ -219,6 +219,12 @@ def dashboard():
                 db.session.commit()
                 session["dungeon_instance_id"] = instance.id
                 session["dungeon_seed"] = instance.seed
+            # Commit the party to this run. extraction_service selects the party
+            # by locked_dungeon_id, so without this nobody can ever extract.
+            for c in chars:
+                c.locked_dungeon_id = instance.id
+                db.session.add(c)
+            db.session.commit()
             return redirect(url_for("dungeon.adventure"))
         elif form_type == "continue_adventure":
             # Reuse existing dungeon instance & last party selection (if any). Do not mutate seed or instance.

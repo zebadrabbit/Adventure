@@ -72,6 +72,11 @@ Each run is based on a **Dungeon Seed** that determines layout and content.
 - Cannot be used until run resumes
 - If the rest of the party extracts → permadeath
 
+### Abandoning (Hearthstone)
+- The player steps out mid-run — no fault, no penalty
+- Party is released; everything they found stays theirs
+- The dungeon is reset: the instance is destroyed, so the next trip is a new one
+
 ---
 
 ## Death Rules
@@ -80,7 +85,11 @@ Each run is based on a **Dungeon Seed** that determines layout and content.
   - Spells
   - Rare shrines
 - If party extracts leaving a corpse behind → **permadeath**
-- Full wipe = all characters lost, dungeon failed
+- Full wipe:
+  - Every character is dead **forever** — no resurrection, no recovery
+  - Everything they carried in (gold, gear, unsecured loot) is gone with them
+  - The player is out of the dungeon and the dungeon is reset
+  - Play resumes only after creating or recruiting new characters
 
 ---
 
