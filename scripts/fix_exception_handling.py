@@ -204,6 +204,13 @@ def main():
     parser.add_argument("--check", action="store_true", help="Check for issues")
     parser.add_argument("--fix", action="store_true", help="Auto-fix issues")
     parser.add_argument("--report", action="store_true", help="Generate detailed report")
+    parser.add_argument(
+        "--max-count",
+        type=int,
+        default=None,
+        help="Ratchet mode: exit 0 while the total stays at or below this number. "
+        "Lower it as handlers get cleaned up; never raise it.",
+    )
     parser.add_argument("--dir", default="app", help="Directory to scan (default: app)")
     parser.add_argument("--output", default="exception_report.md", help="Report output file")
 
@@ -257,6 +264,14 @@ def main():
         print(f"\n✓ Fixed {fixed_count} files")
         print("\nNOTE: Please review the changes and run tests to ensure correctness.")
         print("Some fixes may require manual adjustment for proper context.")
+
+    if args.max_count is not None:
+        if total_issues > args.max_count:
+            print(f"\n✗ {total_issues} silent handlers exceeds the ratchet maximum of {args.max_count}.")
+            print("New silent 'except: pass' handlers are not allowed — log the exception instead.")
+            return 1
+        print(f"\n✓ {total_issues} silent handlers within ratchet maximum of {args.max_count}.")
+        return 0
 
     return 1 if results else 0
 

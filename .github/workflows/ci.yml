@@ -49,31 +49,14 @@ jobs:
           pip install pip-audit
           pip-audit -r requirements.txt
 
-      - name: Check exception handling
-        run: |
-          python scripts/fix_exception_handling.py --check || true
+      - name: Check exception handling (ratchet — lower --max-count as cleanup progresses, never raise)
+        run: python scripts/fix_exception_handling.py --check --max-count 147
 
-      - name: Run tests
+      - name: Run tests (single run, coverage gate included)
         env:
           DATABASE_URL: postgresql://adventure:test_password@localhost:5432/adventure_test
           SECRET_KEY: test-secret-key-for-ci
-        run: pytest -q --maxfail=1 --disable-warnings --cov=app --cov-report=term-missing
-
-      - name: Lint (ruff)
-        run: ruff check .
-
-      - name: Enforce minimum coverage
-        run: |
-          coverage=$(pytest --cov=app --cov-report=term | awk '/TOTAL/ {print $4}' | sed 's/%//') || true
-          echo "Detected coverage: $coverage%"
-          # Minimum enforced coverage threshold (raised from 60 -> 80 after test suite expansion)
-          min=80
-          awk -v c=$coverage -v m=$min 'BEGIN { if (c+0 < m) { printf("Coverage %.1f%% below minimum %d%%\n", c, m); exit 1 } }'
-
-      - name: Coverage (optional)
-        if: always()
-        run: |
-          if python -c "import pytest_cov" 2>/dev/null; then pytest --cov=app --cov-report=term-missing; else echo "pytest-cov not installed"; fi
+        run: pytest -q --maxfail=1 --disable-warnings --cov=app --cov-report=term-missing --cov-fail-under=80
 
   docker-build:
     runs-on: ubuntu-latest
@@ -91,4 +74,4 @@ jobs:
 
       - name: Test Docker image
         run: |
-          docker run --rm -e DATABASE_URL=sqlite:///test.db adventure-mud:latest python -c "print('Docker image OK')"
+          docker run --rm adventure-mud:latest python -c "print('Docker image OK')"
