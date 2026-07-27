@@ -37,6 +37,11 @@ drove the `repo-health` branch is at
 - [ ] Dedupe `equipment.js` vs `equipment-enhanced.js` (near-identical
       encumbrance/gear-bonus helpers; check whether plain `equipment.js`
       is still loaded at all).
+- [ ] `.pre-commit-config.yaml`'s `optimize_svgs` hook never runs: its
+      `files: '\\.(svg)$'` regex is the same doubled-backslash bug class
+      documented in pyproject.toml's black include. Fixing the regex will
+      make it rewrite every SVG on the next run — do it as its own commit
+      and eyeball the asset diff.
 - [ ] Fold the duplicated HP/mana-cap math in
       `combat_service._derive_stats` and
       `dashboard_helpers.build_party_payload` onto `compute_hp_mana_max`.
