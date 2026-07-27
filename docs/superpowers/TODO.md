@@ -26,25 +26,29 @@ drove the `repo-health` branch is at
 - [ ] Application-factory refactor: kill import-time side effects
       (load_dotenv/DB/migrations/seeds on `import app`). Spec:
       [specs/2026-07-27-app-factory-refactor-design.md](specs/2026-07-27-app-factory-refactor-design.md).
-- [ ] Exception-handling ratchet: 63 silent handlers remain (CI enforces
-      via `fix_exception_handling.py --check --max-count 63`). Lower the
+- [ ] Exception-handling ratchet: 62 silent handlers remain (CI enforces
+      via `fix_exception_handling.py --check --max-count 62`). Lower the
       number as modules get cleaned; never raise it.
 - [ ] Opportunistic god-file splits: `dungeon_api.py` (~1.8k lines),
       `combat_service.py` (~1.7k), `admin_new.py` (~1k), `adventure.js`,
       `combat.js` — extract when next touched for a feature.
-- [ ] Remove dead `glass-theme.css` purple body-class rules (confirm
-      `admin_themes.html` doesn't use them first).
-- [ ] Dedupe `equipment.js` vs `equipment-enhanced.js` (near-identical
-      encumbrance/gear-bonus helpers; check whether plain `equipment.js`
-      is still loaded at all).
+- [x] ~~Remove dead `glass-theme.css` purple body-class rules~~ — already
+      gone (removed in an earlier cleanup; the file's remaining rules are
+      live on combat/admin/account pages).
+- [x] ~~Dedupe `equipment.js` vs `equipment-enhanced.js`~~ — shared logic
+      (encumbrance classification, affix totaling) extracted to
+      `equipment-shared.js`; both files are live (adventure vs dashboard)
+      and keep their own DOM templates.
 - [ ] `.pre-commit-config.yaml`'s `optimize_svgs` hook never runs: its
       `files: '\\.(svg)$'` regex is the same doubled-backslash bug class
       documented in pyproject.toml's black include. Fixing the regex will
       make it rewrite every SVG on the next run — do it as its own commit
       and eyeball the asset diff.
-- [ ] Fold the duplicated HP/mana-cap math in
-      `combat_service._derive_stats` and
-      `dashboard_helpers.build_party_payload` onto `compute_hp_mana_max`.
+- [x] ~~Fold the duplicated HP/mana-cap math onto `compute_hp_mana_max`~~ —
+      `build_party_payload` folded (was byte-identical);
+      `combat_service._derive_stats` stays inline deliberately (derives
+      attack/defense/speed in the same pass; legacy CON→STR fallback
+      differs) — documented at the formula block.
 
 ## How to run the suite
 ```bash

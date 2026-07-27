@@ -244,34 +244,12 @@ def build_party_payload(chars: Sequence[Character]):
         except Exception:
             s = {}
 
-        # Calculate max HP and mana based on character stats and level
         level = getattr(c, "level", 1) or 1
-        # Try lowercase first, then uppercase for stats (handle both formats)
-        con = int(s.get("con", s.get("CON", 10)))
-        intelligence = int(s.get("int", s.get("INT", 10)))
+        # Canonical cap math (stats + gear + passives) — was an inline copy
+        # of the same formula before the dedup onto character_stats.
+        from app.services.character_stats import compute_hp_mana_max
 
-        # Max HP: base 50 + CON*2 + level*5 (matches combat_service.py)
-        hp_max = 50 + con * 2 + level * 5
-        # Max Mana: base 20 + INT*2 (matches combat_service.py)
-        mana_max = 20 + intelligence * 2
-
-        from app.services.loot_service import gear_bonuses
-
-        try:
-            gear = json.loads(c.gear) if getattr(c, "gear", None) else {}
-        except Exception:
-            gear = {}
-        gb = gear_bonuses(gear)
-        # Fold unlocked passive skill effects in alongside gear (matches combat).
-        try:
-            from app.services.skill_effects import passive_bonuses
-
-            for _k, _v in passive_bonuses(c.id).items():
-                gb[_k] = gb.get(_k, 0) + _v
-        except Exception:
-            pass
-        hp_max += int(gb.get("max_hp", 0)) + int(gb.get("con", 0)) * 2
-        mana_max += int(gb.get("mana", 0)) + int(gb.get("int", 0)) * 2
+        hp_max, mana_max = compute_hp_mana_max(c)
 
         # Read actual current HP/MP from stats (persistent values)
         hp = int(s.get("hp", hp_max))  # Default to full if not set

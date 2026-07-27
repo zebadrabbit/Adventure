@@ -2,13 +2,12 @@
 project: Adventure MUD
 module: character_stats.py
 
-Single source of truth for the HP/mana cap math used by the persistent
-status-effect decay/regen pass (app/services/status_effects.py). This is a
-deliberately narrow extraction: combat_service._derive_stats and
-dashboard_helpers.build_party_payload compute their own (already-correct,
-slightly different in scope -- they also derive attack/defense/speed) hp_max
-/mana_max inline and are intentionally left untouched by this module, to
-avoid risking working combat/dashboard code for a tangential dedup.
+Single source of truth for the HP/mana cap math, used by the persistent
+status-effect decay/regen pass (app/services/status_effects.py) and
+dashboard_helpers.build_party_payload. combat_service._derive_stats keeps
+an inline copy on purpose: it derives attack/defense/speed from the same
+folded attributes in one pass, and its legacy CON default falls back to
+STR rather than 10 — see the comment at its cap-formula block.
 """
 
 from __future__ import annotations

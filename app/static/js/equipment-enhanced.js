@@ -257,27 +257,22 @@ class EquipmentManager {
     }
 
     renderEncumbrance() {
-        const enc = this.character && this.character.encumbrance;
         const container = document.getElementById('encumbrance-bar');
         if (!container) return;
-        if (!enc || typeof enc.weight !== 'number' || typeof enc.capacity !== 'number') {
+        const view = window.EquipmentShared.encumbranceView(this.character && this.character.encumbrance);
+        if (!view) {
             container.innerHTML = '';
             return;
         }
-        const pct = enc.capacity > 0 ? Math.min(100, (enc.weight / enc.capacity) * 100) : 0;
-        const barClass = enc.status === 'blocked' ? 'bg-danger' : (enc.status === 'encumbered' ? 'bg-warning' : 'bg-success');
-        const textClass = enc.status === 'blocked' ? 'text-danger' : (enc.status === 'encumbered' ? 'text-warning' : '');
-        const statusLabel = enc.status === 'blocked' ? 'Overloaded — cannot carry more' : (enc.status === 'encumbered' ? 'Encumbered' : '');
-        const penaltyNote = (enc.status !== 'normal' && enc.dex_penalty) ? ` (-${enc.dex_penalty} DEX)` : '';
         container.innerHTML = `
             <div class="d-flex justify-content-between small eq-bar-label">
                 <span>Carry Weight</span>
-                <span>${enc.weight.toFixed(1)} / ${enc.capacity.toFixed(1)}</span>
+                <span>${view.weightLabel}</span>
             </div>
             <div class="progress eq-progress-bar">
-                <div class="progress-bar ${barClass}" style="width:${pct}%"></div>
+                <div class="progress-bar ${view.barClass}" style="width:${view.pct}%"></div>
             </div>
-            ${statusLabel ? `<div class="small ${textClass} mt-1">${statusLabel}${penaltyNote}</div>` : ''}
+            ${view.statusLabel ? `<div class="small ${view.textClass} mt-1">${view.statusLabel}${view.penaltyNote}</div>` : ''}
         `;
     }
 
@@ -285,25 +280,8 @@ class EquipmentManager {
         const container = document.getElementById('gear-bonus-summary');
         if (!container) return;
         const gear = (this.character && this.character.gear) || {};
-        const totals = {};
-        Object.values(gear).forEach(inst => {
-            if (!inst) return;
-            const affixes = Array.isArray(inst.affixes) ? inst.affixes
-                : (inst.effects && typeof inst.effects === 'object'
-                    ? Object.entries(inst.effects).map(([stat, val]) => ({ stat, val }))
-                    : []);
-            affixes.forEach(a => {
-                if (!a || !a.stat || typeof a.val !== 'number') return;
-                totals[a.stat] = (totals[a.stat] || 0) + a.val;
-            });
-        });
-        const parts = Object.entries(totals)
-            .filter(([, v]) => v !== 0)
-            .map(([stat, v]) => {
-                const num = Number.isInteger(v) ? v : Math.round(v * 10) / 10;
-                return `${num >= 0 ? '+' : ''}${num} ${stat.toUpperCase()}`;
-            });
-        container.innerHTML = parts.length ? `Gear bonus: ${this.escapeHTML(parts.join(', '))}` : '';
+        const text = window.EquipmentShared.gearBonusText(gear);
+        container.innerHTML = text ? `Gear bonus: ${this.escapeHTML(text)}` : '';
     }
 
     renderInventory() {

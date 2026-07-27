@@ -106,6 +106,11 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
     WIS += int(_gb.get("wis", 0))
     CHA += int(_gb.get("cha", 0))
 
+    # Cap formulas match character_stats.compute_hp_mana_max, but this pass
+    # stays inline deliberately: it derives attack/defense/speed from the
+    # same folded attributes, and its CON default falls back to STR (not 10)
+    # for legacy rows — folding onto the shared helper would change combat
+    # HP for characters missing a con stat.
     max_hp = 50 + CON * 2 + level * 5
     attack = 8 + STR // 2 + level
     defense = 5 + DEX // 3 + level // 2

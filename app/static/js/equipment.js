@@ -87,45 +87,23 @@
   }
 
   function encumbranceBarHtml(enc) {
-    if (!enc || typeof enc.weight !== 'number' || typeof enc.capacity !== 'number') return '';
-    const pct = enc.capacity > 0 ? Math.min(100, (enc.weight / enc.capacity) * 100) : 0;
-    const barClass = enc.status === 'blocked' ? 'bg-danger' : (enc.status === 'encumbered' ? 'bg-warning' : 'bg-success');
-    const textClass = enc.status === 'blocked' ? 'text-danger' : (enc.status === 'encumbered' ? 'text-warning' : '');
-    const statusLabel = enc.status === 'blocked' ? 'Overloaded — cannot carry more' : (enc.status === 'encumbered' ? 'Encumbered' : '');
-    const penaltyNote = (enc.status !== 'normal' && enc.dex_penalty) ? ` (-${enc.dex_penalty} DEX)` : '';
+    const view = window.EquipmentShared.encumbranceView(enc);
+    if (!view) return '';
     return `
-      <div class="encumbrance-bar mb-2" data-status="${esc(enc.status)}">
+      <div class="encumbrance-bar mb-2" data-status="${esc(view.status)}">
         <div class="d-flex justify-content-between small">
           <span>Carry Weight</span>
-          <span>${enc.weight.toFixed(1)} / ${enc.capacity.toFixed(1)}</span>
+          <span>${view.weightLabel}</span>
         </div>
         <div class="progress" style="height:6px;">
-          <div class="progress-bar ${barClass}" style="width:${pct}%"></div>
+          <div class="progress-bar ${view.barClass}" style="width:${view.pct}%"></div>
         </div>
-        ${statusLabel ? `<div class="small ${textClass} mt-1">${statusLabel}${penaltyNote}</div>` : ''}
+        ${view.statusLabel ? `<div class="small ${view.textClass} mt-1">${view.statusLabel}${view.penaltyNote}</div>` : ''}
       </div>`;
   }
 
   function gearBonusSummary(gear) {
-    const totals = {};
-    Object.values(gear || {}).forEach(inst => {
-      if (!inst) return;
-      const affixes = Array.isArray(inst.affixes) ? inst.affixes
-        : (inst.effects && typeof inst.effects === 'object'
-            ? Object.entries(inst.effects).map(([stat, val]) => ({ stat, val }))
-            : []);
-      affixes.forEach(a => {
-        if (!a || !a.stat || typeof a.val !== 'number') return;
-        totals[a.stat] = (totals[a.stat] || 0) + a.val;
-      });
-    });
-    const parts = Object.entries(totals)
-      .filter(([, v]) => v !== 0)
-      .map(([stat, v]) => {
-        const num = Number.isInteger(v) ? v : Math.round(v * 10) / 10;
-        return `${num >= 0 ? '+' : ''}${num} ${stat.toUpperCase()}`;
-      });
-    return parts.join(', ');
+    return window.EquipmentShared.gearBonusText(gear);
   }
 
   function renderCharPanel(ch) {
