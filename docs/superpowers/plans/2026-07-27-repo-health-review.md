@@ -179,28 +179,33 @@ Waiting on playtest verdicts, not engineering-blocked:
 | 8 | P1 app-factory refactor — own spec, own project | L |
 | 9 | P5 gameplay tuning — playtest-driven | — |
 
-## Checklist (todo)
+## Checklist (executed on the `repo-health` branch, 2026-07-27)
 
-- [ ] Session cookie flags: `SAMESITE=Lax`, `HTTPONLY`, `SECURE` (prod)
-- [ ] CSRF gate: require custom header on `/api/` mutating requests + JS fetch helper update
-- [ ] Socket.IO `cors_allowed_origins` default → same-origin, env override for dev
-- [ ] Bump deps (Werkzeug, gunicorn, Flask-SocketIO, alembic, …) + full suite green
-- [ ] Add `pip-audit` to CI + `.github/dependabot.yml`
-- [ ] Gate or remove unauthenticated `/api/client/log`
-- [ ] `DATABASE_URL` fail-fast (no silent SQLite fallback); reconcile README/run.py/Docker smoke test; drop SQLite PRAGMA block
-- [ ] Prod-gate `TEMPLATES_AUTO_RELOAD`, `SEND_FILE_MAX_AGE_DEFAULT=0`, `engineio_logger`
-- [ ] CI: single pytest run with `--cov-fail-under=80`; delete duplicate coverage steps
-- [ ] Make exception-handling check enforcing (ratchet on current count of 140)
-- [ ] De-silence `except Exception: pass` in `combat_service.py` (37)
-- [ ] De-silence `except Exception: pass` in `websockets/lobby.py` (26)
-- [ ] De-silence `except Exception: pass` in `dungeon_api.py` (17)
-- [ ] Committed Playwright smoke suite + CI job
-- [ ] Root-cause the pytest-randomly cross-test DB-state flakes (camp regen / poison / theme)
-- [ ] Archive completed items out of `docs/superpowers/TODO.md`
-- [ ] Archive/delete stale docs (CORRIDOR_GAP_FIX, DASHBOARD_FIX, PROJECT_HEALTH_REPORT, exception_report, STRUCTLOG_PROGRESS, rebase_helper)
-- [ ] Fix `auto-bump.yml` scoped-commit matching (`feat(scope):` → minor)
-- [ ] Delete or dedupe `equipment.js` vs `equipment-enhanced.js`
-- [ ] Fold duplicated HP/mana-cap math onto `compute_hp_mana_max`
-- [ ] Remove dead `glass-theme.css` purple body-class rules (after admin_themes.html check)
-- [ ] Spec the application-factory refactor (separate project)
-- [ ] Playtest-driven tuning pass (EVENT_TUNING, mana/potion economy, spawn density, aggro)
+- [x] Session cookie flags: `SAMESITE=Lax`, `HTTPONLY`, `SECURE` (prod, env-overridable)
+- [x] CSRF gate: `X-Requested-With` required on mutating `/api/` requests; global fetch wrapper in `static/js/api-guard.js`
+- [x] Socket.IO `cors_allowed_origins` default → same-origin, env override for dev
+- [x] Bump deps (Werkzeug 3.0.6, gunicorn 23.0, alembic 1.14.1, psycopg2 2.9.10) — suite green
+- [x] Add `pip-audit` to CI + `.github/dependabot.yml`
+- [x] Gate unauthenticated `/api/client/log` behind login
+- [x] `DATABASE_URL` fail-fast (no silent SQLite fallback); README/run.py/Docker reconciled; SQLite PRAGMA block dropped
+- [x] Prod-gate `TEMPLATES_AUTO_RELOAD`, `SEND_FILE_MAX_AGE_DEFAULT`; `engineio_logger` default off
+- [x] CI: single pytest run with `--cov-fail-under=80`; duplicate coverage steps deleted
+- [x] Exception-handling check enforcing (`--max-count` ratchet, currently 62)
+- [x] De-silence `except Exception: pass` in `combat_service.py` (38 sites)
+- [x] De-silence `except Exception: pass` in `websockets/lobby.py` (27 sites)
+- [x] De-silence `except Exception: pass` in `dungeon_api.py` (17 sites)
+- [x] Committed Playwright smoke suite (`e2e/`) + `e2e-smoke` CI job — 5 tests green vs a live server
+- [~] pytest-randomly flakes: not reproduced — 4+ consecutive full-suite greens today; re-open only if seen again
+- [x] `docs/superpowers/TODO.md` pruned to open items; history → `TODO_ARCHIVE.md`
+- [x] Stale docs → `docs/archive/` (kept `rebase_helper.md`; it documents a live script)
+- [x] `auto-bump.yml` scoped-commit matching fixed
+- [x] `equipment.js`/`equipment-enhanced.js` shared logic → `equipment-shared.js` (both files are live; kept)
+- [x] Dashboard HP/mana-cap math folded onto `compute_hp_mana_max` (combat's copy stays inline, documented — CON→STR legacy fallback differs)
+- [x] `glass-theme.css` purple rules: already removed in an earlier cleanup — verified, no action
+- [x] App-factory refactor spec: `specs/2026-07-27-app-factory-refactor-design.md`
+- [ ] Playtest-driven tuning pass (EVENT_TUNING, mana/potion economy, spawn density, aggro) — needs live play, tracked in TODO.md
+
+Bonus fixes discovered along the way: pinned-black formatting drift in
+`test_autofill_name_pools.py`; 16 assets missing trailing newlines; the
+`optimize_svgs` pre-commit hook has a broken `files` regex and has never
+run (logged in TODO.md, not fixed — enabling it rewrites every SVG).
