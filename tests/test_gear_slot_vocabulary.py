@@ -15,7 +15,11 @@ remove starter body armour.
 Spec: docs/superpowers/specs/2026-07-28-character-panel-redesign.md
 """
 
+import pytest
+
 from app.loot.data.archetypes import SLOTS
+from app.models.models import Item
+from app.routes.inventory_api import _SLOTS, _slot_for_item
 from app.services.auto_equip import AUTO_EQUIP_PREFS, auto_equip_for
 
 
@@ -47,3 +51,39 @@ def test_auto_equip_puts_body_armour_in_chest():
 
     assert gear.get("chest") == "leather-armor"
     assert "armor" not in gear
+
+
+def test_inventory_api_does_not_keep_its_own_slot_list():
+    assert tuple(_SLOTS) == tuple(SLOTS), "_SLOTS must be archetypes.SLOTS, not a restatement"
+
+
+@pytest.mark.parametrize(
+    "slug,name,itype,expected",
+    [
+        ("iron-gauntlets", "Iron Gauntlets", "armor", "hands"),
+        ("leather-gloves", "Leather Gloves", "armor", "hands"),
+        ("steel-boots", "Steel Boots", "armor", "feet"),
+        ("iron-greaves", "Iron Greaves", "armor", "feet"),
+        ("plate-leggings", "Plate Leggings", "armor", "chest"),
+        ("iron-helm", "Iron Helm", "armor", "head"),
+        ("tower-shield", "Tower Shield", "armor", "offhand"),
+        ("chain-shirt", "Chain Shirt", "armor", "chest"),
+        ("long-sword", "Long Sword", "weapon", "weapon"),
+        ("gold-band", "Gold Band", "ring", "ring"),
+        ("jade-amulet", "Jade Amulet", "amulet", "amulet"),
+        ("healing-potion", "Healing Potion", "potion", None),
+    ],
+)
+def test_slot_inference_is_canonical(slug, name, itype, expected):
+    """An authored item must land where a procedural one of the same kind does."""
+    item = Item(slug=slug, name=name, type=itype)
+
+    assert _slot_for_item(item, {}) == expected
+
+
+def test_ring_inference_does_not_depend_on_what_is_worn():
+    """There is one ring slot now; the old code returned ring1 or ring2."""
+    item = Item(slug="gold-band", name="Gold Band", type="ring")
+
+    assert _slot_for_item(item, {}) == "ring"
+    assert _slot_for_item(item, {"ring": "silver-band"}) == "ring"
