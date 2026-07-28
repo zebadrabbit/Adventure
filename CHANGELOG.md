@@ -6,9 +6,70 @@
 
 # [0.8.2] - UNRELEASED
 ### Added
+- `GET /api/dungeon/party` — live party HP/MP, so the adventure screen's
+  character cards can refresh without a page load.
+- Named monster loot tables (`app/loot/tables.py`): a table name resolves to a
+  tier read off its suffix, filtered against the item catalogue by type, rarity
+  and level, so adding an item makes it eligible everywhere it fits.
+- Design specs for the next phase of work, all cross-referenced:
+  tactical combat ([spec](docs/superpowers/specs/2026-07-28-tactical-combat-design.md)),
+  the adventure HUD ([spec](docs/superpowers/specs/2026-07-28-adventure-hud-layout-design.md)),
+  character panels and the paper doll ([spec](docs/superpowers/specs/2026-07-28-character-panel-redesign.md)),
+  item usage in combat ([spec](docs/superpowers/specs/2026-07-28-combat-item-usage-design.md)),
+  and a tile atlas ([spec](docs/superpowers/specs/2026-07-27-tile-atlas-proposal.md)).
+
 ### Changed
+- The dungeon map is sized from the viewport
+  (`clamp(220px, calc(100vh - 390px), 720px)`) instead of a fixed 512px. The
+  adventure screen needed ~880-910px of vertical space against the ~630-660
+  usable on a 1366x768 laptop, so the map and the movement controls could not
+  both be on screen. Large displays now get more map, not the same map.
+- Equipment cannot be changed during a fight. Armour swaps are disallowed
+  outright; weapon swaps are disallowed *through the inventory API* until they
+  exist as a combat action that can charge one.
+- Spawns above the monster catalogue's level ceiling fall back to the deepest
+  band that exists rather than degrading to a nameless stub.
+
 ### Fixed
+- **Reseeding aborted on any played database.** `clear_item_categories` released
+  `dungeon_loot` rows for only four item types while the seed files delete a
+  wider set, so one floor-loot row pointing at (say) a gem blocked that file's
+  DELETE with a foreign-key violation. Everything after it — including the
+  monster catalogue, loaded last — never ran, which is how both databases ended
+  up with 0 monsters and 0 archetypes.
+- **Monsters dropped no catalogue loot, ever.** `loot_table` values
+  (`goblin_basic`, `boss_dragon`) were parsed as a CSV of item *slugs*, matched
+  nothing, and returned an empty pool. Procedural gear and boss keys still
+  dropped, which is why it went unnoticed.
+- **Character panels never updated.** They rendered from a `session["party"]`
+  snapshot frozen when the party was picked, so HP/MP showed selection-time
+  values (full) for the whole run regardless of combat, poison, regen or camping.
+- **The loot distribution dialog was entirely unclickable.** Click handlers were
+  inline attributes with string ids interpolated unquoted, so
+  `selectItem(potion-healing_0)` parsed as `potion - healing_0` and threw
+  ReferenceError. Also labelled every character "Unknown" by reading `class`
+  where the combat snapshot stores `char_class`.
+- **Confirming a distribution 500'd.** `can_add_item(inv, character.stats, ...)`
+  had its first two arguments swapped against the `(str_score, inv, ...)`
+  signature. Behind that, the result was tested as a truthy tuple, so the carry
+  limit would never have blocked an item anyway.
+- **User accounts could not be deleted.** Seven tables reference `user` with no
+  cascade, so any account that had entered a dungeon, opened a combat session or
+  been given a hoard failed on a foreign key.
+- Three order-dependent tests that asserted a fixture monster was the only match
+  for a real family — true only while the catalogue was empty, so they passed on
+  an unseeded database and failed on a seeded one.
+
 ### Notes
+- `docs/TESTING.md` documents two ways to corrupt the test database, both of
+  which cost hours: concurrent pytest runs (`db_isolation` tests drop and
+  recreate the schema mid-run, so two runs destroy each other), and the fact
+  that a `db_isolation` rebuild reseeds with a ~14-item minimal seeder rather
+  than the full catalogue — so a test depending on real seed data passes alone
+  and fails in the suite depending on ordering.
+- Several of these were found by writing the design specs rather than by
+  playing: the equipment loophole, the unenforced carry limit, and a spell that
+  cost no mana when it missed.
 
 # [0.8.1] - UNRELEASED
 ### Added
