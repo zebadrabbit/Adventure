@@ -422,6 +422,54 @@ def get_character_state(cid: int):
     )
 
 
+# Equipment slots that are locked while a fight is running. Weapons are listed
+# too, deliberately: swapping a weapon in combat is meant to *cost an action*
+# (see docs/superpowers/specs/2026-07-28-tactical-combat-design.md), and this
+# endpoint has no way to charge one. Until weapon swapping exists as a combat
+# action, allowing it here would be a free swap-to-best-weapon-every-turn
+# exploit -- worse than not allowing it at all.
+COMBAT_LOCKED_SLOTS = frozenset(_SLOTS)
+
+
+def _active_combat_for(character: Character):
+    """The character's live combat session, or None.
+
+    Combat is per-user and party-wide -- one active session at a time -- so an
+    active session for the owner means this character is in a fight.
+    """
+    from app.models.models import CombatSession
+
+    try:
+        return CombatSession.query.filter_by(user_id=character.user_id, status="active", archived=False).first()
+    except Exception:
+        db.session.rollback()
+        return None
+
+
+def _reject_if_in_combat(character: Character, slot: str):
+    """A 400 response when `slot` may not be changed right now, else None.
+
+    Nothing used to stop equipment changes during a fight: a character could
+    swap armour mid-combat, unlimited and free, straight through this API.
+    """
+    if slot not in COMBAT_LOCKED_SLOTS:
+        return None
+    combat = _active_combat_for(character)
+    if combat is None:
+        return None
+    return (
+        jsonify(
+            {
+                "error": "in_combat",
+                "message": "Armour cannot be changed during a fight, and weapon swaps must be made as a combat action.",
+                "slot": slot,
+                "combat_id": combat.id,
+            }
+        ),
+        400,
+    )
+
+
 @bp_inventory.route("/api/characters/<int:cid>/equip", methods=["POST"])
 @login_required
 def equip_item(cid: int):
@@ -447,6 +495,9 @@ def equip_item(cid: int):
         slot = inst.get("slot")
         if slot not in GEAR_SLOTS:
             return jsonify({"error": "bad_slot"}), 400
+        blocked = _reject_if_in_combat(ch, slot)
+        if blocked:
+            return blocked
         # Swap any currently-equipped item in that slot back into items
         if gear_raw.get(slot):
             items_raw.append(gear_raw[slot])
@@ -478,6 +529,11 @@ def equip_item(cid: int):
         slot = inferred  # prefer inferred slot
     if _slot_for_item(item, gear) is None:
         return jsonify({"error": "item not equippable"}), 400
+    # Legacy slug path needs the same combat lock as the gear-instance path
+    # above; guarding only one of the two would leave the loophole open.
+    blocked = _reject_if_in_combat(ch, slot)
+    if blocked:
+        return blocked
     # Perform equip: remove from bag, move current slot (if any) back to bag
     removed = remove_one(inv, slug)
     if not removed:
@@ -509,6 +565,9 @@ def unequip_item(cid: int):
     slot = (data.get("slot") or "").strip()
     if slot not in _SLOTS:
         return jsonify({"error": "invalid slot"}), 400
+    blocked = _reject_if_in_combat(ch, slot)
+    if blocked:
+        return blocked
     gear = _normalize_gear(_safe_json_load(ch.gear, {}))
     equipped = gear.get(slot)
     if not equipped:
