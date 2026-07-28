@@ -271,7 +271,14 @@ body {
 }
 
 .map-fluid-fixed-height {
-  height: 512px;
+  /* Sized from the viewport rather than fixed. A hard 512px meant the adventure
+     screen needed ~880-910px of vertical space against the ~630-660 usable on a
+     1366x768 laptop, so the map and the movement controls could not both be on
+     screen and the player scrolled mid-fight. The reserve covers navbar, panel
+     chrome and the controls row; the upper bound is above the old 512 so large
+     displays get more map rather than the same map.
+     Full redesign: docs/superpowers/specs/2026-07-28-adventure-hud-layout-design.md */
+  height: clamp(220px, calc(100vh - 390px), 720px);
   width: 100%;
   max-width: 100%;
   border: 2px solid var(--adv-border);
