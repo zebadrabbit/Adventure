@@ -402,6 +402,7 @@ def confirm_loot_distribution():
         assigned_items[char_id].append(slug)
 
     # Assign items to characters
+    skipped: list[str] = []
     for char_id, slugs in assigned_items.items():
         character = db.session.get(Character, char_id)
         if not character or character.user_id != current_user.id:
@@ -410,13 +411,30 @@ def confirm_loot_distribution():
         # Load current inventory
         inv = load_inventory(character.items)
 
-        # Add each item
+        # Add each item, respecting the character's carry limit.
+        #
+        # This read `can_add_item(inv, character.stats, slug, 1)`, but the
+        # signature is (str_score, inv, slug, qty) -- the first two arguments
+        # were swapped, so it raised TypeError ("int() argument must be ... not
+        # 'list'") and the whole endpoint 500'd. The client could not parse the
+        # HTML error page, so every confirmation reported "Failed to distribute
+        # loot". It also ignored that can_add_item returns (allowed, state): a
+        # non-empty tuple is always truthy, so the limit would never have been
+        # enforced even once the call was right.
+        try:
+            str_score = int((json.loads(character.stats or "{}") or {}).get("str", 10))
+        except Exception:
+            str_score = 10
+
         for slug in slugs:
             item = Item.query.filter_by(slug=slug).first()
-            if item:
-                # Check encumbrance
-                if can_add_item(inv, character.stats, slug, 1):
-                    add_item(inv, slug, 1)
+            if not item:
+                continue
+            allowed, _state = can_add_item(str_score, inv, slug, 1)
+            if allowed:
+                add_item(inv, slug, 1)
+            else:
+                skipped.append(slug)
 
         # Save updated inventory
         character.items = dump_inventory(inv)
@@ -438,7 +456,8 @@ def confirm_loot_distribution():
         db.session.rollback()
         return jsonify({"error": "Database error"}), 500
 
-    return jsonify({"success": True, "assigned": len(assignments)})
+    # Report anything the carrier could not take, rather than silently eating it.
+    return jsonify({"success": True, "assigned": len(assignments) - len(skipped), "skipped": skipped})
 
 
 def _get_item_effects(item: Item) -> dict:

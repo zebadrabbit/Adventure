@@ -139,3 +139,72 @@ def test_click_targets_are_addressable_by_data_attribute():
     for attribute in ("data-item-id", "data-assign-item", "data-assign-member"):
         assert attribute in source, f"{attribute} is what delegation binds to"
     assert "addEventListener('click'" in source
+
+
+# ---------------------------------------------------------------- confirming
+
+
+def test_confirming_a_distribution_puts_the_item_in_the_bag(client, looted_combat):
+    """The reported failure: this 500'd and the client said "Failed to distribute loot".
+
+    `can_add_item(inv, character.stats, slug, 1)` had its first two arguments
+    swapped -- the signature is (str_score, inv, slug, qty) -- so it raised
+    TypeError and the endpoint returned an HTML 500 the client could not parse.
+    """
+    from app.inventory.utils import load_inventory
+
+    user, char, combat, item = looted_combat
+    loot = client.get(f"/api/loot/pending?combat_id={combat.id}").get_json()["loot"]
+    assignments = {loot[0]["id"]: char.id}
+
+    resp = client.post(
+        "/api/loot/confirm",
+        json={"combat_id": combat.id, "assignments": assignments},
+    )
+
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:400]
+    body = resp.get_json()
+    assert body["success"] is True
+    assert body["assigned"] == 1
+
+    db.session.refresh(char)
+    bag = {entry["slug"]: entry.get("qty", 0) for entry in load_inventory(char.items)}
+    assert bag.get(item.slug, 0) >= 1, "the assigned item never reached the character"
+
+
+def test_confirming_several_items_at_once(client, looted_combat):
+    from app.inventory.utils import load_inventory
+
+    user, char, combat, item = looted_combat
+    loot = client.get(f"/api/loot/pending?combat_id={combat.id}").get_json()["loot"]
+    assert len(loot) >= 2, "fixture rewards two of the same item"
+    assignments = {entry["id"]: char.id for entry in loot}
+
+    resp = client.post("/api/loot/confirm", json={"combat_id": combat.id, "assignments": assignments})
+
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:400]
+    db.session.refresh(char)
+    bag = {entry["slug"]: entry.get("qty", 0) for entry in load_inventory(char.items)}
+    assert bag.get(item.slug, 0) == len(loot)
+
+
+def test_the_carry_limit_is_actually_enforced(client, looted_combat, monkeypatch):
+    """`if can_add_item(...)` tested a tuple, which is always truthy.
+
+    Even with the arguments fixed, the limit would never have blocked anything.
+    """
+    from app.routes import loot_api
+
+    user, char, combat, item = looted_combat
+    loot = client.get(f"/api/loot/pending?combat_id={combat.id}").get_json()["loot"]
+    monkeypatch.setattr(loot_api, "can_add_item", lambda *a, **k: (False, {"state": "over"}))
+
+    resp = client.post(
+        "/api/loot/confirm",
+        json={"combat_id": combat.id, "assignments": {loot[0]["id"]: char.id}},
+    )
+
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:400]
+    body = resp.get_json()
+    assert body["skipped"], "an item the character cannot carry must be reported, not silently dropped"
+    assert body["assigned"] == 0
