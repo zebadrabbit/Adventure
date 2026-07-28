@@ -120,16 +120,24 @@ for one screen needs either a new block around the header or a context flag
 (e.g. `chrome="minimal"`) that `base.html` honours — the latter is likely
 cleaner, since the combat screen will want the same treatment.
 
+## Decided: layout questions (2026-07-28)
+
+- **Party frames go on the left edge.** Common, and it spends horizontal space,
+  which is the axis this laptop has to spare.
+- **No on-screen movement pad.** WASD and the arrows are already bound; the pad
+  was costing vertical space on the scarce axis to duplicate a working control.
+  Removing it also reclaims part of the controls row.
+- **Combat is its own screen**, not this frame with the scene swapped. It is an
+  abstraction away from the map: the tile the party stands on is magnified into
+  a battlefield. Because it is separate, it owns its own layout entirely rather
+  than inheriting this one. See
+  [2026-07-28-tactical-combat-design.md](2026-07-28-tactical-combat-design.md).
+
 ## Open questions
 
-1. **Party frames above or left?** The player suggested either. Left costs
-   horizontal space (fine at 1366 wide, better at 2K); above costs vertical
-   (the scarce axis on this laptop). Left is the safer default.
-2. **Does the movement pad stay?** With WASD bound, an on-screen pad is a
-   discoverability aid rather than a control. It could shrink to a corner or
-   fade when a key is used.
-3. **Does this layout host combat too**, or does combat remain a separate
-   screen? The references (Gold Box, FF, Phantasy Star) all keep one frame and
-   swap the scene inside it. Sharing the party frames and log between explore
-   and combat would be a strong simplification — worth deciding before either
-   is built.
+1. **Where does the minimap live** once the map is full-bleed? It is currently
+   drawn into the canvas at the top-right; that corner is now the account
+   anchor.
+2. **What happens on a narrow viewport?** The stacked layout is the fallback,
+   but the party frames and floating log need a defined behaviour rather than
+   overlapping.

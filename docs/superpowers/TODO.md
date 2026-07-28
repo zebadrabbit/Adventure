@@ -42,9 +42,14 @@ Full triage with code pointers:
 - [ ] Map readability: wall/floor contrast, props, coordinate + floor readout.
 - [ ] Adventure UX: log window too restrictive for looting, static character
       panels, D&D lingo throughout.
-- [ ] **Combat overhaul** — enemy groups fought together, positioning grid,
-      readable hit feedback, live party panel. Phase it. References in
-      `~/screenshots/` 2026-07-27 (Gold Box, FF Pixel Remaster, Phantasy Star).
+- [ ] **Combat overhaul** — designed: combat is its own screen and zooms into the
+      map tile the party occupies, 4 vs 1-6 on a grid. Phased in
+      [specs/2026-07-28-tactical-combat-design.md](specs/2026-07-28-tactical-combat-design.md);
+      phase 1 (multi-enemy, no grid) is the biggest win and unblocks raising
+      `SpawnConfig.group_size_max` above its current cap of 3.
+- [ ] **Adventure HUD** — full-bleed map, no navbar, account anchor top-right,
+      party frames left, floating log, no movement pad:
+      [specs/2026-07-28-adventure-hud-layout-design.md](specs/2026-07-28-adventure-hud-layout-design.md).
 
 ## Gameplay — waiting on playtest verdicts
 - [ ] Tune `EVENT_TUNING` (app/dungeon/room_events.py): shrine/trap/ambush
