@@ -186,7 +186,6 @@ body {
   font-size: 0.875rem;
   line-height: 1.5rem;
   font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
-  max-height: 280px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--adv-primary) transparent;

@@ -336,3 +336,115 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover {
         flex: 1 1 240px;
     }
 }
+
+/* --- Floating log and action bar ----------------------------------------
+ * Both sit in the bottom band the camera reserves via --hud-inset-bottom.
+ * Actions bottom-left, log bottom-right, and the centre is left clear so the
+ * party is never underneath a panel.
+ *
+ * No pointer-event plumbing is needed: DungeonCanvas binds mousedown,
+ * mousemove, wheel and the touch handlers on the canvas element itself
+ * (dungeon-canvas.js:182-199), and a canvas cannot have DOM children, so
+ * events on these panels never reach it. Scrolling the log will not zoom the
+ * map and dragging a panel will not pan it.
+ */
+
+.adv-hud .adv-actions {
+    position: absolute;
+    left: var(--space-2);
+    bottom: var(--space-2);
+    z-index: var(--z-hud);
+    width: calc(var(--hud-inset-left) - var(--space-4));
+}
+
+.adv-hud .adv-actions .tactical-btn-primary,
+.adv-hud .adv-actions .tactical-btn-secondary,
+.adv-hud .adv-actions .tactical-btn-info,
+.adv-hud .adv-actions .tactical-btn-success,
+.adv-hud .adv-actions .tactical-btn-danger {
+    width: 100%;
+    /* Deviation from the brief (documented in the task report): at
+       var(--space-2) vertical padding, five stacked buttons measure ~235px,
+       which overflows the 212px actually free in the reserved bottom band
+       (--hud-inset-bottom minus the --space-2 the panel sits off the
+       viewport edge) and rides up under the party rail -- the rail is later
+       in DOM order so it wins the overlap and swallows clicks on Search.
+       var(--space-1) brings the stack to ~195px, clear of the rail with
+       room to spare. */
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-sm);
+    letter-spacing: var(--tracking-wide);
+    border-radius: var(--radius);
+}
+
+.adv-hud .adv-log {
+    position: absolute;
+    right: var(--space-2);
+    bottom: var(--space-2);
+    z-index: var(--z-hud);
+    width: clamp(360px, 34vw, 560px);
+    background: var(--surface-overlay);
+    border: 1px solid var(--edge);
+}
+
+.adv-hud .adv-log-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-1) var(--space-3);
+    cursor: pointer;
+    list-style: none;
+    font-family: var(--font-display);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    border-bottom: 1px solid var(--edge-subtle);
+}
+
+.adv-hud .adv-log-head::-webkit-details-marker {
+    display: none;
+}
+
+.adv-hud .adv-log-head::after {
+    content: "▾";
+    color: var(--accent);
+}
+
+.adv-hud .adv-log:not([open]) .adv-log-head {
+    border-bottom: 0;
+}
+
+.adv-hud .adv-log:not([open]) .adv-log-head::after {
+    content: "▸";
+}
+
+/* The "log window is too restrictive for looting" complaint, answered: the
+   panel is taller by default and the player can drag it taller still. */
+.adv-hud .adv-log .dungeon-output {
+    max-height: 32vh;
+    min-height: 120px;
+    resize: vertical;
+    overflow: auto;
+    margin: 0;
+    border: 0;
+    border-left: 3px solid var(--accent-line);
+    border-radius: var(--radius);
+    background: transparent;
+    line-height: var(--leading-loose);
+}
+
+@media (max-width: 1199px) {
+
+    .adv-hud .adv-actions,
+    .adv-hud .adv-log {
+        position: static;
+        width: auto;
+        margin-top: var(--space-3);
+    }
+
+    .adv-hud .adv-actions #adventure-action-panel {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+}

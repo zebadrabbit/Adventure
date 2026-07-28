@@ -143,3 +143,26 @@ def test_party_frame_is_a_click_target(client, party):
     html = client.get("/adventure").get_data(as_text=True)
 
     assert "adv-frame-open" in html, "no hook for opening a character from their frame"
+
+
+def test_log_is_a_floating_collapsible_panel(client, party):
+    html = client.get("/adventure").get_data(as_text=True)
+
+    assert 'class="adv-log"' in html
+    assert "<details" in html, "collapse should be the native element, not a JS toggle"
+    assert 'id="dungeon-output"' in html, "adventure.js grabs the log by this id"
+
+
+def test_log_keeps_the_inline_search_button_selector(client, party):
+    """adventure.js:488 queries '.dungeon-output .inline-search-btn'."""
+    html = client.get("/adventure").get_data(as_text=True)
+
+    assert 'class="dungeon-output' in html
+
+
+def test_action_bar_holds_the_five_game_actions(client, party):
+    html = client.get("/adventure").get_data(as_text=True)
+
+    assert 'class="adv-actions"' in html
+    for btn in ("btn-search", "btn-party-inventory", "btn-camp", "btn-extract", "btn-hearth"):
+        assert f'id="{btn}"' in html, f"{btn} fell out of the action bar"

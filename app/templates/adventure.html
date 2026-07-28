@@ -50,7 +50,7 @@
   </div>
 
   {# Party rail (Task 3) and floating log + action bar (Task 4) mount here. #}
-  <div id="dungeon-controls">
+  <div class="adv-actions">
     <div id="adventure-action-panel" class="d-flex flex-column gap-2">
       <button id="btn-search" type="button" class="tactical-btn-primary"
         title="Search the current tile for hidden treasures (2 turns)">Search</button>
@@ -63,10 +63,20 @@
       <button id="btn-hearth" type="button" class="tactical-btn-danger"
         title="Hearthstone: abandon the run and keep what you found (this dungeon is gone)">Hearth</button>
     </div>
+  </div>
+
+  {# Collapse is <details>, not a JS toggle: the browser owns the open state,
+     the summary is focusable and announced, and there is nothing to keep in
+     sync. Tabs (adventure/combat/chat) are deliberately not built -- this
+     screen has one log stream today. #}
+  <details class="adv-log" open>
+    <summary class="adv-log-head">
+      <span>Log</span>
+    </summary>
     <div id="dungeon-output" class="dungeon-output u-mono">
       <em>Begin your adventure! Your party stands at the entrance of the dungeon...</em>
     </div>
-  </div>
+  </details>
 
   <div class="adv-party-rail">
     {% if party and party|length > 0 %}

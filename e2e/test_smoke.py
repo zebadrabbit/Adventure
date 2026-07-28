@@ -145,6 +145,34 @@ def test_api_move_via_page_fetch(page):
     assert result["status"] < 500, f"server error on move: {result['status']}"
 
 
+def test_log_does_not_cover_the_party(page):
+    """Overlays must not sit on the camera's target (HUD spec, constraint 2)."""
+    page.set_viewport_size({"width": 1366, "height": 768})
+    page.goto(f"{BASE_URL}/adventure")
+    page.wait_for_load_state("networkidle")
+    page.wait_for_timeout(500)  # let centerOnPlayer settle
+
+    overlap = page.evaluate(
+        """() => {
+            const hud = document.querySelector('.adv-hud');
+            const cs = getComputedStyle(hud);
+            const left = parseFloat(cs.getPropertyValue('--hud-inset-left'));
+            const bottom = parseFloat(cs.getPropertyValue('--hud-inset-bottom'));
+            const r = hud.getBoundingClientRect();
+            // Where centerOnPlayer puts the party, per dungeon-canvas.js.
+            const px = (r.width + left) / 2;
+            const py = (r.height - bottom) / 2;
+            const log = document.querySelector('.adv-log').getBoundingClientRect();
+            const rail = document.querySelector('.adv-party-rail').getBoundingClientRect();
+            const hits = (b) => px >= b.left && px <= b.right && py >= b.top && py <= b.bottom;
+            return { log: hits(log), rail: hits(rail) };
+        }"""
+    )
+
+    assert not overlap["log"], "the floating log is sitting on the party"
+    assert not overlap["rail"], "the party rail is sitting on the party"
+
+
 def test_csrf_guard_rejects_bare_mutation(page):
     # page.request bypasses the page's fetch wrapper but shares cookies —
     # exactly what a cross-site forged request looks like to the server.
