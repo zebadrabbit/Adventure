@@ -90,12 +90,37 @@ frame.
 5. **The map must never be shorter than it is wide by much** — the dungeon is
    75×75; an extremely letterboxed viewport makes navigation worse, not better.
 
-## Open questions
+## Decided: the navbar (2026-07-28)
 
-1. **Where does the navbar go?** Dropping it entirely removes navigation to the
-   dashboard, hoard, and admin. A corner menu is the obvious answer, but the
-   adventure screen is also the only place a run can be abandoned — Extract and
-   Hearth need to stay prominent and *not* buried in that menu.
+> "once you ENTER THE DUNGEON youre in the game, the game is the focus, the
+> adventure is more important than 'Getting Started' 'Items' and 'Rules', now i
+> do think there should be an account anchor in the top-right and we can provide
+> essential items (account config, etc.)."
+
+**Drop the informational links; keep an account anchor top-right.**
+
+The four links in question are `#getting-started`, `#classes`, `#items` and
+`#rules` — anchors into sections of the *landing page*. On `/adventure` no such
+elements exist, so they already scroll nowhere. They are not merely
+out of place in a dungeon; they are dead there.
+
+What stays, in a single top-right anchor: the existing user dropdown, which
+already carries Dashboard, Profile, Settings, Admin and Themes (for admins), and
+Logout. Nothing new needs designing — it needs relocating and shrinking to an
+avatar/gear affordance.
+
+What must **not** move into that menu: **Extract** and **Hearth**. They are game
+actions with consequences (banking the run; abandoning it), not account
+settings, and burying them costs a player their haul. They belong with the other
+game controls.
+
+Implementation note: the navbar lives in `base.html`, which every page inherits
+through `dashboard_base.html`, and it is *not* wrapped in a block. Suppressing it
+for one screen needs either a new block around the header or a context flag
+(e.g. `chrome="minimal"`) that `base.html` honours — the latter is likely
+cleaner, since the combat screen will want the same treatment.
+
+## Open questions
 2. **Party frames above or left?** The player suggested either. Left costs
    horizontal space (fine at 1366 wide, better at 2K); above costs vertical
    (the scarce axis on this laptop). Left is the safer default.
