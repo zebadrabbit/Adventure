@@ -60,6 +60,36 @@ def _rehydrate_login_from_session():
         pass
 
 
+def commit_party_to_run(instance, chars):
+    """Bind a party to the dungeon run they are entering.
+
+    Two things every entry path owes the run, whether the instance was just
+    created or is being resumed:
+
+    * ``locked_dungeon_id`` -- extraction_service selects the party by it, so
+      without it nobody can ever extract.
+    * an XP baseline -- so an early extraction docks a share of what was earned
+      *this run* rather than of the character's whole career.
+
+    Baseline entries are only ever added, never rewritten. Re-entering a live
+    run (Continue, or Start Adventure over an existing instance) must not reset
+    the mark, or a player could bank a run's XP by bouncing off the dashboard
+    before extracting.
+    """
+    if instance is None or not chars:
+        return
+    meta = dict(instance.dungeon_metadata or {})
+    baseline = dict(meta.get("xp_at_entry") or {})
+    for c in chars:
+        c.locked_dungeon_id = instance.id
+        db.session.add(c)
+        baseline.setdefault(str(c.id), int(c.xp or 0))
+    meta["xp_at_entry"] = baseline
+    instance.dungeon_metadata = meta
+    db.session.add(instance)
+    db.session.commit()
+
+
 @bp_dashboard.route("/dashboard", methods=["GET", "POST"])
 @login_required
 def dashboard():
@@ -219,22 +249,12 @@ def dashboard():
                 db.session.commit()
                 session["dungeon_instance_id"] = instance.id
                 session["dungeon_seed"] = instance.seed
-            # Commit the party to this run. extraction_service selects the party
-            # by locked_dungeon_id, so without this nobody can ever extract.
-            for c in chars:
-                c.locked_dungeon_id = instance.id
-                db.session.add(c)
-            # Baseline XP per character, so an early extraction can dock a share
-            # of what they earned *this run* rather than of their whole career.
-            meta = dict(instance.dungeon_metadata or {})
-            meta["xp_at_entry"] = {str(c.id): int(c.xp or 0) for c in chars}
-            instance.dungeon_metadata = meta
-            db.session.add(instance)
-            db.session.commit()
+            commit_party_to_run(instance, chars)
             return redirect(url_for("dungeon.adventure"))
         elif form_type == "continue_adventure":
             # Reuse existing dungeon instance & last party selection (if any). Do not mutate seed or instance.
             last_party = session.get("last_party_ids") or []
+            chars = []
             if last_party:
                 chars = Character.query.filter(Character.id.in_(last_party), Character.user_id == current_user_id).all()
                 party = build_party_payload(chars)
@@ -263,6 +283,7 @@ def dashboard():
                 db.session.commit()
                 session["dungeon_instance_id"] = instance.id
                 session["dungeon_seed"] = instance.seed
+            commit_party_to_run(instance, chars)
             return redirect(url_for("dungeon.adventure"))
         # Default: character creation form
         name = request.form["name"]

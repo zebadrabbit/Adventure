@@ -43,9 +43,14 @@ pages' own `dungeon_settings` / `progression_settings` blobs are not consumed by
 gameplay, so any new knob there needs the same mirroring to have an effect.
 
 The run baseline comes from `instance.dungeon_metadata["xp_at_entry"]`, written
-when the party locks in at `start_adventure`. No baseline (older instances, or a
-run started outside that form) means no deduction — it never falls back to
-docking career XP, which is what the -30% rule used to do.
+by `dashboard.commit_party_to_run()` — the one place every entry path (Start
+Adventure and Continue Adventure alike) binds a party to a run. No baseline
+(older instances) means no deduction — it never falls back to docking career XP,
+which is what the -30% rule used to do.
+
+Baseline entries are only ever added, never rewritten. Re-entering a live run
+must not re-mark it, or a player could bank a run's XP by bouncing off the
+dashboard before extracting.
 
 #### Permadeath Rules
 - Characters left behind during extraction → **PERMADEATH**
@@ -55,10 +60,12 @@ docking career XP, which is what the -30% rule used to do.
 
 ## Ways a Run Ends
 
-A run starts when the dashboard's `start_adventure` form creates the
-`DungeonInstance`; every selected character gets `locked_dungeon_id = instance.id`
-there. `extraction_service` selects the party by that column, so the lock is what
-makes any of the three exits below possible.
+A run starts when the dashboard creates (or resumes) the `DungeonInstance`.
+Both the `start_adventure` and `continue_adventure` forms then call
+`commit_party_to_run()`, which sets `locked_dungeon_id = instance.id` on every
+party member and records the XP baseline. `extraction_service` selects the party
+by that column, so the lock is what makes any of the three exits below possible —
+any future entry path owes the run the same call.
 
 | Exit | Endpoint | Characters | Haul | Dungeon |
 |------|----------|-----------|------|---------|

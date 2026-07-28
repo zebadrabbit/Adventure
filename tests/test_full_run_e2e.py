@@ -459,6 +459,58 @@ def test_early_extraction_docks_only_the_runs_xp(client, test_app):
         assert char.xp > int(baseline[str(char.id)]), "an early exit still nets progress"
 
 
+@pytest.mark.db_isolation
+def test_every_entry_path_commits_the_party(client, test_app):
+    """Continue Adventure owes the run the same lock and XP baseline as Start.
+
+    And re-entering a live run must not re-mark the baseline: a player who
+    bounced off the dashboard mid-run would otherwise launder away the
+    early-extraction penalty on everything they had earned so far.
+    """
+    user, party_ids, inst_id = _enter_dungeon(client, "e2econtinue")
+    inst = _instance(inst_id)
+    original = dict((inst.dungeon_metadata or {}).get("xp_at_entry") or {})
+    assert original
+
+    # Earn something, the crude way -- this test is about the entry paths.
+    for char in Character.query.filter_by(user_id=user.id).all():
+        char.xp = char.xp + 1000
+    db.session.commit()
+
+    # Bounce off the dashboard and come back via Continue.
+    r = client.post("/dashboard", data={"form": "continue_adventure"}, follow_redirects=True)
+    assert r.status_code == 200
+    with client.session_transaction() as sess:
+        assert sess["dungeon_instance_id"] == inst_id, "Continue resumes the same run"
+
+    inst = _instance(inst_id)
+    assert (inst.dungeon_metadata or {}).get(
+        "xp_at_entry"
+    ) == original, "re-entering a live run must not reset the XP baseline"
+    assert Character.query.filter_by(user_id=user.id, locked_dungeon_id=inst_id).count() == len(party_ids)
+
+    # Same for Start Adventure over an instance that already exists.
+    r = client.post(
+        "/dashboard",
+        data={"form": "start_adventure", "party_ids": [str(i) for i in party_ids], "difficulty_tier": TIER},
+        follow_redirects=True,
+    )
+    assert r.status_code == 200
+    inst = _instance(inst_id)
+    assert (inst.dungeon_metadata or {}).get("xp_at_entry") == original
+
+    # And a Continue that has to build its own instance still commits the party.
+    client.post("/api/dungeon/hearth")
+    r = client.post("/dashboard", data={"form": "continue_adventure"}, follow_redirects=True)
+    assert r.status_code == 200
+    with client.session_transaction() as sess:
+        fresh_id = sess["dungeon_instance_id"]
+    assert fresh_id != inst_id
+    fresh = _instance(fresh_id)
+    assert Character.query.filter_by(user_id=user.id, locked_dungeon_id=fresh_id).count() == len(party_ids)
+    assert (fresh.dungeon_metadata or {}).get("xp_at_entry"), "a new run needs its own baseline"
+
+
 # ---------------------------------------------------------------- lookups
 
 

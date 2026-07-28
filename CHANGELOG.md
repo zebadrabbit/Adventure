@@ -15,8 +15,9 @@
   character's lifetime XP.
 - A party wipe now resets the run: characters are permadeathed and unlocked, the
   dungeon instance is deleted and the session pointer cleared.
-- Starting an adventure locks the selected party to the instance
-  (`locked_dungeon_id`), which is what extraction selects on.
+- Starting *or continuing* an adventure locks the selected party to the instance
+  (`locked_dungeon_id`), which is what extraction selects on, and records the
+  run's XP baseline. Baselines are never rewritten on re-entry.
 - Early extraction now costs **20% of the XP earned during that run** (was 30% of
   each character's *career* XP, which could erase many runs' progress and left
   `level` out of sync with `xp`). The rate is tunable from Admin → Dungeon
