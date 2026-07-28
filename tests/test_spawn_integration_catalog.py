@@ -108,15 +108,22 @@ def test_boss_above_the_catalogue_ceiling_still_gets_a_real_name(test_app):
     """
     with test_app.app_context():
         _seed_boss_archetype()
+        # Bring our own catalogue entry and pin the theme to it: db_isolation
+        # rebuilds reseed with a minimal ~14-item, zero-monster catalogue, so a
+        # test that leans on the real one passes alone and fails in the suite
+        # (docs/TESTING.md).
+        _seed_test_monster()
         user = create_user("catalogspawn_3")
         inst = create_instance(user, seed=903)
+        inst.monster_family = "test"
+        db.session.commit()
         spawn_service._ELIGIBLE_CACHE.clear()
 
         spawn = SpawnEntry(x=0, y=0, behavior=SpawnBehavior.BOSS, archetype="Boss", level=40)
         populate_spawn_stats(spawn, party_level=40, instance=inst)
 
         assert "(L" not in spawn.name, "a high-level boss should not be a bare archetype label"
-        assert spawn.slug != "boss"
+        assert spawn.slug == "test-grunt"
 
 
 def test_boss_falls_back_to_the_label_when_nothing_is_catalogued(test_app, monkeypatch):
