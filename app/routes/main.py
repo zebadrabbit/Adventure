@@ -184,19 +184,21 @@ NAME_POOLS = {
         "Zalcrist",
     ],
 }
+# Every delver starts with one campfire kit: resting in a dungeon consumes
+# one (see dungeon_camp), and a party that cannot rest at all is not a game.
 STARTER_ITEMS = {
-    "fighter": ["short-sword", "wooden-shield", "potion-healing"],
-    "rogue": ["dagger", "lockpicks", "potion-healing"],
-    "mage": ["oak-staff", "potion-mana", "potion-mana"],
-    "cleric": ["oak-staff", "potion-healing", "potion-mana"],
-    "ranger": ["hunting-bow", "dagger", "potion-healing"],
-    "druid": ["oak-staff", "herbal-pouch", "potion-healing", "potion-mana"],
-    "barbarian": ["iron-axe", "potion-healing", "potion-healing"],
-    "bard": ["dagger", "potion-healing", "potion-mana"],
-    "monk": ["club", "potion-healing", "potion-mana"],
-    "paladin": ["short-sword", "wooden-shield", "potion-healing"],
-    "sorcerer": ["oak-staff", "potion-mana", "potion-mana"],
-    "warlock": ["oak-staff", "potion-mana", "potion-healing"],
+    "fighter": ["short-sword", "wooden-shield", "potion-healing", "consumable_campfire_kit"],
+    "rogue": ["dagger", "lockpicks", "potion-healing", "consumable_campfire_kit"],
+    "mage": ["oak-staff", "potion-mana", "potion-mana", "consumable_campfire_kit"],
+    "cleric": ["oak-staff", "potion-healing", "potion-mana", "consumable_campfire_kit"],
+    "ranger": ["hunting-bow", "dagger", "potion-healing", "consumable_campfire_kit"],
+    "druid": ["oak-staff", "herbal-pouch", "potion-healing", "potion-mana", "consumable_campfire_kit"],
+    "barbarian": ["iron-axe", "potion-healing", "potion-healing", "consumable_campfire_kit"],
+    "bard": ["dagger", "potion-healing", "potion-mana", "consumable_campfire_kit"],
+    "monk": ["club", "potion-healing", "potion-mana", "consumable_campfire_kit"],
+    "paladin": ["short-sword", "wooden-shield", "potion-healing", "consumable_campfire_kit"],
+    "sorcerer": ["oak-staff", "potion-mana", "potion-mana", "consumable_campfire_kit"],
+    "warlock": ["oak-staff", "potion-mana", "potion-healing", "consumable_campfire_kit"],
 }
 BASE_STATS = {
     "fighter": {

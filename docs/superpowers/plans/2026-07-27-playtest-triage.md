@@ -65,23 +65,33 @@ with live per-character status and legible hit feedback.**
   it is the cheapest spell (5 mana) and its edge is elemental typing against
   resistances, but if it still feels weak in play, its dice are the dial.
 
+- **Camping was free, unlimited — and actively harmful.** It restored 30% max
+  HP + 50% mana with no cost, cooldown or supply. Worse, it read
+  `stats.get("max_hp", 100)`, but characters never store `max_hp` (caps are
+  computed: `50 + con*2 + level*5`). So `min(100, current + restore)` *clamped
+  anyone above 100 HP back down to 100*, and mana to 50 — camping damaged
+  healthy high-level parties. Now: costs a `consumable_campfire_kit` from the
+  party's packs, refuses inside a 40-tick cooldown, rolls a 25% ambush that
+  spawns a pack via the room-event ambush path, and uses
+  `compute_hp_mana_max` so resting can only ever help. Tunable live via
+  `GameConfig["camp"]`. Every class starts with one kit; the general store and
+  outfitter stock them.
+- **Floor difficulty rubber-banded upward — fixed.** Spawn levels were the
+  party's *average level at the moment a floor was first mapped*, with elites
+  +1 and bosses +2. Levelling on floor 0 made floor 1 generate harder than it
+  would otherwise have been: the world scaled with the party instead of the
+  party outgrowing it, which is why level 1 mobs became level 3 and wiped the
+  party. `floor_monster_level` now anchors to the party's average level when
+  the run *started* (recorded by `commit_party_to_run`) and adds
+  `floor_level_step` per floor descended (default 1, `GameConfig["difficulty"]`).
+  Floor loot rides the same curve, so descending is rewarded as well as
+  dangerous. Instances predating the anchor get one written on first use so
+  their difficulty stops drifting too.
+
 ## Bugs — confirmed, not yet fixed
 
 - **Party Stash button does nothing.** `adventure-controls.js` literally pops
   `alert('Party Stash feature coming soon!')`.
-- **Camping is unlimited.** `dungeon_camp` restores 30% max HP + 50% mana and
-  applies a regen buff, with no cost, cooldown or supply. Advancing 8 ticks is
-  the only price, and the wandering-monster roll on those ticks is the only
-  risk. Proposal: camping supplies as a consumable with charges, plus a
-  cooldown, plus a real ambush chance while resting.
-- **Floor difficulty rubber-bands upward.** Spawn levels are pinned to the
-  party's *average level at the moment a floor is first mapped*
-  (`dungeon_api._initialize_spawn_system` → `party_level`), and elites are +1,
-  bosses +2. Level up on floor 0 and floor 1 generates harder than it would
-  have been — descending after gaining a level makes the world scale with you
-  instead of you outgrowing it. This is why level 1 mobs became level 3 and
-  wiped the party. Needs an explicit difficulty curve per floor/tier rather
-  than "whatever the party is right now".
 - **Monster loot tables resolve to nothing.** `loot_table` values
   (`goblin_basic`, `boss_dragon`, …) are parsed by
   `loot_service._parse_loot_table` as a CSV of *item slugs*; items are

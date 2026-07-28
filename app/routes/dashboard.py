@@ -75,6 +75,12 @@ def commit_party_to_run(instance, chars):
     run (Continue, or Start Adventure over an existing instance) must not reset
     the mark, or a player could bank a run's XP by bouncing off the dashboard
     before extracting.
+
+    The party's average level is anchored here for the same reason: dungeon
+    difficulty steps up per floor from this number rather than tracking the
+    party's current level, so levelling mid-run makes the party stronger
+    relative to what is left instead of dragging the world up with them
+    (dungeon_api.floor_monster_level).
     """
     if instance is None or not chars:
         return
@@ -85,6 +91,9 @@ def commit_party_to_run(instance, chars):
         db.session.add(c)
         baseline.setdefault(str(c.id), int(c.xp or 0))
     meta["xp_at_entry"] = baseline
+    if meta.get("party_level_at_entry") is None:
+        levels = [int(c.level or 1) for c in chars]
+        meta["party_level_at_entry"] = max(1, sum(levels) // len(levels)) if levels else 1
     instance.dungeon_metadata = meta
     db.session.add(instance)
     db.session.commit()

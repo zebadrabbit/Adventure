@@ -64,7 +64,18 @@
   every turn, so three of four characters were spectators.
 - Turn order steps over downed characters instead of stopping on them.
 
+- Camping now costs a `consumable_campfire_kit`, has a 40-tick cooldown, and
+  carries a 25% chance of drawing an ambush. Tunable via `GameConfig["camp"]`;
+  every class starts with a kit and two merchants stock them.
+- Dungeon difficulty is anchored at run start and steps up per floor descended
+  (`GameConfig["difficulty"]["floor_level_step"]`) instead of tracking the
+  party's current level, so levelling mid-run no longer drags the world up too.
+
 ### Fixed
+- Camping *reduced* the HP of any character above 100: it read
+  `stats["max_hp"]` (which characters never store) with a default of 100 and
+  clamped `min(100, current + restore)`. Now uses `compute_hp_mana_max`, and
+  resting can only ever increase HP/mana.
 - Kill tracking never ran: `start_session` skipped writing the dungeon snapshot
   because the column did not exist, so `bosses_defeated`, `elites_defeated`,
   `monsters_defeated`, the extraction unlock and quest kill progress were all

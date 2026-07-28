@@ -52,6 +52,8 @@ MERCHANT_SPECS: List[Dict] = [
             {"slug": "potion-regen"},
             {"slug": "herbal-pouch"},
             {"slug": "lockpicks", "stock": 10},
+            # Resting in a dungeon consumes one of these (see dungeon_camp).
+            {"slug": "consumable_campfire_kit"},
         ],
     },
     {
@@ -74,6 +76,7 @@ MERCHANT_SPECS: List[Dict] = [
         "items": [
             {"slug": "lockpicks", "stock": 5},
             {"slug": "herbal-pouch"},
+            {"slug": "consumable_campfire_kit"},
             {"slug": "short-sword"},
             {"slug": "dagger"},
             {"slug": "leather-armor"},

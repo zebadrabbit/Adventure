@@ -228,9 +228,18 @@ def _resolve_trap(instance, ent, x, y) -> dict:
 
 
 def _resolve_ambush(instance, ent, x, y, dungeon) -> dict:
+    """Room-event entry point: an ambush entity was stepped on."""
+    return spawn_ambush_pack(instance, x, y, dungeon)
+
+
+def spawn_ambush_pack(instance, x, y, dungeon=None) -> dict:
     """Spawn 2-3 family-themed ambient monsters on walkable tiles adjacent to
     (x, y), created as both SpawnEntry and DungeonEntity rows exactly like
-    normal ambients. Proximity-aggro then takes over."""
+    normal ambients. Proximity-aggro then takes over.
+
+    Public because more than room events want it: an interrupted camp uses the
+    same pack-spawning rules so a botched rest looks like any other ambush.
+    """
     from app.dungeon.spawn_integration import populate_spawn_stats, spawn_to_entity
     from app.dungeon.spawn_manager import SpawnBehavior, SpawnEntry
 

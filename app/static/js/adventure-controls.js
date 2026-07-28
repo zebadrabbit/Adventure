@@ -37,9 +37,28 @@ document.addEventListener('DOMContentLoaded', function () {
                 fetch('/api/dungeon/camp', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
                     .then(r => r.json().catch(() => ({ error: 'bad json' })))
                     .then(j => {
-                        if (j && j.message) appendLog(j.message);
-                        if (j && j.restored_hp_total) appendLog(`Party recovers ${j.restored_hp_total} HP collectively.`, `text-success small`);
-                        if (j && j.encounter && j.encounter.combat_id) { window.location.href = '/combat/' + j.encounter.combat_id; }
+                        if (!j) return;
+                        // Camping costs a campfire kit and has a cooldown; both
+                        // refusals come back as 400s with an explanatory message.
+                        if (j.error === 'no_supplies') {
+                            appendLog('No one is carrying a campfire kit. Buy one before you descend.', 'text-warning');
+                            return;
+                        }
+                        if (j.error === 'camp_cooldown') {
+                            appendLog(`Too soon to rest again (${j.remaining_ticks} ticks).`, 'text-warning');
+                            return;
+                        }
+                        if (j.message) appendLog(j.message);
+                        if (j.restored_hp_total) appendLog(`Party recovers ${j.restored_hp_total} HP collectively.`, 'text-success small');
+                        if (j.restored_mana_total) appendLog(`Party recovers ${j.restored_mana_total} MP collectively.`, 'text-info small');
+                        if (typeof j.supplies_remaining === 'number') {
+                            appendLog(`Campfire kits remaining: ${j.supplies_remaining}`, 'text-muted small');
+                        }
+                        if (j.ambush && j.ambush.count) {
+                            appendLog(`${j.ambush.count} shapes close in on the firelight!`, 'text-danger');
+                            if (window.refreshEntities) window.refreshEntities();
+                        }
+                        if (j.encounter && j.encounter.combat_id) { window.location.href = '/combat/' + j.encounter.combat_id; }
                     })
                     .catch(() => appendLog('Camp failed (network error)', 'text-danger'))
                     .finally(() => { campBtn.disabled = false; });

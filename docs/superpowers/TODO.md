@@ -12,9 +12,10 @@ Full triage with code pointers:
 - [x] ~~Monsters focused one character~~ — weighted target picker.
 - [x] ~~Downed characters still took a turn~~ — `_advance_turn` steps over them.
 - [ ] Party Stash button is a `coming soon` alert.
-- [ ] Camping is unlimited: wants supplies (charges), cooldown, real risk.
-- [ ] Floor difficulty rubber-bands to party level at first visit; needs a real
-      per-floor curve (this is what made level 1 mobs become level 3).
+- [x] ~~Camping is unlimited~~ — costs a campfire kit, 40-tick cooldown, 25%
+      ambush; also stopped clamping healthy characters down to 100 HP.
+- [x] ~~Floor difficulty rubber-bands to party level~~ — anchored at run start,
+      `floor_level_step` per floor (`GameConfig["difficulty"]`).
 - [ ] Monster `loot_table` values resolve to nothing — parsed as item slugs.
 - [ ] Monster catalogue stops at level 20; characters reach 50.
 - [x] ~~Audit spell/skill damage vs plain attack~~ — confirmed: spells scaled

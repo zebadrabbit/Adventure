@@ -11,6 +11,7 @@ and the adventure UI. All routes require authentication.
 """
 
 import json
+import random
 import threading
 from functools import wraps
 
@@ -51,8 +52,10 @@ from app.dungeon.spawn_manager import SpawnConfig, SpawnManager
 from app.loot.generator import LootConfig, generate_loot_for_seed
 from app.models import CharacterStatusEffect, DungeonEntity
 from app.models.dungeon_instance import DungeonInstance
-from app.models.models import Character, GameClock
+from app.inventory.utils import dump_inventory, load_inventory, remove_one
+from app.models.models import Character, GameClock, GameConfig
 from app.services import spawn_service  # Still needed for encounters
+from app.services.character_stats import compute_hp_mana_max
 from app.services.loot_service import roll_loot
 from app.services.rate_limiter import rate_limit as rate_limit_decorator
 
@@ -460,20 +463,17 @@ def dungeon_map():
             walkables = [
                 (x, y) for x in range(MAP_SIZE) for y in range(MAP_SIZE) if dungeon.grid[x][y] in walkable_chars
             ]
-            # Derive average party level (simplified: user characters avg or default 1)
-            avg_level = 1
+            # Floor loot rides the same curve as the monsters on it, so going
+            # deeper is rewarded as well as more dangerous.
             try:
-                from app.models.models import Character
-
-                chars = Character.query.filter_by(user_id=current_user.id).all()
-                if chars:
-                    avg_level = max(1, sum(c.level for c in chars) // len(chars))
+                avg_level = floor_monster_level(instance)
             except Exception:
                 # A failed statement aborts the whole Postgres transaction, not just
                 # this query -- roll back so later commits in this request don't
                 # fail with "current transaction is aborted" on an unrelated statement.
                 db.session.rollback()
-                logger.warning("dungeon_map: failed to compute avg_level", exc_info=True)
+                logger.warning("dungeon_map: failed to compute floor level", exc_info=True)
+                avg_level = 1
             cfg = LootConfig(
                 avg_party_level=avg_level,
                 width=MAP_SIZE,
@@ -648,12 +648,9 @@ def dungeon_map():
                         existing = None
 
                 if not existing:
-                    # Initialize new spawns
-                    try:
-                        chars = Character.query.filter_by(user_id=current_user.id).all()
-                        avg_level = max(1, sum(c.level for c in chars) // len(chars)) if chars else 1
-                    except Exception:
-                        avg_level = 1
+                    # Difficulty comes from the floor curve, not from whatever the
+                    # party happens to be right now -- see floor_monster_level.
+                    avg_level = floor_monster_level(instance)
 
                     # Generate all spawns
                     spawn_manager.initialize_spawns(party_level=avg_level)
@@ -1521,16 +1518,100 @@ def dungeon_search():
     return jsonify(payload), status
 
 
+# Difficulty tuning. Overridable live via GameConfig["difficulty"].
+DIFFICULTY_DEFAULTS = {
+    # Monster level added per floor descended.
+    "floor_level_step": 1,
+}
+
+
+def difficulty_config() -> dict:
+    """Difficulty tuning from GameConfig['difficulty'], merged over defaults."""
+    merged = dict(DIFFICULTY_DEFAULTS)
+    try:
+        raw = GameConfig.get("difficulty")
+        if raw:
+            data = json.loads(raw) if isinstance(raw, str) else raw
+            if isinstance(data, dict):
+                merged.update(data)
+    except Exception:
+        logger.debug("suppressed_exception", where="difficulty_config", exc_info=True)
+    return merged
+
+
+def floor_monster_level(instance) -> int:
+    """Monster level for this instance's current floor.
+
+    Anchored to the party's level when the run *started*, plus a step per floor
+    descended. It used to be the party's average level read fresh every time a
+    floor was first mapped, which meant levelling up on floor 0 made floor 1
+    generate harder than it otherwise would have -- the world scaled with the
+    party instead of the party outgrowing the world. Descending is meant to be
+    a deliberate, predictable step up, and levelling is meant to help.
+
+    Instances that predate the anchor get one computed and stored on first use,
+    so their difficulty stops moving from that point on too.
+    """
+    meta = dict(instance.dungeon_metadata or {})
+    anchor = meta.get("party_level_at_entry")
+    if anchor is None:
+        try:
+            chars = Character.query.filter_by(user_id=instance.user_id).all()
+            anchor = max(1, sum(c.level for c in chars) // len(chars)) if chars else 1
+        except Exception:
+            db.session.rollback()
+            anchor = 1
+        meta["party_level_at_entry"] = int(anchor)
+        instance.dungeon_metadata = meta
+        try:
+            db.session.add(instance)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+    step = int(difficulty_config().get("floor_level_step", 1))
+    return max(1, int(anchor) + int(getattr(instance, "pos_z", 0) or 0) * step)
+
+
+# Camping tuning. Overridable live via GameConfig["camp"]; the defaults are what
+# playtesting settled on after camping stopped being a free full heal.
+CAMP_DEFAULTS = {
+    "supply_slug": "consumable_campfire_kit",  # an existing catalogue item
+    "cooldown_ticks": 40,
+    "hp_restore_pct": 0.30,
+    "mana_restore_pct": 0.50,
+    "ambush_chance": 0.25,
+    "tick_cost": 8,
+}
+
+
+def camp_config() -> dict:
+    """Camp tuning from GameConfig['camp'], merged over CAMP_DEFAULTS."""
+    merged = dict(CAMP_DEFAULTS)
+    try:
+        raw = GameConfig.get("camp")
+        if raw:
+            data = json.loads(raw) if isinstance(raw, str) else raw
+            if isinstance(data, dict):
+                merged.update(data)
+    except Exception:
+        logger.debug("suppressed_exception", where="camp_config", exc_info=True)
+    return merged
+
+
 @bp_dungeon.route("/api/dungeon/camp", methods=["POST"])
 @login_required
 def dungeon_camp():
     """Make camp to rest and recover HP/mana.
 
-    Advances time by 8 ticks, restores HP/mana for all party characters,
-    and has a chance to trigger a random encounter.
+    Resting costs a campfire kit from the party's packs, cannot be repeated
+    until the cooldown elapses, and can be interrupted by an ambush. Before
+    those limits it was a free, unlimited full-heal button, which removed most
+    of the pressure from a run.
 
     Returns:
-        200: {message: str, restored_hp_total: int, encounter?: dict, game_tick?: int}
+        200: {message, restored_hp_total, restored_mana_total, supplies_remaining,
+              game_tick?, ambush?, encounter?}
+        400: {error: "no_supplies"|"camp_cooldown", ...}
         404: no dungeon instance
     """
     dungeon_instance_id = session.get("dungeon_instance_id")
@@ -1540,36 +1621,93 @@ def dungeon_camp():
     if not instance:
         return jsonify({"error": "no_instance"}), 404
 
-    # Restore HP/mana for party characters
-    party_chars = Character.query.filter_by(user_id=current_user.id).all()
+    cfg = camp_config()
+    supply_slug = str(cfg.get("supply_slug") or "consumable_campfire_kit")
+
+    # The party is whoever is locked into this run; fall back to the user's
+    # roster for instances that predate the lock.
+    party_chars = Character.query.filter_by(user_id=current_user.id, locked_dungeon_id=instance.id).all()
+    if not party_chars:
+        party_chars = Character.query.filter_by(user_id=current_user.id).all()
+
+    clock = GameClock.get()
+    now_tick = int(getattr(clock, "tick", 0) or 0)
+    meta = dict(instance.dungeon_metadata or {})
+    cooldown = int(cfg.get("cooldown_ticks", 40) or 0)
+    last_camp = meta.get("last_camp_tick")
+    if cooldown > 0 and last_camp is not None:
+        elapsed = now_tick - int(last_camp)
+        if 0 <= elapsed < cooldown:
+            return (
+                jsonify(
+                    {
+                        "error": "camp_cooldown",
+                        "message": "The party is not tired enough to rest again yet.",
+                        "remaining_ticks": cooldown - elapsed,
+                    }
+                ),
+                400,
+            )
+
+    # Spend one campfire kit from whoever is carrying one.
+    supplier = None
+    for char in party_chars:
+        bag = load_inventory(char.items)
+        if remove_one(bag, supply_slug):
+            char.items = dump_inventory(bag)
+            db.session.add(char)
+            supplier = char
+            break
+    if supplier is None:
+        return (
+            jsonify(
+                {
+                    "error": "no_supplies",
+                    "message": "No one is carrying a campfire kit.",
+                    "required_slug": supply_slug,
+                }
+            ),
+            400,
+        )
+
+    hp_pct = float(cfg.get("hp_restore_pct", 0.30))
+    mana_pct = float(cfg.get("mana_restore_pct", 0.50))
     total_restored = 0
+    total_mana_restored = 0
 
     for char in party_chars:
         if not char.stats:
             continue
         try:
             stats = json.loads(char.stats)
-            current_hp = int(stats.get("hp", 0))
-            max_hp = int(stats.get("max_hp", 100))
-            current_mana = int(stats.get("mana", 0))
-            max_mana = int(stats.get("max_mana", 50))
+            # Caps are computed, never stored: reading stats["max_hp"] with a
+            # default of 100 used to *shrink* anyone healthier than that back
+            # down to 100 (and mana to 50) every time they camped.
+            max_hp, max_mana = compute_hp_mana_max(char)
+            current_hp = int(stats.get("hp", max_hp))
+            current_mana = int(stats.get("current_mana", stats.get("mana", max_mana)))
 
-            # Restore 30% of max HP and 50% of max mana
-            hp_restore = int(max_hp * 0.3)
-            mana_restore = int(max_mana * 0.5)
-
-            new_hp = min(max_hp, current_hp + hp_restore)
-            new_mana = min(max_mana, current_mana + mana_restore)
+            new_hp = min(max_hp, current_hp + int(max_hp * hp_pct))
+            new_mana = min(max_mana, current_mana + int(max_mana * mana_pct))
+            # Resting can only ever help.
+            new_hp = max(new_hp, current_hp)
+            new_mana = max(new_mana, current_mana)
 
             total_restored += new_hp - current_hp
+            total_mana_restored += new_mana - current_mana
 
             stats["hp"] = new_hp
             stats["mana"] = new_mana
+            stats["current_mana"] = new_mana
             char.stats = json.dumps(stats)
             db.session.add(char)
         except Exception as e:
             logger.error(event="camp_heal_failed", char_id=char.id, error=str(e))
             continue
+
+    meta["last_camp_tick"] = now_tick
+    instance.dungeon_metadata = meta
+    db.session.add(instance)
 
     try:
         db.session.commit()
@@ -1580,7 +1718,7 @@ def dungeon_camp():
     tick_val = None
     patrol_resp = {}
     try:
-        tick_val = advance_non_combat_time(instance, tick_amount=8, resp=patrol_resp)
+        tick_val = advance_non_combat_time(instance, tick_amount=int(cfg.get("tick_cost", 8)), resp=patrol_resp)
     except Exception:
         logger.debug("suppressed_exception", where="dungeon_camp", exc_info=True)
 
@@ -1604,9 +1742,23 @@ def dungeon_camp():
     except Exception:
         db.session.rollback()
 
+    remaining = 0
+    try:
+        remaining = sum(
+            entry.get("qty", 0)
+            for char in party_chars
+            for entry in load_inventory(char.items)
+            if entry.get("slug") == supply_slug
+        )
+    except Exception:
+        logger.debug("suppressed_exception", where="dungeon_camp", exc_info=True)
+
     response = {
         "message": "Your party makes camp and rests. The fire crackles softly in the darkness.",
         "restored_hp_total": total_restored,
+        "restored_mana_total": total_mana_restored,
+        "supplies_used": supply_slug,
+        "supplies_remaining": int(remaining),
     }
 
     if tick_val is not None:
@@ -1615,6 +1767,21 @@ def dungeon_camp():
     if patrol_resp.get("encounter"):
         response["encounter"] = patrol_resp["encounter"]
         response["message"] += " But your rest is interrupted!"
+    else:
+        # A fire in a dungeon draws attention. Rolled after the rest resolves so
+        # the party keeps what they recovered and then has to fight for it.
+        try:
+            if random.random() < float(cfg.get("ambush_chance", 0.25)):
+                from app.dungeon.room_events import spawn_ambush_pack
+
+                ambush = spawn_ambush_pack(instance, instance.pos_x, instance.pos_y)
+                db.session.commit()
+                if ambush.get("count"):
+                    response["ambush"] = ambush
+                    response["message"] += " Something in the dark saw the firelight."
+        except Exception:
+            db.session.rollback()
+            logger.debug("suppressed_exception", where="dungeon_camp_ambush", exc_info=True)
 
     return jsonify(response)
 
