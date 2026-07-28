@@ -3,8 +3,13 @@
  * Spec: docs/superpowers/specs/2026-07-28-adventure-hud-layout-design.md
  *
  * The map is the screen. Everything else floats above it, absolutely placed
- * against .adv-hud. Scoped under .adv-hud throughout: this file styles one
- * page, not the app (DESIGN_SYSTEM.md, rule 6).
+ * against .adv-hud. Scoped under .adv-hud throughout — this file styles one
+ * page, not the app (DESIGN_SYSTEM.md, rule 6) — with one exception: the
+ * #account-anchor rules below are scoped by body[data-realm="dungeon"]
+ * instead, because #account-anchor lives in <header>, a sibling of <main>,
+ * so .adv-hud (inside <main>) can never be its ancestor. data-realm is set
+ * from the same route that sets chrome="minimal", so the scope still tracks
+ * this page and nothing else.
  *
  * The two --hud-inset-* values are the contract between this file and
  * dungeon-canvas.js: they name how much of the viewport the HUD is standing
@@ -47,23 +52,25 @@
 
    Deviation from the brief: base.html (not ours to touch) renders
    #account-anchor inside <header>, a sibling of <main>/.adv-hud, not a
-   descendant of it — ".adv-hud #account-anchor" never matches. This
-   stylesheet only ever loads on /adventure (linked from adventure.html's
-   own head block) and account_anchor.html is only included for
-   chrome="minimal", which today is exclusively this route, so an
-   unscoped #account-anchor selector is still page-scoped in practice.
+   descendant of it — ".adv-hud #account-anchor" never matches. Scoping by
+   body[data-realm="dungeon"] instead of leaving these bare: the dungeon
+   realm is stamped by the same route call that sets chrome="minimal"
+   (app/routes/dungeon_api.py), so this stays genuinely page-scoped even if
+   the stylesheet gets re-linked or copy-pasted onto another chrome="minimal"
+   page later — unlike "only one template currently links this file", which
+   is a fact about today's callers, not a property of the selector.
    position: fixed (rather than absolute) places it against the viewport
    directly, which lines up with .adv-hud's own fixed/inset:0 frame at the
    full-bleed breakpoint and needs no separate override in the narrow
    fallback below. */
-#account-anchor {
+body[data-realm="dungeon"] #account-anchor {
     position: fixed;
     top: var(--space-2);
     right: var(--space-2);
     z-index: var(--z-hud);
 }
 
-.account-anchor-trigger {
+body[data-realm="dungeon"] .account-anchor-trigger {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -75,7 +82,7 @@
     text-decoration: none;
 }
 
-.account-anchor-trigger:hover {
+body[data-realm="dungeon"] .account-anchor-trigger:hover {
     border-color: var(--edge-strong);
     background: var(--surface-hover);
 }
@@ -149,7 +156,15 @@
         --hud-inset-left: 0px;
         --hud-inset-bottom: 0px;
 
-        position: static;
+        /* Was position: static per the brief, but .map-controls and
+           .hud-readout stay position: absolute below with no other
+           positioned ancestor in between — static would let them escape
+           to the document root instead of staying pinned to this box.
+           relative keeps .adv-hud's own layout in flow (it no longer
+           needs to cover the full viewport once the canvas is a fixed
+           55vh slice) while still giving those overlays a real
+           containing block. */
+        position: relative;
         overflow: visible;
     }
 
