@@ -88,17 +88,22 @@ with live per-character status and legible hit feedback.**
   dangerous. Instances predating the anchor get one written on first use so
   their difficulty stops drifting too.
 
+- **Monster loot tables resolved to nothing — fixed.** `loot_table` values
+  (`goblin_basic`, `boss_dragon`, …) were parsed as a CSV of *item slugs*, so
+  every monster's curated pool was empty; procedural gear and boss keys still
+  dropped, which is why nobody noticed. Names now resolve through
+  `app/loot/tables.py`. Writing it surfaced that the item catalogue is 225/229
+  common and almost all level 0-2, so tiers are separated by value percentile
+  rather than rarity.
+- **Catalogue ceiling — mitigated.** Spawns above level 20 returned nothing,
+  `choose_monster` raised, and `populate_spawn_stats` swallowed it into a
+  nameless "Trash Monster" stub. `_eligible_monsters` now clamps to the deepest
+  band that exists. The content gap (nothing authored for 21-50) remains.
+
 ## Bugs — confirmed, not yet fixed
 
 - **Party Stash button does nothing.** `adventure-controls.js` literally pops
   `alert('Party Stash feature coming soon!')`.
-- **Monster loot tables resolve to nothing.** `loot_table` values
-  (`goblin_basic`, `boss_dragon`, …) are parsed by
-  `loot_service._parse_loot_table` as a CSV of *item slugs*; items are
-  kebab-case (`short-sword`), so every monster's item pool is empty. Monsters
-  have never dropped catalogue loot.
-- **Catalogue tops out at level 20** while characters can reach 50. Above 20,
-  archetype spawns have no identity to borrow and fall back to a bare label.
 
 ## Tuning
 

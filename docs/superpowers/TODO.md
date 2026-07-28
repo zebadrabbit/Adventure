@@ -19,8 +19,15 @@ Full triage with code pointers:
       ambush; also stopped clamping healthy characters down to 100 HP.
 - [x] ~~Floor difficulty rubber-bands to party level~~ — anchored at run start,
       `floor_level_step` per floor (`GameConfig["difficulty"]`).
-- [ ] Monster `loot_table` values resolve to nothing — parsed as item slugs.
-- [ ] Monster catalogue stops at level 20; characters reach 50.
+- [x] ~~Monster `loot_table` values resolve to nothing~~ — named tables now
+      resolve through `app/loot/tables.py` (tier from the name suffix, filtered
+      by type/rarity/level, separated by value percentile).
+- [x] ~~Monster catalogue stops at level 20~~ — *mitigated*: spawns above the
+      ceiling clamp to the deepest band instead of degrading to nameless
+      stubs. The content gap (no monsters for levels 21-50) is still open.
+- [ ] Author monsters for levels 21-50, and give the item catalogue some
+      rarity spread: it is currently 225/229 common, almost all level 0-2,
+      so loot tiers can only be separated by price.
 - [x] ~~Audit spell/skill damage vs plain attack~~ — confirmed: spells scaled
       with INT but not level, skills with nothing; the party snapshot never
       carried `level`. Fixed via `_spell_power`; re-measure with
