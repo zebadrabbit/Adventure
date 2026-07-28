@@ -15,6 +15,11 @@ Full triage with code pointers:
       delete was FK-blocked by 10 no-cascade tables; party formation took
       "first four by id" which after a wipe is the corpses.
 - [ ] Party Stash button is a `coming soon` alert.
+- [ ] **Item usage in combat** — the service knows 3 hardcoded slugs and the
+      UI offers 2 buttons, against 154 potions in the catalogue, so looted
+      potions cannot be used in a fight (`potion-regen` is implemented but
+      has no button at all). Spec:
+      [specs/2026-07-28-combat-item-usage-design.md](specs/2026-07-28-combat-item-usage-design.md).
 - [x] ~~Camping is unlimited~~ — costs a campfire kit, 40-tick cooldown, 25%
       ambush; also stopped clamping healthy characters down to 100 HP.
 - [x] ~~Floor difficulty rubber-bands to party level~~ — anchored at run start,
