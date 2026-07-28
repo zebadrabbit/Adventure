@@ -692,6 +692,9 @@
       console.debug('[search] starting search request');
       function applySearchPayload(data) {
         if (data && typeof data.game_tick === 'number' && window.__updateGameTickHUD) { window.__updateGameTickHUD(data.game_tick); }
+        // A move advances the clock, which ticks poison and regeneration, so the
+        // party's HP/MP can change without any combat. Refresh the cards.
+        if (window.refreshPartyCards) window.refreshPartyCards();
         console.debug('[search] response payload', data);
         if (data && typeof data.revealed_caches === 'number' && data.revealed_caches > 0) {
           try { refreshEntities(); } catch (e) { }

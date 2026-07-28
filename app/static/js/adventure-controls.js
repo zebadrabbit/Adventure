@@ -58,6 +58,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             appendLog(`${j.ambush.count} shapes close in on the firelight!`, 'text-danger');
                             if (window.refreshEntities) window.refreshEntities();
                         }
+                        if (window.refreshPartyCards) window.refreshPartyCards();
                         if (j.encounter && j.encounter.combat_id) { window.location.href = '/combat/' + j.encounter.combat_id; }
                     })
                     .catch(() => appendLog('Camp failed (network error)', 'text-danger'))
@@ -197,3 +198,51 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Equipment/Bags buttons now handled by equipment.js (same as dashboard)
 });
+
+// ---------------------------------------------------------------- party cards
+// The character cards are server-rendered once. Before /api/dungeon/party
+// existed they were built from a session snapshot taken when the party was
+// picked, so every card showed full HP/MP for the whole run regardless of what
+// combat, regeneration or camping did. They are now refreshed from the database
+// after anything that can change those numbers.
+(function partyCardRefresh() {
+    function paint(member) {
+        const card = document.querySelector(`[data-member-id="${member.id}"]`);
+        if (!card) return;
+
+        const set = (barSelector, cur, max, label) => {
+            const track = card.querySelector(barSelector);
+            if (!track) return;
+            const fill = track.querySelector('.party-stat-bar-fill');
+            const safeMax = Math.max(1, Number(max) || 1);
+            const pct = Math.max(0, Math.min(100, (Number(cur) || 0) / safeMax * 100));
+            if (fill) {
+                fill.style.width = pct + '%';
+                fill.textContent = `${label} ${cur}/${max}`;
+            }
+            track.setAttribute(label === 'HP' ? 'data-hp' : 'data-mana', cur);
+            track.setAttribute(label === 'HP' ? 'data-hp-max' : 'data-mana-max', max);
+        };
+
+        set('.hp-bar', member.hp, member.hp_max, 'HP');
+        set('.mana-bar', member.mana, member.mana_max, 'MP');
+        // A downed character should be obvious at a glance.
+        card.classList.toggle('is-downed', Number(member.hp) <= 0);
+    }
+
+    let inFlight = false;
+    window.refreshPartyCards = function refreshPartyCards() {
+        if (inFlight) return;
+        inFlight = true;
+        fetch('/api/dungeon/party', { headers: { Accept: 'application/json' } })
+            .then(r => (r.ok ? r.json() : null))
+            .then(data => {
+                if (!data || !Array.isArray(data.party)) return;
+                data.party.forEach(paint);
+            })
+            .catch(() => { /* a failed refresh must never break play */ })
+            .finally(() => { inFlight = false; });
+    };
+
+    document.addEventListener('DOMContentLoaded', () => window.refreshPartyCards());
+})();

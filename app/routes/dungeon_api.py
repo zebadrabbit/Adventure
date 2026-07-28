@@ -1599,6 +1599,49 @@ def camp_config() -> dict:
     return merged
 
 
+def live_party_payload():
+    """Current party stats, read fresh from the database.
+
+    The adventure screen used to render its character cards straight from
+    ``session["party"]`` -- a payload built once when the party was picked and
+    then frozen. Every card therefore showed whatever the character had at
+    selection time (full HP/MP) for the rest of the run, no matter what combat,
+    regeneration or camping did. Rebuilding from the Character rows is the only
+    way those numbers can be true.
+
+    Falls back to the session copy when the ids cannot be resolved, so a
+    half-built session still renders something.
+    """
+    from app.routes.dashboard_helpers import build_party_payload
+
+    ids = session.get("last_party_ids") or []
+    if not ids:
+        ids = [p.get("id") for p in (session.get("party") or []) if isinstance(p, dict) and p.get("id")]
+    if not ids:
+        return None
+    try:
+        rows = Character.query.filter(Character.id.in_(ids), Character.user_id == current_user.id).all()
+    except Exception:
+        db.session.rollback()
+        return None
+    if not rows:
+        return None
+    # Preserve the party's chosen order rather than database order.
+    order = {cid: i for i, cid in enumerate(ids)}
+    rows.sort(key=lambda c: order.get(c.id, len(order)))
+    return build_party_payload(rows)
+
+
+@bp_dungeon.route("/api/dungeon/party", methods=["GET"])
+@login_required
+def dungeon_party():
+    """Live HP/MP for the current party, for the adventure screen's cards."""
+    party = live_party_payload()
+    if party is None:
+        return jsonify({"error": "no_party", "party": []}), 404
+    return jsonify({"party": party})
+
+
 @bp_dungeon.route("/api/dungeon/camp", methods=["POST"])
 @login_required
 def dungeon_camp():
@@ -2104,6 +2147,11 @@ def adventure():
         )
     except Exception:
         logger.debug("suppressed_exception", where="adventure", exc_info=True)
+    # Prefer live rows over the frozen session snapshot: the cards must show
+    # what the characters are now, not what they were when the party was picked.
+    live = live_party_payload()
+    if live:
+        enriched_party = live
     return render_template("adventure.html", party=enriched_party, seed=seed, pos=pos, game_clock=clock)
 
 

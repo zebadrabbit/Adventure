@@ -173,7 +173,7 @@
       <div class="d-flex flex-column gap-2 align-items-stretch">
         {% for m in party %}
         {% set class_lower = m.class.lower() %}
-        <div
+        <div data-member-id="{{ m.id }}"
           class="operative-card party-card-compact border-{{ class_lower if class_lower in ['fighter','rogue','mage','cleric','druid','ranger'] else 'secondary' }}">
           <div class="operative-header party-card-header d-flex align-items-center justify-content-between">
             <div class="d-flex align-items-center gap-2">
