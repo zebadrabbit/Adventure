@@ -233,7 +233,7 @@
             {% set hp_pct = (c.stats.hp / c.hp_max * 100)|int if c.hp_max > 0 else 0 %}
             {% set hp_pct = [0, [100, hp_pct]|min]|max %}
             <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
-                <div class="tactical-panel barracks-card {% if in_party %}in-party{% endif %}"
+                <div class="tactical-panel barracks-card {% if in_party %}in-party{% endif %}{% if c.permadeath %} character-lost{% endif %}"
                     data-id="{{ c.id }}"
                     data-class="{{ c.class_name }}"
                     data-level="{{ c.level }}"
@@ -245,7 +245,11 @@
                     </div>
                     <div class="barracks-card-meta">
                         LV{{ c.level }}
-                        {% if in_party %}
+                        {% if c.permadeath %}
+                        · <span class="badge bg-danger">LOST</span>
+                        {% elif c.is_dead %}
+                        · <span class="badge bg-warning text-dark">DOWNED</span>
+                        {% elif in_party %}
                         · <span class="badge badge-in-party">IN PARTY</span>
                         {% endif %}
                     </div>
@@ -257,7 +261,8 @@
                         <form action="{{ url_for('dashboard.delete_character', char_id=c.id) }}" method="post"
                             onsubmit="return confirm('⚠️ DISMISS {{ c.name }}?\n\nThis action is permanent.');">
                             <button class="tactical-btn-danger btn-dismiss-xs">
-                                {{ svg_icon('trash-can', 14, 'me-1') }} DISMISS
+                                {{ svg_icon('trash-can', 14, 'me-1') }}
+                                {% if c.permadeath %}BURY{% else %}DISMISS{% endif %}
                             </button>
                         </form>
                     </div>

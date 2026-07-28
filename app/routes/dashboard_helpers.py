@@ -196,6 +196,11 @@ def serialize_character_list(user_id: int) -> list[dict[str, Any]]:
                 "hp_max": hp_max,
                 "mana_max": mana_max,
                 "effects_display": effects_display,
+                # Permadeathed characters stay listed so the player can see who
+                # they lost and dismiss them; the roster marks them and party
+                # formation skips them (character_service.living_characters).
+                "is_dead": bool(getattr(c, "is_dead", False)),
+                "permadeath": bool(getattr(c, "permadeath", False)),
             }
         )
     if backfilled:

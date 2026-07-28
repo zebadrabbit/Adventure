@@ -11,6 +11,9 @@ Full triage with code pointers:
 [plans/2026-07-27-playtest-triage.md](plans/2026-07-27-playtest-triage.md).
 - [x] ~~Monsters focused one character~~ — weighted target picker.
 - [x] ~~Downed characters still took a turn~~ — `_advance_turn` steps over them.
+- [x] ~~Dead characters stuck in the roster and auto-added to parties~~ —
+      delete was FK-blocked by 10 no-cascade tables; party formation took
+      "first four by id" which after a wipe is the corpses.
 - [ ] Party Stash button is a `coming soon` alert.
 - [x] ~~Camping is unlimited~~ — costs a campfire kit, 40-tick cooldown, 25%
       ambush; also stopped clamping healthy characters down to 100 HP.

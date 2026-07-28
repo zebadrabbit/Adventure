@@ -72,6 +72,18 @@
   party's current level, so levelling mid-run no longer drags the world up too.
 
 ### Fixed
+- Characters could not be deleted. Ten tables carry a foreign key to
+  `character` and none cascade, so `db.session.delete()` raised a
+  ForeignKeyViolation for any character with a skill row — i.e. all of them,
+  since every character is granted a starting skill. `character_service`
+  clears owned rows (skills, talents, effects, achievements, quests, party
+  membership, trade history), nulls the references that outlive a character
+  (party leader, shared-inventory contributor), then deletes.
+- Permadeathed characters were auto-added to parties: formation took "the
+  first four characters by id", which after a wipe is exactly the four
+  corpses. Autofill, Start Adventure (including its lenient name-matching
+  fallback) and Continue Adventure now all skip them. The roster still lists
+  them, marked LOST, with a BURY button.
 - Camping *reduced* the HP of any character above 100: it read
   `stats["max_hp"]` (which characters never store) with a default of 100 and
   clamped `min(100, current + restore)`. Now uses `compute_hp_mana_max`, and

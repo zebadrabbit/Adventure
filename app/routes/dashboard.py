@@ -179,7 +179,11 @@ def dashboard():
                     dungeon_seed=dungeon_seed,
                     validation_error=msg,
                 )
-            chars = Character.query.filter(Character.id.in_(party_ids), Character.user_id == current_user_id).all()
+            chars = (
+                Character.query.filter(Character.id.in_(party_ids), Character.user_id == current_user_id)
+                .filter(Character.permadeath.is_(False))
+                .all()
+            )
             if len(chars) != len(party_ids):
                 # Attempt lenient fallback: if an id refers to another user's character but a character with the same
                 # name exists for this user, substitute that character. This accommodates test flows that select a
@@ -187,8 +191,12 @@ def dashboard():
                 resolved = {c.id: c for c in chars}
                 missing = [pid for pid in party_ids if pid not in resolved]
                 if missing:
-                    # Build name->char map for current user
-                    user_chars = Character.query.filter_by(user_id=current_user_id).all()
+                    # Build name->char map for current user. Living only: this
+                    # fallback matches by *name*, so including the permadeathed
+                    # would re-add the very character the filter above removed.
+                    from app.services.character_service import living_characters
+
+                    user_chars = living_characters(current_user_id)
                     by_name = {}
                     for uc in user_chars:
                         by_name.setdefault(uc.name.lower(), uc)
@@ -265,7 +273,11 @@ def dashboard():
             last_party = session.get("last_party_ids") or []
             chars = []
             if last_party:
-                chars = Character.query.filter(Character.id.in_(last_party), Character.user_id == current_user_id).all()
+                chars = (
+                    Character.query.filter(Character.id.in_(last_party), Character.user_id == current_user_id)
+                    .filter(Character.permadeath.is_(False))
+                    .all()
+                )
                 party = build_party_payload(chars)
                 if party:
                     session["party"] = party
@@ -345,13 +357,19 @@ def delete_character(char_id):
 
     c = Character.query.filter_by(id=char_id, user_id=current_user.id).first()
     if c:
-        from app import db
-
-        db.session.delete(c)
-        db.session.commit()
         from flask import flash
 
-        flash(f"Character {c.name} deleted.", "info")
+        from app.services.character_service import delete_character as _delete
+
+        name = c.name
+        try:
+            _delete(c)
+            flash(f"Character {name} deleted.", "info")
+        except Exception:
+            # Ten tables reference character with no cascade; the service clears
+            # them, but surface a real message if something new starts pointing
+            # at characters rather than 500ing on the dashboard.
+            flash(f"Could not delete {name} — something still references them.", "danger")
     else:
         from flask import flash
 
@@ -381,8 +399,12 @@ def autofill_characters():
     if uid is None:
         return jsonify({"error": "unauthorized"}), 401
 
-    # Fetch existing chars
-    chars = Character.query.filter_by(user_id=uid).order_by(Character.id.asc()).all()
+    # Fetch existing chars. Permadeathed characters stay in the roster to be
+    # dismissed but are not eligible for a party -- "first four by id" after a
+    # wipe is precisely the four corpses.
+    from app.services.character_service import living_characters
+
+    chars = living_characters(uid)
     have = len(chars)
     created_count = 0
     if have < 4:
@@ -390,7 +412,7 @@ def autofill_characters():
         chars, created = handle_autofill(chars, uid)
         created_count = len(created)
         # Re-fetch list to include DB committed rows in deterministic order
-        chars = Character.query.filter_by(user_id=uid).order_by(Character.id.asc()).all()
+        chars = living_characters(uid)
     # Select exactly 4 for party (deterministic: first 4 by id)
     party_source = chars[:4]
     from app.routes.dashboard_helpers import build_party_payload
