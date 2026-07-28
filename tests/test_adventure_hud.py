@@ -121,3 +121,25 @@ def test_adventure_has_no_inline_style_block(client, party):
     body = html.split("</head>", 1)[-1]
 
     assert "<style>" not in body, "inline <style> block still in the adventure body"
+
+
+def test_party_frames_live_in_the_rail(client, party):
+    html = client.get("/adventure").get_data(as_text=True)
+
+    assert 'class="adv-party-rail"' in html
+    assert html.count("data-member-id") == 4, "all four party frames must render in the rail"
+
+
+def test_party_frames_keep_the_refresh_hooks(client, party):
+    """refreshPartyCards() paints .hp-bar/.mana-bar inside [data-member-id]."""
+    html = client.get("/adventure").get_data(as_text=True)
+
+    assert "hp-bar" in html
+    assert "mana-bar" in html
+    assert "party-stat-bar-fill" in html
+
+
+def test_party_frame_is_a_click_target(client, party):
+    html = client.get("/adventure").get_data(as_text=True)
+
+    assert "adv-frame-open" in html, "no hook for opening a character from their frame"

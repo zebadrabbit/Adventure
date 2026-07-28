@@ -181,3 +181,144 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover {
         position: absolute;
     }
 }
+
+/* --- Party rail ---------------------------------------------------------
+ * Four frames down the left edge, always visible, always live. Width is the
+ * same number the camera reserves (--hud-inset-left), declared once on
+ * .adv-hud so the two cannot drift.
+ *
+ * Four frames at ~90px plus gaps clears 768px comfortably; if a fifth party
+ * slot ever exists, the rail scrolls rather than the page.
+ */
+
+.adv-hud .adv-party-rail {
+    position: absolute;
+    top: var(--space-2);
+    left: var(--space-2);
+    bottom: var(--hud-inset-bottom);
+    z-index: var(--z-hud);
+    width: calc(var(--hud-inset-left) - var(--space-4));
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.adv-hud .adv-party-rail .operative-card {
+    background: var(--surface-overlay);
+    border: 1px solid var(--edge);
+    border-radius: var(--radius);
+    box-shadow: var(--elev-flat);
+    cursor: pointer;
+    transition: border-color var(--dur) var(--ease);
+}
+
+.adv-hud .adv-party-rail .operative-card:hover,
+.adv-hud .adv-party-rail .operative-card:focus-visible {
+    border-color: var(--edge-strong);
+    outline: none;
+}
+
+.adv-hud .adv-party-rail .operative-card:focus-visible {
+    box-shadow: var(--focus-ring);
+}
+
+/* A downed character is unmissable — refreshPartyCards() sets this. */
+.adv-hud .adv-party-rail .operative-card.is-downed {
+    border-color: var(--danger-line);
+    background: var(--danger-wash);
+}
+
+/* Deviation from the brief (documented in the task report): .operative-header
+ * and .operative-body (tactical-theme.css, shared with the roomy dashboard
+ * card) carry 14-18px padding and gap sized for that card. Left at the
+ * brief's own padding override alone, four frames measure ~169px each --
+ * 677px total -- well past the 540px the rail actually has between
+ * --space-2 and --hud-inset-bottom at the 1366x768 floor, so the brief's own
+ * "clears 768px comfortably" claim doesn't hold and the rail scrolls on the
+ * ordinary 4-member case rather than only the hypothetical 5th slot this
+ * comment anticipates. Tightened here, scoped to the rail only -- the
+ * dashboard card keeps its original spacing.
+ *
+ * The redundant Bootstrap mb-1/mt-1 utility classes that used to carry this
+ * same spacing (now double-counted against the flex gap below) are dropped
+ * at the call site in adventure.html rather than fought here: Bootstrap
+ * ships its spacers with !important, which this rail-only gap cannot
+ * override without adding !important of its own (not allowed in static
+ * CSS).
+ */
+.adv-hud .adv-party-rail .party-card-header,
+.adv-hud .adv-party-rail .party-card-body {
+    padding: var(--space-1) var(--space-3);
+}
+
+.adv-hud .adv-party-rail .party-card-body {
+    gap: var(--space-1);
+}
+
+.adv-hud .adv-party-rail .party-card-name {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+}
+
+.adv-hud .adv-party-rail .party-card-badge {
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-label);
+    padding: 2px 6px;
+}
+
+.adv-hud .adv-party-rail .party-stat-bar {
+    height: 0.9rem;
+    font-size: var(--text-2xs);
+    border-radius: var(--radius);
+    box-shadow: var(--inset-well);
+}
+
+.adv-hud .adv-party-rail .party-stat-bar-fill {
+    line-height: 0.9rem;
+    border-radius: var(--radius);
+}
+
+.adv-hud .adv-party-rail .hp-bar .party-stat-bar-fill {
+    background: var(--hp);
+}
+
+.adv-hud .adv-party-rail .mana-bar .party-stat-bar-fill {
+    background: var(--mp);
+}
+
+.adv-hud .adv-party-rail .class-icon-slot {
+    width: 20px;
+    height: 20px;
+}
+
+.adv-hud .adv-party-rail .class-icon-slot img {
+    width: 18px;
+    height: 18px;
+}
+
+.adv-hud .adv-party-rail .last-roll-line {
+    min-height: 1rem;
+    font-size: var(--text-2xs);
+}
+
+.adv-hud .adv-party-rail .party-card-action-btn {
+    padding: 2px 8px;
+    font-size: var(--text-2xs);
+}
+
+@media (max-width: 1199px) {
+    .adv-hud .adv-party-rail {
+        position: static;
+        width: auto;
+        bottom: auto;
+        flex-direction: row;
+        flex-wrap: wrap;
+        overflow: visible;
+    }
+
+    .adv-hud .adv-party-rail .operative-card {
+        flex: 1 1 240px;
+    }
+}

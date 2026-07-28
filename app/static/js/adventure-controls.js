@@ -196,7 +196,27 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Equipment/Bags buttons now handled by equipment.js (same as dashboard)
+    // Clicking anywhere on a party frame opens that character, same as the
+    // frame's equip button. The paper doll itself is the next chunk
+    // (specs/2026-07-28-character-panel-redesign.md); this is the hook it
+    // will reuse.
+    document.addEventListener('click', (e) => {
+        const frame = e.target.closest('.adv-frame-open');
+        if (!frame) return;
+        // Let the frame's own buttons handle their own clicks.
+        if (e.target.closest('button')) return;
+        const equipBtn = frame.querySelector('.btn-equip-panel');
+        if (equipBtn) equipBtn.click();
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const frame = e.target.closest?.('.adv-frame-open');
+        if (!frame || e.target !== frame) return;
+        e.preventDefault();
+        const equipBtn = frame.querySelector('.btn-equip-panel');
+        if (equipBtn) equipBtn.click();
+    });
 });
 
 // ---------------------------------------------------------------- party cards
