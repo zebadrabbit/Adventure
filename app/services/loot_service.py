@@ -42,17 +42,32 @@ def _is_boss(monster: Dict[str, Any]) -> bool:
     return monster.get("archetype") == "Boss" or monster.get("is_boss", False)
 
 
-def _parse_loot_table(raw: str | None) -> Tuple[List[str], Dict[str, float]]:
+def _parse_loot_table(raw: str | None, level: int = 1) -> Tuple[List[str], Dict[str, float]]:
     """Return ordered list and weight mapping.
 
     Accepted forms:
+      - Named table: "goblin_basic", "boss_dragon" => resolved against the item
+        catalogue by tier (app/loot/tables.py). This is what monster_catalog
+        actually stores; before it was supported, every such name was treated as
+        a literal item slug, matched nothing, and monsters dropped no catalogue
+        items at all.
       - CSV: "potion-healing, dagger, gold-coin" => equal weights
       - JSON list: ["a","b","c"] => equal weights
       - JSON object: {"a":2, "b":1} => explicit weights
+
+    `level` scopes a named table to level-appropriate items; it is ignored by
+    the other forms.
     """
     if not raw:
         return [], {}
     raw = raw.strip()
+    # Named tables first: they are the only form that needs the catalogue.
+    from app.loot import tables as loot_tables
+
+    named = loot_tables.resolve(raw, level=level)
+    if named is not None:
+        ordered = sorted(named.keys())
+        return ordered, dict(named)
     # JSON object or array
     if raw.startswith("[") or raw.startswith("{"):
         try:
@@ -77,7 +92,7 @@ def _parse_loot_table(raw: str | None) -> Tuple[List[str], Dict[str, float]]:
 def roll_loot(monster: Dict[str, Any], rng: random.Random | None = None) -> Dict[str, Any]:
     rng = rng or random
     raw_table = monster.get("loot_table")
-    items_ordered, weights = _parse_loot_table(raw_table)
+    items_ordered, weights = _parse_loot_table(raw_table, level=int(monster.get("level", 1) or 1))
 
     # Boss loot enhancement
     is_boss = _is_boss(monster)
