@@ -37,15 +37,6 @@
     border-radius: 0.5rem;
 }
 
-/* New responsive map: fixed height, fluid width */
-.map-fluid-fixed-height {
-    height: 512px;
-    width: 100%;
-    max-width: 100%;
-    border: 2px solid #222;
-    border-radius: 0.5rem;
-}
-
 /* Dungeon output panel */
 .dungeon-output {
     padding: 1rem;

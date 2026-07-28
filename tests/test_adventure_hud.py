@@ -100,3 +100,24 @@ def test_dashboard_still_has_full_chrome(client, party):
 
     assert 'id="navbarMain"' in html, "the navbar vanished from the dashboard"
     assert 'data-realm="dungeon"' not in html, "the town screens went cold"
+
+
+def test_adventure_has_a_positioned_hud_root(client, party):
+    html = client.get("/adventure").get_data(as_text=True)
+
+    assert 'class="adv-hud"' in html, "no HUD root to position the overlays against"
+    assert 'id="dungeon-map"' in html, "the canvas went missing"
+
+
+def test_adventure_loads_the_hud_stylesheet(client, party):
+    html = client.get("/adventure").get_data(as_text=True)
+
+    assert "adventure-hud.css" in html
+
+
+def test_adventure_has_no_inline_style_block(client, party):
+    """Page rules belong in the page stylesheet, per DESIGN_SYSTEM.md."""
+    html = client.get("/adventure").get_data(as_text=True)
+    body = html.split("</head>", 1)[-1]
+
+    assert "<style>" not in body, "inline <style> block still in the adventure body"

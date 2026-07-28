@@ -385,6 +385,20 @@
             this.render();
         }
 
+        /* How much of the viewport the HUD is standing on, in CSS pixels.
+           Declared on .adv-hud so the numbers live with the layout that
+           produces them; falls back to zero anywhere the HUD is absent
+           (the dashboard map preview, the stacked narrow layout). */
+        hudInsets() {
+            const root = this.canvas.closest('.adv-hud');
+            if (!root) return { left: 0, bottom: 0 };
+            const cs = getComputedStyle(root);
+            return {
+                left: parseFloat(cs.getPropertyValue('--hud-inset-left')) || 0,
+                bottom: parseFloat(cs.getPropertyValue('--hud-inset-bottom')) || 0,
+            };
+        }
+
         centerOnPlayer(smooth = true) {
             if (!this.playerPos) return;
 
@@ -393,8 +407,12 @@
             // Use flipped Y coordinate for centering
             const centerY = ((this.height - 1 - this.playerPos.y) + 0.5) * TILE_SIZE * this.zoom;
 
-            const newOffsetX = rect.width / 2 - centerX;
-            const newOffsetY = rect.height / 2 - centerY;
+            const inset = this.hudInsets();
+            // Centre the party in the space the player can actually see, not
+            // in the geometric middle of the canvas — otherwise the party
+            // rail and the log sit on top of them.
+            const newOffsetX = (rect.width + inset.left) / 2 - centerX;
+            const newOffsetY = (rect.height - inset.bottom) / 2 - centerY;
 
             if (smooth) {
                 this.targetOffsetX = newOffsetX;
@@ -908,7 +926,10 @@
             const rect = this.canvas.getBoundingClientRect();
             const minimapSize = 120;
             const minimapX = rect.width - minimapSize - 10;
-            const minimapY = 10;
+            // Below the account anchor, which owns the top-right corner:
+            // 36px trigger + 8px gap. Keep in step with .adv-hud .map-controls
+            // in adventure-hud.css, which sits below this in turn.
+            const minimapY = 44;
             const tileScale = minimapSize / Math.max(this.width, this.height);
 
             this.ctx.save();

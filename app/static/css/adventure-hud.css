@@ -1,0 +1,168 @@
+/* Adventure HUD — the dungeon screen's own layout.
+ *
+ * Spec: docs/superpowers/specs/2026-07-28-adventure-hud-layout-design.md
+ *
+ * The map is the screen. Everything else floats above it, absolutely placed
+ * against .adv-hud. Scoped under .adv-hud throughout: this file styles one
+ * page, not the app (DESIGN_SYSTEM.md, rule 6).
+ *
+ * The two --hud-inset-* values are the contract between this file and
+ * dungeon-canvas.js: they name how much of the viewport the HUD is standing
+ * on, so the camera can centre the party in the space that is actually
+ * visible rather than in the geometric middle of the canvas.
+ */
+
+.adv-hud {
+    --hud-inset-left: 300px;
+    --hud-inset-bottom: 220px;
+
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: var(--viewport-bg);
+}
+
+/* The canvas fills the frame. resizeCanvas() reads getBoundingClientRect()
+   and multiplies by devicePixelRatio, so sizing it here is enough — the
+   backing store follows and the tiles stay crisp. */
+.adv-hud #dungeon-map {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: grab;
+    background: var(--viewport-bg);
+    border: 0;
+    border-radius: var(--radius);
+}
+
+.adv-hud #dungeon-map:active {
+    cursor: grabbing;
+}
+
+/* Account anchor: top-right corner. The canvas-drawn minimap also lives
+   top-right (dungeon-canvas.js renderMinimap), inset 10px and 120px square;
+   it is offset downward there to clear this.
+
+   Deviation from the brief: base.html (not ours to touch) renders
+   #account-anchor inside <header>, a sibling of <main>/.adv-hud, not a
+   descendant of it — ".adv-hud #account-anchor" never matches. This
+   stylesheet only ever loads on /adventure (linked from adventure.html's
+   own head block) and account_anchor.html is only included for
+   chrome="minimal", which today is exclusively this route, so an
+   unscoped #account-anchor selector is still page-scoped in practice.
+   position: fixed (rather than absolute) places it against the viewport
+   directly, which lines up with .adv-hud's own fixed/inset:0 frame at the
+   full-bleed breakpoint and needs no separate override in the narrow
+   fallback below. */
+#account-anchor {
+    position: fixed;
+    top: var(--space-2);
+    right: var(--space-2);
+    z-index: var(--z-hud);
+}
+
+.account-anchor-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: var(--surface-overlay);
+    border: 1px solid var(--edge);
+    color: var(--ink);
+    text-decoration: none;
+}
+
+.account-anchor-trigger:hover {
+    border-color: var(--edge-strong);
+    background: var(--surface-hover);
+}
+
+/* Zoom controls sit below the minimap, which sits below the account anchor:
+   36 (anchor) + 8 (gap) = 44 minimap top, + 120 (minimap) + 8 = 172. */
+.adv-hud .map-controls {
+    position: absolute;
+    top: 172px;
+    right: var(--space-2);
+    z-index: var(--z-hud);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.adv-hud .map-controls button {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    font-size: var(--text-base);
+    background: var(--surface-overlay);
+    border: 1px solid var(--edge);
+    color: var(--ink);
+    border-radius: var(--radius);
+}
+
+.adv-hud .map-controls button:hover {
+    border-color: var(--edge-strong);
+    color: var(--accent);
+}
+
+/* Run readout — seed, tick, entity sync. The strip the panel header used to
+   carry, reduced to a corner readout. */
+.adv-hud .hud-readout {
+    position: absolute;
+    top: var(--space-2);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: var(--z-hud);
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-1) var(--space-3);
+    background: var(--surface-overlay);
+    border: 1px solid var(--edge-subtle);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--ink-muted);
+}
+
+.adv-hud #hotkeys-panel {
+    position: absolute;
+    top: var(--space-2);
+    left: var(--space-2);
+    z-index: var(--z-hud);
+    display: none;
+    max-width: 300px;
+    padding: var(--space-3);
+    background: var(--surface);
+    border: 1px solid var(--edge);
+    color: var(--ink);
+    font-size: var(--text-sm);
+}
+
+/* Below the design floor the HUD would overlap itself. Fall back to a
+   stacked layout rather than a broken one: the map keeps a fixed slice of
+   the viewport and the panels flow underneath it. */
+@media (max-width: 1199px) {
+    .adv-hud {
+        --hud-inset-left: 0px;
+        --hud-inset-bottom: 0px;
+
+        position: static;
+        overflow: visible;
+    }
+
+    .adv-hud #dungeon-map {
+        position: relative;
+        height: 55vh;
+    }
+
+    /* #account-anchor is position: fixed unconditionally above, so it
+       needs no override here — it already tracks the viewport in both
+       layouts. */
+    .adv-hud .map-controls,
+    .adv-hud .hud-readout {
+        position: absolute;
+    }
+}

@@ -99,6 +99,35 @@ def test_adventure_page_renders_map(page):
     assert state["ok"], f"/api/dungeon/map returned {state['status']}"
 
 
+def test_adventure_fits_a_1366x768_laptop(page):
+    """The whole reason for the HUD redesign: no scrolling mid-run.
+
+    The old layout needed ~880-910px of vertical space against the ~630-660
+    usable on this screen, so the map and the controls could not both be on
+    screen. A vertical scrollbar here means the regression is back.
+    """
+    page.set_viewport_size({"width": 1366, "height": 768})
+    page.goto(f"{BASE_URL}/adventure")
+    page.wait_for_load_state("networkidle")
+
+    metrics = page.evaluate(
+        """() => ({
+            scrollH: document.documentElement.scrollHeight,
+            clientH: document.documentElement.clientHeight,
+            scrollW: document.documentElement.scrollWidth,
+            clientW: document.documentElement.clientWidth,
+            canvas: document.getElementById('dungeon-map').getBoundingClientRect(),
+        })"""
+    )
+
+    assert (
+        metrics["scrollH"] <= metrics["clientH"] + 1
+    ), f"page scrolls vertically at 1366x768: {metrics['scrollH']} > {metrics['clientH']}"
+    assert metrics["scrollW"] <= metrics["clientW"] + 1, "page scrolls horizontally at 1366x768"
+    assert metrics["canvas"]["height"] > 500, "the map did not take the space the chrome gave back"
+    assert metrics["canvas"]["width"] > 1200, "the map is not full-bleed"
+
+
 def test_api_move_via_page_fetch(page):
     result = page.evaluate(
         """async () => {
