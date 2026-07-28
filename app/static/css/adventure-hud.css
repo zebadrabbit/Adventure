@@ -1,0 +1,589 @@
+/* Adventure HUD — the dungeon screen's own layout.
+ *
+ * Spec: docs/superpowers/specs/2026-07-28-adventure-hud-layout-design.md
+ *
+ * The map is the screen. Everything else floats above it, absolutely placed
+ * against .adv-hud. Scoped under .adv-hud throughout — this file styles one
+ * page, not the app (DESIGN_SYSTEM.md, rule 6) — with one exception: the
+ * #account-anchor rules below are scoped by body[data-realm="dungeon"]
+ * instead, because #account-anchor lives in <header>, a sibling of <main>,
+ * so .adv-hud (inside <main>) can never be its ancestor. data-realm is set
+ * from the same route that sets chrome="minimal", so the scope still tracks
+ * this page and nothing else.
+ *
+ * The two --hud-inset-* values are the contract between this file and
+ * dungeon-canvas.js: they name how much of the viewport the HUD is standing
+ * on, so the camera can centre the party in the space that is actually
+ * visible rather than in the geometric middle of the canvas.
+ */
+
+.adv-hud {
+    --hud-inset-left: 300px;
+    --hud-inset-bottom: 220px;
+
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: var(--viewport-bg);
+}
+
+/* The canvas fills the frame. resizeCanvas() reads getBoundingClientRect()
+   and multiplies by devicePixelRatio, so sizing it here is enough — the
+   backing store follows and the tiles stay crisp. */
+.adv-hud #dungeon-map {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: grab;
+    background: var(--viewport-bg);
+    border: 0;
+    border-radius: var(--radius);
+}
+
+.adv-hud #dungeon-map:active {
+    cursor: grabbing;
+}
+
+/* Account anchor: top-right corner. The canvas-drawn minimap also lives
+   top-right (dungeon-canvas.js renderMinimap), inset 10px and 120px square;
+   it is offset downward there to clear this.
+
+   Deviation from the brief: base.html (not ours to touch) renders
+   #account-anchor inside <header>, a sibling of <main>/.adv-hud, not a
+   descendant of it — ".adv-hud #account-anchor" never matches. Scoping by
+   body[data-realm="dungeon"] instead of leaving these bare: the dungeon
+   realm is stamped by the same route call that sets chrome="minimal"
+   (app/routes/dungeon_api.py), so this stays genuinely page-scoped even if
+   the stylesheet gets re-linked or copy-pasted onto another chrome="minimal"
+   page later — unlike "only one template currently links this file", which
+   is a fact about today's callers, not a property of the selector.
+   position: fixed (rather than absolute) places it against the viewport
+   directly, which lines up with .adv-hud's own fixed/inset:0 frame at the
+   full-bleed breakpoint and needs no separate override in the narrow
+   fallback below. */
+body[data-realm="dungeon"] #account-anchor {
+    position: fixed;
+    top: var(--space-2);
+    right: var(--space-2);
+    z-index: var(--z-hud);
+}
+
+body[data-realm="dungeon"] .account-anchor-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: var(--surface-overlay);
+    border: 1px solid var(--edge);
+    color: var(--ink);
+    text-decoration: none;
+}
+
+body[data-realm="dungeon"] .account-anchor-trigger:hover {
+    border-color: var(--edge-strong);
+    background: var(--surface-hover);
+}
+
+/* The monogram inside the trigger. .avatar-circle is defined only in
+   glass-theme.css, which this page does not load, so without this rule the
+   initial rendered as a bare inline letter floating in the bordered square.
+   A filled monogram plate rather than glass-theme's gradient disc: --radius
+   is 0 on this screen and the anchor is already a hard 36px square, so the
+   letter takes the whole box and reads as a deliberate plate. */
+body[data-realm="dungeon"] .account-anchor-trigger .avatar-circle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    background: var(--surface-raised);
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    line-height: 1;
+    color: var(--ink);
+}
+
+body[data-realm="dungeon"] .account-anchor-trigger:hover .avatar-circle {
+    color: var(--accent);
+}
+
+/* Zoom controls sit below the minimap, which sits below the account anchor:
+   36 (anchor) + 8 (gap) = 44 minimap top, + 120 (minimap) + 8 = 172. */
+.adv-hud .map-controls {
+    position: absolute;
+    top: 172px;
+    right: var(--space-2);
+    z-index: var(--z-hud);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.adv-hud .map-controls button {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    font-size: var(--text-base);
+    background: var(--surface-overlay);
+    border: 1px solid var(--edge);
+    color: var(--ink);
+    border-radius: var(--radius);
+}
+
+.adv-hud .map-controls button:hover {
+    border-color: var(--edge-strong);
+    color: var(--accent);
+}
+
+/* Run readout — seed, tick, entity sync. The strip the panel header used to
+   carry, reduced to a corner readout. */
+.adv-hud .hud-readout {
+    position: absolute;
+    top: var(--space-2);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: var(--z-hud);
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-1) var(--space-3);
+    background: var(--surface-overlay);
+    border: 1px solid var(--edge-subtle);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--ink-muted);
+}
+
+/* Hotkeys reference. Anchored on the geometry contract, not on the viewport
+   corner: at top/left var(--space-2) it landed inside .adv-party-rail's box,
+   and the rail is later in DOM at the same --z-hud, so it won the stacking
+   tie -- the panel rendered behind four opaque frames and every click in that
+   284px-wide column (gaps included) opened a character's equipment instead of
+   hitting the panel. --hud-inset-left clears the rail and --hud-inset-bottom
+   clears the action bar and the log, so both edges track the contract rather
+   than needing a second set of numbers kept in sync by hand. The camera puts
+   the party at ((width + inset-left) / 2), which is to the right of this
+   panel's 300px ceiling, so it does not sit on them either. */
+.adv-hud #hotkeys-panel {
+    position: absolute;
+    left: var(--hud-inset-left);
+    bottom: var(--hud-inset-bottom);
+    z-index: var(--z-hud);
+    display: none;
+    max-width: 300px;
+    padding: var(--space-3);
+    background: var(--surface);
+    border: 1px solid var(--edge);
+    color: var(--ink);
+    font-size: var(--text-sm);
+}
+
+/* Below the design floor the HUD would overlap itself. Fall back to a
+   stacked layout rather than a broken one: the map keeps a fixed slice of
+   the viewport and the panels flow underneath it. */
+@media (max-width: 1199px) {
+    .adv-hud {
+        --hud-inset-left: 0px;
+        --hud-inset-bottom: 0px;
+
+        /* Was position: static per the brief, but .map-controls and
+           .hud-readout stay position: absolute below with no other
+           positioned ancestor in between — static would let them escape
+           to the document root instead of staying pinned to this box.
+           relative keeps .adv-hud's own layout in flow (it no longer
+           needs to cover the full viewport once the canvas is a fixed
+           55vh slice) while still giving those overlays a real
+           containing block. */
+        position: relative;
+        overflow: visible;
+    }
+
+    .adv-hud #dungeon-map {
+        position: relative;
+        height: 55vh;
+    }
+
+    /* #account-anchor is position: fixed unconditionally above, so it
+       needs no override here — it already tracks the viewport in both
+       layouts. */
+    .adv-hud .map-controls,
+    .adv-hud .hud-readout {
+        position: absolute;
+    }
+
+    /* Both insets collapse to 0 here, which would drop the hotkeys panel at
+       the very bottom of the stacked column, on top of the last party frame.
+       It is an explicitly-opened popover, so pin it to the viewport instead
+       — same treatment #account-anchor gets, and it stays reachable however
+       far the stack is scrolled. */
+    .adv-hud #hotkeys-panel {
+        position: fixed;
+        top: var(--space-2);
+        left: var(--space-2);
+        bottom: auto;
+    }
+}
+
+/* --- Party rail ---------------------------------------------------------
+ * Four frames down the left edge, always visible, always live. Width is the
+ * same number the camera reserves (--hud-inset-left), declared once on
+ * .adv-hud so the two cannot drift.
+ *
+ * Four frames at ~90px plus gaps clears 768px comfortably; if a fifth party
+ * slot ever exists, the rail scrolls rather than the page.
+ */
+
+.adv-hud .adv-party-rail {
+    position: absolute;
+    top: var(--space-2);
+    left: var(--space-2);
+    bottom: var(--hud-inset-bottom);
+    z-index: var(--z-hud);
+    width: calc(var(--hud-inset-left) - var(--space-4));
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.adv-hud .adv-party-rail .operative-card {
+    /* .operative-card carries height: 100% (tactical-theme.css, for the
+       dashboard's equal-height card grid). Against this rail's definite
+       height that makes every frame a flex item asking for the full 540px,
+       which the four of them then shrink to share exactly -- the rail could
+       never overflow, so it could never signal that the frames no longer fit,
+       and a fifth member would silently squash the other four instead. Sized
+       by content here (height: auto too -- flex-basis: auto reads the height
+       property, so the 100% would come straight back in through it); the
+       rail's own overflow-y is the pressure valve. */
+    flex: 0 0 auto;
+    height: auto;
+    background: var(--surface-overlay);
+    border: 1px solid var(--edge);
+    border-radius: var(--radius);
+    box-shadow: var(--elev-flat);
+    cursor: pointer;
+    transition: border-color var(--dur) var(--ease);
+}
+
+.adv-hud .adv-party-rail .operative-card:hover,
+.adv-hud .adv-party-rail .operative-card:focus-visible {
+    border-color: var(--edge-strong);
+    outline: none;
+}
+
+.adv-hud .adv-party-rail .operative-card:focus-visible {
+    box-shadow: var(--focus-ring);
+}
+
+/* A downed character is unmissable — refreshPartyCards() sets this.
+   The wash is layered over the frame's own surface, not swapped for it:
+   --danger-wash is 14% opaque, so assigning it alone made the one frame that
+   most needs reading the only translucent one on the rail, with dungeon art
+   showing through the name and the bars. A gradient with the same colour at
+   both stops is the standard way to spend the background-image layer on a
+   flat colour and keep --surface-overlay underneath as the background-color. */
+.adv-hud .adv-party-rail .operative-card.is-downed {
+    border-color: var(--danger-line);
+    background: linear-gradient(var(--danger-wash), var(--danger-wash)), var(--surface-overlay);
+}
+
+/* Deviation from the brief (documented in the task report): .operative-header
+ * and .operative-body (tactical-theme.css, shared with the roomy dashboard
+ * card) carry 14-18px padding and gap sized for that card. Left at the
+ * brief's own padding override alone, four frames measure ~169px each --
+ * 677px total -- well past the 540px the rail actually has between
+ * --space-2 and --hud-inset-bottom at the 1366x768 floor, so the brief's own
+ * "clears 768px comfortably" claim doesn't hold and the rail scrolls on the
+ * ordinary 4-member case rather than only the hypothetical 5th slot this
+ * comment anticipates. Tightened here, scoped to the rail only -- the
+ * dashboard card keeps its original spacing.
+ *
+ * The redundant Bootstrap mb-1/mt-1 utility classes that used to carry this
+ * same spacing (now double-counted against the flex gap below) are dropped
+ * at the call site in adventure.html rather than fought here: Bootstrap
+ * ships its spacers with !important, which this rail-only gap cannot
+ * override without adding !important of its own (not allowed in static
+ * CSS).
+ */
+.adv-hud .adv-party-rail .party-card-header,
+.adv-hud .adv-party-rail .party-card-body {
+    padding: var(--space-1) var(--space-3);
+}
+
+.adv-hud .adv-party-rail .party-card-body {
+    gap: var(--space-1);
+}
+
+.adv-hud .adv-party-rail .party-card-name {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+}
+
+.adv-hud .adv-party-rail .party-card-badge {
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-label);
+    padding: 2px 6px;
+}
+
+.adv-hud .adv-party-rail .party-stat-bar {
+    height: 0.9rem;
+    font-size: var(--text-2xs);
+    border-radius: var(--radius);
+    box-shadow: var(--inset-well);
+}
+
+.adv-hud .adv-party-rail .party-stat-bar-fill {
+    line-height: 0.9rem;
+    border-radius: var(--radius);
+}
+
+/* Base fill colours. adventure-controls.js sets fill.style.backgroundColor
+ * inline once these bars are painted (on load, and again on every
+ * refreshPartyCards() refresh), which wins over these rules per normal CSS
+ * precedence -- so in practice these only paint the instant before that JS
+ * runs (a flash-of-unstyled-bar guard), except where noted.
+ */
+.adv-hud .adv-party-rail .hp-bar .party-stat-bar-fill {
+    background: var(--hp);
+    /* Overridden at runtime: HP is state-carrying (green -> red as the
+       character nears death), computed from percent-remaining by
+       hpFillColor() in adventure-controls.js. This token is the resting/
+       full-health colour and the pre-JS fallback, not what you'll usually
+       see on screen. */
+}
+
+.adv-hud .adv-party-rail .mana-bar .party-stat-bar-fill {
+    background: var(--mp);
+    /* Mana's colour is NOT state-carrying -- adventure-controls.js never
+       sets an inline backgroundColor for the mana fill, so this rule is
+       what actually renders, always. */
+}
+
+.adv-hud .adv-party-rail .class-icon-slot {
+    width: 20px;
+    height: 20px;
+}
+
+.adv-hud .adv-party-rail .class-icon-slot img {
+    width: 18px;
+    height: 18px;
+}
+
+/* Fallback monogram for the classes with no icon yet (barbarian, bard, monk,
+   paladin, sorcerer, warlock). Same re-homing as the account anchor above:
+   .avatar-circle lives in glass-theme.css, which this page does not load. */
+.adv-hud .adv-party-rail .class-icon-slot .avatar-circle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    background: var(--surface-raised);
+    font-family: var(--font-display);
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-semibold);
+    line-height: 1;
+    color: var(--ink-muted);
+}
+
+.adv-hud .adv-party-rail .last-roll-line {
+    min-height: 1rem;
+    font-size: var(--text-2xs);
+}
+
+.adv-hud .adv-party-rail .party-card-action-btn {
+    padding: 2px 8px;
+    font-size: var(--text-2xs);
+}
+
+@media (max-width: 1199px) {
+    .adv-hud .adv-party-rail {
+        position: static;
+        width: auto;
+        bottom: auto;
+        flex-direction: row;
+        flex-wrap: wrap;
+        overflow: visible;
+    }
+
+    .adv-hud .adv-party-rail .operative-card {
+        flex: 1 1 240px;
+    }
+}
+
+/* --- Floating log and action bar ----------------------------------------
+ * Both sit in the bottom band the camera reserves via --hud-inset-bottom.
+ * Actions bottom-left, log bottom-right, and the centre is left clear so the
+ * party is never underneath a panel.
+ *
+ * No pointer-event plumbing is needed: DungeonCanvas binds mousedown,
+ * mousemove, wheel and the touch handlers on the canvas element itself
+ * (dungeon-canvas.js:182-199), and a canvas cannot have DOM children, so
+ * events on these panels never reach it. Scrolling the log will not zoom the
+ * map and dragging a panel will not pan it.
+ */
+
+.adv-hud .adv-actions {
+    position: absolute;
+    left: var(--space-2);
+    bottom: var(--space-2);
+    z-index: var(--z-hud);
+    width: calc(var(--hud-inset-left) - var(--space-4));
+    /* Ceiling derived from the same token the camera reads
+       (--hud-inset-bottom), not a one-off measurement of five buttons at
+       today's padding. Without this, the box is pure content height and the
+       next change to padding, font size or button count can silently push
+       it back under .adv-party-rail (whose own span IS derived from this
+       token) with nothing to catch it -- which is exactly how the bug fixed
+       below got in. If the action list ever needs more room than this
+       gives, it scrolls: clipping Hearth or Extract off the bottom
+       invisibly would be worse than a visible scrollbar. */
+    max-height: calc(var(--hud-inset-bottom) - var(--space-2) * 2);
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.adv-hud .adv-actions .tactical-btn-primary,
+.adv-hud .adv-actions .tactical-btn-secondary,
+.adv-hud .adv-actions .tactical-btn-info,
+.adv-hud .adv-actions .tactical-btn-success,
+.adv-hud .adv-actions .tactical-btn-danger {
+    width: 100%;
+    /* Deviation from the brief (documented in the task report): at
+       var(--space-2) vertical padding, five stacked buttons measure ~235px,
+       which overflows the 212px actually free in the reserved bottom band
+       (--hud-inset-bottom minus the --space-2 the panel sits off the
+       viewport edge) and rides up under the party rail -- the rail is later
+       in DOM order so it wins the overlap and swallows clicks on Search.
+       var(--space-1) brings the stack to ~195px, clear of the rail with
+       room to spare -- and now also clear of the max-height above, so this
+       is headroom rather than the only thing holding the line. */
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-sm);
+    letter-spacing: var(--tracking-wide);
+    border-radius: var(--radius);
+}
+
+/* The log's ceiling (on .dungeon-output below) is two bands' worth of the
+   bottom inset. Two, not one, because the reserved band is what the HUD
+   stands on across the FULL width: the left column (.adv-actions) is capped
+   at one band because .adv-party-rail sits directly above it, but nothing
+   sits above the log until the top-right stack, so the right column can spend
+   the same depth again going up. Measured, it stops 63px clear of
+   .map-controls, and the camera's target x stays left of this panel.
+
+   Measured at the 1366x768 floor (numbers in the fix report): the 32vh this
+   replaces gave the body 246px, and one band would give 172px, both short of
+   the 280px max-height this branch deleted from app.css -- a regression
+   against the very complaint the floating log answers. Raising
+   --hud-inset-bottom to ~317px so that one band covered 280px was measured
+   and rejected: .adv-party-rail derives its own bottom from that token and
+   has just 28px of slack at four members (512px of frames in 540px), so the
+   band cannot grow past ~248px without the rail overflowing on the ordinary
+   case. Two bands gives the body 392px and moves nothing else.
+
+   The ceiling goes on .dungeon-output rather than on this element because a
+   max-height here caps the <details> box but not its content: Chrome puts
+   that content in a ::details-content box that is the real child, so
+   "display: flex here, flex: 1 1 auto on the body" left the body at its full
+   scroll height hanging out of the bottom of the panel (measured: 4949px of
+   log in a 424px frame). Capping the body caps the panel with it. */
+.adv-hud .adv-log {
+    position: absolute;
+    right: var(--space-2);
+    bottom: var(--space-2);
+    z-index: var(--z-hud);
+    width: clamp(360px, 34vw, 560px);
+    background: var(--surface-overlay);
+    border: 1px solid var(--edge);
+}
+
+.adv-hud .adv-log-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-1) var(--space-3);
+    cursor: pointer;
+    list-style: none;
+    font-family: var(--font-display);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    border-bottom: 1px solid var(--edge-subtle);
+}
+
+.adv-hud .adv-log-head::-webkit-details-marker {
+    display: none;
+}
+
+.adv-hud .adv-log-head::after {
+    content: "▾";
+    color: var(--accent);
+}
+
+.adv-hud .adv-log:not([open]) .adv-log-head {
+    border-bottom: 0;
+}
+
+.adv-hud .adv-log:not([open]) .adv-log-head::after {
+    content: "▸";
+}
+
+/* The ceiling, less --space-6 for the <summary> the panel wears above this
+   body (27px of head plus the panel's two 1px borders, so 32px is the nearest
+   token that clears it). 440 - 16 - 32 = 392px of log at the 1366x768 floor,
+   against the 280px max-height this replaces.
+   No resize handle. It was here to answer "the log window is too restrictive
+   for looting", but the panel is anchored by its bottom edge, so the handle
+   sat one --space-2 above the viewport floor with nowhere to travel: it could
+   only ever make the log smaller. The ceiling is the real answer -- the body
+   grows with the scrollback on its own and then scrolls. */
+.adv-hud .adv-log .dungeon-output {
+    max-height: calc(var(--hud-inset-bottom) * 2 - var(--space-2) * 2 - var(--space-6));
+    min-height: 120px;
+    overflow: auto;
+    margin: 0;
+    border: 0;
+    border-left: 3px solid var(--accent-line);
+    border-radius: var(--radius);
+    background: transparent;
+    line-height: var(--leading-loose);
+}
+
+@media (max-width: 1199px) {
+
+    .adv-hud .adv-actions,
+    .adv-hud .adv-log {
+        position: static;
+        width: auto;
+        margin-top: var(--space-3);
+    }
+
+    /* --hud-inset-bottom collapses to 0px in this fallback (.adv-hud above),
+       which would clamp both token-derived ceilings -- .adv-actions' and the
+       log body's -- to zero and hide the buttons and the scrollback outright.
+       There is no reserved bottom band to derive from once these are back in
+       normal flow, so drop the constraint along with it. The log keeps a
+       reading height because in flow it would otherwise grow the page by its
+       whole scrollback. */
+    .adv-hud .adv-actions {
+        max-height: none;
+        overflow: visible;
+    }
+
+    .adv-hud .adv-log .dungeon-output {
+        max-height: 280px;
+    }
+
+    .adv-hud .adv-actions #adventure-action-panel {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+}

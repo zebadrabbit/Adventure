@@ -1,0 +1,31 @@
+{# Corner account affordance for chrome="minimal" screens. Same dropdown the
+   navbar carries; only the trigger shrinks to an avatar. Positioned by the
+   page's own stylesheet, not here. #}
+<div id="account-anchor" class="dropdown">
+  <a class="account-anchor-trigger" href="#" id="accountAnchorMenu" role="button" data-bs-toggle="dropdown"
+    aria-expanded="false" aria-label="Account menu">
+    <span class="avatar-circle">{{ current_user.username[0]|upper }}</span>
+  </a>
+  <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="accountAnchorMenu">
+    <li><a class="dropdown-item" href="{{ url_for('dashboard.dashboard') }}"><i
+          class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+    <li><a class="dropdown-item" href="{{ url_for('account.profile') }}"><i
+          class="bi bi-person-circle me-2"></i>Profile</a></li>
+    <li><a class="dropdown-item" href="{{ url_for('account.settings') }}"><i
+          class="bi bi-person-gear me-2"></i>Settings</a></li>
+    {% if (current_user.role|default('user', true)) == 'admin' %}
+    <li>
+      <hr class="dropdown-divider">
+    </li>
+    <li><a class="dropdown-item" href="{{ url_for('admin_new.dashboard') }}"><i
+          class="bi bi-shield-lock me-2"></i>Admin Dashboard</a></li>
+    <li><a class="dropdown-item" href="{{ url_for('admin_new.themes') }}"><i
+          class="bi bi-palette me-2"></i>Themes</a></li>
+    {% endif %}
+    <li>
+      <hr class="dropdown-divider">
+    </li>
+    <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}"><i
+          class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+  </ul>
+</div>

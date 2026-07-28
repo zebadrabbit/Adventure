@@ -99,6 +99,35 @@ def test_adventure_page_renders_map(page):
     assert state["ok"], f"/api/dungeon/map returned {state['status']}"
 
 
+def test_adventure_fits_a_1366x768_laptop(page):
+    """The whole reason for the HUD redesign: no scrolling mid-run.
+
+    The old layout needed ~880-910px of vertical space against the ~630-660
+    usable on this screen, so the map and the controls could not both be on
+    screen. A vertical scrollbar here means the regression is back.
+    """
+    page.set_viewport_size({"width": 1366, "height": 768})
+    page.goto(f"{BASE_URL}/adventure")
+    page.wait_for_load_state("networkidle")
+
+    metrics = page.evaluate(
+        """() => ({
+            scrollH: document.documentElement.scrollHeight,
+            clientH: document.documentElement.clientHeight,
+            scrollW: document.documentElement.scrollWidth,
+            clientW: document.documentElement.clientWidth,
+            canvas: document.getElementById('dungeon-map').getBoundingClientRect(),
+        })"""
+    )
+
+    assert (
+        metrics["scrollH"] <= metrics["clientH"] + 1
+    ), f"page scrolls vertically at 1366x768: {metrics['scrollH']} > {metrics['clientH']}"
+    assert metrics["scrollW"] <= metrics["clientW"] + 1, "page scrolls horizontally at 1366x768"
+    assert metrics["canvas"]["height"] > 500, "the map did not take the space the chrome gave back"
+    assert metrics["canvas"]["width"] > 1200, "the map is not full-bleed"
+
+
 def test_api_move_via_page_fetch(page):
     result = page.evaluate(
         """async () => {
@@ -114,6 +143,107 @@ def test_api_move_via_page_fetch(page):
     # a blocked move (wall) is still a valid 200/400-class outcome.
     assert result["status"] != 403, "api-guard.js header was not attached"
     assert result["status"] < 500, f"server error on move: {result['status']}"
+
+
+def test_hud_panels_do_not_cover_the_party_or_each_other(page):
+    """Overlays must not sit on the camera's target (HUD spec, constraint 2),
+    and must not sit on top of one another.
+
+    Originally this only checked .adv-log and .adv-party-rail by name. That
+    hand-listed pair missed a real bug: .adv-actions (the action bar) had no
+    CSS relationship to --hud-inset-bottom, so its height was pure content
+    size, and at the brief's own button padding it rode up 23px under
+    .adv-party-rail -- which, being later in DOM order, won the stacking tie
+    and silently ate clicks meant for Search. A hand-listed pair only catches
+    regressions in the pair someone remembered to list.
+
+    So instead of naming panels, this discovers them: any direct child of
+    .adv-hud that is visible and positioned off the normal document flow
+    (absolute/fixed) other than the canvas itself. That is every current
+    overlay (.hud-readout, .map-controls, .adv-actions, .adv-log,
+    .adv-party-rail; #hotkeys-panel too, when open) and, structurally, any
+    future one -- nothing here needs to be remembered and appended to.
+
+    The hotkeys panel is opened first, because "when open" was a promise this
+    test used to make and not keep: the panel was anchored in the party rail's
+    box at the same z-index, and the rail -- later in DOM -- won the tie, so
+    the panel rendered behind four opaque frames and every click aimed at it
+    hit .adv-frame-open instead. Discovery skipped it entirely because a
+    display: none element has no box.
+    """
+    page.set_viewport_size({"width": 1366, "height": 768})
+    page.goto(f"{BASE_URL}/adventure")
+    page.wait_for_load_state("networkidle")
+    page.wait_for_timeout(500)  # let centerOnPlayer settle
+
+    page.click("#btn-show-hotkeys")
+    assert (
+        page.evaluate("() => getComputedStyle(document.getElementById('hotkeys-panel')).display") != "none"
+    ), "one click on #btn-show-hotkeys did not open the panel"
+
+    result = page.evaluate(
+        """() => {
+            const hud = document.querySelector('.adv-hud');
+            const cs = getComputedStyle(hud);
+            const left = parseFloat(cs.getPropertyValue('--hud-inset-left'));
+            const bottom = parseFloat(cs.getPropertyValue('--hud-inset-bottom'));
+            const r = hud.getBoundingClientRect();
+            // Where centerOnPlayer puts the party, per dungeon-canvas.js.
+            const px = (r.width + left) / 2;
+            const py = (r.height - bottom) / 2;
+
+            const panels = Array.from(hud.children).filter((el) => {
+                if (el.id === 'dungeon-map') return false; // the canvas, not an overlay
+                const pcs = getComputedStyle(el);
+                if (pcs.display === 'none' || pcs.visibility === 'hidden') return false;
+                if (pcs.position !== 'absolute' && pcs.position !== 'fixed') return false;
+                const rect = el.getBoundingClientRect();
+                return rect.width > 0 && rect.height > 0;
+            });
+            const describe = (el) => el.className ? String(el.className) : (el.id || el.tagName);
+
+            const onParty = panels
+                .filter((el) => {
+                    const b = el.getBoundingClientRect();
+                    return px >= b.left && px <= b.right && py >= b.top && py <= b.bottom;
+                })
+                .map(describe);
+
+            const pairOverlaps = [];
+            for (let i = 0; i < panels.length; i++) {
+                for (let j = i + 1; j < panels.length; j++) {
+                    const a = panels[i].getBoundingClientRect();
+                    const b = panels[j].getBoundingClientRect();
+                    const overlap = !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom);
+                    if (overlap) pairOverlaps.push([describe(panels[i]), describe(panels[j])]);
+                }
+            }
+
+            // The rail reserves its own span from --hud-inset-bottom, so it
+            // never overflows the HUD -- but it can overflow itself, and then
+            // the fourth frame is only reachable by scrolling a panel that
+            // gives no hint it scrolls.
+            const rail = hud.querySelector('.adv-party-rail');
+            const railOverflow = rail ? rail.scrollHeight - rail.clientHeight : 0;
+            const panelNames = panels.map(describe);
+
+            return { panelCount: panels.length, panelNames, onParty, pairOverlaps, railOverflow };
+        }"""
+    )
+
+    # A sanity floor on panel discovery itself: if this drops to 0 the
+    # selector broke (e.g. the HUD markup moved out of .adv-hud) and the
+    # checks below would vacuously pass.
+    assert result["panelCount"] >= 3, f"HUD panel discovery found too few panels: {result}"
+    assert (
+        "hotkeys-panel" in result["panelNames"]
+    ), f"the open hotkeys panel was not discovered as an overlay: {result['panelNames']}"
+    assert not result["onParty"], f"these panels are sitting on the party: {result['onParty']}"
+    assert not result["pairOverlaps"], f"these HUD panels overlap each other: {result['pairOverlaps']}"
+    # An earlier pass hit this by hand: four frames measured 677px against the
+    # 540px the rail has between --space-2 and --hud-inset-bottom. It will
+    # recur on a font-size change, a fifth party slot, or an extra stat row.
+    assert result["railOverflow"] <= 1, f"the party rail overflows its own box by {result['railOverflow']}px"
 
 
 def test_csrf_guard_rejects_bare_mutation(page):

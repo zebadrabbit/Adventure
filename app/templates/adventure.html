@@ -2,241 +2,149 @@
 
 {% block title %}Adventure Setup - MUD Game{% endblock %}
 
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="{{ asset_url('css/adventure-hud.css') }}">
+{% endblock %}
+
 {% block dashboard_content %}
-<style>
-  /* Canvas dungeon map styles */
-  #dungeon-map {
-    cursor: grab;
-    background: #000000;
-    border-radius: 4px;
-  }
+<div class="adv-hud">
+  <canvas id="dungeon-map" width="800" height="600"></canvas>
 
-  #dungeon-map:active {
-    cursor: grabbing;
-  }
+  <div class="hud-readout">
+    <span class="badge badge-mono seed-badge" id="dungeon-seed-badge">seed: ?</span>
+    <span>Time: <span id="time-tick-value"
+        data-initial="{{ game_clock.tick if game_clock else 0 }}">0</span></span>
+    <span id="entity-sync-status" title="Entity stream status">Syncing</span>
+    <button id="btn-toggle-controls" class="tactical-btn-secondary" title="Toggle Map Controls">
+      <i class="bi bi-sliders"></i>
+    </button>
+    <button id="btn-show-hotkeys" class="tactical-btn-secondary" title="Show Hotkeys">
+      <i class="bi bi-keyboard"></i>
+    </button>
+  </div>
 
-  .map-controls {
-    position: absolute;
-    top: 140px; /* below the canvas-drawn 120px minimap at top-right (10px inset) */
-    right: 10px;
-    z-index: 10;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
+  <div class="map-controls" id="map-controls-panel">
+    <button id="btn-zoom-in" title="Zoom In">+</button>
+    <button id="btn-zoom-out" title="Zoom Out">−</button>
+    <button id="btn-zoom-reset" title="Reset View">⌂</button>
+  </div>
 
-  .map-controls button {
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    font-size: 16px;
-  }
-
-  #hotkeys-panel {
-    display: none;
-    max-width: 300px;
-    border-radius: 4px;
-    font-size: 0.85rem;
-    z-index: 100;
-  }
-
-  #adventure-action-panel {
-    min-width: 110px;
-  }
-
-  .party-card-compact {
-    font-size: 0.85rem;
-  }
-
-  .party-card-header,
-  .party-card-body {
-    padding: 8px 12px;
-  }
-
-  .class-icon-slot {
-    width: 20px;
-    height: 20px;
-  }
-
-  .class-icon-slot img {
-    width: 18px;
-    height: 18px;
-  }
-
-  .avatar-circle-sm {
-    font-size: 0.7rem;
-  }
-
-  .party-card-name {
-    font-size: 0.95rem;
-  }
-
-  .party-card-badge {
-    font-size: 0.7rem;
-    padding: 2px 6px;
-  }
-
-  .party-stat-bar {
-    height: 0.9rem;
-    font-size: 0.7rem;
-  }
-
-  .party-stat-bar-fill {
-    line-height: 0.9rem;
-  }
-
-  .last-roll-line {
-    min-height: 1rem;
-    font-size: 0.7rem;
-  }
-
-  .party-card-action-btn {
-    padding: 4px 10px;
-    font-size: 0.75rem;
-  }
-</style>
-<div class="mission-briefing">
-  <div class="row">
-    <div class="col-lg-9">
-      <div class="tactical-panel mb-3">
-        <div class="panel-header d-flex justify-content-between align-items-center">
-          <h5 class="mb-0"><i class="bi bi-map me-2"></i>Dungeon Crawl</h5>
-          <div class="d-flex align-items-center gap-2">
-            <button id="btn-toggle-controls" class="btn btn-sm btn-outline-secondary" title="Toggle Map Controls">
-              <i class="bi bi-sliders"></i>
-            </button>
-            <button id="btn-show-hotkeys" class="btn btn-sm btn-outline-info" title="Show Hotkeys">
-              <i class="bi bi-keyboard"></i>
-            </button>
-            <span class="badge badge-mono seed-badge" id="dungeon-seed-badge">seed: ?</span>
-            <span class="small">Time: <span id="time-tick-value"
-                data-initial="{{ game_clock.tick if game_clock else 0 }}">0</span></span>
-            <span id="entity-sync-status" class="badge small" title="Entity stream status">Syncing </span>
-          </div>
-        </div>
-        <div class="panel-body position-relative">
-          <div class="position-relative">
-            <canvas id="dungeon-map" class="map-fluid-fixed-height mb-2" width="800" height="600"></canvas>
-            <div class="map-controls" id="map-controls-panel">
-              <button id="btn-zoom-in" class="btn btn-sm btn-dark" title="Zoom In">+</button>
-              <button id="btn-zoom-out" class="btn btn-sm btn-dark" title="Zoom Out">−</button>
-              <button id="btn-zoom-reset" class="btn btn-sm btn-dark" title="Reset View">⌂</button>
-            </div>
-            <div id="hotkeys-panel" class="position-absolute top-0 start-0 p-3 bg-dark text-light">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <strong>Hotkeys</strong>
-                <button id="btn-close-hotkeys" class="btn btn-sm btn-close btn-close-white"></button>
-              </div>
-              <div class="small">
-                <div class="mb-1"><kbd>W/↑</kbd> Move North</div>
-                <div class="mb-1"><kbd>S/↓</kbd> Move South</div>
-                <div class="mb-1"><kbd>A/←</kbd> Move West</div>
-                <div class="mb-1"><kbd>D/→</kbd> Move East</div>
-                <div class="mb-1"><kbd>Space</kbd> Search</div>
-                <div class="mb-1"><kbd>C</kbd> Camp</div>
-                <div class="mb-1"><kbd>E</kbd> Extract</div>
-                <div class="mb-1"><kbd>H</kbd> Hearth</div>
-                <div class="mb-1"><kbd>I</kbd> Inventory</div>
-                <div class="mb-1"><kbd>Esc</kbd> Close panels</div>
-              </div>
-            </div>
-          </div>
-          <div id="dungeon-controls" class="mb-3">
-            <div class="d-flex align-items-start gap-3">
-              <div id="adventure-action-panel" class="d-flex flex-column gap-2 me-1">
-                <button id="btn-search" type="button" class="tactical-btn-primary w-100"
-                  title="Search the current tile for hidden treasures (2 turns)">Search</button>
-                <button id="btn-party-inventory" type="button" class="tactical-btn-info w-100"
-                  title="View party shared inventory and gold">Party Stash</button>
-                <button id="btn-camp" type="button" class="tactical-btn-secondary w-100"
-                  title="Make camp: advance time, minor recovery, possible risk">Camp</button>
-                <button id="btn-extract" type="button" class="tactical-btn-success w-100"
-                  title="Extract: bank the run's haul to your Hoard and end the run">Extract</button>
-                <button id="btn-hearth" type="button" class="tactical-btn-danger w-100"
-                  title="Hearthstone: abandon the run and keep what you found (this dungeon is gone)">Hearth</button>
-              </div>
-              <div class="flex-grow-1 flex-min-0">
-                <div id="dungeon-output" class="dungeon-output u-mono mb-2">
-                  <em>Begin your adventure! Your party stands at the entrance of the dungeon...</em>
-                </div>
-                <div class="d-flex gap-2"><!-- inline search buttons are injected contextually in the log --></div>
-              </div>
-            </div>
-          </div>
-          <!-- Dungeon output relocated beside movement pad -->
-        </div>
-        <div id="party-characters-data" data-json='{{ party|tojson }}' hidden></div>
-      </div>
+  <div id="hotkeys-panel">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <strong>Hotkeys</strong>
+      <button id="btn-close-hotkeys" class="btn btn-sm btn-close btn-close-white"></button>
     </div>
-    <div class="col-lg-3">
-      {% if party and party|length > 0 %}
-      <div class="d-flex flex-column gap-2 align-items-stretch">
-        {% for m in party %}
-        {% set class_lower = m.class.lower() %}
-        <div data-member-id="{{ m.id }}"
-          class="operative-card party-card-compact border-{{ class_lower if class_lower in ['fighter','rogue','mage','cleric','druid','ranger'] else 'secondary' }}">
-          <div class="operative-header party-card-header d-flex align-items-center justify-content-between">
-            <div class="d-flex align-items-center gap-2">
-              <span class="u-flex-center class-icon-slot">
-                {% if class_lower == 'fighter' %}
-                <img src="{{ url_for('static', filename='iconography/swords-power.svg') }}" alt="Fighter">
-                {% elif class_lower == 'mage' %}
-                <img src="{{ url_for('static', filename='iconography/fire-silhouette.svg') }}" alt="Mage">
-                {% elif class_lower == 'rogue' %}
-                <img src="{{ url_for('static', filename='iconography/rogue.svg') }}" alt="Rogue">
-                {% elif class_lower == 'druid' %}
-                <img src="{{ url_for('static', filename='iconography/heavy-thorny-triskelion.svg') }}" alt="Druid">
-                {% elif class_lower == 'cleric' %}
-                <img src="{{ url_for('static', filename='iconography/aura.svg') }}" alt="Cleric">
-                {% elif class_lower == 'ranger' %}
-                <img src="{{ url_for('static', filename='iconography/bowman.svg') }}" alt="Ranger">
-                {% else %}
-                <span class="avatar-circle avatar-circle-sm">{{ m.name[0]|upper }}</span>
-                {% endif %}
-              </span>
-              <h6 class="mb-0 fw-bold party-card-name">{{ m.name }}</h6>
-            </div>
-            <div class="d-flex gap-1">
-              <span class="badge class-badge-{{ class_lower }} party-card-badge">{{ m.class
-                }}</span>
-              <span class="badge party-card-badge">Lv {{ m.level or 1 }}</span>
-            </div>
-          </div>
-          <div class="operative-body party-card-body">
-            <div class="mb-1">
-              <div class="progress hp-bar mb-1 party-stat-bar" data-hp="{{ m.hp }}" data-hp-max="{{ m.hp_max }}"
-                aria-label="HP">
-                <div class="progress-bar hp-fill party-stat-bar-fill" data-bar="hp">HP {{ m.hp }}/{{ m.hp_max
-                  }}</div>
-              </div>
-              <div class="progress mana-bar mb-1 party-stat-bar" data-mana="{{ m.mana }}" data-mana-max="{{ m.mana_max }}"
-                aria-label="Mana">
-                <div class="progress-bar mana-fill party-stat-bar-fill" data-bar="mana">MP {{ m.mana }}/{{
-                  m.mana_max }}</div>
-              </div>
-            </div>
-            <div class="text-warning small last-roll-line" data-char-id="{{ m.id }}" aria-live="polite"></div>
-            <div class="d-flex justify-content-end mt-1">
-              <div class="btn-group btn-group-sm" role="group" aria-label="Character actions">
-                <button class="tactical-btn-secondary btn-equip-panel party-card-action-btn" data-char-id="{{ m.id }}"
-                  aria-label="Equipment" title="Equipment"><i class="bi bi-box"></i></button>
-                <button class="tactical-btn-secondary btn-bag-panel party-card-action-btn" data-char-id="{{ m.id }}"
-                  aria-label="Bags" title="Bags"><i class="bi bi-bag"></i></button>
-              </div>
-            </div>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-      {% else %}
-      <div class="alert alert-secondary small">
-        <strong>No party loaded.</strong> A fallback attempt to load your characters returned zero rows.<br>
-        If you recently created characters, try refreshing or re-selecting a party.
-      </div>
-      {% endif %}
+    <div class="small">
+      <div class="mb-1"><kbd>W/↑</kbd> Move North</div>
+      <div class="mb-1"><kbd>S/↓</kbd> Move South</div>
+      <div class="mb-1"><kbd>A/←</kbd> Move West</div>
+      <div class="mb-1"><kbd>D/→</kbd> Move East</div>
+      <div class="mb-1"><kbd>Space</kbd> Search</div>
+      <div class="mb-1"><kbd>C</kbd> Camp</div>
+      <div class="mb-1"><kbd>E</kbd> Extract</div>
+      <div class="mb-1"><kbd>H</kbd> Hearth</div>
+      <div class="mb-1"><kbd>I</kbd> Inventory</div>
+      <div class="mb-1"><kbd>Esc</kbd> Close panels</div>
     </div>
   </div>
-  {% endblock %}
+
+  {# Party rail (Task 3) and floating log + action bar (Task 4) mount here. #}
+  <div class="adv-actions">
+    <div id="adventure-action-panel" class="d-flex flex-column gap-2">
+      <button id="btn-search" type="button" class="tactical-btn-primary"
+        title="Search the current tile for hidden treasures (2 turns)">Search</button>
+      <button id="btn-party-inventory" type="button" class="tactical-btn-info"
+        title="View party shared inventory and gold">Party Stash</button>
+      <button id="btn-camp" type="button" class="tactical-btn-secondary"
+        title="Make camp: advance time, minor recovery, possible risk">Camp</button>
+      <button id="btn-extract" type="button" class="tactical-btn-success"
+        title="Extract: bank the run's haul to your Hoard and end the run">Extract</button>
+      <button id="btn-hearth" type="button" class="tactical-btn-danger"
+        title="Hearthstone: abandon the run and keep what you found (this dungeon is gone)">Hearth</button>
+    </div>
+  </div>
+
+  {# Collapse is <details>, not a JS toggle: the browser owns the open state,
+     the summary is focusable and announced, and there is nothing to keep in
+     sync. Tabs (adventure/combat/chat) are deliberately not built -- this
+     screen has one log stream today. #}
+  <details class="adv-log" open>
+    <summary class="adv-log-head">
+      <span>Log</span>
+    </summary>
+    <div id="dungeon-output" class="dungeon-output u-mono">
+      <em>Begin your adventure! Your party stands at the entrance of the dungeon...</em>
+    </div>
+  </details>
+
+  <div class="adv-party-rail">
+    {% if party and party|length > 0 %}
+    {% for m in party %}
+    {% set class_lower = m.class.lower() %}
+    <div data-member-id="{{ m.id }}" data-char-id="{{ m.id }}" role="button" tabindex="0"
+      class="operative-card adv-frame-open">
+      <div class="operative-header party-card-header d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-2">
+          <span class="u-flex-center class-icon-slot">
+            {% if class_lower == 'fighter' %}
+            <img src="{{ url_for('static', filename='iconography/swords-power.svg') }}" alt="Fighter">
+            {% elif class_lower == 'mage' %}
+            <img src="{{ url_for('static', filename='iconography/fire-silhouette.svg') }}" alt="Mage">
+            {% elif class_lower == 'rogue' %}
+            <img src="{{ url_for('static', filename='iconography/rogue.svg') }}" alt="Rogue">
+            {% elif class_lower == 'druid' %}
+            <img src="{{ url_for('static', filename='iconography/heavy-thorny-triskelion.svg') }}" alt="Druid">
+            {% elif class_lower == 'cleric' %}
+            <img src="{{ url_for('static', filename='iconography/aura.svg') }}" alt="Cleric">
+            {% elif class_lower == 'ranger' %}
+            <img src="{{ url_for('static', filename='iconography/bowman.svg') }}" alt="Ranger">
+            {% else %}
+            <span class="avatar-circle">{{ m.name[0]|upper }}</span>
+            {% endif %}
+          </span>
+          <h6 class="mb-0 fw-bold party-card-name">{{ m.name }}</h6>
+        </div>
+        <div class="d-flex gap-1">
+          <span class="badge class-badge-{{ class_lower }} party-card-badge">{{ m.class }}</span>
+          <span class="badge party-card-badge">Lv {{ m.level or 1 }}</span>
+        </div>
+      </div>
+      <div class="operative-body party-card-body">
+        <div>
+          <div class="progress hp-bar mb-1 party-stat-bar" data-hp="{{ m.hp }}" data-hp-max="{{ m.hp_max }}"
+            aria-label="HP">
+            <div class="progress-bar hp-fill party-stat-bar-fill" data-bar="hp">HP {{ m.hp }}/{{ m.hp_max }}</div>
+          </div>
+          <div class="progress mana-bar mb-1 party-stat-bar" data-mana="{{ m.mana }}" data-mana-max="{{ m.mana_max }}"
+            aria-label="Mana">
+            <div class="progress-bar mana-fill party-stat-bar-fill" data-bar="mana">MP {{ m.mana }}/{{ m.mana_max }}
+            </div>
+          </div>
+        </div>
+        <div class="text-warning small last-roll-line" data-char-id="{{ m.id }}" aria-live="polite"></div>
+        <div class="d-flex justify-content-end">
+          <div class="btn-group btn-group-sm" role="group" aria-label="Character actions">
+            <button class="tactical-btn-secondary btn-equip-panel party-card-action-btn" data-char-id="{{ m.id }}"
+              aria-label="Equipment" title="Equipment"><i class="bi bi-box"></i></button>
+            <button class="tactical-btn-secondary btn-bag-panel party-card-action-btn" data-char-id="{{ m.id }}"
+              aria-label="Bags" title="Bags"><i class="bi bi-bag"></i></button>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="alert alert-secondary small">
+      <strong>No party loaded.</strong> A fallback attempt to load your characters returned zero rows.<br>
+      If you recently created characters, try refreshing or re-selecting a party.
+    </div>
+    {% endif %}
+  </div>
+
+  <div id="party-characters-data" data-json='{{ party|tojson }}' hidden></div>
+</div>
+{% endblock %}
 
   {% block scripts %}
   {{ super() }}

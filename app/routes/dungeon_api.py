@@ -2152,7 +2152,17 @@ def adventure():
     live = live_party_payload()
     if live:
         enriched_party = live
-    return render_template("adventure.html", party=enriched_party, seed=seed, pos=pos, game_clock=clock)
+    return render_template(
+        "adventure.html",
+        party=enriched_party,
+        seed=seed,
+        pos=pos,
+        game_clock=clock,
+        # Once you enter the dungeon the game is the screen: no navbar, no
+        # container, no footer, and the cold realm palette.
+        chrome="minimal",
+        realm="dungeon",
+    )
 
 
 # ---- Non-combat time advancement ----

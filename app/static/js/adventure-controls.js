@@ -1,3 +1,12 @@
+// Shared by the load-time paint below and partyCardRefresh()'s paint() --
+// HP colour is state-carrying (green -> red as a character nears death), so
+// it needs recomputing every time the bar's percentage changes, not just
+// once on page load.
+function hpFillColor(pct) {
+    const hue = Math.floor(120 * (pct / 100)); // 120 green -> 0 red
+    return 'hsl(' + hue + ',70%,45%)';
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     // Wire static Search, Camp & Hearth buttons (now left of log)
     (function bindActionButtons() {
@@ -107,7 +116,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const panel = document.getElementById('hotkeys-panel');
         if (showBtn && panel) {
             showBtn.addEventListener('click', () => {
-                panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+                // getComputedStyle, not panel.style: the panel's resting
+                // display: none comes from adventure-hud.css, so the inline
+                // style is the empty string until something sets it and the
+                // first click used to read "not none" and hide an already
+                // hidden panel -- the button did nothing at all until the
+                // second press.
+                panel.style.display =
+                    getComputedStyle(panel).display === 'none' ? 'block' : 'none';
             });
         }
         if (closeBtn && panel) {
@@ -120,8 +136,18 @@ document.addEventListener('DOMContentLoaded', function () {
     // Keyboard shortcuts
     (function bindKeyboardShortcuts() {
         document.addEventListener('keydown', (e) => {
-            // Don't trigger if user is typing in an input
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            // Don't trigger if user is typing/selecting in a form control --
+            // every hotkey is suspect here, not just Space, so this stays a
+            // blanket bail regardless of which key was pressed.
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+
+            // Chorded keys belong to the browser and the OS, not to us. Ctrl+C
+            // over a selected log line was firing Camp (a campfire kit, a tick
+            // of the clock and a possible ambush); Ctrl+E opened the extraction
+            // modal and Ctrl+H fired Hearth's confirm on top of the browser's
+            // own history shortcut. Shift is deliberately not listed -- the
+            // movement handler in adventure.js uses it as an override.
+            if (e.metaKey || e.ctrlKey || e.altKey) return;
 
             const key = e.key.toLowerCase();
 
@@ -145,6 +171,14 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             // Actions
             else if (key === ' ') {
+                // Invariant: Space belongs to whatever has focus. Search is
+                // only the page's Space when nothing on the page has claimed
+                // it, and "nothing has focus" is exactly e.target === body.
+                //
+                // Scoped to Space alone: the letter and arrow hotkeys have no
+                // native collision and must keep working with focus resting
+                // on a button, e.g. right after a mouse click.
+                if (e.target !== document.body) return;
                 e.preventDefault();
                 const searchBtn = document.getElementById('btn-search');
                 if (searchBtn && !searchBtn.disabled) searchBtn.click();
@@ -176,11 +210,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const hp = parseFloat(w.getAttribute('data-hp')) || 0;
         const max = parseFloat(w.getAttribute('data-hp-max')) || 0;
         const pct = max > 0 ? clamp((hp / max) * 100, 0, 100) : 0;
-        const hue = Math.floor(120 * (pct / 100)); // 120 green -> 0 red
         const fill = w.querySelector('[data-bar="hp"]');
         if (fill) {
             fill.style.width = pct.toFixed(1) + '%';
-            fill.style.backgroundColor = 'hsl(' + hue + ',70%,45%)';
+            fill.style.backgroundColor = hpFillColor(pct);
             fill.style.transition = 'width 0.3s ease-in-out, background-color 0.3s ease-in-out';
         }
     });
@@ -191,12 +224,35 @@ document.addEventListener('DOMContentLoaded', function () {
         const fill = w.querySelector('[data-bar="mana"]');
         if (fill) {
             fill.style.width = pct.toFixed(1) + '%';
-            fill.style.backgroundColor = '#3b82f6'; // Consistent blue color
+            // No inline colour here -- adventure-hud.css's
+            // .mana-bar .party-stat-bar-fill { background: var(--mp); }
+            // owns it. (Previously hardcoded to '#3b82f6', a near-duplicate
+            // of --mp that didn't match it.)
             fill.style.transition = 'width 0.3s ease-in-out';
         }
     });
 
-    // Equipment/Bags buttons now handled by equipment.js (same as dashboard)
+    // Clicking anywhere on a party frame opens that character, same as the
+    // frame's equip button. The paper doll itself is the next chunk
+    // (specs/2026-07-28-character-panel-redesign.md); this is the hook it
+    // will reuse.
+    document.addEventListener('click', (e) => {
+        const frame = e.target.closest('.adv-frame-open');
+        if (!frame) return;
+        // Let the frame's own buttons handle their own clicks.
+        if (e.target.closest('button')) return;
+        const equipBtn = frame.querySelector('.btn-equip-panel');
+        if (equipBtn) equipBtn.click();
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const frame = e.target.closest?.('.adv-frame-open');
+        if (!frame || e.target !== frame) return;
+        e.preventDefault();
+        const equipBtn = frame.querySelector('.btn-equip-panel');
+        if (equipBtn) equipBtn.click();
+    });
 });
 
 // ---------------------------------------------------------------- party cards
@@ -219,6 +275,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (fill) {
                 fill.style.width = pct + '%';
                 fill.textContent = `${label} ${cur}/${max}`;
+                // Recompute the health hue on every refresh, not just page
+                // load -- otherwise a character who drops to 10% keeps
+                // whatever colour the bar had when the page was rendered
+                // until the next full reload. Mana has no equivalent: its
+                // colour is fixed (adventure-hud.css's --mp), never
+                // inline-styled.
+                if (label === 'HP') fill.style.backgroundColor = hpFillColor(pct);
             }
             track.setAttribute(label === 'HP' ? 'data-hp' : 'data-mana', cur);
             track.setAttribute(label === 'HP' ? 'data-hp-max' : 'data-mana-max', max);
