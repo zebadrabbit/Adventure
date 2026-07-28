@@ -1,3 +1,9 @@
+# [0.8.0] - UNRELEASED
+### Added
+### Changed
+### Fixed
+### Notes
+
 # [0.7.25] - UNRELEASED
 ### Added
 - `tests/test_full_run_e2e.py`: end-to-end runs driven through the real HTTP API
