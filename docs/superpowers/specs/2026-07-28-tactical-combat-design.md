@@ -167,6 +167,25 @@ withdrawal — decisions about who covers whom — and interacts with the existi
 wipe rules: a character who fails to escape is subject to the same permadeath
 path as one who falls.
 
+### Action economy in a fight
+
+| action | in combat | cost |
+|---|---|---|
+| Weapon swap | allowed | an action |
+| Armor swap | **not allowed** | — |
+| Potion / item use | allowed | an action |
+| Anything else (re-gearing, trading) | out of combat only | — |
+
+Two notes on where the code stands against these rules:
+
+- **Item use already costs an action.** `player_use_item` sets `phase = "end"`
+  and progresses the turn, so this rule needs no change.
+- **Nothing enforces the others.** `inventory_api.equip_item` has no combat
+  guard at all, so a character can currently swap armour — or anything —
+  mid-fight, unlimited and free, by calling the inventory API while a combat
+  session is active. That is a live loophole today, not just a rule waiting on
+  the redesign, and it is worth closing before the grid work rather than after.
+
 ### Grid
 
 8×8 confirmed for now, to be revisited after a prototype with six enemies and

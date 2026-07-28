@@ -71,6 +71,10 @@ screen gets the lesser one.
 2. **Is the paper doll per-character or party-wide** with a character selector?
    Four characters and one screen; a selector is fewer pixels, four dolls is
    fewer clicks.
-3. **Does it appear in combat?** Item usage does (see the item spec). Full
-   equipment management mid-fight is a different question — Gold Box let you
-   swap weapons as an action.
+3. ~~Does it appear in combat?~~ **Decided**: weapon swaps are allowed in combat
+   and cost an action; armour swaps are not allowed at all. Item use is allowed
+   and costs an action. Everything else — full re-gearing, trading — is
+   out-of-combat only. So the panel appears in a fight, but in a reduced mode:
+   weapons and consumables live, armour slots locked. See the action-economy
+   table in
+   [2026-07-28-tactical-combat-design.md](2026-07-28-tactical-combat-design.md).
