@@ -570,7 +570,11 @@ Examples:
                 if not user:
                     print(f"[ERROR] User '{username}' does not exist.")
                 else:
-                    db.session.delete(user)
+                    # Seven tables reference `user` with no cascade, so a plain
+                    # delete fails for any account that has ever played.
+                    from app.services.character_service import delete_user as _delete_user
+
+                    _delete_user(user)
                     db.session.commit()
                     print(f"[OK] User '{username}' deleted.")
             continue

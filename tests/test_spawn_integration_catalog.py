@@ -98,17 +98,41 @@ def test_boss_spawn_borrows_a_catalogue_identity(test_app):
         assert spawn.data["archetype"] == "Boss"
 
 
-def test_boss_falls_back_to_the_label_above_the_catalogue(test_app):
-    """Nothing to borrow -> a plain label, not a crash.
+def test_boss_above_the_catalogue_ceiling_still_gets_a_real_name(test_app):
+    """Past the catalogue's top band, borrow from the deepest band that exists.
 
-    Level 40 is past the catalogue's top band (it stops at 20, while characters
-    can reach 50), so this is also a live gap, not a hypothetical.
+    Level 40 is beyond the catalogue's ceiling of 20 (characters reach 50).
+    That used to yield nothing, so the spawn fell back to a bare "Boss (L40)"
+    label with no family, loot table or resistances. _eligible_monsters now
+    clamps to the deepest band instead -- see test_catalogue_level_ceiling.
     """
     with test_app.app_context():
         _seed_boss_archetype()
         user = create_user("catalogspawn_3")
         inst = create_instance(user, seed=903)
         spawn_service._ELIGIBLE_CACHE.clear()
+
+        spawn = SpawnEntry(x=0, y=0, behavior=SpawnBehavior.BOSS, archetype="Boss", level=40)
+        populate_spawn_stats(spawn, party_level=40, instance=inst)
+
+        assert "(L" not in spawn.name, "a high-level boss should not be a bare archetype label"
+        assert spawn.slug != "boss"
+
+
+def test_boss_falls_back_to_the_label_when_nothing_is_catalogued(test_app, monkeypatch):
+    """The genuine empty case still degrades to a label rather than crashing.
+
+    Driven by forcing the identity lookup to come back empty, because that is
+    the actual trigger. An empty *family* is not enough: the lookup deliberately
+    widens from the dungeon's family to any family before giving up, so with any
+    catalogue at all a boss finds something to be.
+    """
+    with test_app.app_context():
+        _seed_boss_archetype()
+        user = create_user("catalogspawn_4")
+        inst = create_instance(user, seed=904)
+        db.session.commit()
+        monkeypatch.setattr(spawn_service, "_identity_for_archetype", lambda *a, **k: None)
 
         spawn = SpawnEntry(x=0, y=0, behavior=SpawnBehavior.BOSS, archetype="Boss", level=40)
         populate_spawn_stats(spawn, party_level=40, instance=inst)

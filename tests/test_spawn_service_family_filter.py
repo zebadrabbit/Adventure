@@ -1,5 +1,11 @@
 """Tests that choose_monster/_eligible_monsters can be restricted to a
-single MonsterCatalog family."""
+single MonsterCatalog family.
+
+Fixtures use private family names. Real family names ("undead", "beast") made
+these tests assert that a fixture monster was the *only* match, which held only
+while the monster catalogue happened to be empty -- so they passed on an
+unseeded database and failed on a properly seeded one. See docs/TESTING.md.
+"""
 
 from app import db
 from app.models.models import MonsterCatalog
@@ -7,7 +13,7 @@ from app.services import spawn_service
 
 
 def _seed_two_families():
-    for slug, family in (("theme-undead-1", "undead"), ("theme-beast-1", "beast")):
+    for slug, family in (("theme-undead-1", "_famtest_undead"), ("theme-beast-1", "_famtest_beast")):
         if MonsterCatalog.query.filter_by(slug=slug).first():
             continue
         db.session.add(
@@ -31,7 +37,7 @@ def _seed_two_families():
 def test_family_filter_restricts_eligible_pool(test_app):
     with test_app.app_context():
         _seed_two_families()
-        pool = spawn_service._eligible_monsters(level=1, family="undead")
+        pool = spawn_service._eligible_monsters(level=1, family="_famtest_undead")
         slugs = {m.slug for m in pool}
         assert "theme-undead-1" in slugs
         assert "theme-beast-1" not in slugs
@@ -41,7 +47,7 @@ def test_choose_monster_with_family_only_returns_that_family(test_app):
     with test_app.app_context():
         _seed_two_families()
         for _ in range(10):
-            monster = spawn_service.choose_monster(level=1, family="undead")
+            monster = spawn_service.choose_monster(level=1, family="_famtest_undead")
             assert monster["slug"] == "theme-undead-1"
 
 

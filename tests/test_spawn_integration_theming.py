@@ -1,5 +1,10 @@
 """Tests that populate_spawn_stats restricts ambient-tier spawns to the
-instance's assigned monster_family theme."""
+instance's assigned monster_family theme.
+
+Fixtures use private family names: asserting that a fixture monster is the only
+match for a *real* family only held while the catalogue was empty, so these
+passed on an unseeded database and failed on a seeded one (docs/TESTING.md).
+"""
 
 from app import db
 from app.dungeon.spawn_integration import populate_spawn_stats
@@ -10,7 +15,7 @@ from tests.factories import create_instance, create_user
 
 
 def _seed_two_families():
-    for slug, family in (("themespawn-undead", "undead"), ("themespawn-beast", "beast")):
+    for slug, family in (("themespawn-undead", "_themetest_undead"), ("themespawn-beast", "_themetest_beast")):
         if MonsterCatalog.query.filter_by(slug=slug).first():
             continue
         db.session.add(
@@ -36,7 +41,7 @@ def test_ambient_spawn_respects_instance_theme(test_app):
         _seed_two_families()
         user = create_user("spawntheme_1")
         inst = create_instance(user, seed=701)
-        inst.monster_family = "undead"
+        inst.monster_family = "_themetest_undead"
         db.session.commit()
 
         for _ in range(10):

@@ -188,3 +188,40 @@ def test_start_adventure_refuses_a_permadeathed_party(client, user):
     with client.session_transaction() as sess:
         party = sess.get("party") or []
     assert dead.id not in [p.get("id") for p in party]
+
+
+# ------------------------------------------------------------ account deletion
+
+
+def test_delete_user_with_a_played_account(client, test_app):
+    """Seven tables reference `user` with no cascade.
+
+    An account that had ever entered a dungeon could not be deleted: the admin
+    shell's `delete user` raised a ForeignKeyViolation on dungeon_instance. Same
+    shape as the character bug above, one level up.
+    """
+    from werkzeug.security import generate_password_hash
+
+    from app.models.dungeon_instance import DungeonInstance
+    from app.models.hoard import Hoard
+    from app.models.models import User
+    from app.services.character_service import delete_user
+
+    account = User(username="doomed_account", password=generate_password_hash("pw"))
+    db.session.add(account)
+    db.session.commit()
+    user_id = account.id
+
+    char = _character(account, "Doomed Hero")
+    db.session.add(DungeonInstance(user_id=user_id, seed=4242, pos_x=0, pos_y=0, pos_z=0))
+    Hoard.get_or_create(user_id)
+    db.session.commit()
+    char_id = char.id
+
+    result = delete_user(account)
+
+    assert db.session.get(User, user_id) is None
+    assert db.session.get(Character, char_id) is None, "the account's characters must go with it"
+    assert DungeonInstance.query.filter_by(user_id=user_id).count() == 0
+    assert result["removed"].get("dungeon_instance") == 1
+    assert result["removed"].get("character") == 1

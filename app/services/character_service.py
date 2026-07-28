@@ -82,6 +82,69 @@ def delete_character(char: Character) -> dict:
     return {"character_id": char_id, "name": name, "removed": removed}
 
 
+# Rows owned by a user account. Same story as OWNED_TABLES above: seven tables
+# carry a foreign key to `user` and none of them cascade, so deleting an account
+# that has ever played raised a ForeignKeyViolation. Characters are handled
+# separately (they own rows of their own), and themes a user authored outlive
+# them.
+USER_OWNED_TABLES = (
+    ("dungeon_instance", "user_id"),
+    ("combat_session", "user_id"),
+    ("hoard", "user_id"),
+    ("user_pref", "user_id"),
+    ("user_quest_pool", "user_id"),
+)
+
+USER_CLEARED_REFERENCES = (("theme", "created_by"),)
+
+
+def delete_user(user) -> dict:
+    """Delete a user account and everything that depends on it.
+
+    Deletes the account's characters through delete_character (each owns ten
+    tables of its own), then the account-scoped rows, then the user. Themes the
+    user authored survive with a null author -- they may be in use by others.
+    """
+    from app.models.models import Character
+
+    user_id = user.id
+    username = user.username
+    removed: dict[str, int] = {}
+
+    try:
+        for char in Character.query.filter_by(user_id=user_id).all():
+            result = delete_character(char)
+            for table, count in result["removed"].items():
+                removed[table] = removed.get(table, 0) + count
+            removed["character"] = removed.get("character", 0) + 1
+
+        for table, column in USER_OWNED_TABLES:
+            res = db.session.execute(
+                text(f"DELETE FROM {table} WHERE {column} = :uid"),  # noqa: S608 - literal table names above
+                {"uid": user_id},
+            )
+            if res.rowcount:
+                removed[table] = removed.get(table, 0) + res.rowcount
+
+        for table, column in USER_CLEARED_REFERENCES:
+            res = db.session.execute(
+                text(f"UPDATE {table} SET {column} = NULL WHERE {column} = :uid"),  # noqa: S608
+                {"uid": user_id},
+            )
+            if res.rowcount:
+                removed[f"{table}.{column} cleared"] = res.rowcount
+
+        db.session.delete(user)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        logger.error("user_delete_failed", user_id=user_id, username=username, exc_info=True)
+        raise
+
+    logger.info("user_deleted", user_id=user_id, username=username, removed=removed)
+    return {"user_id": user_id, "username": username, "removed": removed}
+
+
 def living_characters(user_id: int):
     """The user's characters that can still be sent into a dungeon.
 
