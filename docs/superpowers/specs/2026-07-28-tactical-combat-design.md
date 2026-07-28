@@ -120,15 +120,29 @@ bonuses in the same pass, and it already drives initiative. Reusing it as the
 movement driver keeps one number meaning one thing — a quick character both acts
 earlier and covers more ground — rather than inventing a second speed stat.
 
-**No encumbrance penalty on movement.** Carrying capacity is a *bag space*
-limit, not a mobility tax. This needs care, because the existing system
-disagrees: `inventory/utils.apply_encumbrance_penalty` subtracts a `dex_penalty`
-from DEX when a character is `encumbered` or `blocked`, and DEX is exactly what
-movement would derive from. Left alone, being over capacity would silently slow
-a character in combat. Either movement must read a pre-penalty DEX, or that
-penalty needs retiring in favour of a pure space limit. **The bag-space model
-itself is not yet designed** — currently capacity is weight-based
-(`compute_capacity` = base + STR × per_str).
+**Encumbrance stays, and it feeds movement.** (Revised 2026-07-28: an earlier
+call to drop it came from picturing an MMO-style bag rather than a D&D carry
+weight. The existing system is the D&D one and is the right fit.)
+
+Carry weight already works end to end: `compute_capacity` is
+`base + STR × per_str`, `encumbrance_state` classifies normal / encumbered /
+blocked, and `apply_encumbrance_penalty` subtracts a `dex_penalty` from DEX past
+capacity. Since movement derives from `speed` (`8 + DEX // 2`), an overloaded
+character will move less — which is the correct D&D behaviour and needs no new
+code, only the wiring.
+
+**The requirement is that the player can see it coming.** The plumbing is
+surfaced already: `equipment-shared.encumbranceView` renders a weight bar with
+"Encumbered" / "Overloaded — cannot carry more" and a `(-N DEX)` note, used by
+both equipment panels. What is missing is the consequence *where it bites*:
+
+- The combat screen must show a character's movement allowance, and mark it when
+  encumbrance is reducing it. `(-2 DEX)` on an inventory screen does not tell a
+  player they will be a square short of the archer they were trying to reach.
+- Picking loot up mid-run is where a party crosses the line, so the loot
+  distribution dialog should warn before an assignment tips someone over —
+  it already receives a `skipped` list for items that will not fit
+  (`/api/loot/confirm`), which is the same information one step too late.
 
 ### Ranged and melee
 
@@ -158,10 +172,19 @@ path as one who falls.
 8×8 confirmed for now, to be revisited after a prototype with six enemies and
 four characters.
 
+### Movement and actions are separate budgets
+
+Gold Box standard: a character may move, act, and spend whatever movement is
+left. Moving does **not** consume the action.
+
+The reasoning is playability for the back rank — a caster or ranger frequently
+has to reposition to get a target in line, and making that cost the turn would
+punish exactly the classes whose whole contribution is the action. It also means
+"step back and shoot" is available to a ranger without giving up the shot.
+
 ## Open questions
 
-1. **Bag space model.** "No encumbrance penalty, only bag space limits" needs
-   designing: slot count, stack rules, and what happens when a pickup does not
-   fit. Currently capacity is weight-derived and over-capacity costs DEX.
-2. **Does an action end movement?** Gold Box lets a character move, act, and
-   spend leftover movement. Simpler is move-or-act; richer is move, act, move.
+1. **Where does the movement allowance come from, exactly?** `speed` is
+   `8 + DEX // 2`, which is an initiative number; squares-per-turn needs its own
+   scale (a divisor, or a small base plus a modifier). Wants a prototype rather
+   than a formula picked on paper.
