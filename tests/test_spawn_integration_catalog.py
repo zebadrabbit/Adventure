@@ -1,5 +1,10 @@
-"""Tests that ambient-tier spawns draw from the real MonsterCatalog,
-while boss/elite spawns keep the existing archetype-label system."""
+"""Every spawn takes its identity from the real MonsterCatalog.
+
+Ambient spawns are drawn from the catalog outright. Boss/elite spawns keep the
+archetype system for their *stats* (tier and affix scaling) but borrow a
+catalogued creature's name, family and traits -- otherwise the set piece at the
+bottom of the dungeon announces itself as "Boss (L12)".
+"""
 
 from app import db
 from app.dungeon.spawn_integration import populate_spawn_stats
@@ -60,6 +65,10 @@ def test_ambient_spawn_uses_real_catalog_monster(test_app):
         _seed_test_monster()
         user = create_user("catalogspawn_1")
         inst = create_instance(user, seed=901)
+        # Pin the theme: the real catalogue is seeded here too, so without this
+        # the pick is whatever else happens to cover level 1.
+        inst.monster_family = "test"
+        db.session.commit()
 
         spawn = SpawnEntry(x=0, y=0, behavior=SpawnBehavior.PATROL, archetype="Trash", level=1)
         populate_spawn_stats(spawn, party_level=1, instance=inst)
@@ -69,14 +78,112 @@ def test_ambient_spawn_uses_real_catalog_monster(test_app):
         assert spawn.hp_current == 20
 
 
-def test_boss_spawn_still_uses_archetype_label(test_app):
+def test_boss_spawn_borrows_a_catalogue_identity(test_app):
+    """Archetype stats, catalogue name."""
     with test_app.app_context():
         _seed_boss_archetype()
+        _seed_test_monster()
         user = create_user("catalogspawn_2")
         inst = create_instance(user, seed=902)
+        inst.monster_family = "test"
+        db.session.commit()
 
         spawn = SpawnEntry(x=0, y=0, behavior=SpawnBehavior.BOSS, archetype="Boss", level=1)
         populate_spawn_stats(spawn, party_level=1, instance=inst)
 
-        assert spawn.name is not None and "(L" in spawn.name
+        assert spawn.name == "Test Grunt", "a boss must not be called 'Boss (L1)'"
+        assert spawn.slug == "test-grunt"
+        # Stats still come from the archetype, not the 20 hp catalogue row.
+        assert spawn.hp_current > 100
+        assert spawn.data["archetype"] == "Boss"
+
+
+def test_boss_falls_back_to_the_label_above_the_catalogue(test_app):
+    """Nothing to borrow -> a plain label, not a crash.
+
+    Level 40 is past the catalogue's top band (it stops at 20, while characters
+    can reach 50), so this is also a live gap, not a hypothetical.
+    """
+    with test_app.app_context():
+        _seed_boss_archetype()
+        user = create_user("catalogspawn_3")
+        inst = create_instance(user, seed=903)
+        spawn_service._ELIGIBLE_CACHE.clear()
+
+        spawn = SpawnEntry(x=0, y=0, behavior=SpawnBehavior.BOSS, archetype="Boss", level=40)
+        populate_spawn_stats(spawn, party_level=40, instance=inst)
+
+        assert "(L" in spawn.name
         assert spawn.slug == "boss"
+
+
+def test_ordinary_spawn_never_wears_a_bosses_name(test_app):
+    """Otherwise a trash mob reads as the dungeon boss and unlocks extraction."""
+    from app.services import boss_abilities
+
+    with test_app.app_context():
+        if not MonsterCatalog.query.filter_by(slug="test-tyrant").first():
+            db.session.add(
+                MonsterCatalog(
+                    slug="test-tyrant",
+                    name="Test Tyrant",
+                    level_min=1,
+                    level_max=10,
+                    base_hp=900,
+                    base_damage=60,
+                    family="test",
+                    rarity="boss",
+                    boss=True,
+                    xp_base=2000,
+                )
+            )
+            db.session.commit()
+        spawn_service._ELIGIBLE_CACHE.clear()
+        if not EnemyArchetype.query.filter_by(archetype="Trash").first():
+            db.session.add(
+                EnemyArchetype(
+                    archetype="Trash",
+                    rank="Normal",
+                    base_hp=25,
+                    hp_per_level=10,
+                    base_damage=4,
+                    damage_per_level=2.0,
+                    armor_class_base=10,
+                    armor_class_per_level=0.3,
+                    xp_base=15,
+                    xp_per_level=5,
+                    loot_multiplier=1.0,
+                )
+            )
+            db.session.commit()
+
+        monster = spawn_service.choose_archetype_monster(level=5, archetype_name="Trash", tier=1)
+
+        assert monster["name"] != "Test Tyrant"
+        assert boss_abilities.is_boss(monster) is False
+
+
+def test_set_piece_prefers_the_dungeons_own_family(test_app):
+    with test_app.app_context():
+        _seed_boss_archetype()
+        for fam in ("moss", "cinder"):
+            if not MonsterCatalog.query.filter_by(slug=f"{fam}-thing").first():
+                db.session.add(
+                    MonsterCatalog(
+                        slug=f"{fam}-thing",
+                        name=f"{fam.title()} Thing",
+                        level_min=1,
+                        level_max=10,
+                        base_hp=30,
+                        base_damage=5,
+                        family=fam,
+                        rarity="common",
+                        boss=False,
+                        xp_base=10,
+                    )
+                )
+        db.session.commit()
+        spawn_service._ELIGIBLE_CACHE.clear()
+
+        monster = spawn_service.choose_archetype_monster(level=3, archetype_name="Boss", tier=1, family="cinder")
+        assert monster["name"] == "Cinder Thing"

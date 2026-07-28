@@ -14,6 +14,10 @@
 - `CombatSession.dungeon_snapshot_json` column (migration `d9e2f3a4b5c6`).
 - Per-run XP baseline (`instance.dungeon_metadata["xp_at_entry"]`) recorded when
   the party locks into a run.
+- Monster compendium expanded from 45 to 105 entries (SRD 5.1-derived, CC BY 4.0,
+  reflavoured to house style). Dragons went from a single level-15 boss to a full
+  1-20 line; undead and humanoids previously stopped at level 9-10; the 16-20
+  bands and the cold/water elemental line were empty.
 
 ### Changed
 - Hearthstone is now a no-fault abandon: the party is released, keeps everything
@@ -45,6 +49,11 @@
   granted 1000×tier XP and pooled no haul. The live path is
   `POST /api/dungeon/extraction/extract`.
 
+- Elite and boss spawns now take their identity (name, family, traits, loot
+  table) from the monster catalogue while keeping archetype-driven stats, and
+  respect the dungeon's monster family. They were announced as literal
+  `"Elite (L3)"` / `"Boss (L12)"`.
+
 ### Fixed
 - Kill tracking never ran: `start_session` skipped writing the dungeon snapshot
   because the column did not exist, so `bosses_defeated`, `elites_defeated`,
@@ -58,6 +67,9 @@
   breaking both `/api/dungeon/hearth` and `/api/dungeon/extract`.
 - `_level_window` inverted past party level 18, raising an empty-range
   `randrange` and silently generating no floor loot.
+- `populate_spawn_stats` swallowed missing-reference-data errors silently,
+  substituting junk monsters ("Elite Monster", hp = level*20, no loot table).
+  It now logs `spawn_stats_fallback` with the archetype, level and family.
 
 ### Notes
 - Reward-granting failures in `_check_end` now log instead of rolling back

@@ -134,6 +134,34 @@ Two traps worth remembering:
   `rarity_weights` key weights *monster* rarity in spawn_service. Mirroring the
   first onto the second would silently reweight every spawn.
 
+## Monsters, Archetypes and Identity
+
+Two systems feed a spawn, and both must be seeded or spawns degrade silently:
+
+* `monster_catalog` (105 rows, `sql/monsters_seed.sql`) — who a creature *is*:
+  name, family, level band, traits, loot table.
+* `enemy_archetype` (8 rows, `sql/enemy_archetypes_seed.sql`) — how a set piece
+  *scales*: Trash/Skirmisher/Brute/Caster/Elite/Champion/Miniboss/Boss, each with
+  per-level HP, damage, AC and XP curves that tier and affixes modify.
+
+Ambient spawns come straight from the catalogue. Elite and boss spawns take
+their stats from the archetype and their identity from the catalogue
+(`spawn_service._identity_for_archetype`), preferring the dungeon's own
+`monster_family` and only widening if that family has nothing at the level.
+Ordinary ranks may never borrow a catalogued boss's identity — a Trash mob
+wearing a boss's name would read as the dungeon boss to `boss_abilities.is_boss`
+and unlock extraction.
+
+If either table is unseeded, `populate_spawn_stats` falls back to a bare
+`"<Archetype> Monster"` with `hp = level * 20` and no loot table. That fallback
+now logs `spawn_stats_fallback`; it used to be silent, which is how an empty
+`enemy_archetype` table went unnoticed in a live database.
+
+Known gaps: the catalogue covers levels 1–20 while characters can reach 50, and
+`loot_table` values (`goblin_basic`, `boss_dragon`, …) are parsed by
+`loot_service._parse_loot_table` as **CSV item slugs**, so they resolve to
+nothing — every monster's item pool is currently empty.
+
 ## New API Endpoints
 
 ### `app/routes/extraction_api.py`

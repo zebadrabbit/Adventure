@@ -171,6 +171,44 @@ def sample_distribution(level: int, samples: int = 200) -> dict:
     return freq
 
 
+def _identity_for_archetype(archetype, level: int, family: Optional[str], rng) -> Optional[MonsterCatalog]:
+    """Pick a catalog creature to lend its identity to an archetype spawn.
+
+    The archetype supplies the *stats* (that is its whole job: tier- and
+    affix-driven scaling); the catalog supplies who the thing actually is --
+    name, slug, family, traits, loot table. Without this an Elite is literally
+    called "Elite (L7)".
+
+    Preference order, widening only as far as it must: the dungeon's own family
+    at this level, then any family at this level, then nothing (caller falls
+    back to the bare archetype label). Boss-rank archetypes look for catalogued
+    bosses first, and elite ranks for the rarer end of the catalog, so a set
+    piece does not end up wearing a rat's name.
+    """
+    rank = (getattr(archetype, "rank", "") or "").strip().lower()
+    is_boss_rank = rank in ("boss", "miniboss")
+    is_elite_rank = rank in ("elite", "champion") or is_boss_rank
+
+    for fam in ([family] if family else []) + [None]:
+        # Only set-piece ranks may wear a catalogued boss's identity; a Trash
+        # spawn borrowing the Gloom Prince's name would be absurd, and worse,
+        # would look like a boss to anything reading the payload.
+        rows = _eligible_monsters(level, include_boss=is_elite_rank, family=fam)
+        if not rows:
+            continue
+        pools = []
+        if is_boss_rank:
+            pools.append([r for r in rows if r.boss])
+        if is_elite_rank:
+            pools.append([r for r in rows if (r.rarity or "") in ("boss", "elite", "rare")])
+        pools.append([r for r in rows if not r.boss])
+        pools.append(rows)
+        for pool in pools:
+            if pool:
+                return rng.choice(pool)
+    return None
+
+
 def choose_archetype_monster(
     level: int,
     archetype_name: str = None,
@@ -178,6 +216,7 @@ def choose_archetype_monster(
     affix_ids: List[str] = None,
     party_size: int = 1,
     rng: Optional[random.Random] = None,
+    family: Optional[str] = None,
 ):
     """Choose a monster using enemy archetype system with tier and affix modifiers.
 
@@ -246,8 +285,9 @@ def choose_archetype_monster(
         stats["xp"] = int(stats["xp"] * tier_row.xp_multiplier)
         stats["loot_multiplier"] = stats.get("loot_multiplier", 1.0) * (1.0 + tier_row.loot_quality_bonus)
 
-    # Format as expected monster dict
-    return {
+    # Format as expected monster dict. Stats come from the archetype; identity
+    # comes from the catalog when a creature fits this level/family.
+    monster = {
         "slug": archetype.archetype.lower().replace(" ", "-"),
         "name": f"{archetype.archetype} (L{modified_level})",
         "hp": stats["hp"],
@@ -259,3 +299,25 @@ def choose_archetype_monster(
         "loot_multiplier": stats.get("loot_multiplier", 1.0),
         "archetype": archetype.archetype,
     }
+
+    identity = _identity_for_archetype(archetype, modified_level, family, rng)
+    if identity is not None:
+        monster.update(
+            {
+                "slug": identity.slug,
+                "name": identity.name,
+                "family": identity.family,
+                "rarity": identity.rarity,
+                "traits": identity.traits_list(),
+                "loot_table": identity.loot_table,
+                "special_drop_slug": identity.special_drop_slug,
+                "speed": identity.speed,
+                # Deliberately NOT copying identity.boss: whether a spawn counts
+                # as the dungeon's boss is the archetype's call (the payload's
+                # "archetype" field is what boss_abilities.is_boss reads). An
+                # Elite wearing a catalogued boss's name must not unlock
+                # extraction.
+            }
+        )
+
+    return monster

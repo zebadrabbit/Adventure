@@ -12,10 +12,14 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, List, Optional
 
+import structlog
+
 from app import db
 from app.dungeon.spawn_manager import SpawnBehavior
 from app.models.entities import DungeonEntity
 from app.services import spawn_service
+
+logger = structlog.get_logger(__name__)
 
 if TYPE_CHECKING:
     from app.dungeon.spawn_manager import SpawnEntry, SpawnManager
@@ -31,8 +35,10 @@ def populate_spawn_stats(spawn: "SpawnEntry", party_level: int, instance: "Dunge
     real MonsterCatalog via spawn_service.choose_monster, so placed
     monsters have real names/variety instead of a generic archetype
     label. BOSS/ELITE spawns keep the existing tier/affix-driven
-    archetype system, unchanged -- they're deliberate set-piece
-    placements with their own scaling mechanic, not part of this scope.
+    archetype system for their *stats* -- deliberate set-piece placements
+    with their own tier/affix scaling -- but take their identity (name,
+    family, traits, loot table) from the catalog too, so a boss is never
+    announced as "Boss (L12)".
 
     Args:
         spawn: SpawnEntry to populate
@@ -90,6 +96,8 @@ def populate_spawn_stats(spawn: "SpawnEntry", party_level: int, instance: "Dunge
                 tier=tier,
                 affix_ids=affix_ids,
                 party_size=1,  # Base stats, scale in combat as needed
+                # Set pieces wear the dungeon's own theme, same as ambient spawns.
+                family=getattr(instance, "monster_family", None),
             )
 
         # Populate spawn with generated stats
@@ -99,9 +107,21 @@ def populate_spawn_stats(spawn: "SpawnEntry", party_level: int, instance: "Dunge
         spawn.hp_max = monster_dict.get("hp")
         spawn.data = monster_dict
 
-    except Exception:
+    except Exception as e:
         # Fallback to basic stats if monster selection fails (catalog or
         # archetype system), same fallback shape for both paths.
+        #
+        # Logged loudly on purpose: this branch means reference data is missing
+        # (an unseeded enemy_archetype table, or no catalogue entry covering the
+        # level), and it used to fail invisibly -- players got "Elite Monster"
+        # with hp = level*20 and no loot table, while the server said nothing.
+        logger.warning(
+            "spawn_stats_fallback",
+            archetype=spawn.archetype,
+            level=spawn.level,
+            family=getattr(instance, "monster_family", None),
+            error=str(e),
+        )
         spawn.slug = f"{spawn.archetype.lower()}_monster"
         spawn.name = f"{spawn.archetype} Monster"
         spawn.hp_current = spawn.level * 20
