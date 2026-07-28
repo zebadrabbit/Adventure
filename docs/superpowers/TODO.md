@@ -6,6 +6,27 @@ moved to [TODO_ARCHIVE.md](TODO_ARCHIVE.md). The 2026-07-27 repo audit that
 drove the `repo-health` branch is at
 [plans/2026-07-27-repo-health-review.md](plans/2026-07-27-repo-health-review.md).
 
+## Playtest 2026-07-27 (seed 733064)
+Full triage with code pointers:
+[plans/2026-07-27-playtest-triage.md](plans/2026-07-27-playtest-triage.md).
+- [x] ~~Monsters focused one character~~ — weighted target picker.
+- [x] ~~Downed characters still took a turn~~ — `_advance_turn` steps over them.
+- [ ] Party Stash button is a `coming soon` alert.
+- [ ] Camping is unlimited: wants supplies (charges), cooldown, real risk.
+- [ ] Floor difficulty rubber-bands to party level at first visit; needs a real
+      per-floor curve (this is what made level 1 mobs become level 3).
+- [ ] Monster `loot_table` values resolve to nothing — parsed as item slugs.
+- [ ] Monster catalogue stops at level 20; characters reach 50.
+- [ ] Audit spell/skill damage vs plain attack — do stats apply?
+- [ ] Maze too spiralling: tune `dead_end_keep` / `extra_connection_chance` /
+      `straight_max`.
+- [ ] Map readability: wall/floor contrast, props, coordinate + floor readout.
+- [ ] Adventure UX: log window too restrictive for looting, static character
+      panels, D&D lingo throughout.
+- [ ] **Combat overhaul** — enemy groups fought together, positioning grid,
+      readable hit feedback, live party panel. Phase it. References in
+      `~/screenshots/` 2026-07-27 (Gold Box, FF Pixel Remaster, Phantasy Star).
+
 ## Gameplay — waiting on playtest verdicts
 - [ ] Tune `EVENT_TUNING` (app/dungeon/room_events.py): shrine/trap/ambush
       counts, trap damage/DC, ambush pack size, respawn interval/cap.

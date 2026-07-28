@@ -392,7 +392,8 @@ def start_session(user_id: int, monster: Dict[str, Any]) -> CombatSession:
                 party_state = json.loads(session.party_snapshot_json or "{}") or {}
                 members = party_state.get("members", [])
                 if members:
-                    tgt = members[0]
+                    _amb_idx, _amb_tgt = _pick_monster_target(members)
+                    tgt = _amb_tgt if _amb_tgt is not None else members[0]
                     m_base = monster.get("damage", 8)
                     acc_roll = random.randint(1, 20)
                     accuracy = m_base + acc_roll
@@ -411,7 +412,7 @@ def start_session(user_id: int, monster: Dict[str, Any]) -> CombatSession:
                             dmg = max(1, dmg // 2)
                             tgt["defending"] = False
                         tgt["hp"] = max(0, tgt.get("hp", 0) - dmg)
-                        members[0] = tgt
+                        members[_amb_idx] = tgt
                         party_state["members"] = members
                         session.party_snapshot_json = json.dumps(party_state)
                         logs = json.loads(session.log_json)
@@ -486,6 +487,36 @@ def _potion_counts_by_character(chars, slug: str) -> Dict[str, int]:
     return {str(c.id): _count_potion(c, slug) for c in chars}
 
 
+def _pick_monster_target(members: List[Dict[str, Any]], rng=None) -> tuple[int, Optional[Dict[str, Any]]]:
+    """Choose which party member a monster swings at.
+
+    Returns (index, member) or (0, None) when everyone is down.
+
+    Weighted random among the living, biased toward the wounded rather than
+    locked onto them. The old behaviour sorted by HP and always hit the lowest,
+    so every monster in the dungeon focused the same character until they
+    dropped -- from the player's seat it looks like only one party member is
+    ever in danger, and the other three are spectators.
+    """
+    rng = rng or random
+    alive = [(i, m) for i, m in enumerate(members) if m.get("hp", 0) > 0]
+    if not alive:
+        return 0, None
+    weights = []
+    for _, m in alive:
+        hp = max(0, int(m.get("hp", 0)))
+        max_hp = max(1, int(m.get("max_hp", hp) or hp or 1))
+        # 1.0 at full health, up to 2.0 at death's door.
+        weights.append(1.0 + (1.0 - min(1.0, hp / max_hp)))
+    pivot = rng.random() * sum(weights)
+    acc = 0.0
+    for (idx, member), w in zip(alive, weights):
+        acc += w
+        if pivot <= acc:
+            return idx, member
+    return alive[-1]
+
+
 def _skip_if_unconscious(session: CombatSession, party: Dict[str, Any], char_id: int) -> Optional[Dict[str, Any]]:
     """Apply start-of-turn effects (e.g. poison) to the acting character, then
     if they're downed (hp<=0), log it, skip their turn, and return the
@@ -521,6 +552,19 @@ def _is_monster_turn(session: CombatSession) -> bool:
     return actor["type"] == "monster"
 
 
+def _downed_player_ids(session: CombatSession) -> set:
+    """Character ids in this session currently at 0 HP."""
+    try:
+        party = json.loads(session.party_snapshot_json or "{}") or {}
+    except Exception:
+        return set()
+    return {
+        m.get("char_id") or m.get("id")
+        for m in party.get("members", [])
+        if int(m.get("hp", 0) or 0) <= 0 and (m.get("char_id") or m.get("id")) is not None
+    }
+
+
 def _advance_turn(session: CombatSession):
     """Advance to next initiative entry and reset phase to 'start'."""
     initiative = json.loads(session.initiative_json or "[]")
@@ -530,6 +574,24 @@ def _advance_turn(session: CombatSession):
     if session.active_index >= len(initiative):
         session.active_index = 0
         session.combat_turn += 1
+
+    # Step over downed party members instead of stopping on them. Each action
+    # handler already refuses to act while unconscious, but landing on a downed
+    # character still made their turn the *active* turn: the client offered
+    # their buttons and the player had to spend a click to burn it, which reads
+    # as "dead characters still take turns". Bounded by the initiative length;
+    # a fully downed party is resolved by _check_end, not here.
+    downed = _downed_player_ids(session)
+    if downed:
+        for _ in range(len(initiative)):
+            actor = initiative[session.active_index]
+            if actor.get("type") != "player" or actor.get("id") not in downed:
+                break
+            session.active_index += 1
+            if session.active_index >= len(initiative):
+                session.active_index = 0
+                session.combat_turn += 1
+
     # Reset phases for new actor
     session.phase = "start"
     session.phase_step = 0
@@ -1162,7 +1224,8 @@ def monster_auto_turn(session: CombatSession):
     # Ensure effects list presence for each member to simplify later additions
     for m in members:
         m.setdefault("effects", [])
-    target = members[0]
+    _default_idx, _default_target = _pick_monster_target(members)
+    target = _default_target if _default_target is not None else members[0]
     monster = session.monster() or {}
     # Start-of-turn effects for monster (e.g., poison on monster)
     monster.setdefault("effects", [])
@@ -1266,7 +1329,7 @@ def monster_auto_turn(session: CombatSession):
             logger.debug("suppressed_exception", where="monster_auto_turn", exc_info=True)  # Fall through to normal AI
 
     # AI delegation (still only basic attack). If monster has flag ai_enabled use selector.
-    action = {"type": "attack", "target_index": 0}
+    action = {"type": "attack", "target_index": _default_idx}
     try:
         if monster.get("ai_enabled"):
             action = select_action(monster, party, {"turn": session.combat_turn}) or action
@@ -1341,9 +1404,12 @@ def monster_auto_turn(session: CombatSession):
             _emit_if_completed(session)
             return
 
-        # Prioritize low HP targets (more likely to finish them off)
-        alive_members.sort(key=lambda x: (x[1].get("hp", 100), x[0]))
-        idx, target = alive_members[0]
+        # Weighted toward the wounded, but not locked onto them -- see
+        # _pick_monster_target for why focusing the lowest HP every turn made
+        # combat feel like a one-character fight.
+        idx, target = _pick_monster_target(members)
+        if target is None:
+            idx, target = alive_members[0]
 
         m_base = monster.get("damage", 8)
         acc_roll = random.randint(1, 20)
