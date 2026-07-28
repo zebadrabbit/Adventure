@@ -104,8 +104,16 @@ def clear_item_categories() -> int:
     in_clause = ",".join([f":c{i}" for i, _ in enumerate(categories)])
     params = {f"c{i}": cat for i, cat in enumerate(categories)}
 
-    loot_stmt = text("DELETE FROM dungeon_loot WHERE item_id IN (SELECT id FROM item WHERE type IN (%s))" % in_clause)
-    db.session.execute(loot_stmt, params)
+    # Clear *all* floor loot, not just rows pointing at the four types above.
+    # The SQL seed files delete a wider set than `categories` (items_misc.sql
+    # alone covers tool, gem, key, material, quest, scroll and consumable), so
+    # scoping this delete by type left rows behind that then blocked those
+    # files' own DELETEs with a dungeon_loot_item_id_fkey violation -- aborting
+    # the whole reseed partway and leaving the item and monster catalogues
+    # empty. Floor loot is per-run and regenerated from the floor seed, so
+    # dropping all of it is safe; player property lives in Character.items and
+    # Hoard.items_json as slugs, never as a FK to item.id.
+    db.session.execute(text("DELETE FROM dungeon_loot"))
 
     stmt = text("DELETE FROM item WHERE type IN (%s)" % in_clause)
     result = db.session.execute(stmt, params)

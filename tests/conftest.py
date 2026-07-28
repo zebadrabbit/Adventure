@@ -2,6 +2,7 @@ import os
 import random
 import string
 import sys
+import traceback
 
 import pytest
 
@@ -313,7 +314,19 @@ def _conditional_db_isolation(request, test_app):
                 seed_items()
                 _seed_game_config()
             except Exception:
-                pass
+                # Swallowed so a machine without seed data can still run the
+                # suite -- but never silently. A failure here leaves the test
+                # database with empty item/monster/archetype catalogues, and
+                # the tests that depend on them then fail somewhere far away
+                # (or worse, pass against a fallback). This actually happened:
+                # reseeding aborted on a dungeon_loot foreign key and both
+                # databases sat at 0 monsters until someone counted rows.
+                import warnings
+
+                warnings.warn(
+                    "db_isolation reseed failed; catalogues may be empty: " + traceback.format_exc(),
+                    stacklevel=2,
+                )
     yield
 
     # (App context already managed by earlier autouse fixture)
