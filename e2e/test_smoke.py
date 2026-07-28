@@ -145,14 +145,31 @@ def test_api_move_via_page_fetch(page):
     assert result["status"] < 500, f"server error on move: {result['status']}"
 
 
-def test_log_does_not_cover_the_party(page):
-    """Overlays must not sit on the camera's target (HUD spec, constraint 2)."""
+def test_hud_panels_do_not_cover_the_party_or_each_other(page):
+    """Overlays must not sit on the camera's target (HUD spec, constraint 2),
+    and must not sit on top of one another.
+
+    Originally this only checked .adv-log and .adv-party-rail by name. That
+    hand-listed pair missed a real bug: .adv-actions (the action bar) had no
+    CSS relationship to --hud-inset-bottom, so its height was pure content
+    size, and at the brief's own button padding it rode up 23px under
+    .adv-party-rail -- which, being later in DOM order, won the stacking tie
+    and silently ate clicks meant for Search. A hand-listed pair only catches
+    regressions in the pair someone remembered to list.
+
+    So instead of naming panels, this discovers them: any direct child of
+    .adv-hud that is visible and positioned off the normal document flow
+    (absolute/fixed) other than the canvas itself. That is every current
+    overlay (.hud-readout, .map-controls, .adv-actions, .adv-log,
+    .adv-party-rail; #hotkeys-panel too, when open) and, structurally, any
+    future one -- nothing here needs to be remembered and appended to.
+    """
     page.set_viewport_size({"width": 1366, "height": 768})
     page.goto(f"{BASE_URL}/adventure")
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(500)  # let centerOnPlayer settle
 
-    overlap = page.evaluate(
+    result = page.evaluate(
         """() => {
             const hud = document.querySelector('.adv-hud');
             const cs = getComputedStyle(hud);
@@ -162,15 +179,44 @@ def test_log_does_not_cover_the_party(page):
             // Where centerOnPlayer puts the party, per dungeon-canvas.js.
             const px = (r.width + left) / 2;
             const py = (r.height - bottom) / 2;
-            const log = document.querySelector('.adv-log').getBoundingClientRect();
-            const rail = document.querySelector('.adv-party-rail').getBoundingClientRect();
-            const hits = (b) => px >= b.left && px <= b.right && py >= b.top && py <= b.bottom;
-            return { log: hits(log), rail: hits(rail) };
+
+            const panels = Array.from(hud.children).filter((el) => {
+                if (el.id === 'dungeon-map') return false; // the canvas, not an overlay
+                const pcs = getComputedStyle(el);
+                if (pcs.display === 'none' || pcs.visibility === 'hidden') return false;
+                if (pcs.position !== 'absolute' && pcs.position !== 'fixed') return false;
+                const rect = el.getBoundingClientRect();
+                return rect.width > 0 && rect.height > 0;
+            });
+            const describe = (el) => el.className ? String(el.className) : (el.id || el.tagName);
+
+            const onParty = panels
+                .filter((el) => {
+                    const b = el.getBoundingClientRect();
+                    return px >= b.left && px <= b.right && py >= b.top && py <= b.bottom;
+                })
+                .map(describe);
+
+            const pairOverlaps = [];
+            for (let i = 0; i < panels.length; i++) {
+                for (let j = i + 1; j < panels.length; j++) {
+                    const a = panels[i].getBoundingClientRect();
+                    const b = panels[j].getBoundingClientRect();
+                    const overlap = !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom);
+                    if (overlap) pairOverlaps.push([describe(panels[i]), describe(panels[j])]);
+                }
+            }
+
+            return { panelCount: panels.length, onParty, pairOverlaps };
         }"""
     )
 
-    assert not overlap["log"], "the floating log is sitting on the party"
-    assert not overlap["rail"], "the party rail is sitting on the party"
+    # A sanity floor on panel discovery itself: if this drops to 0 the
+    # selector broke (e.g. the HUD markup moved out of .adv-hud) and the
+    # checks below would vacuously pass.
+    assert result["panelCount"] >= 3, f"HUD panel discovery found too few panels: {result}"
+    assert not result["onParty"], f"these panels are sitting on the party: {result['onParty']}"
+    assert not result["pairOverlaps"], f"these HUD panels overlap each other: {result['pairOverlaps']}"
 
 
 def test_csrf_guard_rejects_bare_mutation(page):

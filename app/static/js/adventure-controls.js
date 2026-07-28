@@ -172,7 +172,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 // WASD/C/E/H/I for the rest of the session after a single
                 // button click -- verified in a live session, not a
                 // hypothetical.)
-                if (e.target.closest?.('.adv-frame-open, button, a')) return;
+                //
+                // <summary> (the log's collapse header, .adv-log-head) is
+                // the same class of native-Space-activation element: focused
+                // and tabbable, and the browser toggles the parent <details>
+                // on Space with no handler of its own needed -- exactly like
+                // button/a. Missing it here meant tabbing to the log header
+                // and pressing Space fired Search (2 turns, can roll an
+                // encounter) instead of, or in addition to, the native
+                // toggle.
+                if (e.target.closest?.('.adv-frame-open, button, a, summary')) return;
                 e.preventDefault();
                 const searchBtn = document.getElementById('btn-search');
                 if (searchBtn && !searchBtn.disabled) searchBtn.click();

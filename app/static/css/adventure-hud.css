@@ -355,6 +355,18 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover {
     bottom: var(--space-2);
     z-index: var(--z-hud);
     width: calc(var(--hud-inset-left) - var(--space-4));
+    /* Ceiling derived from the same token the camera reads
+       (--hud-inset-bottom), not a one-off measurement of five buttons at
+       today's padding. Without this, the box is pure content height and the
+       next change to padding, font size or button count can silently push
+       it back under .adv-party-rail (whose own span IS derived from this
+       token) with nothing to catch it -- which is exactly how the bug fixed
+       below got in. If the action list ever needs more room than this
+       gives, it scrolls: clipping Hearth or Extract off the bottom
+       invisibly would be worse than a visible scrollbar. */
+    max-height: calc(var(--hud-inset-bottom) - var(--space-2) * 2);
+    overflow-y: auto;
+    scrollbar-width: thin;
 }
 
 .adv-hud .adv-actions .tactical-btn-primary,
@@ -370,7 +382,8 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover {
        viewport edge) and rides up under the party rail -- the rail is later
        in DOM order so it wins the overlap and swallows clicks on Search.
        var(--space-1) brings the stack to ~195px, clear of the rail with
-       room to spare. */
+       room to spare -- and now also clear of the max-height above, so this
+       is headroom rather than the only thing holding the line. */
     padding: var(--space-1) var(--space-3);
     font-size: var(--text-sm);
     letter-spacing: var(--tracking-wide);
@@ -441,6 +454,16 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover {
         position: static;
         width: auto;
         margin-top: var(--space-3);
+    }
+
+    /* --hud-inset-bottom collapses to 0px in this fallback (.adv-hud above),
+       which would clamp the token-derived max-height on .adv-actions to 0
+       and hide every button -- there is no reserved bottom band to derive a
+       ceiling from once the panel is back in normal flow, so drop the
+       constraint along with it. */
+    .adv-hud .adv-actions {
+        max-height: none;
+        overflow: visible;
     }
 
     .adv-hud .adv-actions #adventure-action-panel {
