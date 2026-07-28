@@ -121,13 +121,14 @@ for one screen needs either a new block around the header or a context flag
 cleaner, since the combat screen will want the same treatment.
 
 ## Open questions
-2. **Party frames above or left?** The player suggested either. Left costs
+
+1. **Party frames above or left?** The player suggested either. Left costs
    horizontal space (fine at 1366 wide, better at 2K); above costs vertical
    (the scarce axis on this laptop). Left is the safer default.
-3. **Does the movement pad stay?** With WASD bound, an on-screen pad is a
+2. **Does the movement pad stay?** With WASD bound, an on-screen pad is a
    discoverability aid rather than a control. It could shrink to a corner or
    fade when a key is used.
-4. **Does this layout host combat too**, or does combat remain a separate
+3. **Does this layout host combat too**, or does combat remain a separate
    screen? The references (Gold Box, FF, Phantasy Star) all keep one frame and
    swap the scene inside it. Sharing the party frames and log between explore
    and combat would be a strong simplification — worth deciding before either
