@@ -1,3 +1,12 @@
+// Shared by the load-time paint below and partyCardRefresh()'s paint() --
+// HP colour is state-carrying (green -> red as a character nears death), so
+// it needs recomputing every time the bar's percentage changes, not just
+// once on page load.
+function hpFillColor(pct) {
+    const hue = Math.floor(120 * (pct / 100)); // 120 green -> 0 red
+    return 'hsl(' + hue + ',70%,45%)';
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     // Wire static Search, Camp & Hearth buttons (now left of log)
     (function bindActionButtons() {
@@ -120,8 +129,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // Keyboard shortcuts
     (function bindKeyboardShortcuts() {
         document.addEventListener('keydown', (e) => {
-            // Don't trigger if user is typing in an input
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            // Don't trigger if user is typing/selecting in a form control --
+            // every hotkey is suspect here, not just Space, so this stays a
+            // blanket bail regardless of which key was pressed.
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
 
             const key = e.key.toLowerCase();
 
@@ -145,6 +156,23 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             // Actions
             else if (key === ' ') {
+                // Space is special, unlike every other hotkey here: the
+                // browser natively activates a focused <button>/<a> on
+                // Space, and a focused .adv-frame-open activates itself the
+                // same way (its own keydown handler below -- role="button"
+                // gets no native Space handling, which is why that handler
+                // exists). Bail here, scoped to Space only, so Search
+                // doesn't ALSO fire on top of whatever the focused control
+                // just did. Movement and the letter hotkeys below have no
+                // such native collision and must keep working even when
+                // focus is merely resting on a button -- e.g. right after a
+                // mouse click, since browsers leave a clicked <button>
+                // focused. (An earlier version of this guard bailed on ANY
+                // key whenever ANY button/link/frame had focus, which broke
+                // WASD/C/E/H/I for the rest of the session after a single
+                // button click -- verified in a live session, not a
+                // hypothetical.)
+                if (e.target.closest?.('.adv-frame-open, button, a')) return;
                 e.preventDefault();
                 const searchBtn = document.getElementById('btn-search');
                 if (searchBtn && !searchBtn.disabled) searchBtn.click();
@@ -176,11 +204,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const hp = parseFloat(w.getAttribute('data-hp')) || 0;
         const max = parseFloat(w.getAttribute('data-hp-max')) || 0;
         const pct = max > 0 ? clamp((hp / max) * 100, 0, 100) : 0;
-        const hue = Math.floor(120 * (pct / 100)); // 120 green -> 0 red
         const fill = w.querySelector('[data-bar="hp"]');
         if (fill) {
             fill.style.width = pct.toFixed(1) + '%';
-            fill.style.backgroundColor = 'hsl(' + hue + ',70%,45%)';
+            fill.style.backgroundColor = hpFillColor(pct);
             fill.style.transition = 'width 0.3s ease-in-out, background-color 0.3s ease-in-out';
         }
     });
@@ -191,7 +218,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const fill = w.querySelector('[data-bar="mana"]');
         if (fill) {
             fill.style.width = pct.toFixed(1) + '%';
-            fill.style.backgroundColor = '#3b82f6'; // Consistent blue color
+            // No inline colour here -- adventure-hud.css's
+            // .mana-bar .party-stat-bar-fill { background: var(--mp); }
+            // owns it. (Previously hardcoded to '#3b82f6', a near-duplicate
+            // of --mp that didn't match it.)
             fill.style.transition = 'width 0.3s ease-in-out';
         }
     });
@@ -239,6 +269,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (fill) {
                 fill.style.width = pct + '%';
                 fill.textContent = `${label} ${cur}/${max}`;
+                // Recompute the health hue on every refresh, not just page
+                // load -- otherwise a character who drops to 10% keeps
+                // whatever colour the bar had when the page was rendered
+                // until the next full reload. Mana has no equivalent: its
+                // colour is fixed (adventure-hud.css's --mp), never
+                // inline-styled.
+                if (label === 'HP') fill.style.backgroundColor = hpFillColor(pct);
             }
             track.setAttribute(label === 'HP' ? 'data-hp' : 'data-mana', cur);
             track.setAttribute(label === 'HP' ? 'data-hp-max' : 'data-mana-max', max);

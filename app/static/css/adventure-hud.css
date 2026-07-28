@@ -280,12 +280,26 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover {
     border-radius: var(--radius);
 }
 
+/* Base fill colours. adventure-controls.js sets fill.style.backgroundColor
+ * inline once these bars are painted (on load, and again on every
+ * refreshPartyCards() refresh), which wins over these rules per normal CSS
+ * precedence -- so in practice these only paint the instant before that JS
+ * runs (a flash-of-unstyled-bar guard), except where noted.
+ */
 .adv-hud .adv-party-rail .hp-bar .party-stat-bar-fill {
     background: var(--hp);
+    /* Overridden at runtime: HP is state-carrying (green -> red as the
+       character nears death), computed from percent-remaining by
+       hpFillColor() in adventure-controls.js. This token is the resting/
+       full-health colour and the pre-JS fallback, not what you'll usually
+       see on screen. */
 }
 
 .adv-hud .adv-party-rail .mana-bar .party-stat-bar-fill {
     background: var(--mp);
+    /* Mana's colour is NOT state-carrying -- adventure-controls.js never
+       sets an inline backgroundColor for the mana fill, so this rule is
+       what actually renders, always. */
 }
 
 .adv-hud .adv-party-rail .class-icon-slot {
