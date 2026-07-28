@@ -224,6 +224,12 @@ def dashboard():
             for c in chars:
                 c.locked_dungeon_id = instance.id
                 db.session.add(c)
+            # Baseline XP per character, so an early extraction can dock a share
+            # of what they earned *this run* rather than of their whole career.
+            meta = dict(instance.dungeon_metadata or {})
+            meta["xp_at_entry"] = {str(c.id): int(c.xp or 0) for c in chars}
+            instance.dungeon_metadata = meta
+            db.session.add(instance)
             db.session.commit()
             return redirect(url_for("dungeon.adventure"))
         elif form_type == "continue_adventure":

@@ -63,7 +63,7 @@ Each run is based on a **Dungeon Seed** that determines layout and content.
 ### Conditions
 - All bosses defeated → **Hearthstone Portal** unlocks
 - Early extraction allowed with penalties:
-  - XP penalty
+  - -20% of the XP earned during that run (never career XP); admin-tunable
   - Loot penalty
   - Reputation penalty (optional)
 

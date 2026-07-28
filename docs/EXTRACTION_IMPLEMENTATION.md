@@ -29,11 +29,23 @@ Complete extraction mechanics service with:
 - `revive_character()` - Handles resurrection via items/spells/shrines
 - `get_extraction_status()` - Returns current extraction state for UI
 
-#### Extraction Penalties (from DESIGN.md)
+#### Extraction Penalties
 - **Early Extraction** (before all bosses defeated):
-  - -30% XP loss
-  - -20% loot quality reduction
+  - -20% of the XP **earned during that run**, plus the same cut on the
+    extraction bonus. Career XP is never touched.
+  - -20% loot quality reduction (computed and displayed, not yet applied)
 - **No penalties** when all bosses defeated (Hearthstone Portal active)
+
+The XP rate is tunable: **Admin → Dungeon Settings → Early Exit XP Penalty (%)**,
+which mirrors into `GameConfig["progression"]["early_extraction_xp_penalty"]` (a
+0..1 share) — the key `app/services/progression.py` actually reads. The admin
+pages' own `dungeon_settings` / `progression_settings` blobs are not consumed by
+gameplay, so any new knob there needs the same mirroring to have an effect.
+
+The run baseline comes from `instance.dungeon_metadata["xp_at_entry"]`, written
+when the party locks in at `start_adventure`. No baseline (older instances, or a
+run started outside that form) means no deduction — it never falls back to
+docking career XP, which is what the -30% rule used to do.
 
 #### Permadeath Rules
 - Characters left behind during extraction → **PERMADEATH**

@@ -87,7 +87,7 @@ def test_calculate_extraction_penalties_early(test_app, test_dungeon):
     """Test early extraction penalties."""
     penalties = extraction_service.calculate_extraction_penalties(test_dungeon, early=True)
 
-    assert penalties["xp_multiplier"] == 0.7  # 30% loss
+    assert penalties["xp_multiplier"] == 0.8  # 20% of the run's XP
     assert penalties["loot_quality_multiplier"] == 0.8  # 20% reduction
 
 
@@ -146,21 +146,41 @@ def test_extract_with_left_behind(test_app, test_user, test_dungeon, test_charac
 
 
 def test_extract_with_xp_penalty(test_app, test_user, test_dungeon, test_characters):
-    """Test XP penalty applied on early extraction."""
+    """Early extraction forfeits 20% of the XP earned *during the run*."""
     from app.models.models import GameConfig
 
     # Isolate the penalty mechanic from the Spec-5 extraction XP bonus.
     GameConfig.set("progression", '{"extraction_xp": 0}')
-    original_xp = test_characters[0].xp
+    char = test_characters[0]
+    # Entered on 500 XP (recorded at start_adventure), earned 300 in the run.
+    test_dungeon.dungeon_metadata = {"xp_at_entry": {str(char.id): 500}}
+    char.xp = 800
+    db.session.commit()
 
-    success, message, result = extraction_service.extract_party(test_dungeon, [test_characters[0].id], test_user.id)
+    success, message, result = extraction_service.extract_party(test_dungeon, [char.id], test_user.id)
 
     assert success is True
-    db.session.refresh(test_characters[0])
+    db.session.refresh(char)
 
-    # Verify XP reduced by 30%
-    expected_xp = int(original_xp * 0.7)
-    assert test_characters[0].xp == expected_xp
+    # 20% of the 300 earned, not of the 800 total.
+    assert char.xp == 800 - 60
+
+
+def test_extract_xp_penalty_never_touches_career_xp(test_app, test_user, test_dungeon, test_characters):
+    """A character who earned nothing this run loses nothing by leaving early."""
+    from app.models.models import GameConfig
+
+    GameConfig.set("progression", '{"extraction_xp": 0}')
+    char = test_characters[0]
+    test_dungeon.dungeon_metadata = {"xp_at_entry": {str(char.id): char.xp}}
+    db.session.commit()
+    original_xp = char.xp
+
+    success, _, _ = extraction_service.extract_party(test_dungeon, [char.id], test_user.id)
+
+    assert success is True
+    db.session.refresh(char)
+    assert char.xp == original_xp
 
 
 def test_extract_no_penalty_when_bosses_defeated(test_app, test_user, test_dungeon, test_characters):
@@ -242,7 +262,7 @@ def test_get_extraction_status(test_app, test_user, test_dungeon, test_character
     assert status["all_bosses_defeated"] is False
     assert status["bosses_defeated"] == 0
     assert len(status["characters"]) == 3
-    assert status["penalties"]["xp_multiplier"] == 0.7
+    assert status["penalties"]["xp_multiplier"] == 0.8
 
     # Verify character info
     char_info = status["characters"][0]

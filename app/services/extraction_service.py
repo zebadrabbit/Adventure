@@ -38,16 +38,21 @@ def calculate_extraction_penalties(instance: DungeonInstance, early: bool = True
 
     Returns:
         Dict with penalty multipliers:
-        - xp_multiplier: Multiplier for XP gained (1.0 = no penalty, 0.7 = 30% loss)
+        - xp_multiplier: Multiplier on the run's XP (1.0 = no penalty, 0.8 = 20% loss).
+          Applies to XP earned during this run and to the extraction bonus --
+          never to the character's career total.
         - loot_quality_multiplier: Multiplier for loot quality (0.8 = 20% reduction)
     """
     if not early or instance.extraction_available:
         # No penalties if all bosses defeated
         return {"xp_multiplier": 1.0, "loot_quality_multiplier": 1.0}
 
-    # Early extraction penalties from DESIGN.md
-    # -30% XP, -20% loot quality
-    return {"xp_multiplier": 0.7, "loot_quality_multiplier": 0.8}
+    from app.services import progression
+
+    # Rate is tunable: GameConfig["progression"]["early_extraction_xp_penalty"].
+    rate = float(progression.progression_config().get("early_extraction_xp_penalty", 0.20))
+    rate = min(max(rate, 0.0), 1.0)
+    return {"xp_multiplier": 1.0 - rate, "loot_quality_multiplier": 0.8}
 
 
 def is_full_clear(instance: DungeonInstance) -> bool:
@@ -112,11 +117,27 @@ def extract_party(
     # Whole-run bonus: every monster + the boss slain this run.
     full_clear = is_full_clear(instance)
 
+    # XP snapshot taken when the party locked into this run (dashboard
+    # start_adventure). Missing for runs that started before this existed, or
+    # that were created outside that form -- no baseline means no deduction,
+    # never a fall back to docking career XP.
+    xp_at_entry = (instance.dungeon_metadata or {}).get("xp_at_entry") or {}
+
     # Apply penalties to extracting characters
     for char in extracting_chars:
-        # Apply XP penalty
-        if penalties["xp_multiplier"] < 1.0:
-            char.xp = int(char.xp * penalties["xp_multiplier"])
+        # Early exit forfeits a share of what this character earned *this run*.
+        # Career XP is never touched: the stake is the run, not the character.
+        if early_extraction and penalties["xp_multiplier"] < 1.0:
+            baseline = xp_at_entry.get(str(char.id))
+            earned = int(char.xp or 0) - int(baseline) if baseline is not None else 0
+            if earned > 0:
+                # round, not int(): 1.0 - 0.8 is 0.199999... in binary, which
+                # would quietly shave a point off every penalty.
+                char.xp = int(char.xp) - round(earned * (1.0 - penalties["xp_multiplier"]))
+                # Losing the XP can cost a level gained mid-run. Talent points
+                # already granted for it are not clawed back.
+                # ponytail: reclaim them only if level-yo-yoing ever gets abused.
+                char.level = progression.level_for_xp(char.xp, float(cfg.get("xp_difficulty_mod", 1.0)))
 
         # Unlock character from dungeon
         char.locked_in_dungeon = False

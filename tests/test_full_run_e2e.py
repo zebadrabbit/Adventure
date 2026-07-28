@@ -24,7 +24,7 @@ from app.models.dungeon_instance import DungeonInstance
 from app.models.entities import DungeonEntity
 from app.models.models import Character
 from app.routes.dungeon_api import get_instance_dungeon
-from app.services import rate_limiter
+from app.services import progression, rate_limiter
 from tests.factories import create_character, create_user
 
 SEED = 424242
@@ -407,6 +407,56 @@ def test_hearthstone_abandons_the_run_without_losses(client, test_app):
     assert r.status_code == 200
     with client.session_transaction() as sess:
         assert sess["dungeon_instance_id"] != inst_id
+
+
+@pytest.mark.db_isolation
+def test_early_extraction_docks_only_the_runs_xp(client, test_app):
+    """Leaving before the boss costs 20% of what was earned in there.
+
+    The character's career XP is not at stake — a veteran who ducks out early
+    must not lose more than a beginner who did the same.
+    """
+    user, party_ids, inst_id = _enter_dungeon(client, "e2eearly")
+    assert client.get("/api/dungeon/map").status_code == 200
+
+    inst = _instance(inst_id)
+    baseline = (inst.dungeon_metadata or {}).get("xp_at_entry") or {}
+    assert baseline, "entering must snapshot each character's XP"
+    assert sorted(int(k) for k in baseline) == sorted(party_ids)
+
+    # Earn XP the honest way: find a monster and kill it. A kill's XP is split
+    # across the party, and a four-way split of a trash mob rounds to zero, so
+    # this one is worth enough to leave a measurable share.
+    fights = []
+    floor0 = get_instance_dungeon(inst)
+    mob_id, mob_tile = _reachable_monster(inst, floor0)
+    mob = db.session.get(DungeonEntity, mob_id)
+    mob.data = json.dumps({**json.loads(mob.data or "{}"), "xp": 400})
+    db.session.commit()
+
+    _walk_to(client, inst_id, mob_tile, fights=fights)
+    assert fights and fights[-1]["status"] == "complete"
+    assert not _party_wiped(fights[-1])
+
+    inst = _instance(inst_id)
+    assert not inst.extraction_available, "the boss is still alive: this is an early exit"
+    earned = {c.id: c.xp - int(baseline[str(c.id)]) for c in Character.query.filter_by(user_id=user.id).all()}
+    assert any(v > 0 for v in earned.values()), "the kill should have paid XP"
+    before = {c.id: c.xp for c in Character.query.filter_by(user_id=user.id).all()}
+
+    out = client.post(
+        "/api/dungeon/extraction/extract",
+        json={"instance_id": inst_id, "character_ids": party_ids},
+    )
+    assert out.status_code == 200, out.get_json()
+
+    cfg = progression.progression_config()
+    for char in Character.query.filter_by(user_id=user.id).all():
+        # The extraction bonus lands after the deduction and is itself scaled.
+        bonus = int(int(cfg["extraction_xp"]) * 0.8)
+        expected = before[char.id] - round(earned[char.id] * 0.20) + bonus
+        assert char.xp == expected, char.name
+        assert char.xp > int(baseline[str(char.id)]), "an early exit still nets progress"
 
 
 # ---------------------------------------------------------------- lookups

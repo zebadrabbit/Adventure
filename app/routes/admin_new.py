@@ -52,7 +52,7 @@ DEFAULT_DUNGEON_CONFIG = {
     "dmg_mult_per_tier": 1.1,
     "xp_mult_per_tier": 1.25,
     "loot_mult_per_tier": 1.2,
-    "early_exit_xp_penalty": 30,
+    "early_exit_xp_penalty": 20,
     "early_exit_loot_penalty": 20,
     "full_clear_bonus": 25,
     "flawless_xp_bonus": 25,
@@ -181,6 +181,25 @@ def save_dungeon_config(config_data):
 
     config.value = json.dumps(config_data)
     db.session.add(config)
+
+    # Mirror the one knob gameplay reads into GameConfig["progression"], which is
+    # what app/services/progression.py consults. This page's own
+    # "dungeon_settings" blob is not read anywhere in gameplay, so a setting that
+    # must actually take effect has to be copied across.
+    if "early_exit_xp_penalty" in config_data:
+        engine = GameConfig.query.filter_by(key="progression").first()
+        try:
+            engine_cfg = json.loads(engine.value) if engine and engine.value else {}
+        except Exception:
+            engine_cfg = {}
+        # Admin UI works in whole percent; the engine wants a 0..1 share.
+        pct = max(0, min(100, int(config_data["early_exit_xp_penalty"])))
+        engine_cfg["early_extraction_xp_penalty"] = pct / 100.0
+        if engine is None:
+            engine = GameConfig(key="progression", value="")
+        engine.value = json.dumps(engine_cfg)
+        db.session.add(engine)
+
     db.session.commit()
 
 

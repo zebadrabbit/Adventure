@@ -6,6 +6,8 @@
 - Separate **Extract** button (hotkey `E`) on the adventure screen; it and
   **Hearth** used to share one button.
 - `CombatSession.dungeon_snapshot_json` column (migration `d9e2f3a4b5c6`).
+- Per-run XP baseline (`instance.dungeon_metadata["xp_at_entry"]`) recorded when
+  the party locks into a run.
 
 ### Changed
 - Hearthstone is now a no-fault abandon: the party is released, keeps everything
@@ -15,6 +17,11 @@
   dungeon instance is deleted and the session pointer cleared.
 - Starting an adventure locks the selected party to the instance
   (`locked_dungeon_id`), which is what extraction selects on.
+- Early extraction now costs **20% of the XP earned during that run** (was 30% of
+  each character's *career* XP, which could erase many runs' progress and left
+  `level` out of sync with `xp`). The rate is tunable from Admin → Dungeon
+  Settings → Early Exit XP Penalty, which now mirrors into the `progression`
+  GameConfig key the engine actually reads — previously that field was inert.
 
 ### Fixed
 - Kill tracking never ran: `start_session` skipped writing the dungeon snapshot

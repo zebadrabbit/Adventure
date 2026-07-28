@@ -142,10 +142,10 @@
                             <label class="form-label">
                                 Early Exit XP Penalty (%)
                                 <i class="bi bi-info-circle" data-bs-toggle="tooltip"
-                                    title="XP penalty for extracting before all bosses defeated"></i>
+                                    title="Share of the XP earned during a run that is forfeit when the party extracts before all bosses are dead. Career XP is never touched."></i>
                             </label>
                             <input type="number" class="form-control bg-dark text-light border-secondary"
-                                id="early_exit_xp_penalty" value="{{ config.early_exit_xp_penalty or 30 }}" min="0"
+                                id="early_exit_xp_penalty" value="{{ config.early_exit_xp_penalty or 20 }}" min="0"
                                 max="50">
                         </div>
 

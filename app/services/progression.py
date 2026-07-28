@@ -8,7 +8,8 @@ Tuning lives in GameConfig key "progression" (all optional, safe fallbacks):
     {
       "xp_difficulty_mod": 1.0,        # >1 slower leveling, <1 faster
       "talent_points_per_level": 1,    # talent points granted per level gained
-      "extraction_xp": 50              # XP bonus per character on extraction
+      "extraction_xp": 50,             # XP bonus per character on extraction
+      "early_extraction_xp_penalty": 0.20  # share of *run-earned* XP lost on an early exit
     }
 """
 
@@ -29,6 +30,7 @@ _DEFAULT_PROGRESSION = {
     "extraction_xp": 50,
     "full_clear_copper_mult": 1.25,
     "full_clear_xp_bonus": 0.5,
+    "early_extraction_xp_penalty": 0.20,
 }
 
 # Upper bound for level search; the xp table extrapolates beyond 20.
