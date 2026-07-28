@@ -37,8 +37,8 @@ def auto_equip_for(char_class: str, starter_items: Iterable) -> Dict[str, str]:
 
     Returns
     -------
-    dict: mapping like {"weapon": "short-sword", "armor": "leather-armor"}
-          (armor omitted if no preferred armor present).
+    dict: mapping like {"weapon": "short-sword", "chest": "leather-armor"}
+          (chest omitted if no preferred armor present).
     """
     prefs = AUTO_EQUIP_PREFS.get(char_class, {})
     weapon_pref = prefs.get("weapon", [])
@@ -72,7 +72,11 @@ def auto_equip_for(char_class: str, starter_items: Iterable) -> Dict[str, str]:
         gear["weapon"] = w
     a = pick(armor_pref)
     if a:
-        gear["armor"] = a
+        # Body armour is one piece and lives in "chest" -- the canonical slot
+        # from app.loot.data.archetypes.SLOTS. This used to be "armor", a name
+        # in no vocabulary at all, so no panel drew it and unequip_item (which
+        # rejects any slot outside _SLOTS) could never take it off.
+        gear["chest"] = a
     return gear
 
 
