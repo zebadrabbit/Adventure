@@ -62,7 +62,10 @@ frame.
   than stretch — tiles stay crisp.
 - **Party frames**: left edge, static (not draggable). Always visible, always
   live — HP/MP/status per character, which is also what the combat overhaul
-  needs. Four frames at ~90px each ≈ 360px, comfortable at 768.
+  needs. Four frames at ~90px each ≈ 360px, comfortable at 768. The frames are
+  the top layer of the character panel work — clicking one opens that
+  character's paper doll. See
+  [2026-07-28-character-panel-redesign.md](2026-07-28-character-panel-redesign.md).
 - **Log**: floating panel, bottom-right, collapsible, with tabs for
   adventure / combat / chat. Solves the "log window is restrictive" complaint
   and gives looting somewhere to live that is not a wall of text.

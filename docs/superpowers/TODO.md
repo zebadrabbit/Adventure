@@ -50,6 +50,11 @@ Full triage with code pointers:
 - [ ] **Adventure HUD** — full-bleed map, no navbar, account anchor top-right,
       party frames left, floating log, no movement pad:
       [specs/2026-07-28-adventure-hud-layout-design.md](specs/2026-07-28-adventure-hud-layout-design.md).
+- [ ] **Character panels & paper doll** — two live implementations
+      (`equipment.js` 243 lines, `equipment-enhanced.js` 657) with the dungeon
+      getting the lesser one; encumbrance is computed and shown only where
+      nobody looks. Spec:
+      [specs/2026-07-28-character-panel-redesign.md](specs/2026-07-28-character-panel-redesign.md).
 
 ## Gameplay — waiting on playtest verdicts
 - [ ] Tune `EVENT_TUNING` (app/dungeon/room_events.py): shrine/trap/ambush
