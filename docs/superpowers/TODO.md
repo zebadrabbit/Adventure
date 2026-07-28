@@ -47,9 +47,13 @@ Full triage with code pointers:
       [specs/2026-07-28-tactical-combat-design.md](specs/2026-07-28-tactical-combat-design.md);
       phase 1 (multi-enemy, no grid) is the biggest win and unblocks raising
       `SpawnConfig.group_size_max` above its current cap of 3.
-- [ ] **Adventure HUD** — full-bleed map, no navbar, account anchor top-right,
-      party frames left, floating log, no movement pad:
-      [specs/2026-07-28-adventure-hud-layout-design.md](specs/2026-07-28-adventure-hud-layout-design.md).
+- [x] ~~**Adventure HUD**~~ — full-bleed map, chrome="minimal" render flag,
+      account anchor top-right, party frames left, floating collapsible log,
+      action bar bottom-left. Plan:
+      [plans/2026-07-28-adventure-hud-shell.md](plans/2026-07-28-adventure-hud-shell.md).
+      Not built: log tabs (one stream exists on this screen), and the paper
+      doll behind the frame click — next chunk,
+      [specs/2026-07-28-character-panel-redesign.md](specs/2026-07-28-character-panel-redesign.md).
 - [ ] **Character panels & paper doll** — two live implementations
       (`equipment.js` 243 lines, `equipment-enhanced.js` 657) with the dungeon
       getting the lesser one; encumbrance is computed and shown only where
