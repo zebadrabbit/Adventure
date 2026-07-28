@@ -1,0 +1,367 @@
+/* =========================================================================
+   tokens.css — THE source of truth for Adventure's visual design.
+   =========================================================================
+
+   Documented in docs/DESIGN_SYSTEM.md. Read that before editing this file.
+
+   RULES
+   1. This is the only `:root` block in app/static/css/. Do not add another.
+   2. Every other stylesheet consumes these tokens. No raw hex, no raw rgba(),
+      no ad-hoc px shadows outside this file.
+   3. No component may hard-code a hue. If a component only looks right in one
+      realm, it is hard-coding something it should be taking from a token.
+
+   TWO REALMS, ONE STRUCTURE
+   The game is about leaving safety and trying to return to it, so the palette
+   expresses that mechanic rather than decorating it.
+
+     WARM  (town)     amber, candlelight, wood, parchment. Company. Safety.
+     COLD  (dungeon)  slate, blue-grey, stone, damp. Isolation. Danger.
+
+   SHARED, defined once: the type scale, the space scale, edge and corner
+   treatment, component shapes and sizes, elevation rules, focus and disabled
+   states, motion, and the semantic role names themselves.
+
+   VARIES by realm: surface colours, ink colours, accent hue, glow warmth.
+
+   Switched by one attribute on <body>:  data-realm="town" | "dungeon"
+   Town is the default, so an unmarked page is warm.
+
+   ========================================================================= */
+
+:root {
+
+    /* =====================================================================
+       LAYER 0 — THEME PRIMITIVES (owned by the Theme DB row)
+       Eleven values, and they describe the TOWN. This is the surface an
+       admin re-skins: GET /theme/active/css loads after every static file
+       and overwrites these. The dungeon realm below is deliberately NOT
+       theme-controlled — it is matched to the tileset art, and letting an
+       admin recolour it would desynchronise the chrome from the map.
+       ===================================================================== */
+
+    --ui-bg: #0f0c09;
+    /* warm near-black page        Theme.body_bg      */
+    --ui-panel: #181310;
+    /* panel fill, barely lighter  Theme.card_bg      */
+    --ui-elevated: #2b231b;
+    /* rules, borders, raised fill Theme.border_color */
+    --ui-accent: #d9a441;
+    /* lamplight amber             Theme.primary      */
+    --ui-accent-hover: #e8bc63;
+    /* amber, lit                  Theme.secondary    */
+    --ui-danger: #cf6047;
+    /* failure, hostile, HP        Theme.danger       */
+    --ui-success: #87a865;
+    /* success, healing            Theme.success      */
+    --ui-warning: #d4813c;
+    /* ember — caution             Theme.warning      */
+    --ui-text: #d6c9b3;
+    /* bone                        Theme.body_color   */
+    --ui-text-dim: #a2937d;
+    /* secondary text              (derived)          */
+
+    /* --- Fonts (shared by both realms) --------------------------------- */
+    /* Display serif: nav, headings, the few numbers a player is proud of.
+       It carries the fantasy register on its own, which is why the rest of
+       the UI needs almost no ornament. System stack — no web font, no FOUT.
+       NOTE: this deliberately reverses the 2026-06-18 decision to remove all
+       serif type. That decision was right that all-serif reads as "medieval
+       brown"; the fix is serif for DISPLAY only, never for body or data. */
+    --font-display: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Times New Roman', serif;
+    /* UI sans: everything read rather than admired — body copy, form
+       controls, log lines, dense panel text. */
+    --font-ui: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    /* Mono: anything read as data — coordinates, seeds, dice, damage, HUD. */
+    --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+    /* Legacy alias — pre-token CSS references --ui-font in 47 places. */
+    --ui-font: var(--font-ui);
+
+    /* =====================================================================
+       LAYER R — THE REALM
+       The only layer that differs between town and dungeon. Everything below
+       derives from these seven values, so adding a third realm later (a
+       burning town? a flooded level?) is seven lines, not a stylesheet.
+       ===================================================================== */
+
+    /* Town is the default. */
+    --realm-bg: var(--ui-bg);
+    --realm-panel: var(--ui-panel);
+    --realm-edge: var(--ui-elevated);
+    --realm-accent: var(--ui-accent);
+    --realm-accent-hover: var(--ui-accent-hover);
+    --realm-ink: var(--ui-text);
+    --realm-ink-dim: var(--ui-text-dim);
+}
+
+/* The dungeon. Fixed values, matched to the tileset in docs/ASSETS.md
+   (void #0a0b0f, tunnel #242a36, floor #2d3340, wall #39414f) so the chrome
+   and the map read as one place. Contrast is matched to the town realm on
+   purpose — ink lands at ~12:1 and accent at ~8.9:1 in both — so a component
+   carries exactly the same emphasis whichever realm it is standing in. */
+[data-realm="dungeon"] {
+    --realm-bg: #0b0d11;
+    --realm-panel: #161a22;
+    --realm-edge: #2f3745;
+    --realm-accent: #8ab4d8;
+    /* cold lantern-steel */
+    --realm-accent-hover: #b0d0e8;
+    --realm-ink: #c3ccd8;
+    --realm-ink-dim: #8b96a5;
+}
+
+:root,
+[data-realm] {
+
+    /* =====================================================================
+       LAYER 1 — SEMANTIC ROLES
+       Named by what a thing IS, never by what colour it happens to be.
+       Components consume ONLY this layer and Layer 2. A component that
+       reads --ui-* or --realm-* directly is reaching through the system.
+       ===================================================================== */
+
+    /* --- Surfaces -------------------------------------------------------
+       Steps are deliberately TINY (bg -> panel is ~1.1:1). On a screen
+       someone stares at for two hours, separation comes from rules and
+       spacing, not from value jumps that chop the view into blocks. */
+    --surface-sunken: var(--realm-bg);
+    /* the page itself; wells, insets, log backgrounds, input fills */
+    --surface: var(--realm-panel);
+    /* the default panel fill */
+    --surface-raised: color-mix(in srgb, var(--realm-panel) 60%, var(--realm-edge));
+    /* panel headers, hovered rows, blocks nested inside a panel */
+    --surface-overlay: color-mix(in srgb, var(--realm-panel) 40%, var(--realm-edge));
+    /* modals, dropdowns, tooltips — the only surfaces allowed a shadow */
+    --surface-hover: color-mix(in srgb, var(--realm-panel) 88%, var(--realm-ink));
+    --scrim: rgb(0 0 0 / 0.72);
+    /* the dim behind a modal */
+
+    /* --- Edges and rules -------------------------------------------------
+       Rules do the work that boxes do in Bootstrap. Learn these four. */
+    --edge-subtle: color-mix(in srgb, var(--realm-edge) 55%, transparent);
+    /* hairlines *inside* a panel: list separators, table rules */
+    --edge: var(--realm-edge);
+    /* the edge of a panel or input */
+    --edge-strong: color-mix(in srgb, var(--realm-accent) 40%, var(--realm-edge));
+    /* selected / active / focused container; ornamental frames */
+    --rule-tapered: linear-gradient(to right,
+            transparent,
+            var(--edge-strong) 12%,
+            var(--edge-strong) 88%,
+            transparent);
+    /* the house divider — fades at both ends. Use as a background on a
+       1px-tall element, never as a border. */
+
+    /* --- Ink -------------------------------------------------------------
+       Body text sits near 12:1, not the 15:1 the old palette used. Bright
+       text on near-black haloes, and haloing is what makes a long session
+       tiring. Maximum contrast is rationed to --ink-strong.
+       (Colour is --ink*; SIZE is --text-*. Do not confuse the two.) */
+    --ink-strong: color-mix(in srgb, var(--realm-ink) 70%, white);
+    /* the numbers that must punch: damage, HP, gold totals */
+    --ink: var(--realm-ink);
+    /* body copy, values, anything that must be read */
+    --ink-muted: var(--realm-ink-dim);
+    /* labels, captions, metadata, timestamps */
+    --ink-faint: color-mix(in srgb, var(--realm-ink-dim) 60%, transparent);
+    /* placeholders and disabled text only — fails AA by design */
+    --ink-on-accent: var(--realm-bg);
+    /* text sitting on an --accent fill */
+
+    /* --- Interactive accent ----------------------------------------------
+       ONE accent per realm. It marks the thing you can act on, and nothing
+       else. If everything is amber, nothing is. */
+    --accent: var(--realm-accent);
+    --accent-hover: var(--realm-accent-hover);
+    --accent-wash: color-mix(in srgb, var(--realm-accent) 10%, transparent);
+    --accent-line: color-mix(in srgb, var(--realm-accent) 40%, transparent);
+
+    /* --- Feedback --------------------------------------------------------
+       Feedback hues stay constant across realms: "you failed" must not look
+       different because of where you are standing. */
+    --danger: var(--ui-danger);
+    --danger-wash: color-mix(in srgb, var(--ui-danger) 14%, transparent);
+    --danger-line: color-mix(in srgb, var(--ui-danger) 45%, transparent);
+    --warn: var(--ui-warning);
+    --warn-wash: color-mix(in srgb, var(--ui-warning) 14%, transparent);
+    --warn-line: color-mix(in srgb, var(--ui-warning) 45%, transparent);
+    --success: var(--ui-success);
+    --success-wash: color-mix(in srgb, var(--ui-success) 14%, transparent);
+    --success-line: color-mix(in srgb, var(--ui-success) 45%, transparent);
+    --info: var(--realm-accent);
+    --info-wash: var(--accent-wash);
+    --info-line: var(--accent-line);
+
+    /* =====================================================================
+       LAYER 1b — GAME SEMANTICS
+       Roles that exist because this is a dungeon crawler, and that must mean
+       the same thing in both realms. NOT interchangeable with the feedback
+       roles: an HP bar is red because it is HP, not because something failed.
+       ===================================================================== */
+
+    --hp: var(--ui-danger);
+    --mp: #6d9ed6;
+    /* the one blue in the chrome; in the dungeon realm it is deliberately
+       close to the accent, which is correct — magic is cold */
+    --xp: var(--ui-warning);
+    --hostile: var(--ui-danger);
+    --ally: var(--realm-accent);
+
+    /* Currency. Coin gold stays WARM in both realms, and in the dungeon it
+       is the only warm thing on the screen. That is the point: down there,
+       gold is the light you came for. */
+    --coin-gold: #e8b64c;
+    --coin-silver: #b9b2a4;
+    --coin-copper: #b87333;
+
+    /* Rarity — fixed in both realms. A player must be able to learn that
+       purple means epic and have that survive a realm change or a re-skin. */
+    --rarity-common: var(--realm-ink-dim);
+    --rarity-uncommon: #87a865;
+    --rarity-rare: #6d9ed6;
+    --rarity-epic: #a78bfa;
+    --rarity-legendary: #e8b64c;
+
+    /* Class identity — fixed in both realms, for the same reason. One hue per
+       class; badges, header strips and border rings all derive from it.
+       Never hard-code a class colour at a call site. */
+    --class-fighter: #b8503f;
+    --class-rogue: #8a6a9e;
+    --class-mage: #5b8fc9;
+    --class-cleric: #d9a441;
+    --class-ranger: #7a9a5e;
+    --class-druid: #6f9a6a;
+    --class-barbarian: #c46a35;
+    --class-bard: #c9a94a;
+    --class-monk: #4f9a8c;
+    --class-paladin: #cbb676;
+    --class-sorcerer: #b85f7f;
+    --class-warlock: #7b5fa8;
+
+    /* --- The dungeon viewport --------------------------------------------
+       The map canvas paints itself from the tile palette in
+       app/static/js/dungeon-canvas.js — do not restate those colours here.
+       These two tokens are only for the frame the chrome puts around it. */
+    --viewport-bg: #0a0b0f;
+    --viewport-frame: var(--edge-strong);
+
+    /* --- Realm-dependent light -------------------------------------------
+       These live here, not in Layer 2, because a custom property that
+       references another is resolved on the element that DECLARES it. Left
+       at :root they would freeze at the town palette and stay warm
+       underground. Glows carry state, not decoration: one per meaning. */
+    --glow-accent: 0 0 14px color-mix(in srgb, var(--realm-accent) 30%, transparent);
+    --glow-danger: 0 0 14px color-mix(in srgb, var(--ui-danger) 30%, transparent);
+    --focus-ring: 0 0 0 2px var(--realm-bg), 0 0 0 4px color-mix(in srgb, var(--realm-accent) 40%, transparent);
+}
+
+:root {
+
+    /* =====================================================================
+       LAYER 2 — TYPE, SPACE, SHAPE, DEPTH, MOTION
+       Shared by both realms. This is the *register*, and the register does
+       not change when the palette does.
+       ===================================================================== */
+
+    /* --- Type scale ------------------------------------------------------
+       Eight steps replacing the 49 distinct font-size values in use.
+       Display sizes take --font-display; body sizes take --font-ui. */
+    --text-2xs: 0.6875rem;
+    /* 11px — micro-labels, ONLY ever uppercase + --tracking-label */
+    --text-xs: 0.75rem;
+    /* 12px — stat labels, chips, badges, table headers */
+    --text-sm: 0.875rem;
+    /* 14px — dense panel body, log lines. Floor for anything read as prose. */
+    --text-base: 1rem;
+    /* 16px — default body copy, form controls */
+    --text-lg: 1.125rem;
+    /* 18px — card titles */
+    --text-xl: 1.375rem;
+    /* 22px — panel and section headings (display serif) */
+    --text-2xl: 1.75rem;
+    /* 28px — page headings (display serif) */
+    --text-3xl: clamp(2.25rem, 5vw, 3.5rem);
+    /* the landing hero, and nothing else */
+
+    --weight-normal: 400;
+    --weight-medium: 500;
+    --weight-semibold: 600;
+    --weight-bold: 700;
+
+    --leading-tight: 1.2;
+    /* display headings only */
+    --leading-normal: 1.5;
+    /* UI text */
+    --leading-loose: 1.75;
+    /* the combat log and any readout scanned for hours */
+
+    /* Tracking. Small text is made legible by tracking it, not by growing
+       it — that is how the HUD stays dense and still readable. */
+    --tracking-label: 0.14em;
+    /* uppercase micro-labels */
+    --tracking-display: 0.06em;
+    /* serif headings and nav */
+    --tracking-wide: 0.03em;
+    /* buttons */
+
+    /* --- Space scale (4px base) ------------------------------------------ */
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.5rem;
+    --space-6: 2rem;
+    --space-8: 3rem;
+
+    /* --- Shape ------------------------------------------------------------
+       Edges are HARD. Bootstrap's default 0.375rem radius on every card,
+       button and input is one of the two biggest reasons the app reads as a
+       demo page — its diffuse drop shadows are the other. Zero is the
+       default; you should need a reason to leave it. */
+    --radius: 0;
+    --radius-sm: 2px;
+    /* only where 0 collides with a focus ring: inputs, chips */
+    --radius-pill: 999px;
+    /* status dots and avatar rings — never buttons */
+    --radius-circle: 50%;
+
+    /* --- Depth ------------------------------------------------------------
+       Panels do NOT float. Depth comes from rules, insets and value. The only
+       thing allowed a drop shadow is something genuinely above the page. */
+    --elev-flat: none;
+    /* the default for every panel and card */
+    --elev-overlay: 0 16px 40px rgb(0 0 0 / 0.7);
+    /* modals, dropdowns, tooltips — and nothing else */
+    --inset-well: inset 0 1px 3px rgb(0 0 0 / 0.5);
+    /* a sunken track: HP bars, log wells, inputs */
+
+    /* --- Motion ------------------------------------------------------------
+       Motion marks a state change. Nothing loops. An animation that runs
+       forever is fatigue with extra steps, and this game is played for hours. */
+    --dur-fast: 120ms;
+    --dur: 200ms;
+    --dur-slow: 320ms;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* --- Layers -------------------------------------------------------------
+       Aligned with Bootstrap's own z-index scale so the two never fight.
+       Never write a bare z-index: 9999. */
+    --z-base: 0;
+    --z-raised: 10;
+    --z-hud: 200;
+    --z-dropdown: 1000;
+    --z-sticky: 1020;
+    --z-scrim: 1050;
+    --z-modal: 1055;
+    --z-tooltip: 1080;
+    --z-toast: 1090;
+}
+
+/* Reduced motion: kill transitions entirely, keep state changes instant. */
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --dur-fast: 0ms;
+        --dur: 0ms;
+        --dur-slow: 0ms;
+    }
+}

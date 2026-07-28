@@ -21,39 +21,33 @@
 
    =================================================================== */
 
-:root {
-    /* Canonical "Cold Steel" namespace — the single source of truth.
-       --dungeon-* / --adv-* below are aliases for existing call sites. */
-    --ui-bg: #0c0e12;
-    --ui-panel: #1b1f27;
-    --ui-elevated: #2e3440;
-    --ui-accent: #5ad1c9;
-    --ui-accent-hover: #7adbd4;
-    --ui-danger: #c0392b;
-    --ui-success: #4caf82;
-    --ui-warning: #d6a23a;
-    --ui-text: #dfe4ea;
-    --ui-text-dim: #8d97a3;
-    --ui-font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+/* Token definitions moved to tokens.css — see docs/DESIGN_SYSTEM.md.
+   What remains here is the BACK-COMPAT ALIAS LAYER: ~234 call sites across
+   this file and the rest of the CSS still say --dungeon-* / --adv-*. They now
+   resolve to the semantic layer rather than to raw primitives, which means
+   every one of those existing call sites became realm-aware for free — the
+   components below go cold under data-realm="dungeon" without being touched.
+   Retire these aliases file-by-file as each stylesheet is migrated. */
+:root,
+[data-realm] {
+    --dungeon-bg: var(--surface-sunken);
+    --dungeon-panel: var(--surface);
+    --dungeon-border: var(--edge);
+    --dungeon-accent: var(--accent);
+    --dungeon-danger: var(--danger);
+    --dungeon-success: var(--success);
+    --dungeon-warn: var(--warn);
+    --dungeon-text: var(--ink);
+    --dungeon-text-dim: var(--ink-muted);
 
-    --dungeon-bg: var(--ui-bg);
-    --dungeon-panel: var(--ui-panel);
-    --dungeon-border: var(--ui-elevated);
-    --dungeon-accent: var(--ui-accent);
-    --dungeon-danger: var(--ui-danger);
-    --dungeon-success: var(--ui-success);
-    --dungeon-warn: var(--ui-warning);
-    --dungeon-text: var(--ui-text);
-    --dungeon-text-dim: var(--ui-text-dim);
-
-    --adv-primary: var(--ui-accent);
-    --adv-primary-hover: var(--ui-accent-hover);
-    --adv-secondary: var(--ui-elevated);
-    --adv-success: var(--ui-success);
-    --adv-danger: var(--ui-danger);
-    --adv-warning: var(--ui-warning);
-    --adv-link-color: var(--ui-accent);
-    --adv-link-hover-color: var(--ui-accent-hover);
+    --adv-primary: var(--accent);
+    --adv-primary-hover: var(--accent-hover);
+    --adv-secondary: var(--edge);
+    --adv-success: var(--success);
+    --adv-danger: var(--danger);
+    --adv-warning: var(--warn);
+    --adv-link-color: var(--accent);
+    --adv-link-hover-color: var(--accent-hover);
 }
 
 /* ========================================
@@ -61,10 +55,10 @@
    ======================================== */
 
 body {
-    background: var(--ui-bg);
+    background: var(--surface-sunken);
     min-height: 100vh;
-    color: var(--ui-text);
-    font-family: var(--ui-font);
+    color: var(--ink);
+    font-family: var(--font-ui);
 }
 
 /* ========================================

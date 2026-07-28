@@ -26,6 +26,9 @@ Moved from project root to `docs/`.
 - Use data attributes for lightweight state where possible.
 
 ## CSS
+- **[DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) is canonical for anything visual.**
+  Every colour, size, radius, shadow and duration comes from a token in
+  `app/static/css/tokens.css`, which holds the project's only `:root` block.
 - Utility classes for spacing, layout, and effects consolidate styling.
 - Avoid inline `style` attributes; rely on classes and theming variables.
 

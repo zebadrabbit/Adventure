@@ -6,9 +6,35 @@
 
 # [0.8.0] - UNRELEASED
 ### Added
+- `docs/DESIGN_SYSTEM.md` — the source of truth for Adventure's visual design:
+  the two-realm palette, token reference, semantic colour roles,
+  type/space/radius/elevation scales, the component vocabulary and what should
+  replace the stock Bootstrap that carries the game screens, the rules that
+  keep it consistent, and a phased migration plan.
+- `app/static/css/tokens.css` — the project's single token file, replacing the
+  ten `:root` blocks spread across eight files.
+- **Two realms.** The warm town and the cold dungeon share one structural
+  system and differ in seven values, switched by `data-realm` on `<body>`.
+  Town is the default; the dungeon palette is derived from the tileset so the
+  chrome and the map read as one place.
+- "Lamplight" theme — warm candlelit hall with an amber accent, seeded as the
+  active default. "Cold Steel" and "Classic Dungeon" stay selectable.
+
 ### Changed
+- `auth.css` (login + register) rebuilt on the token system as the reference
+  implementation: zero literal colours, radii, shadows or durations, and
+  realm-agnostic. Serif display masthead, tapered rules, corner ticks, hard
+  edges and one solid element.
+- `theme.css` no longer declares tokens; its `--dungeon-*` / `--adv-*` aliases
+  now resolve to the semantic layer, which makes ~234 existing call sites
+  realm-aware without being touched.
+
 ### Fixed
 ### Notes
+- The rest of the CSS has **not** been migrated — see the migration plan in
+  `docs/DESIGN_SYSTEM.md`. Three defects in the theme layer are documented
+  there and block phase 1, including a no-active-theme fallback that renders a
+  second, unrelated palette on every page of a fresh install.
 
 # [0.7.25] - UNRELEASED
 ### Added

@@ -19,6 +19,7 @@ Welcome to the Adventure project documentation. This index links all major docs 
 - [Releasing](RELEASING.md)
 - [Contributing Guide](CONTRIBUTING.md)
 - [Style Guide](STYLE_GUIDE.md)
+- [Design System](DESIGN_SYSTEM.md) — the source of truth for how the game looks: tokens, semantic roles, component vocabulary.
 - [Architecture Diagram](architecture.md)
 - [WebSocket Event Contracts](websocket_events.md)
 

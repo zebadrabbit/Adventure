@@ -22,8 +22,39 @@ from app.models.theme import Theme
 
 THEMES = [
     {
+        # The town/warm realm of the design system (docs/DESIGN_SYSTEM.md).
+        # Values here must stay in step with tokens.css's Layer 0 fallbacks.
+        #
+        # Two column mappings in Theme.to_css_variables() are easy to get
+        # wrong, and "Cold Steel" below gets both wrong — see the doc's
+        # "Known defects":
+        #   secondary -> --ui-accent-hover   (a LIGHTER accent, not a border)
+        #   light     -> --ui-text-dim       (dim text, not the body colour)
+        "name": "Lamplight",
+        "description": "Warm candlelit hall, amber accent — the town realm, and the default look.",
+        "primary": "#d9a441",
+        "secondary": "#e8bc63",
+        "success": "#87a865",
+        "danger": "#cf6047",
+        "warning": "#d4813c",
+        "info": "#d9a441",
+        "light": "#a2937d",
+        "dark": "#0f0c09",
+        "body_bg": "#0f0c09",
+        "body_color": "#d6c9b3",
+        "link_color": "#d9a441",
+        "link_hover_color": "#e8bc63",
+        "border_color": "#2b231b",
+        "card_bg": "#181310",
+        "card_opacity": 1.0,
+        "gradient_angle": 135,
+        "gradient_start": "#0f0c09",
+        "gradient_end": "#181310",
+        "is_active": True,
+    },
+    {
         "name": "Cold Steel",
-        "description": "Slate/charcoal hub with a teal accent — the default look.",
+        "description": "Slate/charcoal hub with a teal accent — the previous default, kept selectable.",
         "primary": "#5ad1c9",
         "secondary": "#2e3440",
         "success": "#4caf82",
@@ -42,7 +73,7 @@ THEMES = [
         "gradient_angle": 135,
         "gradient_start": "#0c0e12",
         "gradient_end": "#1b1f27",
-        "is_active": True,
+        "is_active": False,
     },
     {
         "name": "Classic Dungeon",
