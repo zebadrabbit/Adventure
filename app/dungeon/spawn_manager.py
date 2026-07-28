@@ -48,7 +48,12 @@ class SpawnConfig:
     """Configuration for spawn system."""
 
     # Density controls
-    ambient_density: float = 0.004  # Spawns per walkable tile (~4 per 1000 tiles)
+    # Spawns per walkable tile. Raised from 0.004 for the rooms-and-mazes
+    # generator: it roughly doubled walkable coverage (~27 rooms plus maze), so
+    # the old value left long stretches with nothing in them. Playtest asked for
+    # "more fights, much more spread out" -- this is the "more" half, and
+    # group placement below is the "spread out" half.
+    ambient_density: float = 0.010
     elite_per_region: int = 2  # Elites per major region
     boss_per_dungeon: int = 1  # Bosses per dungeon (increases with tier)
 
@@ -71,10 +76,54 @@ class SpawnConfig:
 
     # Level scaling
     min_spawns: int = 4  # Minimum spawns regardless of density
-    max_spawns: int = 30  # Maximum spawns per dungeon
+    max_spawns: int = 45  # Maximum spawns per dungeon
+
+    # Grouping. Ambient spawns used to be a uniform random sample over every
+    # walkable tile, which clumps by pure chance -- playtesting turned up six
+    # monsters in one room while most of the floor was empty. Spawns are now
+    # placed as packs around anchor points that are kept apart, so encounters
+    # are distinct and spread across the map instead of arriving all at once.
+    group_size_min: int = 1
+    group_size_max: int = 3  # raise once combat can field a whole pack at once
+    group_spread: int = 2  # members land within this radius of the anchor
+    min_group_separation: int = 7  # Chebyshev distance between anchors
 
     # Boss settings
     boss_room_buffer: int = 5  # Min distance from boss to entrance
+
+    @classmethod
+    def from_game_config(cls) -> "SpawnConfig":
+        """Build a config, letting GameConfig["spawns"] override any field.
+
+        Spawn density, pack size, separation and aggro radius are all play-feel
+        numbers that want tuning against a live game rather than a deploy, so
+        they are overridable at runtime. Unknown keys are ignored; bad values
+        fall back to the default for that field.
+        """
+        cfg = cls()
+        try:
+            from app.models.models import GameConfig
+
+            raw = GameConfig.get("spawns")
+            if not raw:
+                return cfg
+            import json as _json
+
+            data = _json.loads(raw) if isinstance(raw, str) else raw
+            if not isinstance(data, dict):
+                return cfg
+            for key, value in data.items():
+                if not hasattr(cfg, key):
+                    continue
+                current = getattr(cfg, key)
+                try:
+                    setattr(cfg, key, type(current)(value))
+                except (TypeError, ValueError):
+                    continue
+            cfg.__post_init__()
+        except Exception:
+            return cls()
+        return cfg
 
     def __post_init__(self):
         """Validate configuration values."""
@@ -504,33 +553,103 @@ class SpawnManager:
 
             self.spawns.append(spawn)
 
+    def _pick_group_anchors(self, walkable_tiles: List[Tuple[int, int]], wanted: int) -> List[Tuple[int, int]]:
+        """Anchor points at least min_group_separation apart.
+
+        Rejection sampling over a shuffled tile list: simple, deterministic
+        under the manager's seeded rng, and good enough for a 75x75 map. Existing
+        spawns (bosses, elites) count as anchors too, so a pack never lands on
+        top of a set piece. Gives up on separation rather than on spawns if the
+        floor is too cramped to honour it -- an under-populated floor is a worse
+        outcome than a slightly tight one.
+        """
+        if wanted <= 0 or not walkable_tiles:
+            return []
+        sep = max(0, int(self.config.min_group_separation))
+        taken = [(s.x, s.y) for s in self.spawns]
+        anchors: List[Tuple[int, int]] = []
+        candidates = list(walkable_tiles)
+        self.rng.shuffle(candidates)
+
+        def far_enough(x, y, points, distance):
+            return all(max(abs(x - px), abs(y - py)) >= distance for px, py in points)
+
+        for x, y in candidates:
+            if len(anchors) >= wanted:
+                break
+            if far_enough(x, y, taken + anchors, sep):
+                anchors.append((x, y))
+
+        # Relax the constraint if the floor could not supply enough room.
+        relaxed = sep
+        while len(anchors) < wanted and relaxed > 1:
+            relaxed = max(1, relaxed // 2)
+            for x, y in candidates:
+                if len(anchors) >= wanted:
+                    break
+                if (x, y) in anchors:
+                    continue
+                if far_enough(x, y, taken + anchors, relaxed):
+                    anchors.append((x, y))
+        return anchors
+
+    def _tiles_near(self, x: int, y: int, walkable: set, used: set, count: int) -> List[Tuple[int, int]]:
+        """Up to `count` free walkable tiles within group_spread of (x, y)."""
+        spread = max(1, int(self.config.group_spread))
+        options = []
+        for dx in range(-spread, spread + 1):
+            for dy in range(-spread, spread + 1):
+                tile = (x + dx, y + dy)
+                if tile in walkable and tile not in used:
+                    options.append(tile)
+        self.rng.shuffle(options)
+        return options[:count]
+
     def _generate_ambient_spawns(self, party_level: int, count: int, walkable_tiles: List[Tuple[int, int]]):
-        """Generate ambient monster spawns."""
+        """Generate ambient monsters as separated packs rather than confetti."""
         if count <= 0 or not walkable_tiles:
             return
 
-        # Sample random walkable tiles
-        sample_size = min(count, len(walkable_tiles))
-        selected_tiles = self.rng.sample(walkable_tiles, sample_size)
+        lo = max(1, int(self.config.group_size_min))
+        hi = max(lo, int(self.config.group_size_max))
+        average = (lo + hi) / 2.0
+        wanted_groups = max(1, int(round(count / average)))
 
-        for x, y in selected_tiles:
-            # Roll behavior
-            roll = self.rng.random()
+        walkable = set(walkable_tiles)
+        used = {(s.x, s.y) for s in self.spawns}
+        placed = 0
 
-            if roll < self.config.patrol_chance:
-                behavior = SpawnBehavior.PATROL
-                move_interval = self.config.patrol_interval_ticks
-            elif roll < self.config.patrol_chance + self.config.wanderer_chance:
-                behavior = SpawnBehavior.WANDERER
-                move_interval = self.config.wander_interval_ticks
-            elif roll < self.config.patrol_chance + self.config.wanderer_chance + self.config.guard_chance:
-                behavior = SpawnBehavior.GUARD
-                move_interval = 999  # Guards don't move
-            else:
-                behavior = SpawnBehavior.AMBIENT
-                move_interval = 999  # Ambient don't move
+        for ax, ay in self._pick_group_anchors(walkable_tiles, wanted_groups):
+            if placed >= count:
+                break
+            size = self.rng.randint(lo, hi)
+            size = min(size, count - placed)
+            if size <= 0:
+                break
+            tiles = self._tiles_near(ax, ay, walkable, used, size)
+            for x, y in tiles:
+                used.add((x, y))
+                placed += 1
+                self._append_ambient_spawn(x, y, party_level)
 
-            spawn = SpawnEntry(
+    def _append_ambient_spawn(self, x: int, y: int, party_level: int):
+        """Roll one ambient spawn's behaviour and add it at (x, y)."""
+        roll = self.rng.random()
+        if roll < self.config.patrol_chance:
+            behavior = SpawnBehavior.PATROL
+            move_interval = self.config.patrol_interval_ticks
+        elif roll < self.config.patrol_chance + self.config.wanderer_chance:
+            behavior = SpawnBehavior.WANDERER
+            move_interval = self.config.wander_interval_ticks
+        elif roll < self.config.patrol_chance + self.config.wanderer_chance + self.config.guard_chance:
+            behavior = SpawnBehavior.GUARD
+            move_interval = 999  # Guards don't move
+        else:
+            behavior = SpawnBehavior.AMBIENT
+            move_interval = 999  # Ambient don't move
+
+        self.spawns.append(
+            SpawnEntry(
                 x=x,
                 y=y,
                 behavior=behavior,
@@ -538,8 +657,7 @@ class SpawnManager:
                 level=party_level,
                 move_interval=move_interval,
             )
-
-            self.spawns.append(spawn)
+        )
 
     def _should_move(self, spawn: SpawnEntry, current_tick: int) -> bool:
         """Check if spawn should move this tick."""

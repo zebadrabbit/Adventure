@@ -1740,6 +1740,11 @@ def player_cast_spell(
     # Normalize storage back into both keys for backward compatibility
     caster["mana"] = mana_available
     caster["current_mana"] = mana_available
+    # Persist the spend immediately. The fizzle and miss paths below commit and
+    # return without re-serialising the party, so the deduction -- which only
+    # mutates the in-memory dict -- used to be discarded: a spell that missed
+    # was free, and casting looked like it cost no mana at all.
+    session.party_snapshot_json = json.dumps(party)
     int_stat = caster.get("int_stat", caster.get("attack", 10))
     # Spell accuracy: d20 + INT-based attack surrogate vs monster evasion (10 + armor)
     acc_roll = random.randint(1, 20)

@@ -624,8 +624,9 @@ def dungeon_map():
 
             def _initialize_spawn_system():
                 """Initialize or load spawn system for dungeon."""
-                # Create spawn manager
-                config = SpawnConfig()
+                # Create spawn manager. Density/pack/aggro numbers are live
+                # tunable via GameConfig["spawns"] -- they are play-feel dials.
+                config = SpawnConfig.from_game_config()
                 spawn_manager = SpawnManager(dungeon, instance, config=config)
 
                 # One boss guards the loot room on the deepest floor; extraction
