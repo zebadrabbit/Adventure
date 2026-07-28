@@ -163,11 +163,23 @@ def test_hud_panels_do_not_cover_the_party_or_each_other(page):
     overlay (.hud-readout, .map-controls, .adv-actions, .adv-log,
     .adv-party-rail; #hotkeys-panel too, when open) and, structurally, any
     future one -- nothing here needs to be remembered and appended to.
+
+    The hotkeys panel is opened first, because "when open" was a promise this
+    test used to make and not keep: the panel was anchored in the party rail's
+    box at the same z-index, and the rail -- later in DOM -- won the tie, so
+    the panel rendered behind four opaque frames and every click aimed at it
+    hit .adv-frame-open instead. Discovery skipped it entirely because a
+    display: none element has no box.
     """
     page.set_viewport_size({"width": 1366, "height": 768})
     page.goto(f"{BASE_URL}/adventure")
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(500)  # let centerOnPlayer settle
+
+    page.click("#btn-show-hotkeys")
+    assert (
+        page.evaluate("() => getComputedStyle(document.getElementById('hotkeys-panel')).display") != "none"
+    ), "one click on #btn-show-hotkeys did not open the panel"
 
     result = page.evaluate(
         """() => {
@@ -207,7 +219,15 @@ def test_hud_panels_do_not_cover_the_party_or_each_other(page):
                 }
             }
 
-            return { panelCount: panels.length, onParty, pairOverlaps };
+            // The rail reserves its own span from --hud-inset-bottom, so it
+            // never overflows the HUD -- but it can overflow itself, and then
+            // the fourth frame is only reachable by scrolling a panel that
+            // gives no hint it scrolls.
+            const rail = hud.querySelector('.adv-party-rail');
+            const railOverflow = rail ? rail.scrollHeight - rail.clientHeight : 0;
+            const panelNames = panels.map(describe);
+
+            return { panelCount: panels.length, panelNames, onParty, pairOverlaps, railOverflow };
         }"""
     )
 
@@ -215,8 +235,15 @@ def test_hud_panels_do_not_cover_the_party_or_each_other(page):
     # selector broke (e.g. the HUD markup moved out of .adv-hud) and the
     # checks below would vacuously pass.
     assert result["panelCount"] >= 3, f"HUD panel discovery found too few panels: {result}"
+    assert (
+        "hotkeys-panel" in result["panelNames"]
+    ), f"the open hotkeys panel was not discovered as an overlay: {result['panelNames']}"
     assert not result["onParty"], f"these panels are sitting on the party: {result['onParty']}"
     assert not result["pairOverlaps"], f"these HUD panels overlap each other: {result['pairOverlaps']}"
+    # An earlier pass hit this by hand: four frames measured 677px against the
+    # 540px the rail has between --space-2 and --hud-inset-bottom. It will
+    # recur on a font-size change, a fifth party slot, or an extra stat row.
+    assert result["railOverflow"] <= 1, f"the party rail overflows its own box by {result['railOverflow']}px"
 
 
 def test_csrf_guard_rejects_bare_mutation(page):

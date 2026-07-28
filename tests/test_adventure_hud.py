@@ -87,11 +87,22 @@ def test_adventure_is_the_cold_realm(client, party):
 
 
 def test_adventure_keeps_the_run_ending_actions_out_of_the_menu(client, party):
-    """Extract and Hearth are game actions with consequences, not settings."""
+    """Extract and Hearth are game actions with consequences, not settings.
+
+    Checking the ids appear *somewhere* in the response would pass just as
+    happily if both moved into the account dropdown, which is the exact thing
+    this is meant to forbid. The account anchor renders inside <header>, so
+    split there and assert against the page body alone.
+    """
     html = client.get("/adventure").get_data(as_text=True)
 
-    assert 'id="btn-extract"' in html
-    assert 'id="btn-hearth"' in html
+    assert "</header>" in html, "no <header> to split on: the account anchor moved"
+    chrome, _, body = html.partition("</header>")
+
+    assert 'id="account-anchor"' in chrome, "split landed in the wrong place"
+    for btn in ('id="btn-extract"', 'id="btn-hearth"'):
+        assert btn in body, f"{btn} is not on the action bar"
+        assert btn not in chrome, f"{btn} moved into the account menu"
 
 
 def test_dashboard_still_has_full_chrome(client, party):

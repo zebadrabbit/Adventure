@@ -87,6 +87,30 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover {
     background: var(--surface-hover);
 }
 
+/* The monogram inside the trigger. .avatar-circle is defined only in
+   glass-theme.css, which this page does not load, so without this rule the
+   initial rendered as a bare inline letter floating in the bordered square.
+   A filled monogram plate rather than glass-theme's gradient disc: --radius
+   is 0 on this screen and the anchor is already a hard 36px square, so the
+   letter takes the whole box and reads as a deliberate plate. */
+body[data-realm="dungeon"] .account-anchor-trigger .avatar-circle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    background: var(--surface-raised);
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    line-height: 1;
+    color: var(--ink);
+}
+
+body[data-realm="dungeon"] .account-anchor-trigger:hover .avatar-circle {
+    color: var(--accent);
+}
+
 /* Zoom controls sit below the minimap, which sits below the account anchor:
    36 (anchor) + 8 (gap) = 44 minimap top, + 120 (minimap) + 8 = 172. */
 .adv-hud .map-controls {
@@ -134,10 +158,20 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover {
     color: var(--ink-muted);
 }
 
+/* Hotkeys reference. Anchored on the geometry contract, not on the viewport
+   corner: at top/left var(--space-2) it landed inside .adv-party-rail's box,
+   and the rail is later in DOM at the same --z-hud, so it won the stacking
+   tie -- the panel rendered behind four opaque frames and every click in that
+   284px-wide column (gaps included) opened a character's equipment instead of
+   hitting the panel. --hud-inset-left clears the rail and --hud-inset-bottom
+   clears the action bar and the log, so both edges track the contract rather
+   than needing a second set of numbers kept in sync by hand. The camera puts
+   the party at ((width + inset-left) / 2), which is to the right of this
+   panel's 300px ceiling, so it does not sit on them either. */
 .adv-hud #hotkeys-panel {
     position: absolute;
-    top: var(--space-2);
-    left: var(--space-2);
+    left: var(--hud-inset-left);
+    bottom: var(--hud-inset-bottom);
     z-index: var(--z-hud);
     display: none;
     max-width: 300px;
@@ -180,6 +214,18 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover {
     .adv-hud .hud-readout {
         position: absolute;
     }
+
+    /* Both insets collapse to 0 here, which would drop the hotkeys panel at
+       the very bottom of the stacked column, on top of the last party frame.
+       It is an explicitly-opened popover, so pin it to the viewport instead
+       — same treatment #account-anchor gets, and it stays reachable however
+       far the stack is scrolled. */
+    .adv-hud #hotkeys-panel {
+        position: fixed;
+        top: var(--space-2);
+        left: var(--space-2);
+        bottom: auto;
+    }
 }
 
 /* --- Party rail ---------------------------------------------------------
@@ -206,6 +252,17 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover {
 }
 
 .adv-hud .adv-party-rail .operative-card {
+    /* .operative-card carries height: 100% (tactical-theme.css, for the
+       dashboard's equal-height card grid). Against this rail's definite
+       height that makes every frame a flex item asking for the full 540px,
+       which the four of them then shrink to share exactly -- the rail could
+       never overflow, so it could never signal that the frames no longer fit,
+       and a fifth member would silently squash the other four instead. Sized
+       by content here (height: auto too -- flex-basis: auto reads the height
+       property, so the 100% would come straight back in through it); the
+       rail's own overflow-y is the pressure valve. */
+    flex: 0 0 auto;
+    height: auto;
     background: var(--surface-overlay);
     border: 1px solid var(--edge);
     border-radius: var(--radius);
@@ -224,10 +281,16 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover {
     box-shadow: var(--focus-ring);
 }
 
-/* A downed character is unmissable — refreshPartyCards() sets this. */
+/* A downed character is unmissable — refreshPartyCards() sets this.
+   The wash is layered over the frame's own surface, not swapped for it:
+   --danger-wash is 14% opaque, so assigning it alone made the one frame that
+   most needs reading the only translucent one on the rail, with dungeon art
+   showing through the name and the bars. A gradient with the same colour at
+   both stops is the standard way to spend the background-image layer on a
+   flat colour and keep --surface-overlay underneath as the background-color. */
 .adv-hud .adv-party-rail .operative-card.is-downed {
     border-color: var(--danger-line);
-    background: var(--danger-wash);
+    background: linear-gradient(var(--danger-wash), var(--danger-wash)), var(--surface-overlay);
 }
 
 /* Deviation from the brief (documented in the task report): .operative-header
@@ -312,6 +375,23 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover {
     height: 18px;
 }
 
+/* Fallback monogram for the classes with no icon yet (barbarian, bard, monk,
+   paladin, sorcerer, warlock). Same re-homing as the account anchor above:
+   .avatar-circle lives in glass-theme.css, which this page does not load. */
+.adv-hud .adv-party-rail .class-icon-slot .avatar-circle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    background: var(--surface-raised);
+    font-family: var(--font-display);
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-semibold);
+    line-height: 1;
+    color: var(--ink-muted);
+}
+
 .adv-hud .adv-party-rail .last-roll-line {
     min-height: 1rem;
     font-size: var(--text-2xs);
@@ -390,6 +470,30 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover {
     border-radius: var(--radius);
 }
 
+/* The log's ceiling (on .dungeon-output below) is two bands' worth of the
+   bottom inset. Two, not one, because the reserved band is what the HUD
+   stands on across the FULL width: the left column (.adv-actions) is capped
+   at one band because .adv-party-rail sits directly above it, but nothing
+   sits above the log until the top-right stack, so the right column can spend
+   the same depth again going up. Measured, it stops 63px clear of
+   .map-controls, and the camera's target x stays left of this panel.
+
+   Measured at the 1366x768 floor (numbers in the fix report): the 32vh this
+   replaces gave the body 246px, and one band would give 172px, both short of
+   the 280px max-height this branch deleted from app.css -- a regression
+   against the very complaint the floating log answers. Raising
+   --hud-inset-bottom to ~317px so that one band covered 280px was measured
+   and rejected: .adv-party-rail derives its own bottom from that token and
+   has just 28px of slack at four members (512px of frames in 540px), so the
+   band cannot grow past ~248px without the rail overflowing on the ordinary
+   case. Two bands gives the body 392px and moves nothing else.
+
+   The ceiling goes on .dungeon-output rather than on this element because a
+   max-height here caps the <details> box but not its content: Chrome puts
+   that content in a ::details-content box that is the real child, so
+   "display: flex here, flex: 1 1 auto on the body" left the body at its full
+   scroll height hanging out of the bottom of the panel (measured: 4949px of
+   log in a 424px frame). Capping the body caps the panel with it. */
 .adv-hud .adv-log {
     position: absolute;
     right: var(--space-2);
@@ -432,12 +536,18 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover {
     content: "▸";
 }
 
-/* The "log window is too restrictive for looting" complaint, answered: the
-   panel is taller by default and the player can drag it taller still. */
+/* The ceiling, less --space-6 for the <summary> the panel wears above this
+   body (27px of head plus the panel's two 1px borders, so 32px is the nearest
+   token that clears it). 440 - 16 - 32 = 392px of log at the 1366x768 floor,
+   against the 280px max-height this replaces.
+   No resize handle. It was here to answer "the log window is too restrictive
+   for looting", but the panel is anchored by its bottom edge, so the handle
+   sat one --space-2 above the viewport floor with nowhere to travel: it could
+   only ever make the log smaller. The ceiling is the real answer -- the body
+   grows with the scrollback on its own and then scrolls. */
 .adv-hud .adv-log .dungeon-output {
-    max-height: 32vh;
+    max-height: calc(var(--hud-inset-bottom) * 2 - var(--space-2) * 2 - var(--space-6));
     min-height: 120px;
-    resize: vertical;
     overflow: auto;
     margin: 0;
     border: 0;
@@ -457,13 +567,19 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover {
     }
 
     /* --hud-inset-bottom collapses to 0px in this fallback (.adv-hud above),
-       which would clamp the token-derived max-height on .adv-actions to 0
-       and hide every button -- there is no reserved bottom band to derive a
-       ceiling from once the panel is back in normal flow, so drop the
-       constraint along with it. */
+       which would clamp both token-derived ceilings -- .adv-actions' and the
+       log body's -- to zero and hide the buttons and the scrollback outright.
+       There is no reserved bottom band to derive from once these are back in
+       normal flow, so drop the constraint along with it. The log keeps a
+       reading height because in flow it would otherwise grow the page by its
+       whole scrollback. */
     .adv-hud .adv-actions {
         max-height: none;
         overflow: visible;
+    }
+
+    .adv-hud .adv-log .dungeon-output {
+        max-height: 280px;
     }
 
     .adv-hud .adv-actions #adventure-action-panel {

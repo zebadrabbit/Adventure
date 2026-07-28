@@ -116,7 +116,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const panel = document.getElementById('hotkeys-panel');
         if (showBtn && panel) {
             showBtn.addEventListener('click', () => {
-                panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+                // getComputedStyle, not panel.style: the panel's resting
+                // display: none comes from adventure-hud.css, so the inline
+                // style is the empty string until something sets it and the
+                // first click used to read "not none" and hide an already
+                // hidden panel -- the button did nothing at all until the
+                // second press.
+                panel.style.display =
+                    getComputedStyle(panel).display === 'none' ? 'block' : 'none';
             });
         }
         if (closeBtn && panel) {
@@ -133,6 +140,14 @@ document.addEventListener('DOMContentLoaded', function () {
             // every hotkey is suspect here, not just Space, so this stays a
             // blanket bail regardless of which key was pressed.
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+
+            // Chorded keys belong to the browser and the OS, not to us. Ctrl+C
+            // over a selected log line was firing Camp (a campfire kit, a tick
+            // of the clock and a possible ambush); Ctrl+E opened the extraction
+            // modal and Ctrl+H fired Hearth's confirm on top of the browser's
+            // own history shortcut. Shift is deliberately not listed -- the
+            // movement handler in adventure.js uses it as an override.
+            if (e.metaKey || e.ctrlKey || e.altKey) return;
 
             const key = e.key.toLowerCase();
 
@@ -156,32 +171,14 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             // Actions
             else if (key === ' ') {
-                // Space is special, unlike every other hotkey here: the
-                // browser natively activates a focused <button>/<a> on
-                // Space, and a focused .adv-frame-open activates itself the
-                // same way (its own keydown handler below -- role="button"
-                // gets no native Space handling, which is why that handler
-                // exists). Bail here, scoped to Space only, so Search
-                // doesn't ALSO fire on top of whatever the focused control
-                // just did. Movement and the letter hotkeys below have no
-                // such native collision and must keep working even when
-                // focus is merely resting on a button -- e.g. right after a
-                // mouse click, since browsers leave a clicked <button>
-                // focused. (An earlier version of this guard bailed on ANY
-                // key whenever ANY button/link/frame had focus, which broke
-                // WASD/C/E/H/I for the rest of the session after a single
-                // button click -- verified in a live session, not a
-                // hypothetical.)
+                // Invariant: Space belongs to whatever has focus. Search is
+                // only the page's Space when nothing on the page has claimed
+                // it, and "nothing has focus" is exactly e.target === body.
                 //
-                // <summary> (the log's collapse header, .adv-log-head) is
-                // the same class of native-Space-activation element: focused
-                // and tabbable, and the browser toggles the parent <details>
-                // on Space with no handler of its own needed -- exactly like
-                // button/a. Missing it here meant tabbing to the log header
-                // and pressing Space fired Search (2 turns, can roll an
-                // encounter) instead of, or in addition to, the native
-                // toggle.
-                if (e.target.closest?.('.adv-frame-open, button, a, summary')) return;
+                // Scoped to Space alone: the letter and arrow hotkeys have no
+                // native collision and must keep working with focus resting
+                // on a button, e.g. right after a mouse click.
+                if (e.target !== document.body) return;
                 e.preventDefault();
                 const searchBtn = document.getElementById('btn-search');
                 if (searchBtn && !searchBtn.disabled) searchBtn.click();

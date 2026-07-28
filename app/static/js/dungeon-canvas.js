@@ -203,6 +203,16 @@
         }
 
         resizeCanvas() {
+            // Clear last pass's explicit size before measuring. The inline
+            // width/height set below beat the stylesheet's width/height:100%,
+            // so re-reading the box without this returns the size we pinned it
+            // to last time and the canvas can never follow the window down --
+            // it stayed 1366x768 inside a 2560x1440 frame, and inside a 1100px
+            // one it stuck out far enough to give the page a horizontal
+            // scrollbar.
+            this.canvas.style.width = '';
+            this.canvas.style.height = '';
+
             const rect = this.canvas.getBoundingClientRect();
             const dpr = window.devicePixelRatio || 1;
 
@@ -213,6 +223,15 @@
             this.canvas.style.width = rect.width + 'px';
             this.canvas.style.height = rect.height + 'px';
 
+            // Re-centre, not just repaint. The canvas is the viewport now, so
+            // both halves of centerOnPlayer's arithmetic have just changed:
+            // the box it measures, and -- crossing the 1200px breakpoint --
+            // the --hud-inset-* values it reads, which flip between 300/220
+            // and 0/0. Without this the party drifts off centre, and in the
+            // stacked layout can end up behind a panel. Not smoothed: a resize
+            // is a discrete event, and easing toward a target that a drag on
+            // the window edge keeps moving just looks like lag.
+            this.centerOnPlayer(false);
             this.render();
         }
 
@@ -387,8 +406,11 @@
 
         /* How much of the viewport the HUD is standing on, in CSS pixels.
            Declared on .adv-hud so the numbers live with the layout that
-           produces them; falls back to zero anywhere the HUD is absent
-           (the dashboard map preview, the stacked narrow layout). */
+           produces them; falls back to zero anywhere the HUD is absent.
+           #dungeon-map is only ever rendered by adventure.html, so today that
+           fallback is defensive rather than a live caller -- the stacked
+           layout below 1200px zeroes the two properties on .adv-hud itself
+           and comes through the branch above. */
         hudInsets() {
             const root = this.canvas.closest('.adv-hud');
             if (!root) return { left: 0, bottom: 0 };

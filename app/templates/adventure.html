@@ -80,64 +80,60 @@
 
   <div class="adv-party-rail">
     {% if party and party|length > 0 %}
-    <div class="d-flex flex-column gap-2 align-items-stretch">
-      {% for m in party %}
-      {% set class_lower = m.class.lower() %}
-      <div data-member-id="{{ m.id }}" data-char-id="{{ m.id }}" role="button" tabindex="0"
-        class="operative-card party-card-compact adv-frame-open border-{{ class_lower if class_lower in ['fighter','rogue','mage','cleric','druid','ranger'] else 'secondary' }}">
-        <div class="operative-header party-card-header d-flex align-items-center justify-content-between">
-          <div class="d-flex align-items-center gap-2">
-            <span class="u-flex-center class-icon-slot">
-              {% if class_lower == 'fighter' %}
-              <img src="{{ url_for('static', filename='iconography/swords-power.svg') }}" alt="Fighter">
-              {% elif class_lower == 'mage' %}
-              <img src="{{ url_for('static', filename='iconography/fire-silhouette.svg') }}" alt="Mage">
-              {% elif class_lower == 'rogue' %}
-              <img src="{{ url_for('static', filename='iconography/rogue.svg') }}" alt="Rogue">
-              {% elif class_lower == 'druid' %}
-              <img src="{{ url_for('static', filename='iconography/heavy-thorny-triskelion.svg') }}" alt="Druid">
-              {% elif class_lower == 'cleric' %}
-              <img src="{{ url_for('static', filename='iconography/aura.svg') }}" alt="Cleric">
-              {% elif class_lower == 'ranger' %}
-              <img src="{{ url_for('static', filename='iconography/bowman.svg') }}" alt="Ranger">
-              {% else %}
-              <span class="avatar-circle avatar-circle-sm">{{ m.name[0]|upper }}</span>
-              {% endif %}
-            </span>
-            <h6 class="mb-0 fw-bold party-card-name">{{ m.name }}</h6>
+    {% for m in party %}
+    {% set class_lower = m.class.lower() %}
+    <div data-member-id="{{ m.id }}" data-char-id="{{ m.id }}" role="button" tabindex="0"
+      class="operative-card adv-frame-open">
+      <div class="operative-header party-card-header d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-2">
+          <span class="u-flex-center class-icon-slot">
+            {% if class_lower == 'fighter' %}
+            <img src="{{ url_for('static', filename='iconography/swords-power.svg') }}" alt="Fighter">
+            {% elif class_lower == 'mage' %}
+            <img src="{{ url_for('static', filename='iconography/fire-silhouette.svg') }}" alt="Mage">
+            {% elif class_lower == 'rogue' %}
+            <img src="{{ url_for('static', filename='iconography/rogue.svg') }}" alt="Rogue">
+            {% elif class_lower == 'druid' %}
+            <img src="{{ url_for('static', filename='iconography/heavy-thorny-triskelion.svg') }}" alt="Druid">
+            {% elif class_lower == 'cleric' %}
+            <img src="{{ url_for('static', filename='iconography/aura.svg') }}" alt="Cleric">
+            {% elif class_lower == 'ranger' %}
+            <img src="{{ url_for('static', filename='iconography/bowman.svg') }}" alt="Ranger">
+            {% else %}
+            <span class="avatar-circle">{{ m.name[0]|upper }}</span>
+            {% endif %}
+          </span>
+          <h6 class="mb-0 fw-bold party-card-name">{{ m.name }}</h6>
+        </div>
+        <div class="d-flex gap-1">
+          <span class="badge class-badge-{{ class_lower }} party-card-badge">{{ m.class }}</span>
+          <span class="badge party-card-badge">Lv {{ m.level or 1 }}</span>
+        </div>
+      </div>
+      <div class="operative-body party-card-body">
+        <div>
+          <div class="progress hp-bar mb-1 party-stat-bar" data-hp="{{ m.hp }}" data-hp-max="{{ m.hp_max }}"
+            aria-label="HP">
+            <div class="progress-bar hp-fill party-stat-bar-fill" data-bar="hp">HP {{ m.hp }}/{{ m.hp_max }}</div>
           </div>
-          <div class="d-flex gap-1">
-            <span class="badge class-badge-{{ class_lower }} party-card-badge">{{ m.class
-              }}</span>
-            <span class="badge party-card-badge">Lv {{ m.level or 1 }}</span>
+          <div class="progress mana-bar mb-1 party-stat-bar" data-mana="{{ m.mana }}" data-mana-max="{{ m.mana_max }}"
+            aria-label="Mana">
+            <div class="progress-bar mana-fill party-stat-bar-fill" data-bar="mana">MP {{ m.mana }}/{{ m.mana_max }}
+            </div>
           </div>
         </div>
-        <div class="operative-body party-card-body">
-          <div>
-            <div class="progress hp-bar mb-1 party-stat-bar" data-hp="{{ m.hp }}" data-hp-max="{{ m.hp_max }}"
-              aria-label="HP">
-              <div class="progress-bar hp-fill party-stat-bar-fill" data-bar="hp">HP {{ m.hp }}/{{ m.hp_max
-                }}</div>
-            </div>
-            <div class="progress mana-bar mb-1 party-stat-bar" data-mana="{{ m.mana }}" data-mana-max="{{ m.mana_max }}"
-              aria-label="Mana">
-              <div class="progress-bar mana-fill party-stat-bar-fill" data-bar="mana">MP {{ m.mana }}/{{
-                m.mana_max }}</div>
-            </div>
-          </div>
-          <div class="text-warning small last-roll-line" data-char-id="{{ m.id }}" aria-live="polite"></div>
-          <div class="d-flex justify-content-end">
-            <div class="btn-group btn-group-sm" role="group" aria-label="Character actions">
-              <button class="tactical-btn-secondary btn-equip-panel party-card-action-btn" data-char-id="{{ m.id }}"
-                aria-label="Equipment" title="Equipment"><i class="bi bi-box"></i></button>
-              <button class="tactical-btn-secondary btn-bag-panel party-card-action-btn" data-char-id="{{ m.id }}"
-                aria-label="Bags" title="Bags"><i class="bi bi-bag"></i></button>
-            </div>
+        <div class="text-warning small last-roll-line" data-char-id="{{ m.id }}" aria-live="polite"></div>
+        <div class="d-flex justify-content-end">
+          <div class="btn-group btn-group-sm" role="group" aria-label="Character actions">
+            <button class="tactical-btn-secondary btn-equip-panel party-card-action-btn" data-char-id="{{ m.id }}"
+              aria-label="Equipment" title="Equipment"><i class="bi bi-box"></i></button>
+            <button class="tactical-btn-secondary btn-bag-panel party-card-action-btn" data-char-id="{{ m.id }}"
+              aria-label="Bags" title="Bags"><i class="bi bi-bag"></i></button>
           </div>
         </div>
       </div>
-      {% endfor %}
     </div>
+    {% endfor %}
     {% else %}
     <div class="alert alert-secondary small">
       <strong>No party loaded.</strong> A fallback attempt to load your characters returned zero rows.<br>
