@@ -68,6 +68,37 @@ change the character's stats, and they are invisible. This is the same failure
 as the encumbrance complaint, one layer down, and it is why this work is worth
 more than a file merge.
 
+## Worse: looted gear cannot be equipped during the run at all
+
+Procedural gear instances live in `items` as dicts carrying a `uid`, and
+`equip_item`'s gear-instance path triggers **only** on a `uid` in the request
+body. `equipment-enhanced.js:384-394` sends one; it is dashboard-only.
+`equipment.js` — the sole equip path on the adventure screen — posts
+`{slug, slot}` and has no `uid` branch, so a procedural instance falls through
+to the legacy path, which does `Item.query.filter_by(slug=...)`, finds no
+catalogue row for a generated slug, and returns **404 `item not found`**.
+
+There is no other equip path in the dungeon: `loot-distribution.js`,
+`adventure.js` and `adventure-controls.js` contain none.
+
+So **nothing the dungeon drops can be equipped until the player extracts.** The
+loop is: fight, loot, carry the weight, extract, and only then gear up. Loot
+cannot be used in the run that produced it.
+
+The evidence is in the data. Across **176 characters** in the development
+database, every single gear dict is exactly `{"weapon": "<slug>"}` — one
+string value, no armour, no procedural instance, no other slot ever occupied.
+Not one character has equipped anything the dungeon gave them.
+
+This compounds the original encumbrance complaint directly: the player carries
+weight that cannot be converted into power until the run ends.
+
+**The consolidation already fixes it.** The panel being promoted is the one
+that sends `uid`, so the correct behaviour arrives with the merge rather than
+as extra work. That is the strongest argument for doing this chunk now, and
+the acceptance test that matters: *equip a procedurally generated item from
+inside the dungeon and see it land in a rendered slot.*
+
 ## Decided (2026-07-28)
 
 ### One slot vocabulary: the canonical eight
@@ -105,6 +136,17 @@ player keeps every item.
 The migration touches column *data*, not schema. It issues no DDL, so it is
 not exposed to the `create_all`-pre-creates-columns hazard that requires
 guards on this project's schema revisions.
+
+`auto_equip.auto_equip_for()` is a **third** vocabulary: it returns
+`gear["armor"]`, a slot name in neither list, so starter body armour would be
+drawn by no panel and could not be unequipped (`unequip_item` rejects any slot
+outside `_SLOTS`). It is remapped to `chest` at the source, and `armor → chest`
+joins the migration table.
+
+In the development database this migration is close to a no-op — all 176
+characters hold only `{"weapon": ...}` — which is a consequence of the equip
+bug above, not evidence the migration is unnecessary. It must still be correct
+for saves that predate it.
 
 ### One renderer, two mounts
 
