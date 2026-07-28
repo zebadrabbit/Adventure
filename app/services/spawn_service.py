@@ -94,6 +94,20 @@ def _eligible_monsters(level: int, include_boss: bool = False, family: Optional[
     if family:
         q = q.filter(MonsterCatalog.family == family)
     rows = q.filter(MonsterCatalog.level_min <= level, MonsterCatalog.level_max >= level).all()
+
+    # Above the catalogue's top band there is nothing to match, and an empty
+    # pool makes choose_monster raise -- which populate_spawn_stats swallows
+    # into a bare "Trash Monster" stub with no name, loot table or resistances.
+    # The catalogue currently stops at level 20 while characters reach 50, so
+    # every spawn for a high-level party degraded silently. Fall back to the
+    # deepest band that does exist: the archetype and tier systems scale the
+    # stats anyway, so a level-40 party fights a properly-scaled version of the
+    # nastiest thing in the book rather than a nameless stub.
+    if not rows:
+        deepest = q.order_by(MonsterCatalog.level_max.desc()).first()
+        if deepest is not None and level > int(deepest.level_max or 0):
+            rows = q.filter(MonsterCatalog.level_max == deepest.level_max).all()
+
     if not include_boss:
         rows = [r for r in rows if not r.boss]
     _ELIGIBLE_CACHE[key] = (now, rows)
