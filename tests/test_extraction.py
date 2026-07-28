@@ -88,7 +88,7 @@ def test_calculate_extraction_penalties_early(test_app, test_dungeon):
     penalties = extraction_service.calculate_extraction_penalties(test_dungeon, early=True)
 
     assert penalties["xp_multiplier"] == 0.8  # 20% of the run's XP
-    assert penalties["loot_quality_multiplier"] == 0.8  # 20% reduction
+    assert penalties["copper_multiplier"] == 0.8  # 20% of the copper skimmed
 
 
 def test_calculate_extraction_penalties_complete(test_app, test_dungeon):
@@ -97,7 +97,7 @@ def test_calculate_extraction_penalties_complete(test_app, test_dungeon):
     penalties = extraction_service.calculate_extraction_penalties(test_dungeon, early=False)
 
     assert penalties["xp_multiplier"] == 1.0  # No penalty
-    assert penalties["loot_quality_multiplier"] == 1.0  # No penalty
+    assert penalties["copper_multiplier"] == 1.0  # No penalty
 
 
 def test_extract_all_characters(test_app, test_user, test_dungeon, test_characters):
@@ -118,6 +118,42 @@ def test_extract_all_characters(test_app, test_user, test_dungeon, test_characte
         assert char.locked_in_dungeon is False
         assert char.locked_dungeon_id is None
         assert char.permadeath is False
+
+
+def test_early_extraction_skims_copper_but_keeps_items(test_app, test_user, test_dungeon, test_characters):
+    """The loot penalty the modal advertises has to be real money."""
+    from app.models.hoard import Hoard
+
+    char = test_characters[0]
+    char.gold = 1000
+    char.items = json.dumps(["short-sword", "wooden-shield"])
+    db.session.commit()
+
+    success, _, result = extraction_service.extract_party(test_dungeon, [char.id], test_user.id)
+
+    assert success is True
+    assert result["early_extraction"] is True
+    hoard = Hoard.query.filter_by(user_id=test_user.id).first()
+    # 20% skimmed off the copper that reaches the Hoard, reported the same way.
+    assert hoard.copper == 800
+    assert result["secured"]["copper"] == 800
+    # Items are never skimmed -- both pieces make it home.
+    assert result["secured"]["items"] == 2
+
+
+def test_full_clear_extraction_skims_nothing(test_app, test_user, test_dungeon, test_characters):
+    from app.models.hoard import Hoard
+
+    test_dungeon.extraction_available = True
+    char = test_characters[0]
+    char.gold = 1000
+    db.session.commit()
+
+    success, _, result = extraction_service.extract_party(test_dungeon, [char.id], test_user.id)
+
+    assert success is True
+    hoard = Hoard.query.filter_by(user_id=test_user.id).first()
+    assert hoard.copper >= 1000, "finishing the run must never cost copper"
 
 
 def test_extract_with_left_behind(test_app, test_user, test_dungeon, test_characters):

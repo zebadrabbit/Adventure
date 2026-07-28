@@ -33,14 +33,14 @@ Complete extraction mechanics service with:
 - **Early Extraction** (before all bosses defeated):
   - -20% of the XP **earned during that run**, plus the same cut on the
     extraction bonus. Career XP is never touched.
-  - -20% loot quality reduction (computed and displayed, not yet applied)
+  - -20% of the copper that reaches the Hoard. Items are never skimmed — only
+    coin, applied to the deposit itself and to the reported total.
 - **No penalties** when all bosses defeated (Hearthstone Portal active)
 
 The XP rate is tunable: **Admin → Dungeon Settings → Early Exit XP Penalty (%)**,
 which mirrors into `GameConfig["progression"]["early_extraction_xp_penalty"]` (a
-0..1 share) — the key `app/services/progression.py` actually reads. The admin
-pages' own `dungeon_settings` / `progression_settings` blobs are not consumed by
-gameplay, so any new knob there needs the same mirroring to have an effect.
+0..1 share) — the key `app/services/progression.py` actually reads. See
+"Admin settings" below for why the mirror is needed.
 
 The run baseline comes from `instance.dungeon_metadata["xp_at_entry"]`, written
 by `dashboard.commit_party_to_run()` — the one place every entry path (Start
@@ -69,7 +69,7 @@ any future entry path owes the run the same call.
 
 | Exit | Endpoint | Characters | Haul | Dungeon |
 |------|----------|-----------|------|---------|
-| **Extract** | `POST /api/dungeon/extraction/extract` | Released; left-behind members permadeath | Pooled into the Hoard (full-clear bonus if the run was cleared) | Instance kept until deleted by the caller |
+| **Extract** | `POST /api/dungeon/extraction/extract` | Released; left-behind members permadeath | Pooled into the Hoard (full-clear bonus if cleared, -20% copper if early) | Instance kept until deleted by the caller |
 | **Hearthstone (abandon)** | `POST /api/dungeon/hearth` | All released, no deaths, no penalty | Kept as-is in their bags | Instance **deleted** — the next trip is a fresh dungeon |
 | **Wipe** | (no endpoint — resolved in combat) | All dead + `permadeath`, locks cleared | Lost with them; never pooled | Instance **deleted**, session pointer cleared |
 
@@ -94,6 +94,45 @@ combat session's `dungeon_snapshot_json` (written by `start_session`), and reads
 the archetype off the monster payload — which `trigger_collision_combat` copies
 wholesale from the spawn's stored `data`. Break either link and kill tracking
 silently stops: no extraction unlock, no quest progress.
+
+## Admin Settings
+
+The admin panel's five settings pages each persist their own JSON blob
+(`dungeon_settings`, `combat_settings`, `loot_settings`, `progression_settings`,
+`fog_settings`). **No gameplay module reads any of them.** The engine reads a
+different, smaller set of `GameConfig` keys:
+
+| Engine key | Read by |
+|---|---|
+| `monster_ai` | `services/monster_ai.py`, `services/monster_patrol.py`, `combat_service.start_session` |
+| `progression` | `services/progression.py` |
+| `floor_loot` | `loot/generator.py` |
+| `rarity_weights` | `services/spawn_service.py` (**monster** rarity, not item) |
+| `regen_rates`, `tick_costs`, `durability`, `trading` | status effects, time, durability, merchant seeding |
+
+`admin_new._mirror_to_engine()` copies the wired-up fields across on save:
+
+| Page field | Engine key |
+|---|---|
+| Dungeon → Early Exit XP Penalty | `progression.early_extraction_xp_penalty` |
+| Combat → Ambush Chance | `monster_ai.ambush_chance` |
+| Combat → Monster Spell Chance | `monster_ai.spell_chance` |
+| Combat → Monster Flee HP Threshold | `monster_ai.flee_threshold` |
+| Combat → Monster Help Chance | `monster_ai.help_chance` |
+| Loot → Rarity Weights | `floor_loot.rarity_weights` |
+
+Everything else on those pages is still inert, and each page carries a banner
+saying so. To wire a new knob: give it a consumer in the engine, mirror it here,
+and make the page's default match the engine's default so that saving the page
+untouched is a no-op (`test_admin_settings_reach_gameplay.py` asserts this).
+
+Two traps worth remembering:
+
+* Percent vs share — the pages work in whole percent, the engine in 0..1.
+* `rarity_weights` means two different things. The Loot page's weights are
+  *item* rarity and mirror to `floor_loot.rarity_weights`; the top-level
+  `rarity_weights` key weights *monster* rarity in spawn_service. Mirroring the
+  first onto the second would silently reweight every spawn.
 
 ## New API Endpoints
 

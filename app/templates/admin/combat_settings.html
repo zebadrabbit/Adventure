@@ -3,6 +3,14 @@
 {% block page_title %}Combat Settings{% endblock %}
 
 {% block content %}
+<div class="row g-3 mb-1"><div class="col-12">
+    <div class="alert alert-warning border-warning bg-dark text-light" role="alert">
+      <i class="bi bi-exclamation-triangle me-1"></i>
+      <strong>Ambush Chance, Monster Spell Chance, Monster Flee HP Threshold and Monster Help Chance</strong> are the only fields here that change the running game. Every other field on this page is
+      saved but not yet read by any gameplay code — see
+      <code>admin_new._mirror_to_engine</code> for how a knob is wired up.
+    </div>
+</div></div>
 <div class="row">
     <div class="col-12">
         <div class="card bg-dark text-light border-secondary">

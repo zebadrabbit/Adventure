@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!data.all_bosses_defeated && data.penalties) {
                         penaltiesDiv.style.display = 'block';
                         const xpPenalty = Math.round((1 - data.penalties.xp_multiplier) * 100);
-                        const lootPenalty = Math.round((1 - data.penalties.loot_quality_multiplier) * 100);
+                        const lootPenalty = Math.round((1 - data.penalties.copper_multiplier) * 100);
                         document.getElementById('xp-penalty').textContent = xpPenalty + '%';
                         document.getElementById('loot-penalty').textContent = lootPenalty + '%';
                     }

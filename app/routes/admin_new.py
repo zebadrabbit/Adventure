@@ -115,10 +115,12 @@ DEFAULT_COMBAT_CONFIG = {
     "spell_costs": {"firebolt": 5, "ice_shard": 6, "lightning": 8},
     "spell_int_scaling": 0.6,
     "initiative_bonus": 0,
-    "ambush_chance": 20,
-    "monster_spell_chance": 30,
+    # These four mirror into GameConfig["monster_ai"]; defaults match the
+    # engine's own (app/server.py) so saving the page unchanged changes nothing.
+    "ambush_chance": 50,
+    "monster_spell_chance": 40,
     "monster_flee_hp_threshold": 20,
-    "monster_help_chance": 15,
+    "monster_help_chance": 20,
     "victory_xp_mult": 1.0,
     "flee_xp_penalty_pct": 50,
     "party_xp_split": "equal",
@@ -127,6 +129,46 @@ DEFAULT_COMBAT_CONFIG = {
     "auto_monster_turns": True,
     "resistance_system": True,
 }
+
+
+def _mirror_to_engine(engine_key: str, updates: dict):
+    """Copy admin settings onto the GameConfig keys gameplay actually reads.
+
+    Each settings page persists its own blob ("combat_settings", "loot_settings",
+    ...) that nothing outside this module consumes. The engine reads a different,
+    smaller set of keys ("monster_ai", "floor_loot", "progression", ...). A knob
+    on one of these pages only does something if it is mirrored here.
+
+    Merges into whatever the key already holds, so mirroring one field never
+    clears the rest.
+    """
+    from app.models.models import GameConfig
+
+    updates = {k: v for k, v in updates.items() if v is not None}
+    if not updates:
+        return
+    row = GameConfig.query.filter_by(key=engine_key).first()
+    try:
+        current = json.loads(row.value) if row and row.value else {}
+    except Exception:
+        current = {}
+    if not isinstance(current, dict):
+        current = {}
+    current.update(updates)
+    if row is None:
+        row = GameConfig(key=engine_key, value="")
+    row.value = json.dumps(current)
+    db.session.add(row)
+
+
+def _pct(config_data: dict, field: str):
+    """Admin pages work in whole percent; the engine wants a 0..1 share."""
+    if field not in config_data:
+        return None
+    try:
+        return max(0, min(100, int(config_data[field]))) / 100.0
+    except (TypeError, ValueError):
+        return None
 
 
 def get_fog_config():
@@ -182,24 +224,7 @@ def save_dungeon_config(config_data):
     config.value = json.dumps(config_data)
     db.session.add(config)
 
-    # Mirror the one knob gameplay reads into GameConfig["progression"], which is
-    # what app/services/progression.py consults. This page's own
-    # "dungeon_settings" blob is not read anywhere in gameplay, so a setting that
-    # must actually take effect has to be copied across.
-    if "early_exit_xp_penalty" in config_data:
-        engine = GameConfig.query.filter_by(key="progression").first()
-        try:
-            engine_cfg = json.loads(engine.value) if engine and engine.value else {}
-        except Exception:
-            engine_cfg = {}
-        # Admin UI works in whole percent; the engine wants a 0..1 share.
-        pct = max(0, min(100, int(config_data["early_exit_xp_penalty"])))
-        engine_cfg["early_extraction_xp_penalty"] = pct / 100.0
-        if engine is None:
-            engine = GameConfig(key="progression", value="")
-        engine.value = json.dumps(engine_cfg)
-        db.session.add(engine)
-
+    _mirror_to_engine("progression", {"early_extraction_xp_penalty": _pct(config_data, "early_exit_xp_penalty")})
     db.session.commit()
 
 
@@ -227,6 +252,12 @@ def save_loot_config(config_data):
 
     config.value = json.dumps(config_data)
     db.session.add(config)
+
+    # Item rarity weights drive procedural floor loot. Deliberately NOT mirrored
+    # onto the top-level "rarity_weights" key -- despite the shared name, that
+    # one weights *monster* rarity in spawn_service.
+    weights = config_data.get("rarity_weights")
+    _mirror_to_engine("floor_loot", {"rarity_weights": weights if isinstance(weights, dict) else None})
     db.session.commit()
 
 
@@ -300,6 +331,18 @@ def save_combat_config(config_data):
         db.session.add(config)
     else:
         config.value = json.dumps(config_data)
+
+    # The monster-behaviour knobs have real consumers (combat_service.start_session,
+    # services/monster_ai.py); the rest of this page is still inert.
+    _mirror_to_engine(
+        "monster_ai",
+        {
+            "ambush_chance": _pct(config_data, "ambush_chance"),
+            "spell_chance": _pct(config_data, "monster_spell_chance"),
+            "flee_threshold": _pct(config_data, "monster_flee_hp_threshold"),
+            "help_chance": _pct(config_data, "monster_help_chance"),
+        },
+    )
     db.session.commit()
     return True
 

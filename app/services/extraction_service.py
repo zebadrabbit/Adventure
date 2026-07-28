@@ -41,18 +41,19 @@ def calculate_extraction_penalties(instance: DungeonInstance, early: bool = True
         - xp_multiplier: Multiplier on the run's XP (1.0 = no penalty, 0.8 = 20% loss).
           Applies to XP earned during this run and to the extraction bonus --
           never to the character's career total.
-        - loot_quality_multiplier: Multiplier for loot quality (0.8 = 20% reduction)
+        - copper_multiplier: Share of the run's copper that makes it into the
+          Hoard (0.8 = 20% skimmed). Items are always kept in full.
     """
     if not early or instance.extraction_available:
         # No penalties if all bosses defeated
-        return {"xp_multiplier": 1.0, "loot_quality_multiplier": 1.0}
+        return {"xp_multiplier": 1.0, "copper_multiplier": 1.0}
 
     from app.services import progression
 
     # Rate is tunable: GameConfig["progression"]["early_extraction_xp_penalty"].
     rate = float(progression.progression_config().get("early_extraction_xp_penalty", 0.20))
     rate = min(max(rate, 0.0), 1.0)
-    return {"xp_multiplier": 1.0 - rate, "loot_quality_multiplier": 0.8}
+    return {"xp_multiplier": 1.0 - rate, "copper_multiplier": 0.8}
 
 
 def is_full_clear(instance: DungeonInstance) -> bool:
@@ -179,6 +180,15 @@ def extract_party(
         boosted = int(secured_copper * float(cfg.get("full_clear_copper_mult", 1.25)))
         hoard_service.deposit_copper(hoard, boosted - secured_copper)
         secured_copper = boosted
+
+    # Early-exit copper haircut, the mirror of the bonus above: leaving with the
+    # dungeon unfinished means part of the haul does not make it home. Same
+    # deposit-then-correct shape, since pool_run_haul already banked the full
+    # amount. Items themselves are kept -- only coin is skimmed.
+    if early_extraction and secured_copper > 0:
+        kept = int(secured_copper * penalties["copper_multiplier"])
+        hoard.copper = max(0, (hoard.copper or 0) - (secured_copper - kept))
+        secured_copper = kept
 
     # Mark left behind characters as permadeath
     for char in left_behind_chars:

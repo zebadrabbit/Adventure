@@ -24,6 +24,21 @@
   Settings → Early Exit XP Penalty, which now mirrors into the `progression`
   GameConfig key the engine actually reads — previously that field was inert.
 
+- Admin → Combat and Admin → Loot now reach the running game: the four
+  monster-behaviour knobs mirror into `monster_ai`, and item rarity weights into
+  `floor_loot`. Combat page defaults were aligned with the engine's so that
+  saving the page untouched changes nothing. Every settings page now carries a
+  banner naming which of its fields are live; the rest are still inert.
+- Early extraction now also skims 20% of the copper reaching the Hoard — the
+  "loot penalty" the extraction modal has always advertised but never applied.
+  Items are never skimmed. `penalties.loot_quality_multiplier` is renamed
+  `penalties.copper_multiplier` to say what it does.
+
+### Removed
+- `POST /api/dungeon/extract`, an unreferenced second extraction model that
+  granted 1000×tier XP and pooled no haul. The live path is
+  `POST /api/dungeon/extraction/extract`.
+
 ### Fixed
 - Kill tracking never ran: `start_session` skipped writing the dungeon snapshot
   because the column did not exist, so `bosses_defeated`, `elites_defeated`,
