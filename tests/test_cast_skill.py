@@ -52,15 +52,24 @@ def _set_member_mana(session, mana):
 
 
 def test_active_damage_skill_hits_monster(monkeypatch):
+    """A physical skill deals its base on top of the caster's attack.
+
+    The base alone never scaled, so a skill costing mana and a cooldown fell
+    behind a free swing by about level 5 (see test_combat_damage_scaling).
+    """
     user, char, skill = _user_char_with_skill(monkeypatch, {"damage": 7})
     monster = {"slug": "orc", "name": "Orc", "hp": 30, "damage": 2, "speed": 5}
     session = combat_service.start_session(user.id, monster)
     before = session.monster_hp
+    attack = json.loads(session.party_snapshot_json)["members"][0]["attack"]
+
     res = combat_service.player_cast_skill(session.id, user.id, session.version, skill.id, actor_id=char.id)
+
     assert res.get("ok"), res
-    assert res.get("damage") == 7
+    assert res.get("damage") == 7 + attack
+    assert res["damage"] > attack, "a skill must beat the attack it replaces"
     fresh = combat_service._load_session(session.id)
-    assert fresh.monster_hp == before - 7
+    assert fresh.monster_hp == before - (7 + attack)
 
 
 def test_active_heal_skill_restores_caster(monkeypatch):
@@ -72,9 +81,13 @@ def test_active_heal_skill_restores_caster(monkeypatch):
     party["members"][0]["hp"] = 5  # wounded
     session.party_snapshot_json = json.dumps(party)
     db.session.commit()
+    caster = json.loads(session.party_snapshot_json)["members"][0]
+    expected = 10 + int(combat_service._spell_power(caster) * 0.5)
+
     res = combat_service.player_cast_skill(session.id, user.id, session.version, skill.id, actor_id=char.id)
     assert res.get("ok"), res
-    assert res.get("heal") == 10  # healed 5 -> 15 (capped at max_hp)
+    # Base heal plus caster power: a flat 10 stops mattering as max HP grows.
+    assert res.get("heal") == expected
     fresh = combat_service._load_session(session.id)
     members = json.loads(fresh.party_snapshot_json)["members"]
     # Net HP is well above the wounded 5 (a minimum-1 monster retaliation may nick it).
@@ -138,9 +151,10 @@ def test_zero_cost_skill_unaffected_by_mana(monkeypatch):
     monster = {"slug": "orc", "name": "Orc", "hp": 30, "damage": 0, "speed": 5}
     session = combat_service.start_session(user.id, monster)
     _set_member_mana(session, 0)  # no mana, but skill is free
+    attack = json.loads(session.party_snapshot_json)["members"][0]["attack"]
     res = combat_service.player_cast_skill(session.id, user.id, session.version, skill.id, actor_id=char.id)
     assert res.get("ok"), res
-    assert res.get("damage") == 7
+    assert res.get("damage") == 7 + attack
     fresh = combat_service._load_session(session.id)
     members = json.loads(fresh.party_snapshot_json)["members"]
     assert members[0]["mana"] == 0  # unchanged

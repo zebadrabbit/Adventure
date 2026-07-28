@@ -97,8 +97,11 @@ def test_firebolt_crit_natural_twenty(user_with_char, monkeypatch):
     assert resp.get("ok")
     assert resp.get("crit") is True
     dmg = resp.get("damage")
-    # Base damage pre-crit: roll(4+5)=9 + int*0.6 (14*0.6=8.4 -> int() 8) => 17, crit 1.5x => 25 (int)
-    assert dmg == 25, dmg
+    # Pre-crit: roll(4+5)=9 + spell power, where spell power is int*0.6 + level
+    # (14*0.6=8.4 plus level 1 => 9.4) => 18 total, crit 1.5x => 27.
+    # The level term is what stops a level-20 firebolt hitting for the same as a
+    # level-1 one -- see tests/test_combat_damage_scaling.py.
+    assert dmg == 27, dmg
     st = resp["state"]
     assert st["monster_hp"] == monster_hp_before - dmg
 

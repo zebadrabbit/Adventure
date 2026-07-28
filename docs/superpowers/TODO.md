@@ -17,7 +17,10 @@ Full triage with code pointers:
       per-floor curve (this is what made level 1 mobs become level 3).
 - [ ] Monster `loot_table` values resolve to nothing — parsed as item slugs.
 - [ ] Monster catalogue stops at level 20; characters reach 50.
-- [ ] Audit spell/skill damage vs plain attack — do stats apply?
+- [x] ~~Audit spell/skill damage vs plain attack~~ — confirmed: spells scaled
+      with INT but not level, skills with nothing; the party snapshot never
+      carried `level`. Fixed via `_spell_power`; re-measure with
+      `scripts/audit_combat_damage.py`.
 - [ ] Maze too spiralling: tune `dead_end_keep` / `extra_connection_chance` /
       `straight_max`.
 - [ ] Map readability: wall/floor contrast, props, coordinate + floor readout.

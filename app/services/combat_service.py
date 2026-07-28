@@ -202,6 +202,7 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
         "speed": speed,
         "mana": mana,
         "mana_max": mana_max,
+        "level": level,
         "int_stat": INT,
         "str_stat": STR,
         "dex_stat": DEX,
@@ -229,6 +230,7 @@ def _base_player_snapshot(user_id: int) -> Dict[str, Any]:
             "speed": 10,
             "mana": 30,
             "mana_max": 30,
+            "level": 1,
             "int_stat": 10,
             "str_stat": 10,
             "dex_stat": 10,
@@ -485,6 +487,20 @@ def _potion_counts_by_character(chars, slug: str) -> Dict[str, int]:
     (string, for JSON round-tripping). Each character's potions are their
     own — there is no shared/party-wide potion pool."""
     return {str(c.id): _count_potion(c, slug) for c in chars}
+
+
+def _spell_power(caster: Dict[str, Any]) -> float:
+    """Magical counterpart to a weapon user's ``attack`` stat.
+
+    ``attack`` is 8 + STR/2 + level + gear, so a fighter's output grows with
+    every level. Spells and skills previously scaled with INT alone (or, for
+    skills, with nothing at all), which is why a level-20 firebolt hit for the
+    same ~17 as a level-1 one while a plain attack had doubled to ~32. Both
+    inputs are folded in here so every offensive action grows together.
+    """
+    int_stat = int(caster.get("int_stat", caster.get("attack", 10)) or 10)
+    level = int(caster.get("level", 1) or 1)
+    return int_stat * 0.6 + level
 
 
 def _pick_monster_target(members: List[Dict[str, Any]], rng=None) -> tuple[int, Optional[Dict[str, Any]]]:
@@ -1761,7 +1777,7 @@ def player_cast_spell(
     # Calculate damage based on spell configuration
     num_dice, die_size, num_rolls = config["damage_dice"]
     roll = sum(random.randint(1, die_size) for _ in range(num_dice * num_rolls))
-    dmg = int(roll + int_stat * 0.6)
+    dmg = int(roll + _spell_power(caster))
     if crit:
         dmg = int(dmg * 1.5)
     # Apply monster resistances if any
@@ -1854,8 +1870,20 @@ def player_cast_skill(
     if mana_cost > 0 and mana_available < mana_cost:
         return {"error": "not_enough_mana", "mana": mana_available, "required": mana_cost}
 
-    dmg = int(eff.get("damage", 0) or 0) + int(eff.get("spell_damage", 0) or 0)
+    # effect_json carries a flat base (5..22 in seed_skills). On its own that
+    # never scaled with anything, so a tier-3 skill costing mana and a cooldown
+    # was worth less than a free swing from level ~5 onward. The base now rides
+    # on top of the caster's power, keyed to the effect's own flavour:
+    # spell_damage scales with _spell_power, damage with the weapon `attack`
+    # stat -- so a skill is always worth more than the basic attack it replaces.
+    phys_base = int(eff.get("damage", 0) or 0)
+    magic_base = int(eff.get("spell_damage", 0) or 0)
     heal = int(eff.get("heal", 0) or 0)
+    dmg = 0
+    if phys_base > 0:
+        dmg += phys_base + int(caster.get("attack", 10) or 10)
+    if magic_base > 0:
+        dmg += magic_base + int(_spell_power(caster))
     if dmg <= 0 and heal <= 0:
         return {"error": "no_effect"}
 
@@ -1871,6 +1899,8 @@ def player_cast_skill(
         )
         extra["damage"] = dmg
     if heal > 0:
+        # Same reasoning as damage: a flat heal stops mattering as max HP grows.
+        heal += int(_spell_power(caster) * 0.5)
         cur_hp = int(caster.get("hp", 0))
         max_hp = int(caster.get("max_hp", cur_hp))
         new_hp = min(max_hp, cur_hp + heal)

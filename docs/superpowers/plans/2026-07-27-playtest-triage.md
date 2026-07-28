@@ -29,6 +29,42 @@ with live per-character status and legible hit feedback.**
   buttons and the player spent a click burning it. `_advance_turn` now steps
   over downed party members.
 
+- **Spells and skills did not scale; attacks did.** Measured through the real
+  service functions (`scripts/audit_combat_damage.py`):
+
+  | level | attack | firebolt | lightning | skill (flat base) |
+  |------:|-------:|---------:|----------:|------------------:|
+  | 1     | 15.2   | 17.4     | 18.4      | 5–22, constant    |
+  | 5     | 20.0   | 17.0     | 18.4      | 5–22, constant    |
+  | 10    | 25.2   | 17.3     | 19.2      | 5–22, constant    |
+  | 20    | **31.8** | 17.8   | 17.4      | 5–22, constant    |
+
+  A weapon swing is `attack ± 25%` where `attack = 8 + STR/2 + level + gear`, so
+  it doubles over 20 levels. A spell was `2d8 + 0.6×INT` — no level term at all.
+  A skill was the bare constant in its `effect_json`, with no stat input
+  whatsoever. By level 5 the free action beat both; by 20 it was nearly double,
+  while spells and skills still cost mana and cooldowns.
+
+  The root cause was structural: `_derive_stats` never put `level` in the combat
+  party snapshot, so nothing downstream *could* scale by it. Fixed by carrying
+  `level` into the snapshot and introducing `_spell_power = 0.6×INT + level`
+  (the caster's answer to a weapon user's `attack`). Spells add it to their dice;
+  skills add their `effect_json` base on top of `attack` (physical) or
+  `_spell_power` (caster); heals add half of it. After:
+
+  | level | attack | firebolt | lightning | skill b5 | skill b22 |
+  |------:|-------:|---------:|----------:|---------:|----------:|
+  | 1     | 16.4   | 18.5     | 17.9      | 21.0     | 31.0      |
+  | 5     | 19.3   | 21.9     | 24.1      | 25.0     | 35.0      |
+  | 10    | 23.7   | 25.4     | 26.9      | 30.0     | 40.0      |
+  | 20    | 35.8   | 35.6     | 37.5      | 40.0     | 50.0      |
+
+  Ordering is now attack ≤ spell < skill, which matches their costs: an attack
+  is free, a spell costs mana and can miss, a skill costs mana plus a cooldown
+  and always hits. Note firebolt sits at parity with a free swing at level 20 —
+  it is the cheapest spell (5 mana) and its edge is elemental typing against
+  resistances, but if it still feels weak in play, its dice are the dial.
+
 ## Bugs — confirmed, not yet fixed
 
 - **Party Stash button does nothing.** `adventure-controls.js` literally pops
@@ -63,11 +99,9 @@ with live per-character status and legible hit feedback.**
 - **Spawn density and group size.** Related to the combat work below: fighting
   one mob at a time is the core complaint, not the number of mobs.
 - **Mana economy** (pre-existing TODO): skill costs 4/8/12 vs a +5 mana potion.
-- **Spells and skills feel weaker than a plain attack.** Player suspects stats
-  are not applying. Unverified — needs a damage-formula audit comparing
-  `player_attack` (attack stat + gear affixes) against `player_cast_spell` /
-  `player_cast_skill` (INT scaling, skill `effect_json`). Worth measuring
-  before tuning.
+- ~~Spells and skills feel weaker than a plain attack~~ — **confirmed and
+  fixed**, see above. The player's instinct ("stats aren't applying") was
+  right; the snapshot did not carry `level` at all.
 
 ## Design work — needs a spec each
 

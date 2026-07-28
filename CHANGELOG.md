@@ -54,6 +54,16 @@
   respect the dungeon's monster family. They were announced as literal
   `"Elite (L3)"` / `"Boss (L12)"`.
 
+- Spell and skill damage now scale with character level, not just INT (spells)
+  or nothing at all (skills). `_derive_stats` never carried `level` into the
+  combat snapshot, so nothing downstream could scale by it: a level-20 firebolt
+  hit for the same ~17 as a level-1 one while a free weapon swing had grown to
+  ~32. Adds `_spell_power` (0.6xINT + level) and applies skill bases on top of
+  the caster's power. Measure with `scripts/audit_combat_damage.py`.
+- Monsters no longer focus one party member: they picked the lowest-HP target
+  every turn, so three of four characters were spectators.
+- Turn order steps over downed characters instead of stopping on them.
+
 ### Fixed
 - Kill tracking never ran: `start_session` skipped writing the dungeon snapshot
   because the column did not exist, so `bosses_defeated`, `elites_defeated`,
