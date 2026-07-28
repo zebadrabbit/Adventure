@@ -106,6 +106,36 @@ class LootDistribution {
 
         // Event listeners
         document.getElementById('confirm-loot-btn').addEventListener('click', () => this.confirmDistribution());
+
+        // Delegated clicks for the loot grid and party selector.
+        //
+        // These used to be inline onclick attributes with the ids interpolated
+        // straight in: `onclick="lootDistribution.selectItem(${item.id})"`.
+        // Loot ids are *strings* built server-side as `${slug}_${index}`, so
+        // that rendered as selectItem(potion-healing_0) -- unquoted, which
+        // JavaScript parses as the expression `potion - healing_0` and throws
+        // ReferenceError before anything happens. Every click in the dialog was
+        // dead: you could not pick an item, quick-assign, or choose a character.
+        // Delegation with data attributes cannot be broken by a value's shape.
+        const modalEl = document.getElementById('loot-distribution-modal');
+        modalEl.addEventListener('click', (event) => {
+            const assignBtn = event.target.closest('[data-assign-item]');
+            if (assignBtn) {
+                event.stopPropagation();
+                this.assignItem(assignBtn.dataset.assignItem, Number(assignBtn.dataset.assignMember));
+                return;
+            }
+            const memberOption = event.target.closest('.party-member-option[data-assign-member]');
+            if (memberOption) {
+                if (this.selectedItemId === null || this.selectedItemId === undefined) return;
+                this.assignItem(this.selectedItemId, Number(memberOption.dataset.assignMember));
+                return;
+            }
+            const card = event.target.closest('.loot-item-card[data-item-id]');
+            if (card) {
+                this.selectItem(card.dataset.itemId);
+            }
+        });
     }
 
     async checkForLoot(combatId) {
@@ -148,8 +178,7 @@ class LootDistribution {
             return `
 <div class="loot-item-card ${assignedChar ? 'assigned' : ''}"
      data-item-id="${item.id}"
-     data-rarity="${item.rarity || 'common'}"
-     onclick="lootDistribution.selectItem(${item.id})">
+     data-rarity="${item.rarity || 'common'}">
     <div class="loot-item-header">
         <div class="loot-item-icon">
             ${this.getItemIcon(item.type)}
@@ -179,7 +208,7 @@ class LootDistribution {
     ` : `
     <div class="quick-assign-buttons">
         ${this.partyMembers.slice(0, 4).map(member =>
-                `<button class="quick-assign-btn" onclick="event.stopPropagation(); lootDistribution.assignItem(${item.id}, ${member.id});">
+                `<button class="quick-assign-btn" data-assign-item="${item.id}" data-assign-member="${member.id}">
                 ${member.name}
             </button>`
             ).join('')}
@@ -215,7 +244,7 @@ class LootDistribution {
 
         const html = this.partyMembers.map(member => `
 <div class="party-member-option ${currentAssignment === member.id ? 'selected' : ''}"
-     onclick="lootDistribution.assignItem(${this.selectedItemId}, ${member.id})">
+     data-assign-member="${member.id}">
     <div class="party-member-icon">
         ${this.getClassIcon(member.class)}
     </div>

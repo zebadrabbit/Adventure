@@ -351,7 +351,10 @@ def get_pending_loot():
             {
                 "id": m.get("char_id"),
                 "name": m.get("name"),
-                "class": m.get("class", "Unknown"),
+                # The combat snapshot calls it char_class (combat_service._derive_stats);
+                # reading "class" meant every character showed as "Unknown" with a
+                # fallback icon in the distribution dialog.
+                "class": m.get("char_class") or m.get("class") or "Unknown",
                 "level": m.get("level", 1),
             }
             for m in members
