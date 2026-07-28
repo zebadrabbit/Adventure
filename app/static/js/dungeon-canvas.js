@@ -37,6 +37,40 @@
         }
     };
 
+    // ---------------------------------------------------------------- tileset
+    // Optional 16x16 spritesheet. When present every tile is drawn from it;
+    // when absent paintTile() falls back to the procedural flagstone/bevel
+    // rendering below, so a clone without the art still runs and still reads.
+    //
+    // The art is third-party and licence-restricted (see docs/ASSETS.md), so it
+    // is gitignored -- absence is the normal case for anyone but the author.
+    const TILE_SHEET_SRC = '/static/tiles/dungeon-set.png';
+    const SHEET_TILE = 16; // source cell size in the sheet
+
+    // Sheet coordinates as [col, row]. `base` is drawn first; `overlay` is drawn
+    // on top of the base and may have transparency (stairs, props). Edit these
+    // to re-pick tiles -- nothing else needs to change.
+    const TILE_SPRITES = {
+        room: { base: [5, 6] },
+        tunnel: { base: [6, 6] },
+        wall: { base: [13, 3] },
+        secret_door: { base: [13, 3] },   // must be indistinguishable from wall
+        door: { base: [11, 4] },
+        locked_door: { base: [16, 0] },   // portcullis
+        stairs_up: { base: [5, 6], overlay: [16, 3] },
+        stairs_down: { base: [5, 6], overlay: [17, 4] },
+        teleporter: { base: [5, 6] },     // the animated portal glow paints over this
+    };
+
+    const tileSheet = new Image();
+    let tileSheetReady = false;
+    tileSheet.onload = () => {
+        tileSheetReady = true;
+        if (window.dungeonCanvas) window.dungeonCanvas.render();
+    };
+    tileSheet.onerror = () => { tileSheetReady = false; };
+    tileSheet.src = TILE_SHEET_SRC;
+
     // Tile color palette (dark mode optimized). `base` is the flat colour used
     // for the minimap and as a fallback; the richer per-tile art in paintTile()
     // layers floor texture, beveled walls and wooden doors on top.
@@ -541,13 +575,40 @@
             return cell;
         }
 
+        // Draw one cell from the spritesheet. Returns false when the tile has no
+        // mapping, so the caller can fall back to procedural painting.
+        drawSpriteTile(name, px, py, S) {
+            const spec = TILE_SPRITES[name];
+            if (!spec) return false;
+            const ctx = this.ctx;
+            // Pixel art must not be smoothed when scaled 16 -> 32.
+            const prevSmoothing = ctx.imageSmoothingEnabled;
+            ctx.imageSmoothingEnabled = false;
+            const blit = (cell) => {
+                ctx.drawImage(
+                    tileSheet,
+                    cell[0] * SHEET_TILE, cell[1] * SHEET_TILE, SHEET_TILE, SHEET_TILE,
+                    px, py, S, S
+                );
+            };
+            blit(spec.base);
+            if (spec.overlay) blit(spec.overlay);
+            ctx.imageSmoothingEnabled = prevSmoothing;
+            return true;
+        }
+
         // Paint a single tile with light texture/depth so the map reads as a
         // stone dungeon rather than flat coloured squares: flagstone floors,
-        // beveled wall blocks and planked wooden doors.
+        // beveled wall blocks and planked wooden doors. Used when no tileset is
+        // installed (see TILE_SHEET_SRC).
         paintTile(cell, tileX, tileY, px, py) {
             const ctx = this.ctx;
-            const s = TILE_STYLE[this.getTileName(cell)] || TILE_STYLE.default;
+            const name = this.getTileName(cell);
             const S = TILE_SIZE;
+
+            if (tileSheetReady && this.drawSpriteTile(name, px, py, S)) return;
+
+            const s = TILE_STYLE[name] || TILE_STYLE.default;
 
             if (s.kind === 'floor') {
                 ctx.fillStyle = ((tileX + tileY) & 1) ? s.alt : s.base;

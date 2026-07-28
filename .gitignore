@@ -53,3 +53,8 @@ test-results/
 .ruff_cache/
 
 .Downloaded_Assets/
+# Third-party tile art: the Dungeon Gathering licence forbids re-distributing
+# the assets (or altered versions) and this repo is public. Run
+# scripts/import_tiles.sh to populate this locally from a pack you own; the
+# renderer falls back to procedural tiles when it is absent. See docs/ASSETS.md.
+app/static/tiles/

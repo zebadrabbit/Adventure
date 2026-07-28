@@ -103,9 +103,18 @@ Full local-dev setup, coding conventions, and the admin CLI are covered in [docs
 | Achievements | [docs/ACHIEVEMENT_SYSTEM.md](docs/ACHIEVEMENT_SYSTEM.md) |
 | Trading system | [docs/TRADING_SYSTEM.md](docs/TRADING_SYSTEM.md) |
 | Frontend style guide | [docs/STYLE_GUIDE.md](docs/STYLE_GUIDE.md) |
+| Art assets & licences | [docs/ASSETS.md](docs/ASSETS.md) |
 | Testing conventions | [docs/TESTING.md](docs/TESTING.md) |
 | Deployment | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) · [docs/DOCKER_SETUP.md](docs/DOCKER_SETUP.md) |
 | Release process | [docs/RELEASING.md](docs/RELEASING.md) |
+
+## Credits
+
+Dungeon tile art: **Dungeon Gathering — Under The Castle Set** by
+[SnowHex](https://snowhex.itch.io/dungeon-gathering). The art is licence-restricted
+and is *not* included in this repository — run `scripts/import_tiles.sh` with a copy
+you own to enable it, or play without it and the map renders procedurally. See
+[docs/ASSETS.md](docs/ASSETS.md).
 
 ## Contributing
 
