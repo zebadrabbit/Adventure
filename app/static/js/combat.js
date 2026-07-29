@@ -119,6 +119,154 @@
         }
     }
 
+    // Cache of slug -> display name per character, populated lazily from the
+    // character's own bag the first time their item panel needs to render.
+    // Names come from the Item catalogue (via the existing, unmodified
+    // /api/characters/<id> endpoint) rather than being derived from the slug
+    // client-side -- resolve_potion_effect is the only place a slug becomes
+    // an effect, and matching substrings against a slug is exactly the bug
+    // class that module exists to close (see item_effects.py's docstring).
+    // Grouping below reads the fetched *name* text, never the slug.
+    const itemNamesCache = new Map(); // charId -> Map(slug -> name)
+
+    async function fetchItemNames(charId) {
+        if (itemNamesCache.has(charId)) return itemNamesCache.get(charId);
+        itemNamesCache.set(charId, new Map()); // placeholder so concurrent calls don't double-fetch
+        try {
+            const r = await fetch(`/api/characters/${charId}`);
+            const j = await r.json();
+            const names = new Map();
+            (Array.isArray(j.bag) ? j.bag : []).forEach(it => {
+                if (it && it.slug && it.name) names.set(it.slug, it.name);
+            });
+            itemNamesCache.set(charId, names);
+            return names;
+        } catch (e) {
+            itemNamesCache.set(charId, new Map());
+            return new Map();
+        }
+    }
+
+    // Which display group a potion's *name* belongs in. Deliberately reads
+    // the name (content the game already writes for players), not the slug
+    // -- see the itemNamesCache comment above. A name matching neither falls
+    // into "Elixirs" (currently just potion-regen, a status effect rather
+    // than a restore, so a group of its own is correct, not a catch-all).
+    function classifyItemGroup(name) {
+        if (/heal/i.test(name)) return 'Healing';
+        if (/mana/i.test(name)) return 'Mana';
+        return 'Elixirs';
+    }
+
+    const ITEM_GROUP_ORDER = ['Healing', 'Mana', 'Elixirs'];
+    const ITEM_GROUP_META = {
+        Healing: { icon: 'bi-heart-pulse-fill', btnClass: 'btn-combat-heal' },
+        Mana: { icon: 'bi-droplet-fill', btnClass: 'btn-combat-spell' },
+        Elixirs: { icon: 'bi-flask-fill', btnClass: '' },
+    };
+
+    // Renders the active character's usable potions into the static
+    // .combat-item-panel container (combat.html), grouped by effect kind so
+    // a bag holding many tiers reads as a few short rows instead of a wall
+    // of buttons -- see combat.css's cap/scroll on the container itself for
+    // the worst case (a character can hold up to ~43 distinct resolvable
+    // slugs at once).
+    //
+    // Buttons are plain data-action="use_item" elements with a data-slug;
+    // they're picked up by the generic clone-and-replace button loop in
+    // render() below like any other action button, so disabling on
+    // !canAct and listener binding both come from there, not from here.
+    //
+    // Item *names* are fetched lazily and cached per character (mirrors
+    // fetchActiveSkills/renderSkillButtons above). Until a character's names
+    // have loaded once, their panel renders empty rather than showing raw
+    // slugs or guessing a group from the slug text; the fetch's completion
+    // triggers a full re-render (render(state) again) so the newly-visible
+    // buttons still go through the generic loop and get wired up normally.
+    function renderItemButtons(actionPanel, charId, charClass, state) {
+        const container = actionPanel.querySelector('.combat-item-panel');
+        if (!container) return;
+        container.innerHTML = '';
+
+        const itemCounts = (state.party && state.party.item_counts) || {};
+        const held = [];
+        Object.keys(itemCounts).forEach(slug => {
+            const byChar = itemCounts[slug] || {};
+            const count = byChar[String(charId)] || 0;
+            if (count > 0) held.push({ slug, count });
+        });
+
+        if (held.length === 0) {
+            container.hidden = true;
+            return;
+        }
+
+        const names = itemNamesCache.get(charId);
+        if (names === undefined) {
+            fetchItemNames(charId).then(() => {
+                // Safe no-op if the active character (or the whole combat)
+                // has moved on by the time this resolves -- render() always
+                // reads the DOM/state fresh.
+                render(state);
+            });
+            container.hidden = true;
+            return;
+        }
+
+        const groups = new Map(); // label -> [{slug, count, name}]
+        held.forEach(({ slug, count }) => {
+            const name = names.get(slug);
+            if (!name) return; // this character's bag fetch didn't carry this slug (stale cache); skip rather than guess
+            const label = classifyItemGroup(name);
+            if (label === 'Mana' && MANALESS_CLASSES.has(charClass)) return; // no mana resource to restore, same as the mana bar itself
+            if (!groups.has(label)) groups.set(label, []);
+            groups.get(label).push({ slug, count, name });
+        });
+
+        if (groups.size === 0) {
+            // Everything held fell into a group that's hidden for this
+            // character (e.g. only mana potions on a manaless class).
+            container.hidden = true;
+            return;
+        }
+        container.hidden = false;
+
+        ITEM_GROUP_ORDER.forEach(label => {
+            const entries = groups.get(label);
+            if (!entries || entries.length === 0) return;
+            entries.sort((a, b) => a.name.localeCompare(b.name));
+
+            const meta = ITEM_GROUP_META[label];
+            const section = document.createElement('div');
+            section.className = 'combat-item-group';
+
+            const heading = document.createElement('div');
+            heading.className = 'combat-item-group-label';
+            heading.textContent = label;
+            section.appendChild(heading);
+
+            const grid = document.createElement('div');
+            grid.className = 'combat-item-grid';
+            entries.forEach(({ slug, count, name }) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `btn-combat btn-combat-item${meta.btnClass ? ' ' + meta.btnClass : ''}`;
+                btn.dataset.action = 'use_item';
+                btn.dataset.slug = slug;
+                const icon = document.createElement('i');
+                icon.className = `bi ${meta.icon}`;
+                btn.appendChild(icon);
+                // Count is visible in the button's own text, not tucked into a
+                // title tooltip -- that was the specific complaint about the
+                // two fixed buttons this panel replaced.
+                btn.appendChild(document.createTextNode(` ${name} ×${count}`));
+                grid.appendChild(btn);
+            });
+            section.appendChild(grid);
+            container.appendChild(section);
+        });
+    }
+
     function classifyAndTransform(msg) {
         let cls = '';
         // Order matters: more specific patterns first
@@ -293,7 +441,6 @@
         const activeIndex = state.active_index;
         const party = (state.party && state.party.members) || [];
         const active = initiative[activeIndex];
-        const itemCounts = (state.party && state.party.item_counts) || {};
         const template = document.getElementById('party-member-template');
 
         let activeCharId = null;
@@ -412,45 +559,22 @@
             actionPanel.classList.remove('d-none');
             actionPanel.style.display = '';
 
-            // Update action buttons
             const activeCharClass = (activeMember.char_class || 'fighter').toLowerCase();
+
+            // Build the actor's potion panel before the generic button loop
+            // below runs -- it needs the freshly-created item buttons already
+            // in the DOM so they get disabled/wired up like every other
+            // action button, rather than inventing a second listener path.
+            renderItemButtons(actionPanel, activeCharId, activeCharClass, state);
+
+            // Update action buttons
             actionPanel.querySelectorAll('button[data-action]').forEach(btn => {
-                // Mana potion button is irrelevant for manaless classes (e.g. barbarian),
-                // same as the mana bar itself.
-                if (btn.dataset.needsManaPotion && MANALESS_CLASSES.has(activeCharClass)) {
-                    btn.style.display = 'none';
-                    return;
-                }
                 btn.style.display = '';
 
                 if (!canAct) {
                     btn.disabled = true;
                 } else {
                     btn.disabled = false;
-                }
-
-                // Potion availability — per-character, not a shared party pool.
-                if (btn.dataset.needsPotion) {
-                    const potionsByChar = itemCounts['potion-healing'] || {};
-                    const potCount = potionsByChar[String(activeCharId)] || 0;
-                    if (potCount <= 0) {
-                        btn.disabled = true;
-                        btn.title = 'No potions available';
-                    } else {
-                        btn.title = potCount + ' potion' + (potCount === 1 ? '' : 's') + ' remaining';
-                    }
-                }
-
-                // Mana potion availability — per-character, not a shared party pool.
-                if (btn.dataset.needsManaPotion) {
-                    const manaPotionsByChar = itemCounts['potion-mana'] || {};
-                    const manaPotCount = manaPotionsByChar[String(activeCharId)] || 0;
-                    if (manaPotCount <= 0) {
-                        btn.disabled = true;
-                        btn.title = 'No mana potions available';
-                    } else {
-                        btn.title = manaPotCount + ' mana potion' + (manaPotCount === 1 ? '' : 's') + ' remaining';
-                    }
                 }
 
                 // Mana gating
@@ -464,9 +588,24 @@
 
                 // Remove old listeners and add new one
                 const action = btn.dataset.action;
+                const slug = btn.dataset.slug || null;
                 const newBtn = btn.cloneNode(true);
                 btn.parentNode.replaceChild(newBtn, btn);
-                newBtn.addEventListener('click', () => doAction(action, state.version, activeCharId));
+                newBtn.addEventListener('click', () => doAction(action, state.version, activeCharId, slug));
+
+                if (slug) {
+                    // Potion entries are activated by Enter like any button,
+                    // but holding Enter down auto-repeats the browser's own
+                    // keydown-driven activation (Space does not -- its
+                    // default click fires once, on keyup). Left unguarded,
+                    // holding the key would fire one /use_item POST per
+                    // repeat tick and drain a whole stack in a couple of
+                    // seconds -- the same bug already hit once on the bag
+                    // grid's own key handler.
+                    newBtn.addEventListener('keydown', (e) => {
+                        if (e.repeat) e.preventDefault();
+                    });
+                }
             });
 
             renderSkillButtons(actionPanel, activeCharId, canAct, state.version, activeMember ? activeMember.mana : undefined);
@@ -547,7 +686,7 @@
         } catch (e) { /* ignore */ }
     }
 
-    async function doAction(action, version, actorId) {
+    async function doAction(action, version, actorId, slug) {
         let endpoint;
         let payload = { version: version, actor_id: actorId };
         let spellType = null;
@@ -569,14 +708,12 @@
             payload.spell = 'lightning';
             spellType = 'lightning';
         }
-        else if (action === 'use_potion') {
+        else if (action === 'use_item') {
+            // Slug comes from the clicked entry (see renderItemButtons) --
+            // there is no longer a fixed slug baked into the action itself,
+            // now that the panel lists whatever the actor actually carries.
             endpoint = '/api/combat/' + combatId + '/use_item';
-            payload.slug = 'potion-healing';
-            spellType = 'heal';
-        }
-        else if (action === 'use_mana_potion') {
-            endpoint = '/api/combat/' + combatId + '/use_item';
-            payload.slug = 'potion-mana';
+            payload.slug = slug;
             spellType = 'heal';
         }
         else if (action === 'flee') endpoint = '/api/combat/' + combatId + '/flee';
@@ -590,8 +727,13 @@
             if (casterCard && targetPanel) {
                 window.combatEffects.createParticles(casterCard, targetPanel, spellType);
 
-                // Add casting glow to button
-                const btn = document.querySelector(`[data-action="${action}"]`);
+                // Add casting glow to button. Several potion entries can now
+                // share data-action="use_item", so the slug has to be part
+                // of the match too or this would always glow the first one.
+                const btnSelector = slug
+                    ? `[data-action="${action}"][data-slug="${slug}"]`
+                    : `[data-action="${action}"]`;
+                const btn = document.querySelector(btnSelector);
                 if (btn) {
                     btn.classList.add('casting');
                     setTimeout(() => btn.classList.remove('casting'), 800);
@@ -616,6 +758,14 @@
             const j = await r.json();
             if (j.state) {
                 render(j.state);
+            } else if (j.message) {
+                // Refusals (no_effect / not_carried / item_removal_failed, ...)
+                // carry a player-readable message and consume neither the
+                // item nor the turn -- surface it, or the refusal is
+                // invisible, same as the old silent catch below used to
+                // make it. appendTransientLogLine is defined further down
+                // this file but hoisted, like every other `function` here.
+                appendTransientLogLine(j.message);
             }
         } catch (e) { /* ignore */ }
     }
