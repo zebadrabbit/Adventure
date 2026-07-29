@@ -393,7 +393,13 @@ a:hover {
 }
 
 .btn-combat-item {
-    flex: 0 0 auto;
+    /* Shrinkable (0 1 auto, not 0 0 auto) with min-width: 0 so a name/count
+       combination longer than today's longest can wrap inside the button
+       instead of forcing a horizontal scrollbar inside the panel -- a flex
+       item's default min-width is auto (its content's width), which
+       overrides max-width on the parent grid and defeats wrapping. */
+    flex: 0 1 auto;
+    min-width: 0;
     padding: var(--space-1) var(--space-2);
     font-size: var(--text-xs);
 }

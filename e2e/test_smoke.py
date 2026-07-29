@@ -111,36 +111,26 @@ def _seed_potions(char_id, slug="potion-healing", qty=3):
     return _run_seed(_SEED_POTION_SCRIPT, char_id, slug, qty)
 
 
-# Seeds the potion the same way _SEED_POTION_SCRIPT does, then starts a real
-# combat session for that character's party and forces their turn to be the
-# active one -- the combat item panel (Task 4 of the potion-resolver work)
-# only renders for whoever's turn it is, and initiative is a speed + d20 roll
-# (combat_service._calc_initiative), so leaving it to chance would make this
-# test flaky rather than exercising the panel.
-_SEED_COMBAT_SCRIPT = """
+# Starts a real combat session for char_id's party and forces their turn to
+# be the active one -- the combat item panel (Task 4 of the potion-resolver
+# work) only renders for whoever's turn it is, and initiative is a speed +
+# d20 roll (combat_service._calc_initiative), so leaving it to chance would
+# make this test flaky rather than exercising the panel. Seeding the potion
+# itself is *not* this script's job -- _seed_combat_with_potion below calls
+# _seed_potions for that half, rather than a second copy of
+# _SEED_POTION_SCRIPT's Item-row-plus-bag-entry logic.
+_SEED_COMBAT_START_SCRIPT = """
 import json, sys
 from app import create_app, db
-from app.models.models import Character, Item
+from app.models.models import Character
 from app.services import combat_service
 
 app = create_app()
 with app.app_context():
     char_id = int(sys.argv[1])
-    slug, qty = sys.argv[2], int(sys.argv[3])
     ch = db.session.get(Character, char_id)
     if ch is None:
         raise SystemExit(f"no character {char_id}")
-
-    if Item.query.filter_by(slug=slug).first() is None:
-        db.session.add(Item(slug=slug, name="Potion of Healing", type="potion",
-                            description="Restores a small amount of HP.", value_copper=150))
-    items = json.loads(ch.items) if ch.items else []
-    if not isinstance(items, list):
-        items = []
-    items = [obj for obj in items if not (isinstance(obj, dict) and obj.get("slug") == slug)]
-    items.append({"slug": slug, "qty": qty})
-    ch.items = json.dumps(items)
-    db.session.commit()
 
     monster = {
         "slug": "e2e-item-panel-mob", "name": "Panel Test Mob", "level": 1,
@@ -158,14 +148,19 @@ with app.app_context():
     session.active_index = idx
     db.session.commit()
 
-    print(json.dumps({"combat_id": session.id, "char_id": char_id, "slug": slug, "qty": qty}))
+    print(json.dumps({"combat_id": session.id, "char_id": char_id}))
 """
 
 
 def _seed_combat_with_potion(char_id, slug="potion-healing", qty=3):
-    """Start a live combat session for char_id's party, seeded so it is
-    already that character's turn and their bag holds qty of slug."""
-    return _run_seed(_SEED_COMBAT_SCRIPT, char_id, slug, qty)
+    """Seed a stack of slug into char_id's bag (via the existing
+    _seed_potions helper) and start a live combat session for their party,
+    forced to already be their turn."""
+    _seed_potions(char_id, slug=slug, qty=qty)
+    result = _run_seed(_SEED_COMBAT_START_SCRIPT, char_id)
+    result["slug"] = slug
+    result["qty"] = qty
+    return result
 
 
 def _seed_procedural_item(char_id, slot="hands"):

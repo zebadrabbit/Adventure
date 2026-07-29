@@ -56,16 +56,20 @@ def combat_state(combat_id: int):
                 mana = m.get("mana", 0)
                 mana_max = m.get("mana_max", 0) or 1
                 m["mana_pct"] = round(100 * mana / mana_max, 1)
-            # Ensure item_counts present for older sessions (per-character, not pooled —
-            # each character's potions are their own).
-            if "item_counts" not in data["party"]:
-                from app.services.combat_service import _item_counts_by_character, _party_characters
+            # Ensure item_counts/item_meta are present for older sessions
+            # (per-character, not pooled — each character's potions are their
+            # own). Guarded on *either* key missing: a session written before
+            # item_meta existed carries item_counts with no item_meta at all,
+            # and the combat UI needs the kind to group correctly.
+            if "item_counts" not in data["party"] or "item_meta" not in data["party"]:
+                from app.services.combat_service import _party_characters, _party_item_payload
 
                 try:
                     chars = _party_characters(current_user.id)
-                    data["party"]["item_counts"] = _item_counts_by_character(chars)
+                    data["party"].update(_party_item_payload(chars))
                 except Exception:
-                    data["party"]["item_counts"] = {}
+                    data["party"].setdefault("item_counts", {})
+                    data["party"].setdefault("item_meta", {})
         if data.get("monster_hp") is not None and data.get("monster_max_hp"):
             mhp = data["monster_hp"]
             mmax = data["monster_max_hp"] or 1

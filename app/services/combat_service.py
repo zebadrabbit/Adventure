@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 import structlog
 
 from app import db, socketio
-from app.models.models import Character, CombatSession
+from app.models.models import Character, CombatSession, Item
 from app.models.dungeon_instance import DungeonInstance
 from app.services import extraction_service
 
@@ -267,18 +267,18 @@ def _base_player_snapshot(user_id: int) -> Dict[str, Any]:
             "buffs": [],
         }
     ]
-    # Per-character inventory counts surfaced for UI gating (e.g. potion button
-    # visibility) — each character's potions are their own, not a shared pool.
-    # Every slug the resolver recognises is counted, not just the two legacy
-    # ones, so tiered potions show up too.
+    # Per-character inventory counts (plus kind/name metadata) surfaced for UI
+    # gating and grouping — each character's potions are their own, not a
+    # shared pool. Every slug the resolver recognises is counted, not just
+    # the two legacy ones, so tiered potions show up too.
     try:
-        item_counts = _item_counts_by_character(chars)
+        item_payload = _party_item_payload(chars)
     except Exception as e:
         logger.warning("Failed to parse inventory", exc_info=e)
-        item_counts = {}
+        item_payload = {"item_counts": {}, "item_meta": {}}
     return {
         "members": members,
-        "item_counts": item_counts,
+        **item_payload,
     }
 
 
@@ -569,12 +569,17 @@ def _item_counts_by_character(chars) -> Dict[str, Dict[str, int]]:
     ``{slug: {char_id: count}}``. Each character's potions are their own --
     there is no shared/party-wide potion pool.
 
-    The single place item_counts gets built. Session start
-    (_base_player_snapshot), reward grants (_check_end), the use_item
-    decrement, and the old-session backfill (combat_api.combat_state) all
-    call this rather than each keeping their own list of "which slugs count"
-    -- that drift is exactly how potion-regen ended up counted at session
-    start but never decremented when spent.
+    The single place the counts get built. All four sites that used to call
+    this directly -- session start (_base_player_snapshot), reward grants
+    (_check_end), the use_item decrement, and the old-session backfill
+    (combat_api.combat_state) -- now go through _party_item_payload instead,
+    which calls this and pairs it with item_meta (kind/name) built from the
+    same counts, so the two can never drift apart. Keeping this function
+    itself narrow (counts only, no catalogue lookup) is what let
+    potion-regen end up counted at session start but never decremented when
+    spent, once upon a time -- that drift is now impossible because there is
+    exactly one place ("which slugs count") both the count and the metadata
+    are derived from.
     """
     counts: Dict[str, Dict[str, int]] = {}
     for c in chars:
@@ -599,6 +604,45 @@ def _item_counts_by_character(chars) -> Dict[str, Dict[str, int]]:
             per_char = counts.setdefault(slug, {})
             per_char[str(c.id)] = per_char.get(str(c.id), 0) + qty
     return counts
+
+
+def _party_item_payload(chars) -> Dict[str, Any]:
+    """``item_counts`` plus the display metadata (kind, name) the combat UI
+    needs to group and label potions -- built together so the two can never
+    disagree about which slugs are recognised.
+
+    _item_counts_by_character already calls resolve_potion_effect(slug) to
+    decide what counts, so the kind is known at the exact moment the map is
+    built. Nothing downstream should have to re-derive it: item_effects.py's
+    own contract is that adding a family is one table entry, no other file
+    needs to change -- the combat UI matching a potion's *name* against a
+    regex to guess its kind (an earlier version of this panel) had quietly
+    become that second file.
+
+    ``item_counts`` keeps its original flat shape ({slug: {char_id: count}})
+    unchanged -- tests/test_potions_per_character.py asserts that shape
+    directly -- so item_meta is a sibling map, not a nested addition.
+
+    A slug can be counted here (resolve_potion_effect recognises it) with no
+    matching Item catalogue row: bag_payload (inventory_api._serialize_item)
+    silently drops those, since _item_counts_by_character is a pure slug
+    parse with no catalogue lookup of its own. item_meta's name falls back
+    to the slug itself for exactly that case, rather than the client finding
+    out the hard way.
+    """
+    counts = _item_counts_by_character(chars)
+    names: Dict[str, str] = {}
+    if counts:
+        try:
+            names = {i.slug: i.name for i in Item.query.filter(Item.slug.in_(counts)).all()}
+        except Exception:
+            names = {}
+    return {
+        "item_counts": counts,
+        "item_meta": {
+            slug: {"kind": resolve_potion_effect(slug)["kind"], "name": names.get(slug, slug)} for slug in counts
+        },
+    }
 
 
 def _spell_power(caster: Dict[str, Any]) -> float:
@@ -925,7 +969,7 @@ def _check_end(session: CombatSession):
                 # party scope _base_player_snapshot used at session start (up to 4
                 # characters), not every character this user owns.
                 reward_chars = _party_characters(session.user_id)
-                party["item_counts"] = _item_counts_by_character(reward_chars)
+                party.update(_party_item_payload(reward_chars))
                 session.party_snapshot_json = json.dumps(party)
         except Exception:
             logger.debug("suppressed_exception", where="_check_end", exc_info=True)
@@ -1775,16 +1819,16 @@ def player_use_item(
         return {"error": "item_removal_failed", "message": _REFUSAL_ITEM_REMOVAL_FAILED}
     db.session.add(char_row)
 
-    # item_counts is rebuilt from the acting character's party roster (same
-    # scope _base_player_snapshot/_check_end use -- up to 4 characters, not
-    # every character this user owns) so it can never drift from what the
-    # party actually carries now that the inventory just changed. Guarded
-    # like the other three item_counts call sites: the effect and the
-    # decrement have already succeeded and nothing has been persisted yet, so
-    # a failure here should leave item_counts stale rather than turn an
-    # otherwise-successful item use into a 500.
+    # item_counts/item_meta are rebuilt from the acting character's party
+    # roster (same scope _base_player_snapshot/_check_end use -- up to 4
+    # characters, not every character this user owns) so it can never drift
+    # from what the party actually carries now that the inventory just
+    # changed. Guarded like the other three item_counts call sites: the
+    # effect and the decrement have already succeeded and nothing has been
+    # persisted yet, so a failure here should leave item_counts stale rather
+    # than turn an otherwise-successful item use into a 500.
     try:
-        party["item_counts"] = _item_counts_by_character(_party_characters(user_id))
+        party.update(_party_item_payload(_party_characters(user_id)))
     except Exception as e:
         logger.warning("item_counts_recompute_failed", char_id=actor_id, slug=slug, exc_info=e)
 

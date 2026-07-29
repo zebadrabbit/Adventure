@@ -119,51 +119,20 @@
         }
     }
 
-    // Cache of slug -> display name per character, populated lazily from the
-    // character's own bag the first time their item panel needs to render.
-    // Names come from the Item catalogue (via the existing, unmodified
-    // /api/characters/<id> endpoint) rather than being derived from the slug
-    // client-side -- resolve_potion_effect is the only place a slug becomes
-    // an effect, and matching substrings against a slug is exactly the bug
-    // class that module exists to close (see item_effects.py's docstring).
-    // Grouping below reads the fetched *name* text, never the slug.
-    const itemNamesCache = new Map(); // charId -> Map(slug -> name)
-
-    async function fetchItemNames(charId) {
-        if (itemNamesCache.has(charId)) return itemNamesCache.get(charId);
-        itemNamesCache.set(charId, new Map()); // placeholder so concurrent calls don't double-fetch
-        try {
-            const r = await fetch(`/api/characters/${charId}`);
-            const j = await r.json();
-            const names = new Map();
-            (Array.isArray(j.bag) ? j.bag : []).forEach(it => {
-                if (it && it.slug && it.name) names.set(it.slug, it.name);
-            });
-            itemNamesCache.set(charId, names);
-            return names;
-        } catch (e) {
-            itemNamesCache.set(charId, new Map());
-            return new Map();
-        }
-    }
-
-    // Which display group a potion's *name* belongs in. Deliberately reads
-    // the name (content the game already writes for players), not the slug
-    // -- see the itemNamesCache comment above. A name matching neither falls
-    // into "Elixirs" (currently just potion-regen, a status effect rather
-    // than a restore, so a group of its own is correct, not a catch-all).
-    function classifyItemGroup(name) {
-        if (/heal/i.test(name)) return 'Healing';
-        if (/mana/i.test(name)) return 'Mana';
-        return 'Elixirs';
-    }
-
-    const ITEM_GROUP_ORDER = ['Healing', 'Mana', 'Elixirs'];
-    const ITEM_GROUP_META = {
-        Healing: { icon: 'bi-heart-pulse-fill', btnClass: 'btn-combat-heal' },
-        Mana: { icon: 'bi-droplet-fill', btnClass: 'btn-combat-spell' },
-        Elixirs: { icon: 'bi-flask-fill', btnClass: '' },
+    // Display grouping for each effect kind the resolver can produce
+    // (item_effects.resolve_potion_effect's contract: restore_hp,
+    // restore_mp, status -- see combat_service._party_item_payload, which
+    // sends the kind straight from that same resolver call rather than
+    // making the client guess it from a slug or a name). An unrecognised
+    // kind (defensive; should not happen) falls back to the Elixirs bucket
+    // rather than vanishing.
+    const ITEM_KIND_GROUPS = {
+        restore_hp: { label: 'Healing', icon: 'bi-heart-pulse-fill', btnClass: 'btn-combat-heal' },
+        restore_mp: { label: 'Mana', icon: 'bi-droplet-fill', btnClass: 'btn-combat-spell' },
+        status: { label: 'Elixirs', icon: 'bi-flask-fill', btnClass: '' },
     };
+    const DEFAULT_ITEM_GROUP = ITEM_KIND_GROUPS.status;
+    const ITEM_GROUP_ORDER = ['Healing', 'Mana', 'Elixirs'];
 
     // Renders the active character's usable potions into the static
     // .combat-item-panel container (combat.html), grouped by effect kind so
@@ -172,89 +141,79 @@
     // the worst case (a character can hold up to ~43 distinct resolvable
     // slugs at once).
     //
+    // Both the count and the kind/name come straight from state.party
+    // (item_counts/item_meta) -- both built server-side, together, by
+    // combat_service._party_item_payload, which is also what decides which
+    // slugs are real. There is no client-side fetch, cache, or re-render
+    // dance here, and no slug or name text is ever pattern-matched: the
+    // kind is a fact handed down, not a guess made here.
+    //
     // Buttons are plain data-action="use_item" elements with a data-slug;
     // they're picked up by the generic clone-and-replace button loop in
     // render() below like any other action button, so disabling on
     // !canAct and listener binding both come from there, not from here.
-    //
-    // Item *names* are fetched lazily and cached per character (mirrors
-    // fetchActiveSkills/renderSkillButtons above). Until a character's names
-    // have loaded once, their panel renders empty rather than showing raw
-    // slugs or guessing a group from the slug text; the fetch's completion
-    // triggers a full re-render (render(state) again) so the newly-visible
-    // buttons still go through the generic loop and get wired up normally.
     function renderItemButtons(actionPanel, charId, charClass, state) {
         const container = actionPanel.querySelector('.combat-item-panel');
         if (!container) return;
         container.innerHTML = '';
 
         const itemCounts = (state.party && state.party.item_counts) || {};
-        const held = [];
+        const itemMeta = (state.party && state.party.item_meta) || {};
+
+        const groups = new Map(); // label -> { meta, entries: [{slug, count, name}] }
         Object.keys(itemCounts).forEach(slug => {
             const byChar = itemCounts[slug] || {};
             const count = byChar[String(charId)] || 0;
-            if (count > 0) held.push({ slug, count });
-        });
+            if (count <= 0) return;
 
-        if (held.length === 0) {
-            container.hidden = true;
-            return;
-        }
+            const info = itemMeta[slug] || {};
+            if (info.kind === 'restore_mp' && MANALESS_CLASSES.has(charClass)) return; // no mana resource to restore, same as the mana bar itself
+            const kindGroup = ITEM_KIND_GROUPS[info.kind] || DEFAULT_ITEM_GROUP;
 
-        const names = itemNamesCache.get(charId);
-        if (names === undefined) {
-            fetchItemNames(charId).then(() => {
-                // Safe no-op if the active character (or the whole combat)
-                // has moved on by the time this resolves -- render() always
-                // reads the DOM/state fresh.
-                render(state);
-            });
-            container.hidden = true;
-            return;
-        }
-
-        const groups = new Map(); // label -> [{slug, count, name}]
-        held.forEach(({ slug, count }) => {
-            const name = names.get(slug);
-            if (!name) return; // this character's bag fetch didn't carry this slug (stale cache); skip rather than guess
-            const label = classifyItemGroup(name);
-            if (label === 'Mana' && MANALESS_CLASSES.has(charClass)) return; // no mana resource to restore, same as the mana bar itself
-            if (!groups.has(label)) groups.set(label, []);
-            groups.get(label).push({ slug, count, name });
+            if (!groups.has(kindGroup.label)) groups.set(kindGroup.label, { meta: kindGroup, entries: [] });
+            // item_meta.name falls back to the slug server-side (see
+            // _party_item_payload) for the rare case of a resolvable slug
+            // with no catalogue row, so info.name is never missing here --
+            // the `|| slug` is a second, defensive fallback only.
+            groups.get(kindGroup.label).entries.push({ slug, count, name: info.name || slug });
         });
 
         if (groups.size === 0) {
-            // Everything held fell into a group that's hidden for this
-            // character (e.g. only mana potions on a manaless class).
+            // Either the character holds nothing resolvable, or everything
+            // held fell into a group hidden for this character (e.g. only
+            // mana potions on a manaless class).
             container.hidden = true;
             return;
         }
         container.hidden = false;
 
         ITEM_GROUP_ORDER.forEach(label => {
-            const entries = groups.get(label);
-            if (!entries || entries.length === 0) return;
-            entries.sort((a, b) => a.name.localeCompare(b.name));
+            const group = groups.get(label);
+            if (!group || group.entries.length === 0) return;
+            group.entries.sort((a, b) => a.name.localeCompare(b.name));
 
-            const meta = ITEM_GROUP_META[label];
             const section = document.createElement('div');
             section.className = 'combat-item-group';
+            section.setAttribute('role', 'group');
+            const headingId = `combat-item-group-${label.toLowerCase()}`;
+            section.setAttribute('aria-labelledby', headingId);
 
             const heading = document.createElement('div');
             heading.className = 'combat-item-group-label';
+            heading.id = headingId;
             heading.textContent = label;
             section.appendChild(heading);
 
             const grid = document.createElement('div');
             grid.className = 'combat-item-grid';
-            entries.forEach(({ slug, count, name }) => {
+            group.entries.forEach(({ slug, count, name }) => {
                 const btn = document.createElement('button');
                 btn.type = 'button';
-                btn.className = `btn-combat btn-combat-item${meta.btnClass ? ' ' + meta.btnClass : ''}`;
+                btn.className = `btn-combat btn-combat-item${group.meta.btnClass ? ' ' + group.meta.btnClass : ''}`;
                 btn.dataset.action = 'use_item';
                 btn.dataset.slug = slug;
                 const icon = document.createElement('i');
-                icon.className = `bi ${meta.icon}`;
+                icon.className = `bi ${group.meta.icon}`;
                 btn.appendChild(icon);
                 // Count is visible in the button's own text, not tucked into a
                 // title tooltip -- that was the specific complaint about the
@@ -601,9 +560,13 @@
                     // holding the key would fire one /use_item POST per
                     // repeat tick and drain a whole stack in a couple of
                     // seconds -- the same bug already hit once on the bag
-                    // grid's own key handler.
+                    // grid's own key handler. Narrowed to the two activation
+                    // keys specifically -- a bare `if (e.repeat)` would also
+                    // swallow every repeat of an unrelated held key (e.g. an
+                    // arrow key used to scroll) while focus sits on the
+                    // button.
                     newBtn.addEventListener('keydown', (e) => {
-                        if (e.repeat) e.preventDefault();
+                        if (e.repeat && (e.key === 'Enter' || e.key === ' ')) e.preventDefault();
                     });
                 }
             });
@@ -613,6 +576,8 @@
             actionPanel.classList.add('d-none');
             const stale = actionPanel.querySelector('.skill-buttons-group');
             if (stale) stale.remove();
+            const itemPanel = actionPanel.querySelector('.combat-item-panel');
+            if (itemPanel) { itemPanel.innerHTML = ''; itemPanel.hidden = true; }
         }
         // If combat complete, show a return to dungeon action area (once)
         if (state.status === 'complete') {
@@ -766,6 +731,12 @@
                 // make it. appendTransientLogLine is defined further down
                 // this file but hoisted, like every other `function` here.
                 appendTransientLogLine(j.message);
+            } else if (j.error) {
+                // A handful of error shapes (cannot_use, item_required, ...)
+                // carry neither state nor a player-facing message -- still
+                // better than nothing, mirroring doSkillAction's own fallback
+                // below for its own message-less errors (on_cooldown aside).
+                appendTransientLogLine(`Action could not be completed (${j.error}).`);
             }
         } catch (e) { /* ignore */ }
     }
