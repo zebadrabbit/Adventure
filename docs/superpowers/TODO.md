@@ -15,11 +15,24 @@ Full triage with code pointers:
       delete was FK-blocked by 10 no-cascade tables; party formation took
       "first four by id" which after a wipe is the corpses.
 - [ ] Party Stash button is a `coming soon` alert.
-- [ ] **Item usage in combat** — the service knows 3 hardcoded slugs and the
-      UI offers 2 buttons, against 154 potions in the catalogue, so looted
-      potions cannot be used in a fight (`potion-regen` is implemented but
-      has no button at all). Spec:
-      [specs/2026-07-28-combat-item-usage-design.md](specs/2026-07-28-combat-item-usage-design.md).
+- [x] ~~**Item usage in combat** — the service knew 3 hardcoded slugs and the
+      UI offered 2 buttons, against 154 potions in the catalogue~~ — one
+      resolver, `resolve_potion_effect` in `app/services/item_effects.py`,
+      now backs both the combat and out-of-combat paths. 43 of 154 potions
+      resolve (20 `heal`, 20 `mana`, 3 legacy hyphenated slugs); every other
+      family refuses with a readable message and keeps the item rather than
+      consuming it. Two live bugs came out of the exploration pass and are
+      fixed with it: an infinite-potion exploit (ownership was checked
+      *after* the effect applied, inside a swallowing `try/except`), and
+      out-of-combat consumption silently destroying 127/154 potions for zero
+      effect (it matched the substring `"healing"` against a catalogue that
+      spells it `heal`). The combat screen's two fixed buttons are now a
+      panel listing the potions the character actually carries, grouped by
+      effect, with counts on the button. Spec:
+      [specs/2026-07-28-combat-item-usage-design.md](specs/2026-07-28-combat-item-usage-design.md),
+      whose two 2026-07-29 correction sections record what the exploration
+      pass found and what was deliberately left out. The other 111 potions
+      are recorded below, under Engineering, one missing mechanic per family.
 - [x] ~~Camping is unlimited~~ — costs a campfire kit, 40-tick cooldown, 25%
       ambush; also stopped clamping healthy characters down to 100 HP.
 - [x] ~~Floor difficulty rubber-bands to party level~~ — anchored at run start,
@@ -168,6 +181,10 @@ misbehave today.
       counts, trap damage/DC, ambush pack size, respawn interval/cap.
 - [ ] Mana economy: skill costs 4/8/12 vs mana potion +5 — potion likely
       wants a buff now that casting drains.
+- [ ] Potion tier curve: heal is `10 + 5×(N−1)` (10→105 across `l1`-`l20`),
+      mana is `4 + 2×(N−1)` (4→42) — `app/services/item_effects.py`'s
+      `_heal`/`_mana`. First pass, never playtested, and the only balance
+      decision in the whole potion-resolver chunk.
 - [ ] Spawn density / `aggro_radius` play-feel tuning.
 - [ ] Combat-screen visual redesign (deliberately deferred to a live
       session with the user).
@@ -184,9 +201,64 @@ misbehave today.
 - [x] ~~Looted gear cannot be equipped during a run~~ — the dungeon's only equip
       path posted `{slug, slot}` with no `uid` branch, so procedural instances
       404'd on the legacy path. The promoted panel sends `uid`.
-- [ ] Shrine/camp write `stats["mana"]` instead of `current_mana`
-      (pre-existing camp convention) — post-combat characters may not see
-      the restore; small cleanup.
+- [ ] Shrine (`app/dungeon/room_events.py:163-166`, `_resolve_shrine`) still
+      writes `stats["mana"]` instead of `current_mana` (pre-existing camp
+      convention). Camp (`dungeon_api.py:1744-1745`) and `consume_item`
+      (`inventory_api.py:656-657`) both write both keys now — camp already
+      did, and the potion-resolver chunk fixed `consume_item` — so the
+      shrine is the one live remaining instance. Combat's `_derive_stats`
+      prefers `current_mana`, so a mana restore from a shrine can be
+      silently discarded the moment the party enters its next fight.
+
+Potion families the resolver refuses (111 of 154 potions) have no combat
+mechanic to attach to yet. `app/services/item_effects.py`'s
+`_FAMILY_HANDLERS` table is the extension point once one exists — one table
+entry plus a handler:
+
+- [ ] `buff_attack`, `buff_defense`, `resist_fire` (45 potions) need one
+      shared piece: an effect kind that modifies a derived stat and expires.
+      The combat snapshot is mutable so a modifier sticks, but nothing can
+      un-apply it — there is no expiry hook and no recompute pass. Note
+      `defense` is *evasion* only, so a defence potion makes you harder to
+      hit, not tougher. Highest leverage of the blocked families — unblocks
+      three at once.
+- [ ] `antidote` (5 potions) needs a `remove_effect` primitive.
+      `status_effects.py` can add and replace an effect but never remove
+      one; expiry is the only route today. It must also delete the
+      `CharacterStatusEffect` row, or the poison returns via `_derive_stats`.
+- [ ] `buff_speed` (20 potions) needs dynamic or re-rolled initiative.
+      `speed` is read once, by `_calc_initiative` during `start_session`,
+      and never again.
+- [ ] `resist_cold`, `resist_lightning`, `resist_poison` (15 potions) need
+      typed damage that actually reaches players. No cold or lightning
+      damage ever reaches a player today — monster attacks hardcode
+      `["physical"]` and the one firebolt hardcodes `["fire"]`; the
+      `damage_types` column exists and no damage path reads it. Poison
+      bypasses `apply_resistances` entirely. Also the element string is
+      `"ice"`, not `cold`. Player `resistances` is hardcoded `{}` at
+      `combat_service.py:209`, so `combat_utils.apply_resistances` is live
+      code that always no-ops.
+- [ ] `stamina`, `perception` (10 potions) have no combat mechanic at all —
+      zero references to stamina anywhere in `app/`; perception exists only
+      in exploration and reads `Character.stats` rather than the combat
+      snapshot.
+- [ ] `group_battle`, `invis`, `luck` (12 potions) were never in the
+      original item-usage spec's table and have no mechanic at all.
+- [ ] `stun` has a handler nothing can trigger — `status_effects.py:102`
+      defines it, but `add_effect` is never called anywhere in `app/`.
+- [ ] The regen buff's duration and multipliers are duplicated
+      literal-for-literal in four places: `inventory_api.py`,
+      `combat_service.py`, `dungeon_api.py`, `dungeon/room_events.py`. This
+      is why `item_effects.py` deliberately leaves `potion_regen_lN`
+      unhandled (resolves to `None`) — tiering it would create a fifth copy.
+      Folding those four together is the prerequisite for a tiered regen
+      potion.
+- [ ] `tests/test_bag_potion_consumption.py` asserts only `hp > 0` and
+      `hp > previous`, so it would pass against a heal of 5, 25 or 500 —
+      it never pins the actual amount. A pre-existing coverage gap, now
+      backstopped by the potion resolver's parity test, but worth
+      tightening since this is the file whose name reads as the one
+      guarding it.
 - [ ] Multi-worker Socket.IO (sticky sessions + message queue) — only if
       `--workers > 1` ever becomes real.
 - [ ] Application-factory refactor: kill import-time side effects
@@ -225,3 +297,14 @@ E2E browser smoke (needs a running server):
 ```bash
 E2E=1 ADVENTURE_BASE_URL=http://localhost:5000 pytest e2e -q
 ```
+
+Known flaky tests, not regressions if seen in isolation:
+- `tests/test_camp_regen_buff.py` and `tests/test_camp_supplies_and_cooldown.py`
+  fail intermittently when run together — re-run the failure alone to confirm.
+- `tests/test_quest_hooks.py::test_kill_increments_daily_quest` self-skips
+  (`pytest.skip("No kill_count quest generated this run")`) roughly a third of
+  runs: `quest_generator.get_or_generate_daily` draws 3 templates via
+  `random.choices(_DAILY_TEMPLATES, weights=[3,2,3,2], k=3)` against unseeded
+  global `random` state, so the odds of drawing zero `kill_count` templates
+  are `0.7³ ≈ 34%`. Bisected and reproduced in isolation across fresh
+  interpreters — not an artifact of suite ordering.
