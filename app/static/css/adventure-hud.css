@@ -67,7 +67,14 @@ body[data-realm="dungeon"] #account-anchor {
     position: fixed;
     top: var(--space-2);
     right: var(--space-2);
-    z-index: var(--z-hud);
+    /* Above the character panel (--z-hud): that panel covers the canvas-drawn
+       minimap and the zoom controls while open, which is acceptable because
+       it is transient, but the account anchor must stay reachable regardless.
+       This also closes a known defect: at >=1200px .adv-hud is
+       position: fixed and so a stacking context, but in the narrow fallback
+       it is not, and the zoom buttons could paint over an open account
+       dropdown. */
+    z-index: var(--z-dropdown);
 }
 
 body[data-realm="dungeon"] .account-anchor-trigger {
@@ -585,5 +592,42 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover .avatar-circle {
     .adv-hud .adv-actions #adventure-action-panel {
         flex-direction: row;
         flex-wrap: wrap;
+    }
+}
+
+/* --- Character panel ------------------------------------------------------
+ * Sits beside the party rail, not over it, so the rail stays live as the
+ * character selector. Spans from the rail's right edge to the viewport edge,
+ * and from the top down to the band the log and action bar occupy -- both
+ * derived from the same properties the camera reads, so the panel and the
+ * camera cannot disagree about where the HUD is.
+ *
+ * It does cover the camera's target point while open, which the layout spec
+ * forbids for persistent furniture. This panel is transient and dismissible,
+ * and moving closes it, so the player never walks blind underneath it.
+ */
+
+.adv-hud .adv-character {
+    position: absolute;
+    top: var(--space-2);
+    left: var(--hud-inset-left);
+    right: var(--space-2);
+    bottom: var(--hud-inset-bottom);
+    z-index: var(--z-hud);
+    overflow: auto;
+    scrollbar-width: thin;
+    background: var(--surface);
+    border: 1px solid var(--edge-strong);
+    box-shadow: var(--elev-overlay);
+}
+
+.adv-hud .adv-character[hidden] {
+    display: none;
+}
+
+@media (max-width: 1199px) {
+    .adv-hud .adv-character {
+        position: static;
+        margin-top: var(--space-3);
     }
 }

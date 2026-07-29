@@ -246,6 +246,28 @@ def test_hud_panels_do_not_cover_the_party_or_each_other(page):
     assert result["railOverflow"] <= 1, f"the party rail overflows its own box by {result['railOverflow']}px"
 
 
+def test_character_panel_opens_from_a_party_frame(page):
+    """The rail is the character selector, and the panel it opens is the one
+    that can equip procedural gear (it posts uid). The old dungeon panel could
+    not, which is the defect this chunk exists to fix."""
+    page.set_viewport_size({"width": 1366, "height": 768})
+    page.goto(f"{BASE_URL}/adventure")
+    page.wait_for_load_state("networkidle")
+
+    scripts = page.evaluate("() => Array.from(document.scripts).map(s => s.src).filter(Boolean).join(' ')")
+    assert "equipment-panel.js" in scripts
+    assert "equipment-enhanced.js" not in scripts, "two paper dolls again"
+    assert "/equipment.js" not in scripts, "the old dungeon panel is still loaded"
+
+    page.click(".adv-party-rail .adv-frame-open")
+    panel = page.locator(".adv-character")
+    panel.wait_for(state="visible", timeout=3000)
+
+    box = panel.bounding_box()
+    rail = page.locator(".adv-party-rail").bounding_box()
+    assert box["x"] >= rail["x"] + rail["width"] - 1, "the panel is covering the rail it selects from"
+
+
 def test_csrf_guard_rejects_bare_mutation(page):
     # page.request bypasses the page's fetch wrapper but shares cookies —
     # exactly what a cross-site forged request looks like to the server.

@@ -127,8 +127,6 @@
           <div class="btn-group btn-group-sm" role="group" aria-label="Character actions">
             <button class="tactical-btn-secondary btn-equip-panel party-card-action-btn" data-char-id="{{ m.id }}"
               aria-label="Equipment" title="Equipment"><i class="bi bi-box"></i></button>
-            <button class="tactical-btn-secondary btn-bag-panel party-card-action-btn" data-char-id="{{ m.id }}"
-              aria-label="Bags" title="Bags"><i class="bi bi-bag"></i></button>
           </div>
         </div>
       </div>
@@ -142,6 +140,12 @@
     {% endif %}
   </div>
 
+  {# The character panel. Mounted by equipment-panel.js, revealed on demand.
+     It sits beside the rail rather than over it, so clicking another frame
+     swaps its contents with the panel still open -- the rail is the character
+     selector, and no in-panel selector is built. #}
+  <aside class="adv-character" id="adv-character-panel" hidden></aside>
+
   <div id="party-characters-data" data-json='{{ party|tojson }}' hidden></div>
 </div>
 {% endblock %}
@@ -154,11 +158,9 @@
   <script src="{{ asset_url('js/adventure.js') }}"></script>
   <link rel="stylesheet" href="{{ asset_url('css/tooltips.css') }}">
   <script src="{{ asset_url('js/tooltips.js') }}"></script>
-  <script src="{{ asset_url('js/equipment-shared.js') }}"></script>
-  <script src="{{ asset_url('js/equipment.js') }}"></script>
+  <script src="{{ asset_url('js/equipment-panel.js') }}"></script>
   <script src="{{ asset_url('js/time-widget.js') }}"></script>
   <script src="{{ asset_url('js/adventure-controls.js') }}"></script>
-  <!-- Modals are now handled by equipment.js -->
 
   <!-- Templates for dynamic content -->
   <template id="loot-dropdown-item-template">

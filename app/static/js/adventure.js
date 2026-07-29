@@ -910,6 +910,15 @@
         return;
       }
       e.preventDefault();
+      // The character panel covers the camera's target point while open (see
+      // adventure-hud.css) -- acceptable only because it is transient and
+      // dismissible, on condition the player never walks blind underneath
+      // it. This is the one place a keyboard move is actually issued (the
+      // button click path below has no matching buttons in the current HUD
+      // markup), so it is where that condition gets enforced.
+      if (window.EquipmentPanel && window.EquipmentPanel.isOpen()) {
+        window.EquipmentPanel.close();
+      }
       queueMove(dir);
     });
 

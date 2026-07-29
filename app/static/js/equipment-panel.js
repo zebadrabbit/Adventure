@@ -24,9 +24,11 @@
  * Public interface:
  *   window.EquipmentPanel = { mount, open, close, isOpen, refresh }
  *
- * `window.equipmentManager` is aliased to the same object below so that
- * equipment.js's existing `.btn-equip-panel` delegation (equipment.js:222)
- * keeps working without also running its own handler for the same click.
+ * This module wires its own delegated `.btn-equip-panel` click listener at
+ * load time (see the bottom of this file), so every page that loads this
+ * script gets a working equip button with no separate wiring script -- see
+ * the dashboard's and the adventure HUD's templates, neither of which binds
+ * it themselves.
  */
 (function () {
     "use strict";
@@ -186,6 +188,7 @@
             this._bsModal = null;
             this._open = false;
             this._openCharId = null;
+            this._openGen = 0;
         }
 
         // ---- mount contract ----
@@ -201,24 +204,35 @@
 
         async open(charId) {
             if (!this.root) this._ensureDashboardMount();
+            // Request-generation guard: open() is async (a character fetch),
+            // so clicking two frames quickly starts two overlapping calls.
+            // Without this, whichever fetch resolves last wins regardless of
+            // which was clicked last -- a slow response for character A could
+            // land after a fast one for character B and paint A over B. Each
+            // call captures the generation counter as it starts and bails
+            // before rendering if a newer call has since begun.
+            const gen = ++this._openGen;
             await Promise.all([this.loadCharacter(charId), this._ensureSlots()]);
+            if (gen !== this._openGen) return;
             this.render();
             this._openCharId = charId;
             this._reveal();
         }
 
-        // Back-compat name for equipment.js's existing delegation -- see the
-        // window.equipmentManager alias at the bottom of this file. Not part
-        // of the documented EquipmentPanel interface.
-        openForCharacter(charId) {
-            return this.open(charId);
-        }
-
         close() {
+            // The comparison tooltip lives on document.body, not this.root,
+            // so hiding/removing the panel never took it with it -- it would
+            // otherwise be stranded over the map by a close-on-move.
+            this.hideComparisonTooltip();
             if (this._isModal && this._bsModal) {
                 this._bsModal.hide();
             } else if (this.root) {
-                this.root.classList.add("d-none");
+                // The generic (non-modal) mount case, e.g. the HUD's <aside
+                // hidden>: visibility there is the native hidden attribute
+                // (adventure-hud.css keys off [hidden]), not a Bootstrap
+                // class, so that's what has to be set here for the panel to
+                // actually disappear.
+                this.root.hidden = true;
             }
             this._open = false;
         }
@@ -234,8 +248,8 @@
         }
 
         // ---- dashboard self-bootstrap ----
-        // Only runs the first time open()/openForCharacter() is called on a
-        // page that never mounted the panel into a container of its own.
+        // Only runs the first time open() is called on a page that never
+        // mounted the panel into a container of its own.
         // A caller that mounts explicitly (the adventure HUD) never reaches
         // this, so open() there just re-renders into the already-mounted
         // container instead of spawning an unrelated hidden modal.
@@ -258,13 +272,22 @@
         }
 
         _reveal() {
+            // Unconditionally clear whatever close() may have set on
+            // this.root, regardless of which branch runs below. Previously
+            // this only ran in the non-modal branch, so a close() that fired
+            // while _isModal was true but _bsModal had not been created yet
+            // (a failed first open() on the dashboard) left the modal-content
+            // hidden forever after -- the modal chrome would show, but its
+            // content stayed display:none, i.e. a permanently empty panel.
+            if (this.root) {
+                this.root.classList.remove("d-none");
+                this.root.hidden = false;
+            }
             if (this._isModal) {
                 if (!this._bsModal) {
                     this._bsModal = new bootstrap.Modal(document.getElementById("equipment-panel-modal"));
                 }
                 this._bsModal.show();
-            } else if (this.root) {
-                this.root.classList.remove("d-none");
             }
             this._open = true;
         }
@@ -673,17 +696,16 @@
         // ---- helper functions ----
 
         getSlotLabel(slot) {
+            // The canonical eight (app/loot/data/archetypes.py SLOTS). Old
+            // ring1/ring2/legs/boots/gloves vocabulary is gone -- carrying
+            // dead keys here shipped a slot (feet) with no label at all.
             const labels = {
                 weapon: "Main Hand",
                 offhand: "Off Hand",
                 head: "Head",
                 chest: "Chest",
-                legs: "Legs",
-                boots: "Boots",
-                gloves: "Gloves",
                 hands: "Hands",
-                ring1: "Ring 1",
-                ring2: "Ring 2",
+                feet: "Feet",
                 ring: "Ring",
                 amulet: "Amulet",
             };
@@ -696,12 +718,8 @@
                 offhand: '<i class="bi bi-shield"></i>',
                 head: '<i class="bi bi-person-circle"></i>',
                 chest: '<i class="bi bi-shield-fill-check"></i>',
-                legs: '<i class="bi bi-dash-lg"></i>',
-                boots: '<i class="bi bi-box"></i>',
-                gloves: '<i class="bi bi-hand-index"></i>',
                 hands: '<i class="bi bi-hand-index"></i>',
-                ring1: '<i class="bi bi-circle"></i>',
-                ring2: '<i class="bi bi-circle"></i>',
+                feet: '<i class="bi bi-person-walking"></i>',
                 ring: '<i class="bi bi-circle"></i>',
                 amulet: '<i class="bi bi-gem"></i>',
             };
@@ -819,17 +837,24 @@
         close: () => panel.close(),
         isOpen: () => panel.isOpen(),
         refresh: () => panel.refresh(),
-        // Compatibility name for equipment.js's existing delegation
-        // (equipment.js:222-223). Not part of the documented interface;
-        // remove this alongside equipment.js itself in Task 2.
-        openForCharacter: (charId) => panel.open(charId),
     };
 
-    // equipment.js still runs on this page and delegates `.btn-equip-panel`
-    // clicks to `window.equipmentManager` when it exists. Aliasing it here
-    // routes that delegation into this panel instead of equipment.js's own
-    // modal, so only one handler acts per click.
-    window.equipmentManager = window.EquipmentPanel;
+    // The panel owns its trigger. Both screens use .btn-equip-panel on an
+    // element carrying data-char-id; the adventure screen additionally opens
+    // from anywhere on a party frame (see adventure-controls.js). Registered
+    // once at module load, unconditionally -- not inside mount(). On the
+    // dashboard nothing ever calls mount() explicitly (it only happens
+    // lazily, as a side effect of open()'s own _ensureDashboardMount()), so
+    // a listener registered inside mount() would never exist to be clicked:
+    // open() is what triggers the first mount(), and this listener is what
+    // is supposed to trigger open(). Module-load registration breaks that
+    // circularity; open() still lazily mounts on first call either way.
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.btn-equip-panel');
+        if (!btn) return;
+        const host = btn.closest('[data-char-id]');
+        if (host && host.dataset.charId) window.EquipmentPanel.open(host.dataset.charId);
+    });
 
     if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
         window.openEquipment = (charId) => window.EquipmentPanel.open(charId);

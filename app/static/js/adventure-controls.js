@@ -192,14 +192,22 @@ document.addEventListener('DOMContentLoaded', function () {
                 const hearthBtn = document.getElementById('btn-hearth');
                 if (hearthBtn && !hearthBtn.disabled) hearthBtn.click();
             } else if (key === 'i') {
-                // Open first character's bag panel
-                const bagBtn = document.querySelector('.btn-bag-panel');
-                if (bagBtn) bagBtn.click();
+                // Slots, doll and bag are one panel now (no more standalone
+                // .btn-bag-panel) -- open the first character's.
+                const equipBtn = document.querySelector('.btn-equip-panel');
+                if (equipBtn) equipBtn.click();
             } else if (key === 'escape') {
-                // Close hotkeys panel
-                const panel = document.getElementById('hotkeys-panel');
-                if (panel && panel.style.display !== 'none') {
-                    panel.style.display = 'none';
+                // Escape closes whichever transient overlay is open. Only one
+                // of the two: the character panel sits above the map and
+                // blocks play, so it takes priority, and a single keypress
+                // must not also close the hotkeys panel underneath it.
+                if (window.EquipmentPanel && window.EquipmentPanel.isOpen()) {
+                    window.EquipmentPanel.close();
+                } else {
+                    const panel = document.getElementById('hotkeys-panel');
+                    if (panel && panel.style.display !== 'none') {
+                        panel.style.display = 'none';
+                    }
                 }
             }
         });
@@ -232,17 +240,15 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Clicking anywhere on a party frame opens that character, same as the
-    // frame's equip button. The paper doll itself is the next chunk
-    // (specs/2026-07-28-character-panel-redesign.md); this is the hook it
-    // will reuse.
+    // The party rail is the character selector: clicking a frame opens that
+    // character's panel, and clicking another swaps the contents rather than
+    // closing and reopening. The panel sits beside the rail, never over it.
     document.addEventListener('click', (e) => {
         const frame = e.target.closest('.adv-frame-open');
         if (!frame) return;
-        // Let the frame's own buttons handle their own clicks.
-        if (e.target.closest('button')) return;
-        const equipBtn = frame.querySelector('.btn-equip-panel');
-        if (equipBtn) equipBtn.click();
+        if (e.target.closest('button:not(.btn-equip-panel)')) return;
+        const charId = frame.dataset.charId;
+        if (charId && window.EquipmentPanel) window.EquipmentPanel.open(charId);
     });
 
     document.addEventListener('keydown', (e) => {
@@ -250,9 +256,15 @@ document.addEventListener('DOMContentLoaded', function () {
         const frame = e.target.closest?.('.adv-frame-open');
         if (!frame || e.target !== frame) return;
         e.preventDefault();
-        const equipBtn = frame.querySelector('.btn-equip-panel');
-        if (equipBtn) equipBtn.click();
+        const charId = frame.dataset.charId;
+        if (charId && window.EquipmentPanel) window.EquipmentPanel.open(charId);
     });
+
+    // Mount the character panel once, into the HUD's own mount point. open()
+    // re-renders into it on every frame click; nothing else here needs to
+    // create or tear down the container.
+    const eqPanelHost = document.getElementById('adv-character-panel');
+    if (eqPanelHost && window.EquipmentPanel) window.EquipmentPanel.mount(eqPanelHost);
 });
 
 // ---------------------------------------------------------------- party cards
