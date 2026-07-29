@@ -14,8 +14,12 @@ ADVENTURE_BASE_URL (default http://localhost:5000). The CI job
     E2E=1 ADVENTURE_BASE_URL=http://localhost:5000 pytest e2e -q
 """
 
+import json
 import os
+import subprocess
+import sys
 import time
+from pathlib import Path
 
 import pytest
 
@@ -26,6 +30,52 @@ playwright_sync = pytest.importorskip("playwright.sync_api")
 BASE_URL = os.environ.get("ADVENTURE_BASE_URL", "http://localhost:5000")
 USERNAME = f"e2e_smoke_{int(time.time())}"
 PASSWORD = "e2e-smoke-pass-1"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+_SEED_SCRIPT = """
+import json, random, sys
+from app import create_app, db
+from app.loot.generator import generate_item
+from app.models.models import Character
+
+app = create_app()
+with app.app_context():
+    ch = db.session.get(Character, int(sys.argv[1]))
+    if ch is None:
+        raise SystemExit(f"no character {sys.argv[1]}")
+    instance = generate_item(level=2, rarity="common", slot=sys.argv[2], rng=random.Random(4242))
+    items = json.loads(ch.items) if ch.items else []
+    if not isinstance(items, list):
+        items = []
+    items.append(instance)
+    ch.items = json.dumps(items)
+    db.session.commit()
+    print(json.dumps(instance))
+"""
+
+
+def _seed_procedural_item(char_id, slot="hands"):
+    """Seed one procedural gear instance directly into a party member's bag.
+
+    Run out-of-process (a subprocess that imports `app` on its own) rather
+    than importing `app`/`db` here: this module is a black-box browser test
+    against a live server (see the module docstring) and must not import the
+    app package or rebind a DB session itself. There is no HTTP route that
+    grants gear directly -- app/loot/generator.py:generate_item is the same
+    pure function tests/test_procedural_gear_equip.py uses server-side.
+
+    Returns the seeded instance dict (uid, slot, name, ...).
+    """
+    result = subprocess.run(
+        [sys.executable, "-c", _SEED_SCRIPT, str(char_id), slot],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, f"seeding a procedural item failed: {result.stderr}"
+    return json.loads(result.stdout.strip().splitlines()[-1])
 
 
 @pytest.fixture(scope="module")
@@ -249,7 +299,17 @@ def test_hud_panels_do_not_cover_the_party_or_each_other(page):
 def test_character_panel_opens_from_a_party_frame(page):
     """The rail is the character selector, and the panel it opens is the one
     that can equip procedural gear (it posts uid). The old dungeon panel could
-    not, which is the defect this chunk exists to fix."""
+    not, which is the defect this chunk exists to fix.
+
+    Everything up to the drag-drop only proves the panel opens in the right
+    place with the right scripts loaded -- it would pass unchanged even if
+    the drop posted {slug, slot}, posted nothing, or the slot stayed empty.
+    The uid assertion at the end is the one that actually proves the defect
+    is fixed: a procedural item, seeded directly into a party member's bag
+    (there is no route that grants gear), dropped on its slot from this
+    panel, sends a request whose body is {"uid": ...} -- not the old
+    dungeon panel's {slug, slot}, which 404s for a generated item.
+    """
     page.set_viewport_size({"width": 1366, "height": 768})
     page.goto(f"{BASE_URL}/adventure")
     page.wait_for_load_state("networkidle")
@@ -259,6 +319,9 @@ def test_character_panel_opens_from_a_party_frame(page):
     assert "equipment-enhanced.js" not in scripts, "two paper dolls again"
     assert "/equipment.js" not in scripts, "the old dungeon panel is still loaded"
 
+    char_id = page.evaluate("() => document.querySelector('.adv-party-rail .adv-frame-open')?.dataset.charId")
+    assert char_id, "no deployed party member to open a panel for"
+
     page.click(".adv-party-rail .adv-frame-open")
     panel = page.locator(".adv-character")
     panel.wait_for(state="visible", timeout=3000)
@@ -266,6 +329,34 @@ def test_character_panel_opens_from_a_party_frame(page):
     box = panel.bounding_box()
     rail = page.locator(".adv-party-rail").bounding_box()
     assert box["x"] >= rail["x"] + rail["width"] - 1, "the panel is covering the rail it selects from"
+
+    instance = _seed_procedural_item(char_id, slot="hands")
+    page.reload()
+    page.wait_for_load_state("networkidle")
+    page.click(".adv-party-rail .adv-frame-open")
+    panel.wait_for(state="visible", timeout=3000)
+
+    with page.expect_request(lambda req: req.url.endswith("/equip") and req.method == "POST") as req_info:
+        page.evaluate(
+            """([uid, slot]) => {
+                const cell = document.querySelector(`.bag-grid-cell[data-item-uid="${uid}"]`);
+                const target = document.querySelector(`.equipment-slot[data-slot="${slot}"]`);
+                const dt = new DataTransfer();
+                cell.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+                target.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
+                target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+            }""",
+            [instance["uid"], instance["slot"]],
+        )
+    equip_request = req_info.value
+    equip_body = json.loads(equip_request.post_data)
+    assert (
+        equip_body.get("uid") == instance["uid"]
+    ), f"the dungeon panel did not send uid for the dropped item: {equip_body}"
+    assert "slug" not in equip_body and "slot" not in equip_body, (
+        "this is the old dungeon panel's request shape ({slug, slot}), which 404s for a "
+        f"generated item with no catalogue row: {equip_body}"
+    )
 
 
 def test_csrf_guard_rejects_bare_mutation(page):

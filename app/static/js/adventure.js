@@ -286,6 +286,18 @@
 
     // Movement queue helpers (restored after refactor)
     function queueMove(dir) {
+      // The character panel covers the camera's target point while open (see
+      // adventure-hud.css) -- acceptable only because it is transient and
+      // dismissible, on condition the player never walks blind underneath
+      // it. This is the real choke point for every move regardless of how
+      // it was issued (keyboard today; the disabled-button click path at
+      // moveNorthBtn etc. below, if those buttons ever return to the
+      // markup), so it's where that condition gets enforced -- a check
+      // living at one keydown call site could drift the moment a second
+      // entry point exists.
+      if (window.EquipmentPanel && window.EquipmentPanel.isOpen()) {
+        window.EquipmentPanel.close();
+      }
       moveQueue.push(dir);
       if (!moveInFlight) processNextMove();
     }
@@ -910,15 +922,6 @@
         return;
       }
       e.preventDefault();
-      // The character panel covers the camera's target point while open (see
-      // adventure-hud.css) -- acceptable only because it is transient and
-      // dismissible, on condition the player never walks blind underneath
-      // it. This is the one place a keyboard move is actually issued (the
-      // button click path below has no matching buttons in the current HUD
-      // markup), so it is where that condition gets enforced.
-      if (window.EquipmentPanel && window.EquipmentPanel.isOpen()) {
-        window.EquipmentPanel.close();
-      }
       queueMove(dir);
     });
 

@@ -151,6 +151,21 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const key = e.key.toLowerCase();
 
+            // The character panel is the same "acting blind under an
+            // overlay" hazard close-on-move exists to prevent, just for the
+            // action keys instead of movement: with the panel open and focus
+            // still on body (its bag cells carry no tabindex), Space fires a
+            // real Search -- 2 turns and an encounter roll the player can't
+            // see -- and C/E/H fire Camp/Extract/Hearth the same way.
+            // Movement is deliberately exempt: it already closes the panel
+            // itself (adventure.js's queueMove), so W/A/S/D is how the player
+            // gets back to seeing the map, not something done blind.
+            if ((key === ' ' || key === 'c' || key === 'e' || key === 'h') &&
+                window.EquipmentPanel && window.EquipmentPanel.isOpen()) {
+                e.preventDefault(); // Space's default is to scroll the page
+                return;
+            }
+
             // Movement
             if (key === 'w' || key === 'arrowup') {
                 e.preventDefault();
@@ -243,10 +258,17 @@ document.addEventListener('DOMContentLoaded', function () {
     // The party rail is the character selector: clicking a frame opens that
     // character's panel, and clicking another swaps the contents rather than
     // closing and reopening. The panel sits beside the rail, never over it.
+    //
+    // Let every button handle its own click, including .btn-equip-panel:
+    // equipment-panel.js now wires that button itself (a delegated listener
+    // registered at module load, see its "panel owns its trigger" comment),
+    // so without this bail a click on the equip button ran open() twice --
+    // once from that listener, once from this one -- doubling the
+    // GET /api/characters/<id> the panel makes on every open.
     document.addEventListener('click', (e) => {
         const frame = e.target.closest('.adv-frame-open');
         if (!frame) return;
-        if (e.target.closest('button:not(.btn-equip-panel)')) return;
+        if (e.target.closest('button')) return;
         const charId = frame.dataset.charId;
         if (charId && window.EquipmentPanel) window.EquipmentPanel.open(charId);
     });

@@ -93,7 +93,7 @@
         <i class="bi bi-person-gear me-2"></i>
         <span id="eq-char-name">Character</span> - Equipment & Inventory
     </h5>
-    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" data-action="close"></button>
 </div>
 <div class="modal-body">
     <div class="equipment-grid">
@@ -173,7 +173,7 @@
     </div>
 </div>
 <div class="modal-footer eq-modal-footer">
-    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-action="close">Close</button>
 </div>`;
 
     class EquipmentPanelController {
@@ -199,6 +199,21 @@
             if (container.dataset.eqPanelMounted === "1") return; // idempotent
             container.innerHTML = SKELETON_HTML;
             container.dataset.eqPanelMounted = "1";
+            if (!this._isModal) {
+                // The header X and footer Close button carry
+                // data-bs-dismiss="modal" for the dashboard's real modal.
+                // Bootstrap's own globally-registered click delegate also
+                // matches that attribute and tries to resolve a .modal
+                // ancestor for it; on a plain (non-modal) mount there is
+                // none, and instead of no-oping it throws internally
+                // ("Cannot read properties of undefined (reading
+                // 'backdrop')"). Stripped here so only this controller's own
+                // data-action="close" handling (_attachRootListeners) ever
+                // reacts to these buttons outside the dashboard's modal.
+                container.querySelectorAll('[data-bs-dismiss="modal"]').forEach((el) => {
+                    el.removeAttribute('data-bs-dismiss');
+                });
+            }
             this._attachRootListeners();
         }
 
@@ -211,9 +226,19 @@
             // land after a fast one for character B and paint A over B. Each
             // call captures the generation counter as it starts and bails
             // before rendering if a newer call has since begun.
+            //
+            // The fetch is captured into a local (fetchCharacter) rather than
+            // going through loadCharacter, which assigns straight into
+            // this.character. Assigning there unconditionally, before the
+            // gate, would still let a stale response win: the DOM would show
+            // the fast character but this.character -- what every later
+            // click reads (bag lookups, the id in the equip/unequip POST) --
+            // would silently belong to the stale one. The gate has to guard
+            // the model, not just the repaint.
             const gen = ++this._openGen;
-            await Promise.all([this.loadCharacter(charId), this._ensureSlots()]);
+            const [characterData] = await Promise.all([this.fetchCharacter(charId), this._ensureSlots()]);
             if (gen !== this._openGen) return;
+            this.character = characterData;
             this.render();
             this._openCharId = charId;
             this._reveal();
@@ -255,6 +280,20 @@
         // container instead of spawning an unrelated hidden modal.
 
         _ensureDashboardMount() {
+            // A page that ships its own mount point always wins, even if
+            // this runs before that page's own explicit mount() call gets a
+            // chance to. The delegated .btn-equip-panel listener is
+            // registered at module load, so an unusually early click (before
+            // adventure-controls.js's DOMContentLoaded handler mounts the
+            // HUD panel) can beat it here. Without this check that race would
+            // latch _isModal = true and spawn an orphan Bootstrap modal
+            // instead of ever using #adv-character-panel -- permanently, for
+            // the rest of the page's life, since _isModal is never reset.
+            const ownMount = document.getElementById("adv-character-panel");
+            if (ownMount) {
+                this.mount(ownMount);
+                return;
+            }
             let modalEl = document.getElementById("equipment-panel-modal");
             if (!modalEl) {
                 const wrapperHTML = `
@@ -314,10 +353,14 @@
             return this._slotsPromise;
         }
 
-        async loadCharacter(charId) {
+        async fetchCharacter(charId) {
             const response = await fetch(`/api/characters/${charId}`);
             if (!response.ok) throw new Error("Failed to load character");
-            this.character = await response.json();
+            return response.json();
+        }
+
+        async loadCharacter(charId) {
+            this.character = await this.fetchCharacter(charId);
         }
 
         // ---- rendering ----
@@ -498,6 +541,23 @@
             // attached once at mount time, covers every slot across every
             // re-render without re-binding or leaking.
             this.root.addEventListener("click", (e) => {
+                // The skeleton's header X and footer Close button both carry
+                // data-action="close" (see SKELETON_HTML above).
+                // On the dashboard's real modal, data-bs-dismiss="modal" is
+                // what actually closes it (Bootstrap's own global delegate);
+                // on a generic (non-modal) mount there is no .modal ancestor
+                // for that delegate to find, so it used to no-op (or, once
+                // mount() stops stripping the attribute for this case,
+                // throw) and a mouse-only player had no way to close the
+                // panel at all -- only Escape or a movement key did
+                // anything. Wired to close() ourselves here, but only for
+                // the non-modal case: on the dashboard this would be
+                // redundant with (not a replacement for) Bootstrap's own
+                // handling, so it's left untouched there.
+                if (!this._isModal && e.target.closest('[data-action="close"]')) {
+                    this.close();
+                    return;
+                }
                 const btn = e.target.closest('[data-action="unequip"]');
                 if (!btn) return;
                 const slotEl = btn.closest("[data-slot]");
@@ -854,6 +914,17 @@
         if (!btn) return;
         const host = btn.closest('[data-char-id]');
         if (host && host.dataset.charId) window.EquipmentPanel.open(host.dataset.charId);
+    });
+
+    // Loot claimed elsewhere (adventure.js:774, adventure-extraction.js:89)
+    // dispatches this to invalidate cached character state. equipment.js was
+    // its only listener; that died with it, so without this, gear picked up
+    // while the panel is open (a search-tile claim, a shrine reward) doesn't
+    // show up in the bag until the panel is closed and reopened. Only
+    // refresh while actually open -- refresh() only matters for what's on
+    // screen right now.
+    document.addEventListener('mud-characters-state-invalidated', () => {
+        if (window.EquipmentPanel.isOpen()) window.EquipmentPanel.refresh();
     });
 
     if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
