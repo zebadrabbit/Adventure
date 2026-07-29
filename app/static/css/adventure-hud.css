@@ -421,6 +421,23 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover .avatar-circle {
     font-size: var(--text-2xs);
 }
 
+/* Encumbrance state on the frame. Warn by default; danger when the character
+   cannot carry any more. The number lives in the character panel. */
+.adv-hud .adv-party-rail .frame-encumbrance {
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    color: var(--warn);
+}
+
+.adv-hud .adv-party-rail .frame-encumbrance.is-blocked {
+    color: var(--danger);
+}
+
+.adv-hud .adv-party-rail .frame-encumbrance[hidden] {
+    display: none;
+}
+
 @media (max-width: 1199px) {
     .adv-hud .adv-party-rail {
         position: static;

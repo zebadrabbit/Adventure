@@ -260,6 +260,10 @@ def build_party_payload(chars: Sequence[Character]):
         hp = int(s.get("hp", hp_max))  # Default to full if not set
         mana = int(s.get("current_mana", s.get("mana", mana_max)))  # Check both keys
 
+        from app.inventory.utils import encumbrance_state, load_inventory
+
+        enc = encumbrance_state(int(s.get("str", 10) or 10), load_inventory(getattr(c, "items", None)))
+
         party.append(
             {
                 "id": c.id,
@@ -270,6 +274,14 @@ def build_party_payload(chars: Sequence[Character]):
                 "hp_max": hp_max,
                 "mana": mana,
                 "mana_max": mana_max,
+                # The frame shows the *state*; the weight numbers stay one click
+                # away in the character panel. Past capacity a dex_penalty
+                # applies and combat movement derives from speed (8 + DEX // 2),
+                # so a player has to see this before the fight, not during it.
+                "encumbrance": {
+                    "status": enc.get("status", "normal"),
+                    "dex_penalty": int(enc.get("dex_penalty", 0) or 0),
+                },
             }
         )
     return party

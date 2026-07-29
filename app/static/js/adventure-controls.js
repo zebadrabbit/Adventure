@@ -344,6 +344,25 @@ document.addEventListener('DOMContentLoaded', function () {
         set('.mana-bar', member.mana, member.mana_max, 'MP');
         // A downed character should be obvious at a glance.
         card.classList.toggle('is-downed', Number(member.hp) <= 0);
+
+        // Encumbrance is state, not a number: "you are slower" belongs on the
+        // frame, the weight belongs in the panel.
+        const enc = member.encumbrance || {};
+        const marker = card.querySelector('.frame-encumbrance');
+        if (marker) {
+            const status = enc.status || 'normal';
+            const pen = Number(enc.dex_penalty) || 0;
+            if (status === 'normal') {
+                marker.hidden = true;
+                marker.textContent = '';
+            } else {
+                marker.hidden = false;
+                marker.textContent = status === 'blocked'
+                    ? `Overloaded${pen ? ` (-${pen} DEX)` : ''}`
+                    : `Encumbered${pen ? ` (-${pen} DEX)` : ''}`;
+            }
+            marker.classList.toggle('is-blocked', status === 'blocked');
+        }
     }
 
     let inFlight = false;
