@@ -40,8 +40,11 @@ Full triage with code pointers:
 - [ ] Maze too spiralling: tune `dead_end_keep` / `extra_connection_chance` /
       `straight_max`.
 - [ ] Map readability: wall/floor contrast, props, coordinate + floor readout.
-- [ ] Adventure UX: log window too restrictive for looting, static character
-      panels, D&D lingo throughout.
+- [ ] Adventure UX: ~~log window too restrictive for looting~~ (floating,
+      collapsible, resizable now), ~~static character panels~~ (live HP/MP,
+      encumbrance, clickable to the paper doll) — **D&D lingo throughout is
+      still open**, and "Party Stash" is the design system's own worked example
+      of what not to say (`DESIGN_SYSTEM.md` rule 8).
 - [ ] **Combat overhaul** — designed: combat is its own screen and zooms into the
       map tile the party occupies, 4 vs 1-6 on a grid. Phased in
       [specs/2026-07-28-tactical-combat-design.md](specs/2026-07-28-tactical-combat-design.md);
@@ -60,6 +63,105 @@ Full triage with code pointers:
       `equipment-shared.js` deleted. Restyled onto the token system.
       Encumbrance state now shows on the party frame. Plan:
       [plans/2026-07-28-paper-doll-consolidation.md](plans/2026-07-28-paper-doll-consolidation.md).
+
+## Found during the 2026-07-28 UI chunks
+
+Turned up by review while building the HUD, the slot unification and the paper
+doll. None blocked those merges; all are real. Grouped by whether they
+misbehave today.
+
+### Live defects
+
+- [ ] **`unequip_item` destroys a malformed gear value.** The legacy branch
+      (`inventory_api.py:577-581`) calls `add_item(inv, <dict>, 1)`, producing
+      `{"slug": {...}, "qty": 1}`, which `load_inventory` then discards because
+      `slug` is not a string. One click, item gone. The gear-slot migration was
+      hardened against exactly this shape; the live app path was not.
+- [ ] **`consume` has no HP clamp.** `inventory_api.py:626` adds HP without
+      capping at max, so drinking at full HP burns the potion for nothing — now
+      one click away in the bag grid, where a mis-click costs a potion.
+- [ ] **Server refusals are machine codes.** Only the in-combat lock
+      (`inventory_api.py:454`) sends a human `message`; the other ~10
+      (`item not equippable`, `bad_slot`, `not_in_inventory`, `empty slot`,
+      `item not in bag`, `not consumable`, …) are bare codes. The panel now
+      shows the player whatever it gets, so these are player-facing strings and
+      fall under the D&D-register rule.
+- [ ] **Resize-then-zoom snaps the camera off-centre.** `resizeCanvas` calls
+      `centerOnPlayer`, which writes `offsetX/Y` without syncing
+      `targetOffsetX/Y`, so the next zoom eases back toward the pre-resize
+      target. Pre-existing in kind — `onMouseMove` and `onWheel` diverge the
+      same way, so drag-then-zoom has always snapped.
+- [ ] **`adventure.js:842`'s `.character-card` selector is dead**, so the
+      per-character "last roll" readout has never worked on the party rail —
+      every roll silently takes the fallback above the log. Now load-bearing:
+      the encumbrance marker occupies that row, so repairing the selector means
+      re-measuring the rail budget. Warning comments are at both sites.
+- [ ] **The floating log collides with the zoom controls below a 705px viewport
+      height.** The log's ceiling is a constant ~421px, so it is outside the
+      768px design floor but reachable on a 768px physical screen once
+      scrollback fills.
+
+### One vocabulary, four times over
+
+- [ ] **Class colours have four sources.** `tokens.css`'s `--class-*`,
+      `class-badges.css`, `equipment.css`'s `.eq-class-bg-*`, and — the live one
+      — a runtime injector (`adventure.js:112-148` with
+      `config_api.py:257-270`) that stamps `--class-{slug}-bg/-fg/-border` and
+      `!important` rules onto `document.documentElement` on every `/adventure`
+      load. It hides from grep because the property name is built by
+      template-literal interpolation, so `--class-fighter-bg` never appears as a
+      searchable string. This is the same shape as the gear-slot vocabularies
+      and deserves the same treatment: spec, single source, migration if needed.
+- [ ] `party-management.css`'s `.rarity-*` block was `!important` and defeated
+      the rarity tokens on both screens — fixed, but the same `!important`
+      pattern is worth sweeping for elsewhere.
+- [ ] `--info` is a literal alias of `--accent` (`tokens.css:191`), so
+      `tactical-btn-info` and `-primary` share a hue and differ only by fill vs
+      wash. Decide whether info deserves its own hue or the alias is intended.
+- [ ] Hover glows are inconsistent: `--glow-accent`/`--glow-danger` exist at
+      14px/30%, `-info`/`-success` hand-roll 12px/15%, and `-danger`'s own hover
+      uses a raw `rgba()`. Add `--glow-info`/`--glow-success` and point all four
+      at tokens.
+
+### Interaction and accessibility
+
+- [ ] Bag-grid cells are focusable but arrow keys still move the party — grid
+      arrow-navigation is the natural follow-up now that the grid is a
+      keyboard target.
+- [ ] The character panel ignores the tooltip preference. `tooltips.js`
+      persists `mudTooltipMode` (`rich`/`plain`/`off`) and the deleted
+      `equipment.js` honoured it; `equipment-panel.js` shows its comparison
+      tooltip unconditionally, so a player who set tooltips off gets them back
+      inside the panel. Bag cells also carry both a native `title` and the
+      custom tooltip, so hovering fires two.
+- [ ] 257px of residual scroll in the character panel at 1366×768. The cause is
+      the `78vh` cap on `.equipment-slots`/`.inventory-bag` — a dashboard-modal
+      number applied to a HUD mount that has ~494px. Real fix is
+      `.equipment-slot` sizing or a markup change.
+- [ ] `account_anchor.html` has no `is_authenticated` guard (the navbar dropdown
+      it was lifted from did). Unreachable today — `/adventure` is
+      `@login_required` — and live the moment `chrome="minimal"` reaches an
+      ungated route, which the combat screen is expected to want.
+- [ ] Four decorative icons in the character panel still carry Bootstrap's
+      `text-danger`/`text-warning` rather than tokens.
+
+### Hygiene
+
+- [ ] Flashed messages are dropped under `chrome="minimal"` — nothing flashes
+      into `/adventure` today, so a message queued elsewhere surfaces on an
+      unrelated later page instead of being lost visibly.
+- [ ] `<main class="chrome-minimal">` has no CSS anywhere — dead hook or
+      missing rule.
+- [ ] `sql/README.md`'s Files section omits eight `.sql` files that do exist.
+- [ ] `dashboard_helpers.render_dashboard` imports inside a per-character loop
+      (`:82,88`) — same shape as the one fixed in `build_party_payload`.
+- [ ] Dev-database throwaway accounts from Playwright verification runs; 11
+      removed, more will accumulate. Worth a cleanup helper rather than manual
+      FK-walking each time.
+- [ ] **No JS test tooling** — no jest, no vitest, no `package.json`. A large
+      share of the UI is vanilla JS and nothing automated covers it;
+      `e2e/test_smoke.py` is the only browser-level net. This is how the dungeon
+      silently lost potion consumption during the paper-doll port.
 
 ## Gameplay — waiting on playtest verdicts
 - [ ] Tune `EVENT_TUNING` (app/dungeon/room_events.py): shrine/trap/ambush
@@ -99,10 +201,10 @@ Full triage with code pointers:
 - [x] ~~Remove dead `glass-theme.css` purple body-class rules~~ — already
       gone (removed in an earlier cleanup; the file's remaining rules are
       live on combat/admin/account pages).
-- [x] ~~Dedupe `equipment.js` vs `equipment-enhanced.js`~~ — shared logic
-      (encumbrance classification, affix totaling) extracted to
-      `equipment-shared.js`; both files are live (adventure vs dashboard)
-      and keep their own DOM templates.
+- [x] ~~Dedupe `equipment.js` vs `equipment-enhanced.js`~~ — superseded and
+      finished: all three files (including `equipment-shared.js`, which existed
+      only to stop the two drifting) are deleted in favour of one
+      `equipment-panel.js`. See the character-panel entry above.
 - [ ] `.pre-commit-config.yaml`'s `optimize_svgs` hook never runs: its
       `files: '\\.(svg)$'` regex is the same doubled-backslash bug class
       documented in pyproject.toml's black include. Fixing the regex will

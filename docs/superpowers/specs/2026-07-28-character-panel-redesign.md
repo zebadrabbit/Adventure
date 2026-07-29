@@ -26,7 +26,8 @@ Two paper-doll implementations, both live:
 | `equipment-shared.js` | 66 | both (extracted common logic) |
 
 `equipment-enhanced.js` is the richer one — drag-and-drop, eight slots, item
-comparison, set bonuses. `equipment.js` is the simpler panel. The dashboard
+comparison. (Its header comment also advertises set bonuses; see the correction
+below — they were never implemented.) `equipment.js` is the simpler panel. The dashboard
 loads *both*: `equipment.js:222` delegates `.btn-equip-panel` clicks to
 `window.equipmentManager` when it exists, while `equipment-enhanced.js:123`
 also binds its own document-level listener for the same class, so one click
@@ -168,8 +169,14 @@ One set of slot, doll, bag, encumbrance and comparison code; two thin wrappers.
 `equipment-shared.js` folds in — it exists solely to stop two implementations
 drifting, and there will be one.
 
-Everything `equipment-enhanced.js` can do — drag-and-drop, comparison tooltips,
-set bonuses — reaches the dungeon for the first time.
+Everything `equipment-enhanced.js` can do — drag-and-drop, comparison tooltips
+— reaches the dungeon for the first time.
+
+**Correction (2026-07-29):** an earlier draft of this line, and
+`equipment-enhanced.js`'s own header comment, also claimed set bonuses. They do
+not exist: `equipment.css` carried `.set-bonus-*` rules that no JavaScript has
+ever emitted. The dead CSS was deleted during the consolidation. If set bonuses
+are wanted they are a feature to build, not one to carry across.
 
 ### The party rail is the character selector
 

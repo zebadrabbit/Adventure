@@ -86,6 +86,28 @@ Note the combat screen is also due a redesign (see the HUD layout spec) — the
 panel should be designed to live inside that, not bolted onto the current
 layout.
 
+### What the paper-doll chunk already built (2026-07-29)
+
+This spec predates the panel consolidation, and three of its assumptions have
+moved:
+
+- **There is one inventory renderer now**, `equipment-panel.js`, mounting into
+  any container it is handed (a modal on the dashboard, a HUD panel on
+  `/adventure`). A combat item panel is a third mount, not a fourth
+  implementation. `equipment.js` and `equipment-enhanced.js` are gone.
+- **Its bag grid already resolves an item's verb from its type** — potions POST
+  `/consume`, equippables POST `/equip` — with a tooltip action line, `title`,
+  `role="button"`, `tabindex="0"`, Enter/Space activation and an `e.repeat`
+  guard. Combat use is the same shape against a different endpoint, so "grouped
+  by effect, disabled at zero, keyboard-reachable" is largely a restyle of a
+  working control rather than new interaction work.
+- **`inventory_api.consume_item` is now reachable from the dungeon**, so the
+  "collapse both precedents into one resolver" note above has a live second
+  caller and is worth more than when it was written.
+
+The action-economy rule still holds: `player_use_item` sets `phase = "end"` and
+progresses the turn, so item use already costs an action.
+
 ## Scope
 
 Deliberately not included: throwables, scrolls with combat effects, and using an
