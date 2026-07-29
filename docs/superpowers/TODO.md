@@ -85,6 +85,18 @@ misbehave today.
 
 ### Live defects
 
+- [ ] **Every combat loot drop is granted twice.** `loot_service.roll_loot`
+      returns the same drops under two keys — `items` (a quantity map) and
+      `items_list` (a flat list, "for legacy compatibility",
+      `loot_service.py:182`) — and `_check_end` iterates **both**, in two
+      independent `if`s (`combat_service.py:975-984` and `:985-987`). Confirmed
+      empirically: a single drop lands at `qty: 2`. `treasure.py:130` does it
+      correctly with an `or`, so combat is the only doubling site.
+      Pre-existing and long-standing, which is why it is flagged rather than
+      quietly fixed — halving every combat item drop is a loot-economy
+      decision, not a bug fix, and neither behaviour has test coverage.
+      Note the `items_list` loop and the `items`-as-list branch have no
+      integration test of their own, so a regression in either would be silent.
 - [ ] **`unequip_item` destroys a malformed gear value.** The legacy branch
       (`inventory_api.py:577-581`) calls `add_item(inv, <dict>, 1)`, producing
       `{"slug": {...}, "qty": 1}`, which `load_inventory` then discards because
