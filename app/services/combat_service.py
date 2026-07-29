@@ -954,7 +954,7 @@ def _check_end(session: CombatSession):
                         xp_map[str(m.get("char_id") or m.get("id"))] = share
                     except Exception:
                         logger.debug("suppressed_exception", where="_check_end", exc_info=True)
-            if rewards.get("items") and char_rows:
+            if (rewards.get("items") or rewards.get("items_list")) and char_rows:
                 first = next(iter(char_rows.values()))
                 inv_items: list = []
                 if first.items:
@@ -972,6 +972,15 @@ def _check_end(session: CombatSession):
                 # parser and invisible to load_inventory: in the item panel and
                 # drinkable mid-fight, absent from the bag grid and the
                 # dashboard, and destroyed by the next load/dump round-trip.
+                # Exactly one of these branches may run. roll_loot returns the
+                # same drops twice -- `items` as a quantity map and `items_list`
+                # as a flat mirror "for legacy compatibility"
+                # (loot_service.py:182) -- and this used to read both, in two
+                # independent `if`s, so every real combat drop was granted
+                # twice: one potion landed at qty 2, two at qty 4. The outer
+                # guard also required `items`, so `items_list` could never
+                # actually serve as the fallback it exists to be; it was
+                # reachable only as a duplicate.
                 if isinstance(rewards.get("items"), dict):
                     for slug, qty in rewards.get("items", {}).items():
                         try:
@@ -982,7 +991,7 @@ def _check_end(session: CombatSession):
                 elif isinstance(rewards.get("items"), list):
                     for slug in rewards.get("items", []):
                         _grant_slug_to_inventory(inv_items, slug)
-                if isinstance(rewards.get("items_list"), list):
+                elif isinstance(rewards.get("items_list"), list):
                     for slug in rewards.get("items_list"):
                         _grant_slug_to_inventory(inv_items, slug)
                 first.items = json.dumps(inv_items)

@@ -206,3 +206,92 @@ def test_reward_dropped_into_a_legacy_bag_survives(client, monkeypatch):
     bag = load_inventory(char.items)
     assert {"slug": REWARD_SLUG, "qty": 1} in bag
     assert {"slug": "potion-healing", "qty": 1} in bag
+
+
+# --------------------------------------------------------------------------
+# The count, against roll_loot's real return shape.
+# --------------------------------------------------------------------------
+
+
+def test_a_single_drop_is_granted_once(client, monkeypatch):
+    """roll_loot returns the same drops twice, and _check_end granted both.
+
+    ``roll_loot`` collapses its ``drops`` list into a quantity map and returns
+    *both* (``loot_service.py:182``) -- ``items`` for the count and
+    ``items_list`` as a flat mirror, kept for legacy callers. _check_end used to
+    iterate them in two independent ``if``s, so every real combat drop was
+    granted twice and a single potion landed at ``qty: 2``.
+
+    This test feeds the genuine dual shape rather than the trimmed one the
+    shape tests above use, so it fails if either branch is ever made
+    unconditional again.
+    """
+    user, char = _fresh_user_and_char([])
+    char_id = char.id
+
+    if not Item.query.filter_by(slug=REWARD_SLUG).first():
+        db.session.add(Item(slug=REWARD_SLUG, name="Standard Healing Potion", type="potion", value_copper=10))
+        db.session.commit()
+    monkeypatch.setattr(random, "randint", lambda a, b: 1)
+    session = combat_service.start_session(user.id, _monster())
+    monkeypatch.setattr(
+        combat_service,
+        "roll_loot",
+        lambda monster, *a, **kw: {"items": {REWARD_SLUG: 1}, "items_list": [REWARD_SLUG], "gear": []},
+    )
+    session.monster_hp = 0
+    combat_service._check_end(session)
+    db.session.commit()
+
+    bag = load_inventory(db.session.get(Character, char_id).items)
+    assert bag == [{"slug": REWARD_SLUG, "qty": 1}], f"one drop must grant one item, got {bag}"
+
+
+def test_two_of_the_same_drop_are_granted_twice(client, monkeypatch):
+    """The guard against over-correcting: a genuine qty of 2 must stay 2."""
+    user, char = _fresh_user_and_char([])
+    char_id = char.id
+
+    if not Item.query.filter_by(slug=REWARD_SLUG).first():
+        db.session.add(Item(slug=REWARD_SLUG, name="Standard Healing Potion", type="potion", value_copper=10))
+        db.session.commit()
+    monkeypatch.setattr(random, "randint", lambda a, b: 1)
+    session = combat_service.start_session(user.id, _monster())
+    monkeypatch.setattr(
+        combat_service,
+        "roll_loot",
+        lambda monster, *a, **kw: {
+            "items": {REWARD_SLUG: 2},
+            "items_list": [REWARD_SLUG, REWARD_SLUG],
+            "gear": [],
+        },
+    )
+    session.monster_hp = 0
+    combat_service._check_end(session)
+    db.session.commit()
+
+    bag = load_inventory(db.session.get(Character, char_id).items)
+    assert bag == [{"slug": REWARD_SLUG, "qty": 2}], f"two drops must grant two items, got {bag}"
+
+
+def test_a_caller_supplying_only_the_flat_list_still_grants(client, monkeypatch):
+    """items_list must remain a working fallback, not dead code."""
+    user, char = _fresh_user_and_char([])
+    char_id = char.id
+
+    if not Item.query.filter_by(slug=REWARD_SLUG).first():
+        db.session.add(Item(slug=REWARD_SLUG, name="Standard Healing Potion", type="potion", value_copper=10))
+        db.session.commit()
+    monkeypatch.setattr(random, "randint", lambda a, b: 1)
+    session = combat_service.start_session(user.id, _monster())
+    monkeypatch.setattr(
+        combat_service,
+        "roll_loot",
+        lambda monster, *a, **kw: {"items_list": [REWARD_SLUG], "gear": []},
+    )
+    session.monster_hp = 0
+    combat_service._check_end(session)
+    db.session.commit()
+
+    bag = load_inventory(db.session.get(Character, char_id).items)
+    assert bag == [{"slug": REWARD_SLUG, "qty": 1}], f"the flat-list fallback must still grant, got {bag}"
