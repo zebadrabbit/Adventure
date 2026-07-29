@@ -43,8 +43,12 @@
     function encumbranceView(enc) {
         if (!enc || typeof enc.weight !== "number" || typeof enc.capacity !== "number") return null;
         const pct = enc.capacity > 0 ? Math.min(100, (enc.weight / enc.capacity) * 100) : 0;
-        const barClass = enc.status === "blocked" ? "bg-danger" : (enc.status === "encumbered" ? "bg-warning" : "bg-success");
-        const textClass = enc.status === "blocked" ? "text-danger" : (enc.status === "encumbered" ? "text-warning" : "");
+        // Token-backed classes from equipment.css, not Bootstrap's bg-*/text-*.
+        // The HP/MP/XP bars a few centimetres away are realm-aware (--hp/--mp/
+        // --xp); an encumbrance bar painted from Bootstrap's fixed palette was
+        // the one element inside this panel that ignored the realm.
+        const barClass = enc.status === "blocked" ? "eq-enc-blocked" : (enc.status === "encumbered" ? "eq-enc-encumbered" : "eq-enc-normal");
+        const textClass = enc.status === "blocked" ? "eq-enc-text-blocked" : (enc.status === "encumbered" ? "eq-enc-text-encumbered" : "");
         const statusLabel = enc.status === "blocked"
             ? "Overloaded — cannot carry more"
             : (enc.status === "encumbered" ? "Encumbered" : "");
@@ -86,16 +90,29 @@
     // (Same markup equipment-enhanced.js used to build its modal from, minus
     // the outer .modal/.modal-dialog wrapper -- that part is dashboard-only
     // chrome, created by _ensureDashboardMount() below.)
+    //
+    // The three wrappers are .eq-panel-* and not Bootstrap's .modal-header/
+    // -body/-footer. Bootstrap 5.3 declares --bs-modal-padding and friends on
+    // .modal itself and its chrome rules read them through var(); on the HUD
+    // mount (#adv-character-panel) there is no .modal ancestor, so those
+    // var()s were unresolvable, the padding declarations were invalid at
+    // computed-value time, and every one of them fell back to 0 -- the title
+    // and the X sat flush against the panel border and the grid had no outer
+    // gutter, while the identical markup on /dashboard had 1rem. Owning the
+    // three classes in equipment.css removes the undeclared dependency
+    // instead of patching around it, and makes both mounts render the same.
+    // .modal-* survives only on the dashboard's own wrapper (see
+    // _ensureDashboardMount), which really does live inside a .modal.
 
     const SKELETON_HTML = `
-<div class="modal-header eq-modal-header">
-    <h5 class="modal-title">
+<div class="eq-panel-header">
+    <h5 class="eq-panel-title">
         <i class="bi bi-person-gear me-2"></i>
         <span id="eq-char-name">Character</span> - Equipment & Inventory
     </h5>
     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" data-action="close"></button>
 </div>
-<div class="modal-body">
+<div class="eq-panel-body">
     <div class="equipment-grid">
         <!-- Left: Equipment Slots -->
         <div class="equipment-slots">
@@ -172,7 +189,7 @@
         </div>
     </div>
 </div>
-<div class="modal-footer eq-modal-footer">
+<div class="eq-panel-footer">
     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-action="close">Close</button>
 </div>`;
 
@@ -227,21 +244,77 @@
             // call captures the generation counter as it starts and bails
             // before rendering if a newer call has since begun.
             //
-            // The fetch is captured into a local (fetchCharacter) rather than
-            // going through loadCharacter, which assigns straight into
-            // this.character. Assigning there unconditionally, before the
-            // gate, would still let a stale response win: the DOM would show
-            // the fast character but this.character -- what every later
-            // click reads (bag lookups, the id in the equip/unequip POST) --
+            // The fetch is captured into a local and assigned only after the
+            // gate. Assigning unconditionally as the response lands would
+            // still let a stale one win: the DOM would show the fast
+            // character but this.character -- what every later click reads
+            // (bag lookups, the id in the equip/unequip/consume POST) --
             // would silently belong to the stale one. The gate has to guard
-            // the model, not just the repaint.
+            // the model, not just the repaint. Every other async
+            // fetch-then-render path in this class does the same thing via
+            // _reloadAndRender(); open() spells it out because it has extra
+            // work to gate (the slot vocabulary, _openCharId, _reveal).
             const gen = ++this._openGen;
-            const [characterData] = await Promise.all([this.fetchCharacter(charId), this._ensureSlots()]);
-            if (gen !== this._openGen) return;
-            this.character = characterData;
-            this.render();
-            this._openCharId = charId;
-            this._reveal();
+            let painted = false;
+            try {
+                const [characterData] = await Promise.all([this.fetchCharacter(charId), this._ensureSlots()]);
+                if (gen !== this._openGen) return;
+                this.character = characterData;
+                this.render();
+                this._openCharId = charId;
+                this._reveal();
+                painted = true;
+            } finally {
+                this._releaseGeneration(gen, painted);
+            }
+        }
+
+        /**
+         * Hand the generation counter back if this call never painted.
+         *
+         * fetchCharacter() rejects on any non-ok response (and on a dropped
+         * connection), and the bump happens before the request. Without this,
+         * a failed open/refresh/equip/unequip/consume would leave the counter
+         * raised forever, so an *older* call still in flight -- one that is
+         * about to resolve with perfectly good data -- fails its own gate and
+         * silently cancels itself, leaving the panel showing nothing or stale
+         * contents with no error and no repaint. Only rolled back when
+         * nothing newer has claimed the counter since; if it has, that newer
+         * call owns the paint and must not be cancelled by our cleanup.
+         */
+        _releaseGeneration(gen, painted) {
+            if (!painted && gen === this._openGen) this._openGen = gen - 1;
+        }
+
+        /**
+         * Re-fetch `charId` and repaint, under the same generation guard
+         * open() uses.
+         *
+         * This is the one rule for every async fetch-then-render path in the
+         * panel -- open(), refresh(), equipItem(), unequipItem() and
+         * consumeItem() all go through it or repeat it exactly. The mutation
+         * paths used to call loadCharacter(), which assigned this.character
+         * with no gate at all: drop an item on character A's slot, click
+         * frame B while the POST is in flight, and A's reload lands after
+         * open(B) has already painted B and set _openCharId = B -- repainting
+         * A over B while _openCharId still says B. Guarding the model matters
+         * as much as guarding the repaint, because this.character is what
+         * every later click reads (bag lookups, the id in the next POST), so
+         * a stale response winning there is a wrong-character mutation and
+         * not merely a wrong-character picture.
+         */
+        async _reloadAndRender(charId) {
+            const gen = ++this._openGen;
+            let painted = false;
+            try {
+                const characterData = await this.fetchCharacter(charId);
+                if (gen !== this._openGen) return;
+                this.character = characterData;
+                this.render();
+                painted = true;
+            } finally {
+                this._releaseGeneration(gen, painted);
+            }
         }
 
         close() {
@@ -277,12 +350,7 @@
             // incoming open() already painted B, it would repaint the panel
             // back to A with no open() call involved. Guarding this fetch
             // the same way open() guards its own closes that path.
-            const gen = ++this._openGen;
-            const charId = this._openCharId;
-            const characterData = await this.fetchCharacter(charId);
-            if (gen !== this._openGen) return;
-            this.character = characterData;
-            this.render();
+            await this._reloadAndRender(this._openCharId);
         }
 
         // ---- dashboard self-bootstrap ----
@@ -370,10 +438,6 @@
             const response = await fetch(`/api/characters/${charId}`);
             if (!response.ok) throw new Error("Failed to load character");
             return response.json();
-        }
-
-        async loadCharacter(charId) {
-            this.character = await this.fetchCharacter(charId);
         }
 
         // ---- rendering ----
@@ -510,7 +574,14 @@
             const totalSlots = Math.max(20, bag.length + 4);
             this.root.querySelector("#bag-count").textContent = `${bag.length} / ${totalSlots}`;
 
-            // Build grid cells
+            // Build grid cells.
+            //
+            // Every filled cell is role="button" + tabindex="0" with a
+            // keydown handler, not a bare <div> with a click listener. The
+            // grid is where equipping happens -- the thing this panel exists
+            // for -- and until now it could only be reached with a mouse, on
+            // a screen whose hotkey suppression was written specifically to
+            // protect the keyboard affordances inside this panel.
             const cells = [];
             bag.forEach((item, index) => {
                 const rarityClass = `rarity-${item.rarity || "common"}`;
@@ -519,28 +590,50 @@
                 const qtyBadge = (item.qty && item.qty > 1)
                     ? `<span class="cell-qty">${item.qty}</span>`
                     : "";
+                const drinkable = this.isConsumable(item);
+                // draggable only for things that can actually land in a slot:
+                // dragging a potion onto one asked the server to equip it and
+                // earned a 400.
+                const draggable = drinkable ? "false" : "true";
+                const verb = drinkable ? "drink" : "equip";
 
                 cells.push(`
-<div class="bag-grid-cell ${rarityClass}" draggable="true"
+<div class="bag-grid-cell ${rarityClass}" draggable="${draggable}"
+     role="button" tabindex="0"
      data-item-index="${index}"
+     data-consumable="${drinkable ? "true" : "false"}"
      data-item-slug="${this.escapeHTML(item.slug || "")}"
      data-item-uid="${this.escapeHTML(item.uid || "")}"
-     title="${this.escapeHTML(item.name)}">
+     aria-label="${this.escapeHTML(`${verb === "drink" ? "Drink" : "Equip"} ${item.name}`)}"
+     title="${this.escapeHTML(`${item.name} — click to ${verb}`)}">
     ${icon}
     ${qtyBadge}
 </div>`);
             });
 
-            // Empty cells
+            // Empty cells -- decoration for the grid's shape, nothing to
+            // land on and nothing to announce.
             for (let i = bag.length; i < totalSlots; i++) {
-                cells.push(`<div class="bag-grid-cell empty"></div>`);
+                cells.push(`<div class="bag-grid-cell empty" aria-hidden="true"></div>`);
             }
 
             this.root.querySelector("#inventory-items-list").innerHTML =
                 `<div class="bag-grid">${cells.join("")}</div>`;
 
-            // Attach drag + tooltip handlers
-            this.attachItemDragHandlers();
+            // Attach drag + keyboard + tooltip handlers
+            this.attachBagCellHandlers();
+        }
+
+        /**
+         * Whether this bag entry is drunk rather than worn.
+         *
+         * Potions are the only thing /consume accepts (inventory_api.py's
+         * consume_item rejects any other type), and a procedural gear
+         * instance -- which carries a uid -- is never one.
+         */
+        isConsumable(item) {
+            if (!item || item.uid) return false;
+            return String(item.type || "").toLowerCase() === "potion";
         }
 
         // ---- delegated + per-element listeners ----
@@ -587,21 +680,63 @@
             });
         }
 
-        attachItemDragHandlers() {
-            this.root.querySelectorAll('.bag-grid-cell[draggable="true"]').forEach((cell) => {
+        attachBagCellHandlers() {
+            // Every filled cell, not just the draggable ones: potions are
+            // deliberately not draggable (there is no slot to drop one in)
+            // and still need the click, the keyboard and the tooltip.
+            this.root.querySelectorAll(".bag-grid-cell[data-item-index]").forEach((cell) => {
                 cell.addEventListener("dragstart", (e) => this.onItemDragStart(e));
                 cell.addEventListener("dragend", (e) => this.onItemDragEnd(e));
                 cell.addEventListener("mouseenter", (e) => this.showComparisonTooltip(e));
                 cell.addEventListener("mouseleave", () => this.hideComparisonTooltip());
-                // Click to equip -- auto-detects slot from item type
-                cell.addEventListener("click", () => {
-                    const idx = parseInt(cell.dataset.itemIndex, 10);
-                    const item = this.character.bag[idx];
-                    if (!item) return;
-                    const slot = this.getSlotForItemType(item.type || item.slot || "");
-                    this.equipItem(item, slot);
+                // Focus gets the same tooltip hover does -- it is where the
+                // "click to equip"/"click to drink" line lives, so without
+                // this a keyboard user has the affordance but not the notice
+                // that it is there.
+                cell.addEventListener("focus", (e) => this.showComparisonTooltip(e));
+                cell.addEventListener("blur", () => this.hideComparisonTooltip());
+                cell.addEventListener("click", () => this.activateBagCell(cell, false));
+                cell.addEventListener("keydown", (e) => {
+                    if (e.key !== "Enter" && e.key !== " " && e.key !== "Spacebar") return;
+                    // Space would otherwise scroll the panel, and both keys
+                    // would carry on to adventure-controls.js's document-level
+                    // hotkey handler.
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.activateBagCell(cell, true);
                 });
             });
+        }
+
+        /**
+         * Do the one thing this cell's item is for: drink it, or wear it.
+         *
+         * Potions route to /consume; everything else to /equip. Splitting on
+         * the item rather than adding a second control per cell keeps the
+         * 48px cell a single target -- and the tooltip, the title attribute
+         * and the aria-label all name the verb before the player commits, so
+         * which of the two will happen is never a guess.
+         */
+        async activateBagCell(cell, fromKeyboard) {
+            const idx = parseInt(cell.dataset.itemIndex, 10);
+            const item = this.character.bag[idx];
+            if (!item) return;
+
+            if (this.isConsumable(item)) {
+                await this.consumeItem(item);
+            } else {
+                await this.equipItem(item, this.getSlotForItemType(item.type || item.slot || ""));
+            }
+
+            if (!fromKeyboard) return;
+            // The repaint above rebuilds the whole grid, so the cell the
+            // player was standing on no longer exists and focus has dropped
+            // to <body>. Put it back on the same position -- or the last
+            // cell, if the bag just got shorter -- so using one item doesn't
+            // end the keyboard run through the bag.
+            const cells = this.root.querySelectorAll(".bag-grid-cell[data-item-index]");
+            if (!cells.length) return;
+            cells[Math.min(idx, cells.length - 1)].focus();
         }
 
         onItemDragStart(e) {
@@ -638,6 +773,11 @@
         }
 
         async equipItem(item, slot) {
+            // Read once, before the POST. this.character can be swapped out
+            // from under us by an open() landing while the request is in
+            // flight, and the reload afterwards must reload the character we
+            // actually mutated, not whichever one the panel drifted to.
+            const charId = this.character.id;
             // Procedural gear instances carry a `uid` and self-describe their
             // slot; equip them by uid. Legacy catalog items equip by slug +
             // target slot.
@@ -645,41 +785,89 @@
             const body = isInstance
                 ? { uid: item.uid }
                 : { slug: (typeof item === "object" ? item.slug : item), slot: slot };
-            const response = await fetch(`/api/characters/${this.character.id}/equip`, {
+            const response = await fetch(`/api/characters/${charId}/equip`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(body),
             });
 
             if (response.ok) {
-                await this.loadCharacter(this.character.id);
-                this.render();
+                await this._reloadAndRender(charId);
             } else {
                 const d = await response.json().catch(() => ({}));
-                this.toast(d.error || "Could not equip item", false);
+                this.toast(this.refusalText(d, "Could not equip that."), false);
             }
         }
 
-        toast(msg, ok = true) {
-            const el = document.createElement("div");
-            el.className = `alert alert-${ok ? "success" : "warning"} alert-dismissible fade show position-fixed top-0 end-0 m-3`;
-            el.style.zIndex = "10000";
-            el.innerHTML = `${this.escapeHTML(msg)}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
-            document.body.appendChild(el);
-            setTimeout(() => el.remove(), 3000);
-        }
-
         async unequipItem(slot) {
-            const response = await fetch(`/api/characters/${this.character.id}/unequip`, {
+            const charId = this.character.id;
+            const response = await fetch(`/api/characters/${charId}/unequip`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ slot: slot }),
             });
 
             if (response.ok) {
-                await this.loadCharacter(this.character.id);
-                this.render();
+                await this._reloadAndRender(charId);
+            } else {
+                // Previously absent entirely, which made a refused unequip --
+                // an armour slot locked mid-fight, most commonly -- a button
+                // that did nothing at all with no explanation.
+                const d = await response.json().catch(() => ({}));
+                this.toast(this.refusalText(d, "Could not remove that."), false);
             }
+        }
+
+        /**
+         * Drink a potion out of combat.
+         *
+         * The panel this one replaced rendered a `Use` button on every potion
+         * in the bag and posted it here; the replacement never had one, so
+         * out-of-combat healing (and regen potions, which are out-of-combat
+         * only by design) had no route into the game at all -- clicking a
+         * potion tried to *equip* it and earned a 400. Combat potions were
+         * never affected; they go through combat.js.
+         */
+        async consumeItem(item) {
+            const charId = this.character.id;
+            const response = await fetch(`/api/characters/${charId}/consume`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ slug: item.slug }),
+            });
+
+            if (response.ok) {
+                this.toast(`${item.name} — drained to the last drop.`, true);
+                // No mud-characters-state-invalidated dispatch: this panel is
+                // that event's only listener, so firing it here would just
+                // queue a second, identical fetch behind the reload below.
+                await this._reloadAndRender(charId);
+            } else {
+                const d = await response.json().catch(() => ({}));
+                this.toast(this.refusalText(d, "Nothing happens."), false);
+            }
+        }
+
+        /**
+         * The human sentence a refusal carries, never the machine code.
+         *
+         * These endpoints answer with `{error: "in_combat", message: "Armour
+         * cannot be changed during a fight..."}`; the panel used to show the
+         * player `in_combat`, or `item not equippable`, which reads as a bug
+         * report rather than a rule of the game. `error` is kept as a second
+         * choice only because a few older branches of the API send it alone.
+         */
+        refusalText(payload, fallback) {
+            const d = payload || {};
+            return d.message || d.error || fallback;
+        }
+
+        toast(msg, ok = true) {
+            const el = document.createElement("div");
+            el.className = `eq-toast alert alert-${ok ? "success" : "warning"} alert-dismissible fade show position-fixed top-0 end-0 m-3`;
+            el.innerHTML = `${this.escapeHTML(msg)}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 3000);
         }
 
         // ---- item comparison tooltip ----
@@ -688,8 +876,13 @@
             const itemIndex = parseInt(e.currentTarget.dataset.itemIndex, 10);
             const item = this.character.bag[itemIndex];
             if (!item) return;
-            const slot = this.getSlotForItemType(item.type || item.slot || "");
-            const equipped = this.character.gear?.[slot];
+            // A consumable has nothing to compare against. getSlotForItemType
+            // falls back to "weapon" for anything outside the canonical eight,
+            // so without this a potion was shown "vs. Equipped" against
+            // whatever the character was holding.
+            const equipped = this.isConsumable(item)
+                ? null
+                : this.character.gear?.[this.getSlotForItemType(item.type || item.slot || "")];
 
             this.hideComparisonTooltip();
 
@@ -739,6 +932,16 @@
             if (item.description) {
                 html += `<div class="tooltip-description">${this.escapeHTML(item.description)}</div>`;
             }
+
+            // What activating the cell will actually do. The grid is icons in
+            // 48px squares with no room for a label, so this line is the only
+            // place a player is told that clicking does anything at all --
+            // and, for a potion, that it drinks rather than equips.
+            html += `<div class="tooltip-action-hint">${
+                this.isConsumable(item)
+                    ? "Click or press Enter to drink"
+                    : "Click or press Enter to equip"
+            }</div>`;
 
             tooltip.innerHTML = html;
             return tooltip;

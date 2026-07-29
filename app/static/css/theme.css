@@ -803,10 +803,11 @@ body {
     border-color: #d87070;
 }
 
-/* -primary, -info and -success were used across the app (the adventure
-   action bar among them) and defined nowhere, so they fell back to bare
-   browser buttons. -primary is the screen's principal action, so it is
-   filled solid like the reference .btn-primary in auth.css; -info and
+/* -primary, -info and -success were used but defined nowhere, so they fell
+   back to bare browser buttons. Repo-wide that is exactly three elements,
+   all in adventure.html's action bar: Search (-primary), Party Stash (-info)
+   and Extract (-success). -primary is the screen's principal action, so it
+   is filled solid like the reference .btn-primary in auth.css; -info and
    -success follow -secondary/-danger's wash-and-line outline shape,
    differing only in hue. */
 

@@ -227,9 +227,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (hearthBtn && !hearthBtn.disabled) hearthBtn.click();
             } else if (key === 'i') {
                 // Slots, doll and bag are one panel now (no more standalone
-                // .btn-bag-panel) -- open the first character's.
-                const equipBtn = document.querySelector('.btn-equip-panel');
-                if (equipBtn) equipBtn.click();
+                // .btn-bag-panel). Toggle, not open: this used to click the
+                // *first* .btn-equip-panel unconditionally, so pressing I
+                // while looking at the fourth character's gear silently swapped
+                // the panel to the first character's -- an inventory key that
+                // changes who you are looking at. Closing is what a player
+                // means by pressing the open key again; picking a different
+                // character is what the party rail is for.
+                if (window.EquipmentPanel && window.EquipmentPanel.isOpen()) {
+                    window.EquipmentPanel.close();
+                } else {
+                    const equipBtn = document.querySelector('.btn-equip-panel');
+                    if (equipBtn) equipBtn.click();
+                }
             } else if (key === 'escape') {
                 // Escape closes whichever transient overlay is open. Only one
                 // of the two: the character panel sits above the map and

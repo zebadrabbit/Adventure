@@ -44,8 +44,17 @@
       <div class="mb-1"><kbd>C</kbd> Camp</div>
       <div class="mb-1"><kbd>E</kbd> Extract</div>
       <div class="mb-1"><kbd>H</kbd> Hearth</div>
-      <div class="mb-1"><kbd>I</kbd> Inventory</div>
+      <div class="mb-1"><kbd>I</kbd> Character panel (again to close)</div>
       <div class="mb-1"><kbd>Esc</kbd> Close panels</div>
+      {# The two rules the screen actually enforces while the character panel
+         is open, neither of which was written down: movement closes it
+         (adventure.js's queueMove), and the action keys are held back so
+         nothing is spent blind under it (adventure-controls.js). #}
+      <div class="mt-2 pt-2 border-top text-muted">
+        <div class="mb-1">With the panel open:</div>
+        <div class="mb-1"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move and close it</div>
+        <div class="mb-1"><kbd>Space</kbd><kbd>C</kbd><kbd>E</kbd><kbd>H</kbd> are held until it closes</div>
+      </div>
     </div>
   </div>
 

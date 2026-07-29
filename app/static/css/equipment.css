@@ -15,11 +15,61 @@
     box-shadow: var(--elev-overlay);
 }
 
-.eq-modal-header {
+/* Panel chrome — header, body, footer.
+
+   These three used to be Bootstrap's .modal-header/.modal-body/.modal-footer.
+   Bootstrap 5.3 declares --bs-modal-padding (and the header/footer variants)
+   on `.modal` itself and its chrome rules read them through var(); the HUD
+   mount (#adv-character-panel on /adventure) has no .modal ancestor, so every
+   one of those var()s was unresolvable, the padding declarations were invalid
+   at computed-value time, and padding fell back to 0. The title and the X sat
+   flush against the panel border and the grid had no outer gutter, while the
+   identical markup inside the dashboard's real modal had 1rem — and the day
+   anyone declared --bs-modal-padding at :root the HUD panel would have
+   silently gained ~32px of vertical padding against a height budget that is
+   already tight. Owning the padding here from --space-* removes the
+   dependency rather than restating Bootstrap's numbers, and makes the two
+   mounts render identically, which they always claimed to.
+
+   The layout properties are not decoration: .modal-content is a column flex
+   container, so the header/footer need flex-shrink and the body needs to be
+   the part that grows and scrolls. That is what Bootstrap's own .modal-body
+   and .modal-dialog-scrollable .modal-body rules were doing for the dashboard
+   before the rename. On the HUD mount the parent is not a flex container, so
+   these are inert there and .adv-character's own overflow does the scrolling,
+   exactly as before. */
+.eq-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    gap: var(--space-3);
+    padding: var(--space-4);
     border-bottom: 1px solid var(--edge-subtle);
 }
 
-.eq-modal-footer {
+.eq-panel-title {
+    margin: 0;
+    font-size: 1.25rem;
+    line-height: 1.2;
+    color: var(--ink);
+}
+
+.eq-panel-body {
+    position: relative;
+    flex: 1 1 auto;
+    padding: var(--space-4);
+    overflow-y: auto;
+}
+
+.eq-panel-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    flex-shrink: 0;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
     border-top: 1px solid var(--edge-subtle);
 }
 
@@ -169,12 +219,17 @@
     margin-top: 2px;
 }
 
+/* Reveal-on-hover unequip button. :focus-within is not a nicety here: without
+   it a keyboard user tabs onto a button at opacity 0 — fully transparent,
+   focus ring and all — which is the one affordance the adventure screen's
+   Space-key suppression was written to protect. */
 .slot-action {
     opacity: 0;
     transition: opacity 0.2s;
 }
 
-.equipment-slot:hover .slot-action {
+.equipment-slot:hover .slot-action,
+.equipment-slot:focus-within .slot-action {
     opacity: 1;
 }
 
@@ -289,6 +344,29 @@
     background: var(--xp);
 }
 
+/* Encumbrance — the fourth bar in this column, and until now the only one
+   painted from Bootstrap's fixed palette (bg-success/bg-warning/bg-danger)
+   while the three above it were realm-aware. */
+.eq-enc-normal {
+    background: var(--success);
+}
+
+.eq-enc-encumbered {
+    background: var(--warn);
+}
+
+.eq-enc-blocked {
+    background: var(--danger);
+}
+
+.eq-enc-text-encumbered {
+    color: var(--warn);
+}
+
+.eq-enc-text-blocked {
+    color: var(--danger);
+}
+
 /* Stat grid (2×2) */
 .eq-stat-grid {
     display: grid;
@@ -319,13 +397,17 @@
     color: var(--ink-strong);
 }
 
-/* Inventory Bag */
+/* Inventory Bag — 78vh, the same cap .equipment-slots uses above, for the
+   reason stated there: the two columns must crop at the same point. A flat
+   600px was only equal to 78vh at exactly 768px tall, so above the design
+   floor the two siblings cropped at visibly different heights — the bag
+   frozen at 600px while the slot column kept growing. */
 .inventory-bag {
     background: var(--surface);
     border-radius: var(--radius);
     padding: 1.5rem;
     border: 1px solid var(--edge);
-    max-height: 600px;
+    max-height: 78vh;
     overflow-y: auto;
 }
 
@@ -356,8 +438,26 @@
     transform: scale(1.08);
 }
 
+/* Filled cells are role="button" tabindex="0" (equipment-panel.js): the grid
+   is where equipping and drinking happen, so it has to be reachable without a
+   mouse. No transform on focus — scaling the cell would push its own focus
+   ring under the neighbouring cells. */
+.bag-grid-cell:focus-visible {
+    outline: none;
+    background: var(--surface-hover);
+    box-shadow: var(--focus-ring);
+}
+
 .bag-grid-cell[draggable="true"]:active {
     cursor: grabbing;
+}
+
+/* A potion is drunk, not worn. Its cell's primary action is different from
+   every other cell's, so its cursor says so instead of promising the grab-
+   and-drag that has nowhere to land. What the click will actually do is
+   named in the cell's title, its aria-label, and the hover/focus tooltip. */
+.bag-grid-cell[data-consumable="true"] {
+    cursor: pointer;
 }
 
 .bag-grid-cell.empty {
@@ -436,7 +536,6 @@
 }
 
 .stat-positive { color: var(--success); }
-.stat-negative { color: var(--danger); }
 .stat-neutral  { color: var(--ink-muted); }
 
 .tooltip-comparison {
@@ -476,40 +575,32 @@
     opacity: 0.9;
 }
 
-/* Set Bonus Display — fixed rarity-epic violet in both realms, matching the
-   other item-identity colours (rarity, class): this is about the item, not
-   the realm, so it does not derive from --accent. */
-.set-bonus-indicator {
-    background: color-mix(in srgb, var(--rarity-epic) 14%, transparent);
-    border-left: 3px solid var(--rarity-epic);
-    padding: 0.5rem;
-    margin-top: 0.75rem;
-    border-radius: var(--radius);
-}
-
-.set-bonus-name {
+/* What activating this cell will do. The bag is bare icons in 48px squares,
+   so this is the only place the player is told that clicking one does
+   anything — and, for a potion, that it drinks rather than equips. */
+.tooltip-action-hint {
     font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--rarity-epic);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.set-bonus-progress {
-    font-size: 0.7rem;
+    letter-spacing: 1px;
     color: var(--ink-muted);
-    margin-top: 0.25rem;
+    margin-top: 0.75rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--edge-subtle);
 }
 
-.set-bonus-effect {
-    font-size: 0.75rem;
-    color: var(--ink);
-    margin-top: 0.25rem;
+/* Toasts land on document.body, above the dashboard's Bootstrap modal as well
+   as the HUD panel, so they take the scale's toast layer rather than the
+   hand-picked 10000 this file's JS used to set inline. */
+.eq-toast {
+    z-index: var(--z-toast);
 }
 
-.set-bonus-active {
-    color: var(--success);
-}
+/* The .set-bonus-* rules that stood here were deleted: no JavaScript in this
+   repo has ever emitted .set-bonus-indicator, -name, -progress, -effect or
+   -active, on this branch or before it. Set bonuses are not a feature the
+   game has; styling one does not create it, and the spec's claim that "set
+   bonuses reach the dungeon for the first time" was describing this dead CSS.
+   Deleted with it: .stat-bonus and .stat-negative, also emitted by nothing. */
 
 /* Durability Indicator — a sunken track + flat fill, same shape as the
    HP/MP/XP bars above. */
@@ -550,10 +641,4 @@
     font-size: 0.85rem;
     font-weight: 600;
     color: var(--ink-strong);
-}
-
-.stat-bonus {
-    color: var(--success);
-    font-size: 0.75rem;
-    margin-left: 0.25rem;
 }

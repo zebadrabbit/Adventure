@@ -655,23 +655,39 @@
     }
 }
 
-/* ========== Rarity Colors ========== */
-.rarity-common {
-    border-color: #95a5a6 !important;
+/* ========== Rarity Colors ==========
+   Scoped to the shared-stash card, which is the only thing on this page that
+   wants a rarity-coloured border. The block that stood here was unscoped
+   `.rarity-* { border-color: #hex !important }` — five hard-coded hues, no
+   mythic, and `!important`. Because this file loads after equipment.css (see
+   dashboard_base.html), and /adventure inherits that head, it beat the
+   token-backed .bag-grid-cell.rarity-* rules on *both* screens: five of the
+   six tiers in the equipment panel rendered from these literals and only
+   mythic, which had no entry here, used its token. The ramp read as
+   incoherent because it was two ramps.
+
+   Tokens, not literals, and all six tiers: rarity is fixed across realms
+   precisely so a player can learn that purple means epic. */
+.shared-item-card.rarity-common {
+    border-color: var(--rarity-common);
 }
 
-.rarity-uncommon {
-    border-color: #2ecc71 !important;
+.shared-item-card.rarity-uncommon {
+    border-color: var(--rarity-uncommon);
 }
 
-.rarity-rare {
-    border-color: #3498db !important;
+.shared-item-card.rarity-rare {
+    border-color: var(--rarity-rare);
 }
 
-.rarity-epic {
-    border-color: #9b59b6 !important;
+.shared-item-card.rarity-epic {
+    border-color: var(--rarity-epic);
 }
 
-.rarity-legendary {
-    border-color: #f39c12 !important;
+.shared-item-card.rarity-legendary {
+    border-color: var(--rarity-legendary);
+}
+
+.shared-item-card.rarity-mythic {
+    border-color: var(--rarity-mythic);
 }
