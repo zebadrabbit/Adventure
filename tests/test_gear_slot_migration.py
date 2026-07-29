@@ -8,6 +8,15 @@ so the displacement rules are checked directly. The rules:
   legs  -> always back to the bag (no canonical legs slot)
   a legacy item loses to an already-occupied canonical slot and goes to the bag
 
+ring1 beats ring2 for the ring slot regardless of which key comes first in the
+row's own JSON -- the tie is broken by SLOT_MAP's table order, not incidental
+key order. A displaced slug is appended in whatever shape the target items
+list already uses (bare string vs {"slug", "qty"} dict), since load_inventory
+infers the whole list's shape from its first entry and a mismatched shape
+would make the item invisible on the next load. A displaced gear instance
+that would need a bare-string items list to grow a dict entry is not bagged
+at all -- the whole row is left untouched rather than dropping the item.
+
 Nothing is ever destroyed.
 
 Spec: docs/superpowers/specs/2026-07-28-character-panel-redesign.md
@@ -69,6 +78,14 @@ def test_second_ring_goes_to_the_bag(remap):
     assert _slugs(items) == {"silver-band": 1}
 
 
+def test_ring1_wins_regardless_of_key_order(remap):
+    """The tie-break is SLOT_MAP's table order, not the row's JSON key order."""
+    gear, items = remap({"ring2": "silver-band", "ring1": "gold-band"}, [])
+
+    assert gear == {"ring": "gold-band"}
+    assert _slugs(items) == {"silver-band": 1}
+
+
 def test_legs_always_goes_to_the_bag(remap):
     gear, items = remap({"legs": "plate-leggings", "chest": "plate-mail"}, [])
 
@@ -99,6 +116,36 @@ def test_gear_instances_survive_displacement_as_dicts(remap):
 
     assert gear == {"hands": instance}
     assert _slugs(items) == {"leather-gloves": 1}
+
+
+def test_displaced_slug_matches_a_bare_string_items_shape(remap):
+    """load_inventory infers the whole list's format from entry 0.
+
+    Appending a {"slug", "qty"} dict to a list that starts with a bare string
+    would make that dict invisible to load_inventory's legacy aggregate
+    branch, so the displaced slug must be appended as a bare string too.
+    """
+    gear, items = remap({"legs": "plate-leggings"}, ["potion-a", "potion-a"])
+
+    assert gear == {}
+    assert items == ["potion-a", "potion-a", "plate-leggings"]
+
+
+def test_gear_instance_into_bare_string_items_leaves_the_row_untouched(remap):
+    """No lossless bare-string representation exists for a gear instance.
+
+    Rather than drop it, the whole row is left exactly as it came in.
+    """
+    instance = {"uid": "abc123", "slot": "chest", "name": "Old Armor", "affixes": []}
+    gear_in = {"armor": instance, "chest": "plate-mail"}
+    items_in = ["potion-a"]
+
+    gear, items = remap(gear_in, items_in)
+
+    assert gear == gear_in
+    assert gear is not gear_in
+    assert items == items_in
+    assert items is not items_in
 
 
 def test_empty_and_null_slots_are_dropped(remap):

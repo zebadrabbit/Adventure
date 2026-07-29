@@ -52,7 +52,7 @@ export TEST_DATABASE_URL=postgresql://adventure:changeme@localhost:5433/adventur
 |---|---|---|
 | `app/services/auto_equip.py` | modify | Starter gear picks a canonical slot |
 | `app/routes/inventory_api.py` | modify | `_SLOTS` single-sourced; `_slot_for_item` returns canonical names |
-| `migrations/versions/a1b2c3d4e5f6_unify_gear_slots.py` | **create** | Rewriting existing `Character.gear` rows |
+| `migrations/versions/c9405725c1f4_unify_gear_slots.py` | **create** | Rewriting existing `Character.gear` rows |
 | `tests/test_gear_slot_vocabulary.py` | **create** | That one vocabulary exists and every producer honours it |
 | `tests/test_gear_slot_migration.py` | **create** | The mapping table, including the displacement rules |
 | `tests/test_autofill_gear.py` | modify | Existing assertion names the `armor` slot |
@@ -337,7 +337,7 @@ archetypes.SLOTS and inference returns canonical names."
 Rewrite every character's `gear` JSON. Anything displaced goes back to `items` — no item is destroyed.
 
 **Files:**
-- Create: `migrations/versions/a1b2c3d4e5f6_unify_gear_slots.py`
+- Create: `migrations/versions/c9405725c1f4_unify_gear_slots.py`
 - Test: `tests/test_gear_slot_migration.py`
 
 **Interfaces:**
@@ -373,7 +373,7 @@ REVISION = (
     pathlib.Path(__file__).resolve().parents[1]
     / "migrations"
     / "versions"
-    / "a1b2c3d4e5f6_unify_gear_slots.py"
+    / "c9405725c1f4_unify_gear_slots.py"
 )
 
 
@@ -492,12 +492,12 @@ Expected: collection error — the revision file does not exist.
 
 - [ ] **Step 3: Write the migration**
 
-Create `migrations/versions/a1b2c3d4e5f6_unify_gear_slots.py`:
+Create `migrations/versions/c9405725c1f4_unify_gear_slots.py`:
 
 ```python
 """Unify gear slot vocabularies onto app.loot.data.archetypes.SLOTS.
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: c9405725c1f4
 Revises: d9e2f3a4b5c6
 Create Date: 2026-07-28
 
@@ -517,7 +517,7 @@ import json
 import sqlalchemy as sa
 from alembic import op
 
-revision = "a1b2c3d4e5f6"
+revision = "c9405725c1f4"
 down_revision = "d9e2f3a4b5c6"
 branch_labels = None
 depends_on = None
@@ -659,7 +659,7 @@ Expected: no new failures. The suite creates its schema through `create_all`, so
 - [ ] **Step 7: Commit**
 
 ```bash
-git add migrations/versions/a1b2c3d4e5f6_unify_gear_slots.py tests/test_gear_slot_migration.py
+git add migrations/versions/c9405725c1f4_unify_gear_slots.py tests/test_gear_slot_migration.py
 git commit -m "feat(gear): migrate existing gear onto the canonical slots
 
 Rewrites Character.gear keys: armor->chest, gloves->hands, boots->feet,

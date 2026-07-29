@@ -36,47 +36,84 @@ SLOT_MAP = {
 }
 
 
-def _bag(items, value):
+def _bag(items, value, aggregate_shaped):
     """Append a displaced gear value to an items list, in place.
 
-    Gear instances (dicts with a uid) go back whole. Legacy slugs stack onto an
-    existing entry when one is present, matching the app's own add_item().
+    Gear instances (dicts with a uid) go back whole -- callers must not pass
+    one when ``aggregate_shaped`` is true; there is no lossless bare-string
+    representation for it there (see ``remap_gear``). A legacy slug stacks
+    onto an existing {"slug", "qty"} entry when one is present, matching the
+    app's own add_item() -- unless the list is in load_inventory's legacy
+    bare-string aggregate shape (entry 0 is a plain string), in which case the
+    slug is appended as a bare string too, matching that shape: appending a
+    dict there would be silently unreadable by that loader, which decides the
+    whole list's format from entry 0 alone.
     """
     if isinstance(value, dict):
         items.append(value)
         return
     slug = value
+    if aggregate_shaped:
+        items.append(slug)
+        return
     for entry in items:
         if isinstance(entry, dict) and entry.get("slug") == slug and "uid" not in entry:
-            entry["qty"] = int(entry.get("qty", 1)) + 1
+            entry["qty"] = int(entry.get("qty") or 1) + 1
             return
     items.append({"slug": slug, "qty": 1})
 
 
 def remap_gear(gear, items):
-    """Return (new_gear, new_items). Neither argument is mutated.
+    """Return (new_gear, new_items).
+
+    Neither the ``gear`` dict nor the ``items`` list passed in is modified in
+    place. ``items`` is JSON-round-tripped, so its entries are fresh objects,
+    never shared with the input. ``gear``'s values are not deep-copied --
+    ``new_gear`` reuses them by reference, so a gear-instance dict that
+    survives displacement is the *same* object as in the input, not a clone.
 
     Canonical slots win: where a legacy name and its destination are both
     occupied, the legacy item is bagged. Slot names this table does not know
-    are passed through untouched rather than silently eaten.
+    are passed through untouched rather than silently eaten. Among legacy
+    names that share a destination (ring1/ring2), the winner is SLOT_MAP's own
+    order -- ring1 -- not the row's incidental JSON key order.
+
+    If a displaced gear instance (a dict) would have to be bagged into a list
+    that is in load_inventory's legacy bare-string aggregate shape, there is
+    no lossless representation for it there. Rather than destroy the item,
+    the whole row is left untouched (original gear and items returned as-is)
+    -- a partial remap that drops one item to fix the rest is not acceptable.
     """
+    gear = gear or {}
+    items = items or []
+    original_gear = dict(gear)
+    original_items = json.loads(json.dumps(items)) if items else []
+    aggregate_shaped = bool(items) and isinstance(items[0], str)
+
     new_gear = {}
     new_items = json.loads(json.dumps(items)) if items else []
 
     # Canonical and unknown slots first, so a legacy item cannot claim a
     # destination that is already spoken for regardless of dict ordering.
-    for slot, value in (gear or {}).items():
+    for slot, value in gear.items():
         if not value:
             continue
         if slot not in SLOT_MAP:
             new_gear[slot] = value
 
-    for slot, value in (gear or {}).items():
-        if not value or slot not in SLOT_MAP:
+    # Legacy slots in SLOT_MAP's own order (not the row's JSON key order), so
+    # a tie between two legacy names sharing a destination -- ring1/ring2 --
+    # resolves deterministically by table order rather than incidental
+    # dict/JSON ordering.
+    for slot in SLOT_MAP:
+        value = gear.get(slot)
+        if not value:
             continue
         dest = SLOT_MAP[slot]
         if dest is None or dest in new_gear:
-            _bag(new_items, value)
+            if aggregate_shaped and isinstance(value, dict):
+                return original_gear, original_items
+            _bag(new_items, value, aggregate_shaped)
         else:
             new_gear[dest] = value
 
@@ -98,7 +135,7 @@ def upgrade():
         if not isinstance(gear, dict):
             continue
         if not isinstance(items, list):
-            items = []
+            continue  # can't safely bag into a non-list; leave the row for a human
         if not any(slot in SLOT_MAP for slot in gear):
             continue  # already canonical
 
