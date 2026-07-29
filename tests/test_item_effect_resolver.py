@@ -9,6 +9,8 @@ magnitude by 5x for the one slug they shared.
 Spec: docs/superpowers/specs/2026-07-28-combat-item-usage-design.md
 """
 
+import re
+
 import pytest
 
 from app.services.item_effects import REFUSAL_NO_EFFECT, resolve_potion_effect
@@ -85,21 +87,28 @@ def test_a_refusal_sentence_exists_and_reads_as_prose():
 
 
 def test_every_catalogue_potion_either_resolves_or_is_refused(test_app):
-    """No potion may raise, and the implemented count must be deliberate.
+    """No potion may raise, and exactly the implemented families may resolve.
 
-    This is the guard against the original bug: a slug the resolver does not
-    recognise must produce None, never an exception and never a wrong effect.
+    Asserted as a property of whatever catalogue is loaded rather than a fixed
+    count: a db_isolation-marked test elsewhere in the suite reseeds a smaller
+    placeholder catalogue, so a hardcoded number makes this test order-dependent.
+
+    (In the full 154-potion seed this works out to 20 heal + 20 mana + 3
+    legacy hyphenated = 43, tiers contiguous 1..20 for both families --
+    verified directly against the database, not asserted here.)
     """
     from app.models.models import Item
 
     with test_app.app_context():
         slugs = [i.slug for i in Item.query.filter_by(type="potion").all()]
 
-    assert len(slugs) >= 150, "catalogue shrank unexpectedly; check the seed"
+    assert slugs, "no potions in the catalogue at all"
 
+    expected = {s for s in slugs if re.fullmatch(r"potion_(heal|mana)_l\d+", s)} | (
+        {"potion-healing", "potion-mana", "potion-regen"} & set(slugs)
+    )
     resolved = {s: resolve_potion_effect(s) for s in slugs}
     implemented = {s: e for s, e in resolved.items() if e is not None}
 
-    # 20 heal + 20 mana + 3 legacy hyphenated
-    assert len(implemented) == 43, sorted(implemented)
+    assert set(implemented) == expected
     assert all(e["kind"] in ("restore_hp", "restore_mp", "status") for e in implemented.values())
