@@ -11,11 +11,92 @@ More than the symptom suggests, which is why this is a contained job:
 
 - `POST /api/combat/<id>/use_item` exists and is wired to
   `combat_service.player_use_item`.
-- It **does** consume the item: the character's `items` JSON is decremented and
-  committed, so there is no infinite-potion bug.
+- It decrements the character's `items` JSON and commits.
 - The party snapshot carries `item_counts` so the client can grey out a button
   when a character has none left, counted **per character** rather than as a
   shared party pool.
+
+## Correction (2026-07-29): three live bugs this spec missed
+
+An exploration pass before implementation found the ground less solid than the
+section above claims. All three are fixed as part of this work.
+
+**1. There is an infinite-potion bug.** The line above is wrong.
+`player_use_item` (`combat_service.py:1602-1622`) applies the effect on a bare
+slug string match against the party snapshot, and decrements inventory
+*afterwards* (`:1623-1666`) inside a `try/except` that logs at debug and
+swallows everything. `removed_successfully == False` rolls nothing back. So
+`POST /api/combat/<id>/use_item {"slug": "potion-healing"}` with an empty bag
+heals 25 and burns a turn, repeatably. The only gate on having the item is
+client-side (`combat.js:436`). **Ownership must be verified before the effect is
+applied, not after.**
+
+**2. 127 of the 154 potions are consumed and destroyed for nothing out of
+combat.** `inventory_api.consume_item` (`:613-628`) matches by unanchored
+substring — `"regen"`, then `"healing"`, then `"mana"`. The catalogue slugs say
+`heal`, not `healing`, so all twenty `potion_heal_lN` fall through every branch,
+are removed from the bag, and grant zero HP. Everything outside those three
+substrings does the same.
+
+**3. The same potion does two different things.** `potion-healing` heals **25 in
+combat** (clamped to `max_hp`) and **5 out of combat** (unclamped, can exceed
+max). The comment at `combat_service.py:1610` claims the two paths were aligned
+deliberately; only mana actually is. Unifying them means out-of-combat healing
+rises to match combat — one potion, one effect.
+
+There are also **three** item→effect derivations in the codebase, not two:
+`loot_api._get_item_effects` (`:463`, display-only), `inventory_api._item_effects`
+(`:116`, load-bearing — folded into character stats), and the two consumption
+paths above. The first two concern equipment rather than potions and are out of
+scope here, but they are the same class of duplication as the gear-slot
+vocabularies and belong in the same eventual sweep.
+
+## Correction (2026-07-29): the catalogue does not map onto the engine
+
+This spec's framing — a resolver and "all 154 work with no data change" — does
+not survive contact with the combat engine. Most families have nothing to attach
+to. What each can express today:
+
+| family | count | verdict |
+|---|---|---|
+| `heal`, `mana` | 40 | **Works now.** Needs only tier scaling. |
+| `buff_attack`, `buff_defense` | 40 | Needs *one* shared piece: an effect kind that modifies a derived stat and expires. The snapshot is mutable so a modifier sticks, but nothing can un-apply it — there is no expiry hook and no recompute pass. `defense` is evasion only, so a defence potion makes you harder to hit, not tougher. |
+| `resist_fire` | 5 | Same extension. The resist pipe is complete (`combat_utils.apply_resistances`, called with `["fire"]` at `combat_service.py:1383`) but player `resistances` is hardcoded `{}` at `:209`, so it is live code that always no-ops. |
+| `antidote` | 5 | Needs a `remove_effect` primitive — none exists; `status_effects` can add and replace but never remove, and expiry is the only route today. Must also delete the `CharacterStatusEffect` row or the poison returns via `_derive_stats:177-186`. |
+| `buff_speed` | 20 | **No mechanic.** `speed` is read once, by `_calc_initiative` during `start_session`, and never again. Requires dynamic or re-rolled initiative. |
+| `resist_cold`, `resist_lightning`, `resist_poison` | 15 | **No mechanic.** No cold or lightning damage ever reaches a player — monster attacks hardcode `["physical"]` and the one firebolt `["fire"]`; the `damage_types` column exists and no damage path reads it. Poison bypasses `apply_resistances` entirely. Also the element string is `"ice"`, not `cold`. |
+| `stamina` | 5 | **No mechanic.** Zero references in `app/`. |
+| `perception` | 5 | **No combat mechanic.** Exists only in exploration (`perception.py`), reads `Character.stats` rather than the combat snapshot. Viable as an out-of-combat consumable only. |
+| `group_battle`, `invis`, `luck` | 12 | Not in this spec's original table at all. No mechanic. |
+
+Note also `stun` has a handler (`status_effects.py:102`) that nothing can
+trigger — `add_effect` is never called anywhere in `app/`.
+
+## Decided (2026-07-29)
+
+**Scope: the resolver and the two families that work, not the mechanics.**
+
+- **One resolver, shared by both paths**, so a potion behaves identically in and
+  out of a fight. Pattern-based, per option 1 below: parse `potion_<family>_l<N>`
+  and the three legacy hyphenated slugs, return a typed effect descriptor.
+- **`heal` and `mana` scale with the `_lN` tier.** They are the only two families
+  the engine can express without new machinery, and the tier suffix is the only
+  strength signal that exists — `Item.level` is `0` for all 154, `rarity` is 153
+  common, and `description` contains no digits. `value_copper` is the sole other
+  monotonic correlate and it is price, not potency.
+- **A family with no implemented effect refuses and keeps the item.** The player
+  gets a readable "that has no effect yet" and loses nothing. This replaces the
+  current silent destruction, and it makes the content gap visible instead of
+  hiding it — which matters, because 100 of the 154 potions are in that state
+  and will be until the mechanics exist.
+- **Ownership is verified before the effect is applied.** Closes the infinite
+  potion.
+
+Deliberately **not** built: the expiring stat-modifier effect kind, the
+`remove_effect` primitive, dynamic initiative, typed damage reaching players, and
+stamina. Each is a combat-mechanics change that competes with the tactical
+combat overhaul rather than belonging to an item-usage chunk, and the resolver is
+designed so adding a family later is a table entry plus a handler.
 
 ## What is missing
 
