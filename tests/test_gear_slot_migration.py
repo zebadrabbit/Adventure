@@ -16,11 +16,17 @@ infers the whole list's shape from its first entry and a mismatched shape
 would make the item invisible on the next load. A displaced gear instance
 that would need a bare-string items list to grow a dict entry is not bagged
 at all -- the whole row is left untouched rather than dropping the item.
+A displaced value that is neither a slug nor a gear instance is not bagged
+either: no items shape can carry it, so the row is left untouched too.
+
 Stacking onto an existing bag entry reads that entry's qty exactly as
-load_inventory does: a present-but-invalid or present-but-None qty reads as
-1, and a genuine 0 (invisible to the reader, since it drops qty <= 0 on load)
-reads as 0, not 1 -- so it must not raise, and must not conjure a phantom
-extra item.
+load_inventory does -- same bare `except Exception`, because int() of a JSON
+Infinity raises OverflowError and anything escaping here rolls back the whole
+migration for every character. A present-but-invalid or present-but-None qty
+reads as 1; a genuine 0 (invisible to the reader, since it drops qty <= 0 on
+load) reads as 0, not 1, so no phantom extra item is conjured; and a negative
+qty clamps to 0, so the displaced item lands at a readable 1 instead of a
+still-invisible negative.
 
 Nothing is ever destroyed.
 
@@ -28,19 +34,27 @@ Spec: docs/superpowers/specs/2026-07-28-character-panel-redesign.md
 """
 
 import importlib.util
+import json
 import pathlib
 
 import pytest
+
+from app.inventory.utils import load_inventory
 
 REVISION = pathlib.Path(__file__).resolve().parents[1] / "migrations" / "versions" / "c9405725c1f4_unify_gear_slots.py"
 
 
 @pytest.fixture(scope="module")
-def remap():
+def revision():
     spec = importlib.util.spec_from_file_location("_unify_gear_slots", REVISION)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    return mod.remap_gear
+    return mod
+
+
+@pytest.fixture(scope="module")
+def remap(revision):
+    return revision.remap_gear
 
 
 def _slugs(items):
@@ -50,6 +64,15 @@ def _slugs(items):
         if isinstance(entry, dict) and "slug" in entry and "uid" not in entry:
             out[entry["slug"]] = out.get(entry["slug"], 0) + int(entry.get("qty", 1))
     return out
+
+
+def _as_the_game_reads_it(items):
+    """slug -> qty as the running app would actually see this bag.
+
+    "Not destroyed" means visible to load_inventory, not merely present in the
+    JSON: it drops any entry whose qty is <= 0 or whose slug is not a string.
+    """
+    return {e["slug"]: e["qty"] for e in load_inventory(json.dumps(items)) if "slug" in e}
 
 
 def test_straight_renames(remap):
@@ -134,6 +157,70 @@ def test_displaced_slug_stacking_survives_a_non_numeric_qty(remap):
 
     assert gear == {}
     assert _slugs(items) == {"plate-leggings": 2}
+
+
+def test_displaced_slug_stacking_survives_a_json_infinity_qty(remap):
+    """json.loads accepts Infinity, and int(float('inf')) raises OverflowError.
+
+    That is neither TypeError nor ValueError, so a coercion narrower than
+    load_inventory's own bare `except Exception` lets it escape upgrade():
+    alembic rolls the transaction back, _ensure_schema swallows it, and every
+    character stays un-migrated with no visible error -- identically on every
+    restart. The corrupt row is reachable straight from stored JSON, so this
+    parses it the way the migration itself does rather than synthesising inf.
+    """
+    stored = json.loads('[{"slug": "plate-leggings", "qty": Infinity}]')
+
+    gear, items = remap({"legs": "plate-leggings"}, stored)
+
+    assert gear == {}
+    assert _as_the_game_reads_it(items) == {"plate-leggings": 2}
+
+
+def test_a_negative_existing_qty_does_not_destroy_the_displaced_item(remap):
+    """Worse than the qty:0 case: without a clamp this *deletes* a real item.
+
+    -3 + 1 is -2, still <= 0, so load_inventory drops the entry and the
+    leggings are gone. The corrupt qty predates the migration, but the loss
+    would be caused by the migration writing into it. Clamping to 0 first
+    lands the displaced item at a readable 1.
+    """
+    gear, items = remap({"legs": "plate-leggings"}, [{"slug": "plate-leggings", "qty": -3}])
+
+    assert gear == {}
+    assert _as_the_game_reads_it(items) == {"plate-leggings": 1}
+
+
+def test_a_gear_value_that_is_neither_slug_nor_instance_leaves_the_row_untouched(remap):
+    """No items shape can carry it, so bagging it would silently delete it.
+
+    load_inventory keeps a bare-string entry only if it is a str and a
+    {"slug", "qty"} entry only if its slug is a str -- an int survives
+    neither. Same answer as the gear-instance-into-bare-strings case: leave
+    the whole row for a human rather than drop the item.
+    """
+    gear_in = {"boots": 123, "feet": "steel-boots"}
+    items_in = [{"slug": "potion-a", "qty": 1}]
+
+    gear, items = remap(gear_in, items_in)
+
+    assert gear == gear_in
+    assert gear is not gear_in
+    assert items == items_in
+    assert items is not items_in
+
+
+def test_both_unbaggable_cases_report_why_the_row_was_skipped(revision):
+    """upgrade() prints this reason; a silently skipped row is a lost report."""
+    instance = {"uid": "abc123", "slot": "chest", "name": "Old Armor"}
+
+    _, _, no_reason = revision._remap({"armor": "chain-shirt"}, [])
+    _, _, bare_string = revision._remap({"armor": instance, "chest": "plate-mail"}, ["potion-a"])
+    _, _, wrong_type = revision._remap({"boots": 123, "feet": "steel-boots"}, [])
+
+    assert no_reason is None
+    assert "bare-string" in bare_string
+    assert "int" in wrong_type
 
 
 def test_gear_instances_survive_displacement_as_dicts(remap):

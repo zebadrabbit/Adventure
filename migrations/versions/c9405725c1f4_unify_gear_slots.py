@@ -36,18 +36,34 @@ SLOT_MAP = {
 }
 
 
+def _unbaggable(value, aggregate_shaped):
+    """Why ``value`` cannot be bagged without losing it, or None if it can be.
+
+    Both cases end the same way: the row is left untouched and the reason is
+    printed, rather than writing a bag entry the app's own reader would throw
+    away on the next load. Nothing is destroyed to fix the rest of the row.
+    """
+    if not isinstance(value, (str, dict)):
+        # load_inventory keeps a bare-string entry only if it is a str, and a
+        # {"slug", "qty"} entry only if its slug is a str -- so neither shape
+        # can carry, say, an int. Bagging one would silently delete it.
+        return f"a displaced gear value is neither a slug nor a gear instance (got {type(value).__name__})"
+    if aggregate_shaped and isinstance(value, dict):
+        return "a displaced gear instance has no lossless representation in this character's bare-string items list"
+    return None
+
+
 def _bag(items, value, aggregate_shaped):
     """Append a displaced gear value to an items list, in place.
 
-    Gear instances (dicts with a uid) go back whole -- callers must not pass
-    one when ``aggregate_shaped`` is true; there is no lossless bare-string
-    representation for it there (see ``remap_gear``). A legacy slug stacks
-    onto an existing {"slug", "qty"} entry when one is present, matching the
-    app's own add_item() -- unless the list is in load_inventory's legacy
-    bare-string aggregate shape (entry 0 is a plain string), in which case the
-    slug is appended as a bare string too, matching that shape: appending a
-    dict there would be silently unreadable by that loader, which decides the
-    whole list's format from entry 0 alone.
+    Callers must have cleared ``value`` through ``_unbaggable`` first (see
+    ``remap_gear``). Gear instances (dicts with a uid) go back whole. A legacy
+    slug stacks onto an existing {"slug", "qty"} entry when one is present,
+    matching the app's own add_item() -- unless the list is in load_inventory's
+    legacy bare-string aggregate shape (entry 0 is a plain string), in which
+    case the slug is appended as a bare string too, matching that shape:
+    appending a dict there would be silently unreadable by that loader, which
+    decides the whole list's format from entry 0 alone.
     """
     if isinstance(value, dict):
         items.append(value)
@@ -58,40 +74,36 @@ def _bag(items, value, aggregate_shaped):
         return
     for entry in items:
         if isinstance(entry, dict) and entry.get("slug") == slug and "uid" not in entry:
-            # Mirror load_inventory's own read of this field exactly (falls
-            # back to 1 on anything int() rejects, including a present-but-
-            # None qty) rather than treating a falsy-but-valid 0 the same way
-            # -- `or 1` would turn a reader-invisible qty:0 into a phantom
-            # extra item (0 -> 1, then +1 -> 2 instead of the correct 1).
+            # Read this field exactly as load_inventory does -- a bare
+            # `except Exception`, because int() of a JSON Infinity raises
+            # OverflowError, which is neither TypeError nor ValueError and
+            # would escape upgrade(), roll the whole migration back, and
+            # (since _ensure_schema swallows it) leave every character
+            # un-migrated with no visible error, on every restart.
+            #
+            # A falsy-but-valid 0 is deliberately *not* treated as "absent":
+            # `or 1` would turn a reader-invisible qty:0 into a phantom extra
+            # item (0 -> 1, then +1 -> 2 instead of the correct 1). Negative
+            # quantities are equally invisible to the reader (it drops
+            # qty <= 0), so they clamp to 0 as well -- without the clamp,
+            # stacking onto qty:-3 lands on -2, still invisible, and the
+            # displaced item is gone.
             try:
                 q = int(entry.get("qty", 1))
-            except (TypeError, ValueError):
+            except Exception:
                 q = 1
-            entry["qty"] = q + 1
+            entry["qty"] = max(0, q) + 1
             return
     items.append({"slug": slug, "qty": 1})
 
 
-def remap_gear(gear, items):
-    """Return (new_gear, new_items).
+def _remap(gear, items):
+    """The whole of remap_gear, plus the reason a row was left alone.
 
-    Neither the ``gear`` dict nor the ``items`` list passed in is modified in
-    place. ``items`` is JSON-round-tripped, so its entries are fresh objects,
-    never shared with the input. ``gear``'s values are not deep-copied --
-    ``new_gear`` reuses them by reference, so a gear-instance dict that
-    survives displacement is the *same* object as in the input, not a clone.
-
-    Canonical slots win: where a legacy name and its destination are both
-    occupied, the legacy item is bagged. Slot names this table does not know
-    are passed through untouched rather than silently eaten. Among legacy
-    names that share a destination (ring1/ring2), the winner is SLOT_MAP's own
-    order -- ring1 -- not the row's incidental JSON key order.
-
-    If a displaced gear instance (a dict) would have to be bagged into a list
-    that is in load_inventory's legacy bare-string aggregate shape, there is
-    no lossless representation for it there. Rather than destroy the item,
-    the whole row is left untouched (original gear and items returned as-is)
-    -- a partial remap that drops one item to fix the rest is not acceptable.
+    Returns (new_gear, new_items, reason). ``reason`` is None when the remap
+    succeeded, and otherwise a human-readable string naming the displaced
+    value that had no lossless home -- see remap_gear's docstring. upgrade()
+    wants that string; the tests only want the two mapped halves.
     """
     gear = gear or {}
     items = items or []
@@ -120,12 +132,39 @@ def remap_gear(gear, items):
             continue
         dest = SLOT_MAP[slot]
         if dest is None or dest in new_gear:
-            if aggregate_shaped and isinstance(value, dict):
-                return original_gear, original_items
+            reason = _unbaggable(value, aggregate_shaped)
+            if reason:
+                return original_gear, original_items, reason
             _bag(new_items, value, aggregate_shaped)
         else:
             new_gear[dest] = value
 
+    return new_gear, new_items, None
+
+
+def remap_gear(gear, items):
+    """Return (new_gear, new_items).
+
+    Neither the ``gear`` dict nor the ``items`` list passed in is modified in
+    place. ``items`` is JSON-round-tripped, so its entries are fresh objects,
+    never shared with the input. ``gear``'s values are not deep-copied --
+    ``new_gear`` reuses them by reference, so a gear-instance dict that
+    survives displacement is the *same* object as in the input, not a clone.
+
+    Canonical slots win: where a legacy name and its destination are both
+    occupied, the legacy item is bagged. Slot names this table does not know
+    are passed through untouched rather than silently eaten. Among legacy
+    names that share a destination (ring1/ring2), the winner is SLOT_MAP's own
+    order -- ring1 -- not the row's incidental JSON key order.
+
+    A displaced value with no lossless home in this row's items list -- a gear
+    instance (a dict) that would have to go into a bare-string aggregate list,
+    or a value that is neither a slug nor a gear instance and so survives in
+    neither items shape -- leaves the whole row untouched (original gear and
+    items returned as-is). A partial remap that drops one item to fix the rest
+    is not acceptable.
+    """
+    new_gear, new_items, _reason = _remap(gear, items)
     return new_gear, new_items
 
 
@@ -155,17 +194,12 @@ def upgrade():
         if not any(slot in SLOT_MAP for slot in gear):
             continue  # already canonical
 
-        new_gear, new_items = remap_gear(gear, items)
-        if new_gear == gear and new_items == items:
-            # remap_gear only returns its input back unchanged when it hit a
-            # displaced gear instance with no lossless home in this row's
-            # bare-string items list (see its docstring) -- every other path
-            # through a row with a legacy key changes at least that key.
-            print(
-                f"gear-slot migration: character {row.id} left unchanged -- "
-                "a displaced gear instance has no lossless representation in "
-                "this character's bare-string items list"
-            )
+        new_gear, new_items, reason = _remap(gear, items)
+        if reason:
+            # A displaced value with no lossless home in this row's items list
+            # (see remap_gear's docstring). The row is left exactly as it came
+            # in -- say so, or no one finds out it was skipped.
+            print(f"gear-slot migration: character {row.id} left unchanged -- {reason}")
             continue
         conn.execute(
             sa.text('UPDATE "character" SET gear = :gear, items = :items WHERE id = :id'),

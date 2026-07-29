@@ -6,8 +6,8 @@ item(id INTEGER PK, slug TEXT UNIQUE, name TEXT, type TEXT, description TEXT, va
 ```
 
 ## Files
-- `items_weapons.sql` – Level 1-20 progression for eight weapon classes (sword, axe, spear/halberd, bow, dagger, staff, mace, wand). Value scaling uses roughly quadratic growth with thematic rarity boosts.
-- `items_armor.sql` – Level 1-20 sets for armor slots (head, chest, legs, hands, feet) plus belt, cloak, shield, rings, amulets.
+- `items_weapons.sql` – **Missing from this directory.** Documented as level 1-20 progression for eight weapon classes (sword, axe, spear/halberd, bow, dagger, staff, mace, wand), with roughly quadratic value scaling and thematic rarity boosts. The file has never been committed; weapons currently come from the seed data in `app/server.py` and the procedural generator.
+- `items_armor.sql` – **Missing from this directory.** Documented as level 1-20 sets for the armor slots (head, chest, hands, feet) plus offhand/shield, rings and amulets. Armor currently comes from the same places as weapons. Note there is no `legs` slot: the canonical vocabulary is the eight names in `app/loot/data/archetypes.py` (`SLOTS`), and D&D-style body armour is one piece, so leg armour is part of the chest piece.
 - `items_potions.sql` – Healing & mana potions (levels 1-20), offensive/defensive/speed buff elixirs, antidotes, elemental resistance potions (sparse tier milestones).
 - `items_misc.sql` – Tools, scrolls, gems, crafting materials, consumables, and generic keys used for future locked/secret door mechanics.
 - `monsters_seed.sql` – Catalog of monsters (common, named elite, bosses) with level bands, base stats, rarity tiers, and optional special drops referencing existing item slugs.
@@ -22,13 +22,12 @@ item(id INTEGER PK, slug TEXT UNIQUE, name TEXT, type TEXT, description TEXT, va
 ## Loading
 From project root in an environment with the SQLite DB (`instance/mud.db` by default):
 ```bash
-sqlite3 instance/mud.db < sql/items_weapons.sql
-sqlite3 instance/mud.db < sql/items_armor.sql
 sqlite3 instance/mud.db < sql/items_potions.sql
 sqlite3 instance/mud.db < sql/items_misc.sql
 sqlite3 instance/mud.db < sql/monsters_seed.sql
 ```
-(Adjust path if using a different DB URI.)
+(Adjust path if using a different DB URI. `items_weapons.sql` and `items_armor.sql`
+are described above but are not in this directory, so they cannot be loaded.)
 
 ## Future Enhancements
 The following ideas extend the now-implemented monster + loot systems:
