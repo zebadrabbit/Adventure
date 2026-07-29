@@ -227,9 +227,24 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
     }
 
 
+def _party_characters(user_id: int) -> List[Character]:
+    """The up to 4 characters that make up ``user_id``'s combat party -- the
+    same scope _base_player_snapshot uses to build ``members``.
+
+    Every item_counts call site must query this exact set, not just "all of
+    this user's characters": a character outside the active party can never
+    be ``actor_id`` in this session, so counting their potions produces
+    entries no combat action can ever touch, and (worse) a user with 5+
+    characters would otherwise get a session-start item_counts that omits
+    characters 5+ while every later recompute (reward grant, item use,
+    backfill) silently includes them.
+    """
+    return Character.query.filter_by(user_id=user_id).order_by(Character.id.asc()).limit(4).all()
+
+
 def _base_player_snapshot(user_id: int) -> Dict[str, Any]:
     # Build party from user's characters (up to 4)
-    chars = Character.query.filter_by(user_id=user_id).order_by(Character.id.asc()).limit(4).all()
+    chars = _party_characters(user_id)
     members = [_derive_stats(c) for c in chars] or [
         {
             "controller_id": user_id,
@@ -475,6 +490,20 @@ def _player_ref(party: Dict[str, Any], char_id: int):
     return None
 
 
+def _entry_qty(entry: Any) -> int:
+    """Parse the ``qty`` of a stacked ``{"slug", "qty"}`` inventory entry.
+
+    Defaults to 1 for a missing qty, and to 1 for an unparseable one (never
+    raises) -- the one place that parse happens, so a malformed qty can't
+    make ownership and decrement disagree about how many units an entry
+    represents (ownership would see it as present, decrement would raise).
+    """
+    try:
+        return int(entry.get("qty", 1))
+    except Exception:
+        return 1
+
+
 def _entry_matches_slug(entry: Any, slug: str) -> bool:
     """True if a single inventory entry -- bare string (legacy, one unit) or
     ``{"slug", "qty"}`` dict (stacked) -- represents at least one unit of
@@ -484,11 +513,7 @@ def _entry_matches_slug(entry: Any, slug: str) -> bool:
     if isinstance(entry, str):
         return entry == slug
     if isinstance(entry, dict):
-        try:
-            qty = int(entry.get("qty", 1))
-        except Exception:
-            qty = 1
-        return entry.get("slug") == slug and qty > 0
+        return entry.get("slug") == slug and _entry_qty(entry) > 0
     return False
 
 
@@ -528,7 +553,7 @@ def _decrement_character_slug(character, slug: str) -> bool:
         if not removed and _entry_matches_slug(entry, slug):
             removed = True
             if isinstance(entry, dict):
-                qty = int(entry.get("qty", 1)) - 1
+                qty = _entry_qty(entry) - 1
                 if qty > 0:
                     new_inv.append(dict(entry, qty=qty))
             continue
@@ -566,10 +591,7 @@ def _item_counts_by_character(chars) -> Dict[str, Dict[str, int]]:
                 slug, qty = entry, 1
             elif isinstance(entry, dict):
                 slug = entry.get("slug")
-                try:
-                    qty = int(entry.get("qty", 1))
-                except Exception:
-                    qty = 1
+                qty = _entry_qty(entry)
             else:
                 continue
             if not slug or qty <= 0 or resolve_potion_effect(slug) is None:
@@ -899,8 +921,10 @@ def _check_end(session: CombatSession):
             party = json.loads(session.party_snapshot_json or "{}") or {}
             if rewards.get("items") or rewards.get("items_list"):
                 # Recompute per-character (not just whichever character happened to
-                # receive the loot) — each character's potions are their own.
-                reward_chars = Character.query.filter_by(user_id=session.user_id).all()
+                # receive the loot) — each character's potions are their own. Same
+                # party scope _base_player_snapshot used at session start (up to 4
+                # characters), not every character this user owns.
+                reward_chars = _party_characters(session.user_id)
                 party["item_counts"] = _item_counts_by_character(reward_chars)
                 session.party_snapshot_json = json.dumps(party)
         except Exception:
@@ -1712,12 +1736,20 @@ def player_use_item(
     if not _character_holds_slug(char_row, slug):
         return {"error": "not_carried", "message": _REFUSAL_NOT_CARRIED}
 
-    # 3. Apply the descriptor to the party-snapshot member.
+    # 3. Apply the descriptor to the party-snapshot member. `or <fallback>`,
+    # not `.get(key, <fallback>)`: a present-but-falsy (0/None) cap must not
+    # win over the fallback either, or a snapshot member missing its cap
+    # clamps healing down to 0 -- a healing potion that kills. Unreachable
+    # today (_derive_stats and the no-characters fallback below both always
+    # set these), but the clamp itself must not depend on that holding.
+    # Fallbacks match the synthetic "no characters" member's own values.
     kind = effect.get("kind")
     if kind == "restore_hp":
-        member["hp"] = min(member.get("max_hp", 0), member.get("hp", 0) + effect.get("amount", 0))
+        max_hp = member.get("max_hp") or 100
+        member["hp"] = min(max_hp, member.get("hp", 0) + effect.get("amount", 0))
     elif kind == "restore_mp":
-        member["mana"] = min(member.get("mana_max", 0), member.get("mana", 0) + effect.get("amount", 0))
+        mana_max = member.get("mana_max") or 30
+        member["mana"] = min(mana_max, member.get("mana", 0) + effect.get("amount", 0))
     elif kind == "status":
         member["effects"] = replace_effect(
             member.get("effects", []) or [], effect["name"], effect["ticks"], **effect.get("data", {})
@@ -1743,10 +1775,18 @@ def player_use_item(
         return {"error": "item_removal_failed", "message": _REFUSAL_ITEM_REMOVAL_FAILED}
     db.session.add(char_row)
 
-    # item_counts is rebuilt from the acting character's user's full roster so
-    # it can never drift from what characters actually carry now that the
-    # inventory just changed (same helper _base_player_snapshot/_check_end use).
-    party["item_counts"] = _item_counts_by_character(Character.query.filter_by(user_id=user_id).all())
+    # item_counts is rebuilt from the acting character's party roster (same
+    # scope _base_player_snapshot/_check_end use -- up to 4 characters, not
+    # every character this user owns) so it can never drift from what the
+    # party actually carries now that the inventory just changed. Guarded
+    # like the other three item_counts call sites: the effect and the
+    # decrement have already succeeded and nothing has been persisted yet, so
+    # a failure here should leave item_counts stale rather than turn an
+    # otherwise-successful item use into a 500.
+    try:
+        party["item_counts"] = _item_counts_by_character(_party_characters(user_id))
+    except Exception as e:
+        logger.warning("item_counts_recompute_failed", char_id=actor_id, slug=slug, exc_info=e)
 
     session.party_snapshot_json = json.dumps(party)
     user_name = member.get("name", "Player")

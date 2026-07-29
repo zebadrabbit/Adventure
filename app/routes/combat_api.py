@@ -59,11 +59,10 @@ def combat_state(combat_id: int):
             # Ensure item_counts present for older sessions (per-character, not pooled —
             # each character's potions are their own).
             if "item_counts" not in data["party"]:
-                from app.models.models import Character as _Ch
-                from app.services.combat_service import _item_counts_by_character
+                from app.services.combat_service import _item_counts_by_character, _party_characters
 
                 try:
-                    chars = _Ch.query.filter_by(user_id=current_user.id).all()
+                    chars = _party_characters(current_user.id)
                     data["party"]["item_counts"] = _item_counts_by_character(chars)
                 except Exception:
                     data["party"]["item_counts"] = {}
