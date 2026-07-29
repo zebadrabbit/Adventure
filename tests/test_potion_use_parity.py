@@ -88,17 +88,40 @@ def _start_combat(user_id, monkeypatch):
     return combat_service.start_session(user_id, _simple_monster())
 
 
-@pytest.mark.parametrize("slug", ["potion_heal_l4", "potion-healing"])
+# Which pool a resolver kind restores, and what each of the two paths calls it.
+# The stat keys are the ones the out-of-combat route reads back: mana lives
+# under "current_mana" with a legacy "mana" fallback, and both must be seeded
+# or the route falls back to "full" and the potion has nothing to restore.
+_POOLS = {
+    # kind: (character stat keys, key in the consume response, key on the snapshot member)
+    "restore_hp": (("hp",), "hp", "hp"),
+    "restore_mp": (("mana", "current_mana"), "mana", "mana"),
+}
+
+_STARTING = 1  # low enough that any tier restores in full; non-zero so HP isn't a downed character
+
+
+def _seed_pool(char, stat_keys):
+    stats = json.loads(char.stats)
+    for key in stat_keys:
+        stats[key] = _STARTING
+    char.stats = json.dumps(stats)
+
+
+@pytest.mark.parametrize("slug", ["potion_heal_l4", "potion-healing", "potion_mana_l4", "potion-mana"])
 def test_potion_restores_the_same_amount_in_and_out_of_combat(client, monkeypatch, slug):
+    """Both restoring families, both eras of slug. Covering heal alone would
+    miss a divergence in *mana* amounts between the two paths -- the exact
+    shape of the bug this test exists for, one pool over."""
     _ensure_item(slug, name=slug)
-    expected = resolve_potion_effect(slug)["amount"]
+    effect = resolve_potion_effect(slug)
+    expected = effect["amount"]
+    stat_keys, response_key, member_key = _POOLS[effect["kind"]]
 
     # Out of combat, through the HTTP route.
     user, char = _fresh_user_and_char([{"slug": slug, "qty": 1}])
     char_id = char.id
-    stats = json.loads(char.stats)
-    stats["hp"] = 1
-    char.stats = json.dumps(stats)
+    _seed_pool(char, stat_keys)
     db.session.commit()
 
     _login_as(client, user.id)
@@ -110,25 +133,51 @@ def test_potion_restores_the_same_amount_in_and_out_of_combat(client, monkeypatc
     # effect -- a real, unrelated mechanic that would otherwise contaminate
     # this comparison. Combat pauses that clock, so the in-combat side below
     # has no such confound.
-    out_of_combat_delta = resp.get_json()["effects"]["hp"]
+    out_of_combat_delta = resp.get_json()["effects"][response_key]
     assert out_of_combat_delta == expected
 
     # In combat, through the service the fight uses. Same character, same
-    # starting HP, same potion, restocked after the out-of-combat draught
+    # starting pool, same potion, restocked after the out-of-combat draught
     # above consumed it.
-    stats = json.loads(char.stats)
-    stats["hp"] = 1
-    char.stats = json.dumps(stats)
+    _seed_pool(char, stat_keys)
     char.items = json.dumps([{"slug": slug, "qty": 1}])
     db.session.commit()
 
     session = _start_combat(user.id, monkeypatch)
     result = combat_service.player_use_item(session.id, user.id, session.version, slug, actor_id=char_id)
     assert result.get("ok"), result
-    in_combat_delta = result["state"]["party"]["members"][0]["hp"] - 1
+    in_combat_delta = result["state"]["party"]["members"][0][member_key] - _STARTING
     assert in_combat_delta == expected
 
     assert in_combat_delta == out_of_combat_delta, "the two paths disagreed on what the same potion does"
+
+
+def test_the_combat_log_names_the_potion_rather_than_printing_its_slug(client, monkeypatch):
+    """The log is read by a player. Before the tiered catalogue only two legacy
+    hyphenated slugs could reach this line; now forty underscore-and-tier
+    machine strings can, which made "Hero uses potion_heal_l4." ordinary play.
+    """
+    slug = "potion_heal_l4"
+    display_name = "Improved Healing Potion"
+    item = _ensure_item(slug, name=display_name)
+    item.name = display_name  # the row may predate this test within the session
+    db.session.commit()
+
+    user, char = _fresh_user_and_char([{"slug": slug, "qty": 1}])
+    char_id = char.id
+    stats = json.loads(char.stats)
+    stats["hp"] = 1
+    char.stats = json.dumps(stats)
+    db.session.commit()
+
+    session = _start_combat(user.id, monkeypatch)
+    result = combat_service.player_use_item(session.id, user.id, session.version, slug, actor_id=char_id)
+    assert result.get("ok"), result
+
+    lines = [entry["m"] for entry in json.loads(session.log_json)]
+    used = [line for line in lines if display_name in line]
+    assert used, f"no log line names the potion: {lines}"
+    assert not any(slug in line for line in lines), f"the raw slug reached the player: {lines}"
 
 
 def test_out_of_combat_restore_clamps_at_the_characters_max(client):

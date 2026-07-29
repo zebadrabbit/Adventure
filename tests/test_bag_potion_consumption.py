@@ -99,6 +99,62 @@ def test_drinking_a_healing_potion_out_of_combat_restores_hp(test_app, auth_clie
         assert json.loads(char.stats)["hp"] > 7
 
 
+_GEAR_INSTANCE = {
+    "uid": "0f1e2d3c4b5a",
+    "base": "sword",
+    "slot": "weapon",
+    "name": "Rusty Sword",
+    "rarity": "common",
+    "ilvl": 1,
+    "affixes": [],
+    "value": 12,
+    "durability": 50,
+    "max_durability": 50,
+}
+
+
+def test_a_potion_sitting_behind_looted_gear_can_still_be_drunk(test_app, auth_client):
+    """The ownership check subscripted ``o["slug"]`` on every bag entry, and a
+    procedural gear instance carries a uid and no slug at all -- so the check
+    raised a KeyError, a 500, whose non-JSON body reached the player as the
+    panel's generic "Nothing happens." ``any()`` short-circuits, which is why a
+    starter potion at the front of the bag hid this: it only bit a potion
+    acquired *after* the character had looted gear.
+    """
+    with test_app.app_context():
+        _ensure_healing_potion()
+        user = User.query.filter_by(username="tester").first()
+        char = Character.query.filter_by(user_id=user.id).first()
+        char.items = json.dumps([_GEAR_INSTANCE, {"slug": "potion-healing", "qty": 1}])
+        db.session.commit()
+        char_id = char.id
+
+    resp = auth_client.post(f"/api/characters/{char_id}/consume", json={"slug": "potion-healing"})
+    assert resp.status_code == 200, resp.get_json()
+
+    with test_app.app_context():
+        char = db.session.get(Character, char_id)
+        remaining = json.loads(char.items)
+        assert any(o.get("uid") == _GEAR_INSTANCE["uid"] for o in remaining), "the gear must survive the draught"
+        assert not any(o.get("slug") == "potion-healing" for o in remaining)
+
+
+def test_equipping_behind_looted_gear_refuses_rather_than_erroring(test_app, auth_client):
+    """The same subscript, in the legacy slug-based equip path. A slug the
+    character does not hold must earn a 400, not a 500, when there is gear in
+    the bag ahead of it."""
+    with test_app.app_context():
+        _ensure_healing_potion()
+        user = User.query.filter_by(username="tester").first()
+        char = Character.query.filter_by(user_id=user.id).first()
+        char.items = json.dumps([_GEAR_INSTANCE])
+        db.session.commit()
+        char_id = char.id
+
+    resp = auth_client.post(f"/api/characters/{char_id}/equip", json={"slug": "potion-healing", "slot": "weapon"})
+    assert resp.status_code == 400, resp.get_json()
+
+
 def test_equipping_a_potion_is_refused_with_a_sentence_not_a_code(test_app, auth_client):
     """Why the bag grid routes potions to /consume rather than /equip.
 

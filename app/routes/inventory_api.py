@@ -24,17 +24,24 @@ from app.models import CharacterStatusEffect
 from app.models.models import Character, Item
 from app.models.xp import xp_for_level
 from app.services.character_stats import compute_hp_mana_max
-from app.services.item_effects import REFUSAL_NO_EFFECT, resolve_potion_effect
+from app.services.item_effects import REFUSAL_ITEM_REMOVAL_FAILED, REFUSAL_NO_EFFECT, resolve_potion_effect
 from app.services.progression import progression_config
 from app.services.time_service import advance_for
 
 bp_inventory = Blueprint("inventory", __name__)
 
-# Distinct from "item not in bag" below: ownership is verified against the
-# same in-memory inv list a few lines before this can fire, so a miss here is
-# a genuine bug (e.g. a lost race), not a normal refusal path. Same register
-# as combat_service's own _REFUSAL_ITEM_REMOVAL_FAILED.
-_REFUSAL_ITEM_REMOVAL_FAILED = "Something went wrong reaching for that potion. Try again."
+# The refusals consume_item can return. The bag grid and the combat item panel
+# both show the player whatever ``message`` comes back, so a branch without one
+# puts a machine code on screen -- which is what "not consumable" and friends
+# were doing next door to the two refusals that already answered in prose.
+# (item_removal_failed's wording is shared with the combat path and so lives in
+# item_effects; it is distinct from "item not in bag" -- ownership was verified
+# against the same in-memory inv list a few lines earlier, so a miss there is a
+# genuine bug, e.g. a lost race, not a normal refusal.)
+_REFUSAL_MISSING_SLUG = "Name the item you mean to use."
+_REFUSAL_ITEM_UNKNOWN = "No such item is known in these lands."
+_REFUSAL_NOT_IN_BAG = "You carry no such thing among your provisions."
+_REFUSAL_NOT_CONSUMABLE = "That is not something you can drink."
 
 # The one gear-slot vocabulary. Defined by the loot generator, which is what
 # every procedural item, prefix and suffix keys off, so it is what the player
@@ -513,8 +520,11 @@ def equip_item(cid: int):
         return jsonify({"error": "item not found"}), 404
     inv = load_inventory(ch.items)
     gear = _normalize_gear(_safe_json_load(ch.gear, {}))
-    # Require at least one instance
-    if not any(o["slug"] == slug for o in inv):
+    # Require at least one instance. .get, not [...]: load_inventory preserves
+    # procedural gear instances verbatim and those carry a uid, not a slug, so
+    # subscripting raises KeyError -- a 500 -- the moment the bag holds any
+    # generated gear ahead of the item being looked for.
+    if not any(o.get("slug") == slug for o in inv):
         return jsonify({"error": "item not in bag"}), 400
     slot = data.get("slot") or _slot_for_item(item, gear)
     if slot not in _SLOTS:
@@ -607,16 +617,20 @@ def consume_item(cid: int):
     data = request.get_json(silent=True) or {}
     slug = (data.get("slug") or "").strip()
     if not slug:
-        return jsonify({"error": "missing slug"}), 400
+        return jsonify({"error": "missing slug", "message": _REFUSAL_MISSING_SLUG}), 400
     item = Item.query.filter_by(slug=slug).first()
     if not item:
-        return jsonify({"error": "item not found"}), 404
+        return jsonify({"error": "item not found", "message": _REFUSAL_ITEM_UNKNOWN}), 404
     inv = load_inventory(ch.items)
-    if not any(o["slug"] == slug for o in inv):
-        return jsonify({"error": "item not in bag"}), 400
+    # .get, not [...]: see the same check in equip_item. A gear instance in the
+    # bag has no "slug" key, and any() short-circuits, so this only blew up for
+    # a potion picked up *after* the character looted gear -- and the 500's
+    # non-JSON body reached the player as the panel's generic "Nothing happens."
+    if not any(o.get("slug") == slug for o in inv):
+        return jsonify({"error": "item not in bag", "message": _REFUSAL_NOT_IN_BAG}), 400
     # Only allow potions for now
     if (item.type or "").lower() != "potion":
-        return jsonify({"error": "not consumable"}), 400
+        return jsonify({"error": "not consumable", "message": _REFUSAL_NOT_CONSUMABLE}), 400
 
     # The resolver (app.services.item_effects) is the only place a slug
     # becomes an effect -- see its module docstring. A slug it doesn't
@@ -671,7 +685,7 @@ def consume_item(cid: int):
     # unless its effect was actually applied above.
     removed = remove_one(inv, slug)
     if not removed:
-        return jsonify({"error": "item_removal_failed", "message": _REFUSAL_ITEM_REMOVAL_FAILED}), 500
+        return jsonify({"error": "item_removal_failed", "message": REFUSAL_ITEM_REMOVAL_FAILED}), 500
     ch.items = dump_inventory(inv)
     ch.stats = _safe_json_dump(base_stats)
     db.session.commit()

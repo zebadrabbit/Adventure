@@ -721,21 +721,28 @@
         try {
             const r = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             const j = await r.json();
-            if (j.state) {
-                render(j.state);
-            } else if (j.message) {
-                // Refusals (no_effect / not_carried / item_removal_failed, ...)
+            if (j.message) {
+                // Refusals (no_effect / not_carried / not_your_turn / ...)
                 // carry a player-readable message and consume neither the
                 // item nor the turn -- surface it, or the refusal is
                 // invisible, same as the old silent catch below used to
                 // make it. appendTransientLogLine is defined further down
                 // this file but hoisted, like every other `function` here.
+                //
+                // Checked *before* j.state rather than after it: the turn and
+                // version refusals carry both, and when the state branch came
+                // first it re-rendered and dropped the sentence on the floor,
+                // so the player was told nothing at all about why the draught
+                // went undrunk.
                 appendTransientLogLine(j.message);
-            } else if (j.error) {
-                // A handful of error shapes (cannot_use, item_required, ...)
-                // carry neither state nor a player-facing message -- still
-                // better than nothing, mirroring doSkillAction's own fallback
-                // below for its own message-less errors (on_cooldown aside).
+            }
+            if (j.state) {
+                render(j.state);
+            } else if (!j.message && j.error) {
+                // An error shape carrying neither state nor a player-facing
+                // message -- still better than nothing, mirroring
+                // doSkillAction's own fallback below for its own message-less
+                // errors (on_cooldown aside).
                 appendTransientLogLine(`Action could not be completed (${j.error}).`);
             }
         } catch (e) { /* ignore */ }

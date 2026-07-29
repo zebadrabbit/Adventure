@@ -6,6 +6,8 @@ route layer thin; business logic remains in service.
 
 from __future__ import annotations
 
+import json
+
 from flask import Blueprint, jsonify, render_template, request  # add render_template
 from flask_login import current_user, login_required
 
@@ -66,8 +68,30 @@ def combat_state(combat_id: int):
 
                 try:
                     chars = _party_characters(current_user.id)
-                    data["party"].update(_party_item_payload(chars))
+                    payload = _party_item_payload(chars)
+                    data["party"].update(payload)
+                    # Persist it, don't just patch the response. `data` is a
+                    # throwaway row.to_dict(); every other response path (the
+                    # dungeon action route, the sibling /api/combat routes, the
+                    # combat_update emit) returns to_dict() straight off
+                    # party_snapshot_json. Patching only here meant a session
+                    # started before this branch rendered its item panel on
+                    # load and then lost it from the first attack onward --
+                    # with the two fixed buttons gone, no way to drink a potion
+                    # for the rest of that fight short of a page reload.
+                    #
+                    # Written back onto a *fresh* read of the snapshot rather
+                    # than `data["party"]`, which the loop above has already
+                    # decorated with presentation-only hp_pct/mana_pct: those
+                    # are recomputed per response and would go stale the moment
+                    # anything took damage.
+                    stored = json.loads(row.party_snapshot_json or "{}")
+                    if isinstance(stored, dict):
+                        stored.update(payload)
+                        row.party_snapshot_json = json.dumps(stored)
+                        db.session.commit()
                 except Exception:
+                    db.session.rollback()
                     data["party"].setdefault("item_counts", {})
                     data["party"].setdefault("item_meta", {})
         if data.get("monster_hp") is not None and data.get("monster_max_hp"):

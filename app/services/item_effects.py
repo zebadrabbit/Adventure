@@ -29,6 +29,14 @@ from typing import Callable, Dict, Optional
 # player reads this sentence.
 REFUSAL_NO_EFFECT = "That draught has no effect you can call upon yet."
 
+# Distinct from the above: the slug resolved, the effect was applied, and only
+# then did removing the potion from the bag fail -- a genuine race or bug, not
+# a normal refusal path, so the message must not claim the draught did nothing.
+# Lives here rather than in either caller because combat and out-of-combat both
+# say it, and both used to define it verbatim, which is exactly the drift this
+# module exists to prevent.
+REFUSAL_ITEM_REMOVAL_FAILED = "Something went wrong reaching for that potion. Try again."
+
 # Anchor the parse on the "_l<digits>" suffix at the end of the slug, not on a
 # fixed split index: a family may itself contain underscores (buff_attack,
 # resist_fire, group_battle), so `slug.split("_")[n]` would cut a family name

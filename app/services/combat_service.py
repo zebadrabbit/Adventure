@@ -52,8 +52,8 @@ from .combat_constants import (
     PLAYER_USE_ITEM,
 )
 from .combat_utils import apply_resistances
-from .item_effects import REFUSAL_NO_EFFECT, resolve_potion_effect
-from .loot_service import _loot_summary, roll_loot
+from .item_effects import REFUSAL_ITEM_REMOVAL_FAILED, REFUSAL_NO_EFFECT, resolve_potion_effect
+from .loot_service import _item_display_name, _loot_summary, roll_loot
 from .monster_ai import select_action
 from .status_effects import apply_start_of_turn, can_act, replace_effect
 from .time_service import set_combat_state
@@ -66,11 +66,16 @@ logger = structlog.get_logger()
 # this is what an exploited "use an item you don't have" attempt now gets.
 _REFUSAL_NOT_CARRIED = "No such potion turns up among your provisions."
 
-# Distinct from the above: ownership was verified moments earlier against the
-# same inventory row, so this only fires on a genuine race/bug, not a normal
-# refusal path. Kept separate so the message doesn't lie about *why* nothing
-# happened.
-_REFUSAL_ITEM_REMOVAL_FAILED = "Something went wrong reaching for that potion. Try again."
+# The remaining refusals player_use_item can return. The item panel shows the
+# player whatever comes back, so every branch of that one function needs prose
+# -- no_effect and not_carried arriving as sentences while their immediate
+# neighbours still answered with machine codes is how "cannot_use" ended up on
+# screen. (The item-removal failure shares its wording with the out-of-combat
+# path, so it lives in item_effects alongside REFUSAL_NO_EFFECT.)
+_REFUSAL_ITEM_REQUIRED = "Name the draught you mean to drink."
+_REFUSAL_CANNOT_USE = "No such hero stands with the party in this fight."
+_REFUSAL_NOT_YOUR_TURN = "It is not your turn to act."
+_REFUSAL_VERSION_CONFLICT = "The fight has moved on since you last looked. Take stock and try again."
 
 
 def _now():
@@ -564,6 +569,39 @@ def _decrement_character_slug(character, slug: str) -> bool:
     return True
 
 
+def _grant_slug_to_inventory(inv: List[Any], slug: str, qty: int = 1) -> None:
+    """Add ``qty`` units of ``slug`` to a raw inventory list *in the shape that
+    list is already in*, mutating it in place.
+
+    The bag is stored in one of two shapes and inventory.utils.load_inventory
+    picks its branch by sniffing ``data[0]`` alone -- then discards every entry
+    of the other kind. So the shape of the existing list is not cosmetic:
+    appending a bare string to a list of dicts (which is what combat rewards
+    used to do) means load_inventory takes the canonical branch and drops the
+    reward, leaving a potion that combat's own parser can see and spend but
+    that never appears in the bag grid, and that the next load/dump round-trip
+    deletes outright. Appending a dict to a legacy list of strings is the same
+    bug pointed the other way, and it would take procedural gear instances with
+    it, so neither shape may simply be imposed on the other.
+
+    Legacy lists therefore get bare strings and canonical lists get a merged
+    ``{"slug", "qty"}`` stack. An empty list is canonical: the first entry it
+    gets decides the branch for good, and canonical is the format everything
+    else writes. Gear instances (dicts with a ``uid`` and no ``slug``) are never
+    merged into -- they are not stacks and hold no qty.
+    """
+    if qty <= 0:
+        return
+    if inv and isinstance(inv[0], str):
+        inv.extend([slug] * qty)
+        return
+    for entry in inv:
+        if isinstance(entry, dict) and not entry.get("uid") and entry.get("slug") == slug:
+            entry["qty"] = _entry_qty(entry) + qty
+            return
+    inv.append({"slug": slug, "qty": qty})
+
+
 def _item_counts_by_character(chars) -> Dict[str, Dict[str, int]]:
     """Per-character counts of every potion the resolver recognises, keyed
     ``{slug: {char_id: count}}``. Each character's potions are their own --
@@ -926,20 +964,27 @@ def _check_end(session: CombatSession):
                             inv_items = []
                     except Exception:
                         inv_items = []
+                # Every append goes through _grant_slug_to_inventory, which
+                # matches the shape the bag is already in. These three loops
+                # used to append bare strings unconditionally, so a reward
+                # dropped into a canonical bag (any character who has ever
+                # equipped or consumed anything) was visible to combat's own
+                # parser and invisible to load_inventory: in the item panel and
+                # drinkable mid-fight, absent from the bag grid and the
+                # dashboard, and destroyed by the next load/dump round-trip.
                 if isinstance(rewards.get("items"), dict):
                     for slug, qty in rewards.get("items", {}).items():
                         try:
                             q = int(qty)
                         except Exception:
                             q = 1
-                        for _ in range(max(1, q)):
-                            inv_items.append(slug)
+                        _grant_slug_to_inventory(inv_items, slug, max(1, q))
                 elif isinstance(rewards.get("items"), list):
                     for slug in rewards.get("items", []):
-                        inv_items.append(slug)
+                        _grant_slug_to_inventory(inv_items, slug)
                 if isinstance(rewards.get("items_list"), list):
                     for slug in rewards.get("items_list"):
-                        inv_items.append(slug)
+                        _grant_slug_to_inventory(inv_items, slug)
                 first.items = json.dumps(inv_items)
                 db.session.add(first)
             if rewards.get("gear"):
@@ -1743,20 +1788,20 @@ def player_use_item(
     if session.status != "active":
         return {"error": "inactive", "state": session.to_dict()}
     if session.version != version:
-        return {"error": "version_conflict", "state": session.to_dict()}
+        return {"error": "version_conflict", "message": _REFUSAL_VERSION_CONFLICT, "state": session.to_dict()}
     initiative = json.loads(session.initiative_json or "[]")
     actor = initiative[session.active_index]
     if actor["type"] != "player":
-        return {"error": "not_your_turn", "state": session.to_dict()}
+        return {"error": "not_your_turn", "message": _REFUSAL_NOT_YOUR_TURN, "state": session.to_dict()}
     if actor_id is None:
         actor_id = actor.get("id")
     if actor.get("controller_id") != user_id:
-        return {"error": "not_your_turn", "state": session.to_dict()}
+        return {"error": "not_your_turn", "message": _REFUSAL_NOT_YOUR_TURN, "state": session.to_dict()}
     if actor.get("id") != actor_id:
         # Allow stale actor id (client cached) by rebinding to current initiative actor
         actor_id = actor.get("id")
     if not slug:
-        return {"error": "item_required"}
+        return {"error": "item_required", "message": _REFUSAL_ITEM_REQUIRED}
     party = json.loads(session.party_snapshot_json or "{}") or {}
     skip_result = _skip_if_unconscious(session, party, actor_id)
     if skip_result is not None:
@@ -1772,7 +1817,7 @@ def player_use_item(
         # Actor isn't part of this session's party snapshot -- nothing to
         # apply an effect to. Distinct from "not carried"; shouldn't happen
         # via the real callers, all of which derive actor_id from initiative.
-        return {"error": "cannot_use"}
+        return {"error": "cannot_use", "message": _REFUSAL_CANNOT_USE}
 
     # 2. Ownership: ONLY the acting character's own bag counts, checked
     # before the effect is applied -- this is the gate that was missing.
@@ -1816,7 +1861,7 @@ def player_use_item(
             slug=slug,
             combat_id=combat_id,
         )
-        return {"error": "item_removal_failed", "message": _REFUSAL_ITEM_REMOVAL_FAILED}
+        return {"error": "item_removal_failed", "message": REFUSAL_ITEM_REMOVAL_FAILED}
     db.session.add(char_row)
 
     # item_counts/item_meta are rebuilt from the acting character's party
@@ -1834,7 +1879,13 @@ def player_use_item(
 
     session.party_snapshot_json = json.dumps(party)
     user_name = member.get("name", "Player")
-    _append_log(session, f"{user_name} uses {slug}.", code=PLAYER_USE_ITEM)
+    # The catalogue name, never the raw slug: before the tiered catalogue only
+    # two legacy hyphenated slugs could reach this line, and now forty
+    # underscore-and-tier machine strings can, which made "Hero uses
+    # potion_heal_l4." ordinary play. _item_display_name is the same lookup
+    # (and the same title-cased fallback for a slug with no catalogue row) that
+    # _loot_summary uses two lines up the very same log.
+    _append_log(session, f"{user_name} drinks {_item_display_name(slug)}.", code=PLAYER_USE_ITEM)
     session.phase = "end"
     _progress_phase(session)
     _check_end(session)
