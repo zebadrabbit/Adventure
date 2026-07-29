@@ -63,6 +63,18 @@
    directly, which lines up with .adv-hud's own fixed/inset:0 frame at the
    full-bleed breakpoint and needs no separate override in the narrow
    fallback below. */
+
+/* The anchor's own square size, as a token rather than a literal repeated
+   wherever something else needs to clear it (.adv-character's top offset,
+   below) -- the two calculations can't drift apart if they read the same
+   value. Declared on body, not on .adv-hud or on #account-anchor itself:
+   #account-anchor (<header>) and .adv-character (.adv-hud, <main>) share no
+   ancestor closer than body, the same constraint documented above for why
+   the account-anchor rules already break out of .adv-hud scoping. */
+body[data-realm="dungeon"] {
+    --account-anchor-size: 36px;
+}
+
 body[data-realm="dungeon"] #account-anchor {
     position: fixed;
     top: var(--space-2);
@@ -81,8 +93,8 @@ body[data-realm="dungeon"] .account-anchor-trigger {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    width: var(--account-anchor-size);
+    height: var(--account-anchor-size);
     background: var(--surface-overlay);
     border: 1px solid var(--edge);
     color: var(--ink);
@@ -603,35 +615,36 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover .avatar-circle {
  * forbids for persistent furniture. This panel is transient and dismissible,
  * and moving closes it, so the player never walks blind underneath it.
  *
- * top clears #account-anchor (36px square, inset --space-2, raised to
- * --z-dropdown by this same file so it always paints over this panel) --
- * without this the panel's own header, which right-aligns its close button
- * into this exact corner, would be genuinely unreachable to a mouse.
+ * top clears #account-anchor (--account-anchor-size square, inset
+ * --space-2, raised to --z-dropdown by this same file so it always paints
+ * over this panel) -- without this the panel's own header, which
+ * right-aligns its close button into this exact corner, would be genuinely
+ * unreachable to a mouse.
  *
- * bottom clears both of the other transient overlays that can be open at
- * the same time, not just the log/action-bar band the rail and action bar
- * use (one --hud-inset-bottom is not tall enough to clear either of them --
- * an earlier version of this rule claimed it did and was wrong):
- *   - a filled .adv-log, whose real ceiling is two bands (see
- *     .dungeon-output's max-height below) -- measured top edge ~339px at
- *     the 1366x768 floor;
- *   - #hotkeys-panel, which has no ceiling token of its own (its height is
- *     whatever its ten content rows add up to) and is the taller of the
- *     two -- measured top edge ~267px at the floor. This is the binding
- *     constraint below; clearing it clears the log too, with room to spare.
- * A partial overlap was tried and rejected: #hotkeys-panel's own close
- * button lives in its header, at the very top of the box, which is exactly
- * where a too-small clearance still reached -- reachable content underneath
- * an unreachable dismiss control is worse than covering the whole thing.
- * A future hotkeys-panel row needs this re-measured.
+ * bottom is one band (--hud-inset-bottom), same as the party rail and
+ * action bar -- deliberately NOT clearing a filled .adv-log or
+ * #hotkeys-panel. Both were tried (a taller bottom, derived from their real
+ * measured ceilings) and rejected: at the 1366x768 floor that left the panel
+ * 176px tall for eight equipment slots, a three-bar portrait and a bag grid
+ * -- a letterbox, not a character panel, which is a worse outcome than the
+ * overlap it was avoiding. This panel covers the log's upper half and all
+ * of #hotkeys-panel while open, and that is the intended trade, not an
+ * oversight: choosing gear is not something a player does while also
+ * reading the scrollback or a help overlay, the log is exactly that --
+ * scrollback, read between actions, not while one is in progress -- and
+ * #hotkeys-panel is reference chrome, not live state. Covering both while
+ * this panel is open costs nothing a player was using in that moment; a
+ * panel too short to show its own content costs the feature. Escape, a
+ * movement key, and the panel's own header X and footer Close button (four
+ * ways) all close it and give both back.
  */
 
 .adv-hud .adv-character {
     position: absolute;
-    top: calc(36px + var(--space-2) * 2);
+    top: calc(var(--account-anchor-size) + var(--space-2) * 2);
     left: var(--hud-inset-left);
     right: var(--space-2);
-    bottom: calc(var(--hud-inset-bottom) + 320px);
+    bottom: var(--hud-inset-bottom);
     z-index: var(--z-hud);
     overflow: auto;
     scrollbar-width: thin;
