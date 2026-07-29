@@ -160,10 +160,29 @@ document.addEventListener('DOMContentLoaded', function () {
             // Movement is deliberately exempt: it already closes the panel
             // itself (adventure.js's queueMove), so W/A/S/D is how the player
             // gets back to seeing the map, not something done blind.
-            if ((key === ' ' || key === 'c' || key === 'e' || key === 'h') &&
-                window.EquipmentPanel && window.EquipmentPanel.isOpen()) {
-                e.preventDefault(); // Space's default is to scroll the page
-                return;
+            //
+            // Space is scoped to e.target === document.body -- the exact
+            // condition the Space handler below already uses, and the only
+            // one under which Space could have fired Search in the first
+            // place. An earlier version of this guard suppressed Space
+            // unconditionally, which also ran (and preventDefault()'d)
+            // while focus sat on a button inside the panel itself: Space on
+            // a focused <button> synthesizes a click on release, and
+            // preventDefault() on keydown blocks that -- so a keyboard user
+            // tabbed to the panel's header X, footer Close, or an
+            // [data-action="unequip"] button lost Space as a way to press
+            // it, which is exactly the affordance this suppression exists
+            // alongside, not instead of. C/E/H have no such native
+            // collision (unlike Space/Enter, letter keys don't activate a
+            // focused button on their own), so they stay unconditional.
+            if (window.EquipmentPanel && window.EquipmentPanel.isOpen()) {
+                if (key === ' ' && e.target === document.body) {
+                    e.preventDefault(); // Space's default is to scroll the page
+                    return;
+                }
+                if (key === 'c' || key === 'e' || key === 'h') {
+                    return;
+                }
             }
 
             // Movement

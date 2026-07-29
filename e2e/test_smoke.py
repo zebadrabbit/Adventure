@@ -65,14 +65,45 @@ def _seed_procedural_item(char_id, slot="hands"):
     grants gear directly -- app/loot/generator.py:generate_item is the same
     pure function tests/test_procedural_gear_equip.py uses server-side.
 
+    DATABASE_URL is required and passed to the subprocess explicitly (not
+    left to ambient inheritance): app/__init__.py imports at module scope
+    and raises immediately if DATABASE_URL is unset, so on CI (no .env in
+    the checkout, and this pytest step's own env previously carried only
+    E2E/ADVENTURE_BASE_URL) the subprocess used to die before it could seed
+    anything -- see ci.yml's e2e step, which now sets it to match the
+    server's own database. Passing it explicitly rather than relying on
+    inheritance also matters locally: a shell with a TEST_DATABASE_URL habit
+    can easily have some *other* DATABASE_URL set, pointing at a database the
+    running server under test never reads from. That doesn't crash -- it
+    seeds silently into the wrong place, and the failure then surfaces as a
+    null dereference inside page.evaluate (the bag cell the test looks for
+    was never written to the database the server actually queries) instead
+    of anything that says "wrong database."
+
     Returns the seeded instance dict (uid, slot, name, ...).
+
+    Leaves the seeded item in the character's items/gear JSON rather than
+    deleting it afterward -- the character itself belongs to this run's own
+    throwaway e2e_smoke_<timestamp> account (registered fresh, never reused
+    across runs, and nothing else in this file cleans up its own registered
+    accounts either), so the marginal cost is one extra key inside already-
+    ephemeral test data, not a separately-tracked row that accumulates
+    unboundedly on its own.
     """
+    database_url = os.environ.get("DATABASE_URL")
+    assert database_url, (
+        "DATABASE_URL must be set for the e2e suite to seed procedural gear, and it must be "
+        "the exact database the server under test (ADVENTURE_BASE_URL) was started with -- "
+        "see ci.yml's e2e step and this function's docstring."
+    )
+    env = {**os.environ, "DATABASE_URL": database_url}
     result = subprocess.run(
         [sys.executable, "-c", _SEED_SCRIPT, str(char_id), slot],
         cwd=str(REPO_ROOT),
         capture_output=True,
         text=True,
         timeout=30,
+        env=env,
     )
     assert result.returncode == 0, f"seeding a procedural item failed: {result.stderr}"
     return json.loads(result.stdout.strip().splitlines()[-1])

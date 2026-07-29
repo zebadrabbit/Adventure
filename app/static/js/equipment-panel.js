@@ -268,7 +268,20 @@
 
         async refresh() {
             if (this._openCharId == null) return;
-            await this.loadCharacter(this._openCharId);
+            // Takes part in the same generation counter open() uses, and for
+            // the same reason: this is an async fetch-then-render sequence
+            // that can race a real one. refresh() reads _openCharId, which
+            // only updates after open()'s own gate passes -- so a loot claim
+            // landing mid-swap (open(B) in flight, _openCharId still A) can
+            // fetch the outgoing character, and if that resolves after the
+            // incoming open() already painted B, it would repaint the panel
+            // back to A with no open() call involved. Guarding this fetch
+            // the same way open() guards its own closes that path.
+            const gen = ++this._openGen;
+            const charId = this._openCharId;
+            const characterData = await this.fetchCharacter(charId);
+            if (gen !== this._openGen) return;
+            this.character = characterData;
             this.render();
         }
 

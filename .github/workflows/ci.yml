@@ -107,6 +107,13 @@ jobs:
         env:
           E2E: "1"
           ADVENTURE_BASE_URL: http://localhost:5000
+          # e2e/test_smoke.py's _seed_procedural_item() shells out to a
+          # subprocess that imports `app` on its own (see that function's
+          # docstring for why) -- app/__init__.py requires DATABASE_URL at
+          # import time. Must match the "Seed and boot server" step above:
+          # the subprocess has to write into the same database the running
+          # server reads from, not just any reachable one.
+          DATABASE_URL: postgresql://adventure:test_password@localhost:5432/adventure_e2e
         run: pytest e2e -q
 
       - name: Server log on failure
