@@ -242,6 +242,16 @@ def render_dashboard():
 
 
 def build_party_payload(chars: Sequence[Character]):
+    # Deferred to function scope, as this module does throughout, but hoisted
+    # out of the loop below: both of these were being re-imported once per
+    # party member, which is a dictionary lookup the loop pays for and reads
+    # as if each iteration might resolve something different.
+    from app.inventory.utils import encumbrance_state, load_inventory
+
+    # Canonical cap math (stats + gear + passives) — was an inline copy
+    # of the same formula before the dedup onto character_stats.
+    from app.services.character_stats import compute_hp_mana_max
+
     party = []
     for c in chars:
         try:
@@ -250,15 +260,13 @@ def build_party_payload(chars: Sequence[Character]):
             s = {}
 
         level = getattr(c, "level", 1) or 1
-        # Canonical cap math (stats + gear + passives) — was an inline copy
-        # of the same formula before the dedup onto character_stats.
-        from app.services.character_stats import compute_hp_mana_max
-
         hp_max, mana_max = compute_hp_mana_max(c)
 
         # Read actual current HP/MP from stats (persistent values)
         hp = int(s.get("hp", hp_max))  # Default to full if not set
         mana = int(s.get("current_mana", s.get("mana", mana_max)))  # Check both keys
+
+        enc = encumbrance_state(int(s.get("str", 10) or 10), load_inventory(getattr(c, "items", None)))
 
         party.append(
             {
@@ -270,6 +278,14 @@ def build_party_payload(chars: Sequence[Character]):
                 "hp_max": hp_max,
                 "mana": mana,
                 "mana_max": mana_max,
+                # The frame shows the *state*; the weight numbers stay one click
+                # away in the character panel. Past capacity a dex_penalty
+                # applies and combat movement derives from speed (8 + DEX // 2),
+                # so a player has to see this before the fight, not during it.
+                "encumbrance": {
+                    "status": enc.get("status", "normal"),
+                    "dex_penalty": int(enc.get("dex_penalty", 0) or 0),
+                },
             }
         )
     return party

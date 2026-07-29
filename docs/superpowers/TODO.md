@@ -54,11 +54,12 @@ Full triage with code pointers:
       Not built: log tabs (one stream exists on this screen), and the paper
       doll behind the frame click — next chunk,
       [specs/2026-07-28-character-panel-redesign.md](specs/2026-07-28-character-panel-redesign.md).
-- [ ] **Character panels & paper doll** — two live implementations
-      (`equipment.js` 243 lines, `equipment-enhanced.js` 657) with the dungeon
-      getting the lesser one; encumbrance is computed and shown only where
-      nobody looks. Spec:
-      [specs/2026-07-28-character-panel-redesign.md](specs/2026-07-28-character-panel-redesign.md).
+- [x] ~~**Character panels & paper doll**~~ — one `equipment-panel.js` mounted
+      two ways (HUD panel beside the party rail in the dungeon, modal on the
+      dashboard); `equipment.js`, `equipment-enhanced.js` and
+      `equipment-shared.js` deleted. Restyled onto the token system.
+      Encumbrance state now shows on the party frame. Plan:
+      [plans/2026-07-28-paper-doll-consolidation.md](plans/2026-07-28-paper-doll-consolidation.md).
 
 ## Gameplay — waiting on playtest verdicts
 - [ ] Tune `EVENT_TUNING` (app/dungeon/room_events.py): shrine/trap/ambush
@@ -78,11 +79,9 @@ Full triage with code pointers:
       canonical eight, all into the same `gear` dict. Now single-sourced from
       `archetypes.SLOTS`, with a data migration. Plan:
       [plans/2026-07-28-gear-slot-unification.md](plans/2026-07-28-gear-slot-unification.md).
-- [ ] **Looted gear cannot be equipped during a run** — the dungeon's only equip
-      path (`equipment.js`) posts `{slug, slot}` and has no `uid` branch, so
-      procedural instances 404 on the legacy path. Fixed by consolidating the
-      two paper dolls onto the one that sends `uid`. Spec:
-      [specs/2026-07-28-character-panel-redesign.md](specs/2026-07-28-character-panel-redesign.md).
+- [x] ~~Looted gear cannot be equipped during a run~~ — the dungeon's only equip
+      path posted `{slug, slot}` with no `uid` branch, so procedural instances
+      404'd on the legacy path. The promoted panel sends `uid`.
 - [ ] Shrine/camp write `stats["mana"]` instead of `current_mana`
       (pre-existing camp convention) — post-combat characters may not see
       the restore; small cleanup.

@@ -63,19 +63,38 @@
    directly, which lines up with .adv-hud's own fixed/inset:0 frame at the
    full-bleed breakpoint and needs no separate override in the narrow
    fallback below. */
+
+/* The anchor's own square size, as a token rather than a literal repeated
+   wherever something else needs to clear it (.adv-character's top offset,
+   below) -- the two calculations can't drift apart if they read the same
+   value. Declared on body, not on .adv-hud or on #account-anchor itself:
+   #account-anchor (<header>) and .adv-character (.adv-hud, <main>) share no
+   ancestor closer than body, the same constraint documented above for why
+   the account-anchor rules already break out of .adv-hud scoping. */
+body[data-realm="dungeon"] {
+    --account-anchor-size: 36px;
+}
+
 body[data-realm="dungeon"] #account-anchor {
     position: fixed;
     top: var(--space-2);
     right: var(--space-2);
-    z-index: var(--z-hud);
+    /* Above the character panel (--z-hud): that panel covers the canvas-drawn
+       minimap and the zoom controls while open, which is acceptable because
+       it is transient, but the account anchor must stay reachable regardless.
+       This also closes a known defect: at >=1200px .adv-hud is
+       position: fixed and so a stacking context, but in the narrow fallback
+       it is not, and the zoom buttons could paint over an open account
+       dropdown. */
+    z-index: var(--z-dropdown);
 }
 
 body[data-realm="dungeon"] .account-anchor-trigger {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    width: var(--account-anchor-size);
+    height: var(--account-anchor-size);
     background: var(--surface-overlay);
     border: 1px solid var(--edge);
     color: var(--ink);
@@ -395,11 +414,59 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover .avatar-circle {
 .adv-hud .adv-party-rail .last-roll-line {
     min-height: 1rem;
     font-size: var(--text-2xs);
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .adv-hud .adv-party-rail .party-card-action-btn {
     padding: 2px 8px;
     font-size: var(--text-2xs);
+}
+
+/* The row last-roll-line already occupied (a fixed min-height every frame
+   pays for, encumbered or not) also holds the encumbrance badge now. A
+   header-row badge was tried first and measured too narrow: at 1366x768
+   with real class names, a third badge pushed "Overloaded" past the card's
+   right edge and .operative-card's overflow: hidden clipped it silently.
+   This row has no competing content -- last-roll-line's selector never
+   matches anything on this page's markup, so it is always empty here. */
+.adv-hud .adv-party-rail .party-status-line {
+    min-height: 1rem;
+}
+
+/* Encumbrance state. Warn by default; danger when the character cannot
+   carry any more. The weight numbers stay in the character panel; the DEX
+   penalty detail moves to this badge's title (JS) rather than its text, to
+   keep the badge itself short. */
+.adv-hud .adv-party-rail .frame-encumbrance {
+    /* flex: 0 1 auto (not 0 0) + min-width: 0 lets this badge shrink instead
+       of forcing the row wider than the card -- .operative-card's
+       overflow: hidden turns any overrun into a silent clip otherwise (the
+       same failure mode the header-row attempt was rejected for). Uppercase
+       text runs ~13% wider than mixed-case for words this size, which is
+       roughly the entire gutter .party-card-body's padding leaves at the
+       1366x768 floor, so ellipsis is the real fallback, not a formality.
+       The full word is still in the title attribute (JS) either way. */
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border-radius: var(--radius);
+    border: 1px solid var(--warn-line);
+    background: var(--warn-wash);
+    color: var(--warn);
+    text-transform: uppercase;
+}
+
+.adv-hud .adv-party-rail .frame-encumbrance.is-blocked {
+    border-color: var(--danger-line);
+    background: var(--danger-wash);
+    color: var(--danger);
+}
+
+.adv-hud .adv-party-rail .frame-encumbrance[hidden] {
+    display: none;
 }
 
 @media (max-width: 1199px) {
@@ -585,5 +652,62 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover .avatar-circle {
     .adv-hud .adv-actions #adventure-action-panel {
         flex-direction: row;
         flex-wrap: wrap;
+    }
+}
+
+/* --- Character panel ------------------------------------------------------
+ * Sits beside the party rail, not over it, so the rail stays live as the
+ * character selector.
+ *
+ * It does cover the camera's target point while open, which the layout spec
+ * forbids for persistent furniture. This panel is transient and dismissible,
+ * and moving closes it, so the player never walks blind underneath it.
+ *
+ * top clears #account-anchor (--account-anchor-size square, inset
+ * --space-2, raised to --z-dropdown by this same file so it always paints
+ * over this panel) -- without this the panel's own header, which
+ * right-aligns its close button into this exact corner, would be genuinely
+ * unreachable to a mouse.
+ *
+ * bottom is one band (--hud-inset-bottom), same as the party rail and
+ * action bar -- deliberately NOT clearing a filled .adv-log or
+ * #hotkeys-panel. Both were tried (a taller bottom, derived from their real
+ * measured ceilings) and rejected: at the 1366x768 floor that left the panel
+ * 176px tall for eight equipment slots, a three-bar portrait and a bag grid
+ * -- a letterbox, not a character panel, which is a worse outcome than the
+ * overlap it was avoiding. This panel covers the log's upper half and all
+ * of #hotkeys-panel while open, and that is the intended trade, not an
+ * oversight: choosing gear is not something a player does while also
+ * reading the scrollback or a help overlay, the log is exactly that --
+ * scrollback, read between actions, not while one is in progress -- and
+ * #hotkeys-panel is reference chrome, not live state. Covering both while
+ * this panel is open costs nothing a player was using in that moment; a
+ * panel too short to show its own content costs the feature. Escape, a
+ * movement key, and the panel's own header X and footer Close button (four
+ * ways) all close it and give both back.
+ */
+
+.adv-hud .adv-character {
+    position: absolute;
+    top: calc(var(--account-anchor-size) + var(--space-2) * 2);
+    left: var(--hud-inset-left);
+    right: var(--space-2);
+    bottom: var(--hud-inset-bottom);
+    z-index: var(--z-hud);
+    overflow: auto;
+    scrollbar-width: thin;
+    background: var(--surface);
+    border: 1px solid var(--edge-strong);
+    box-shadow: var(--elev-overlay);
+}
+
+.adv-hud .adv-character[hidden] {
+    display: none;
+}
+
+@media (max-width: 1199px) {
+    .adv-hud .adv-character {
+        position: static;
+        margin-top: var(--space-3);
     }
 }

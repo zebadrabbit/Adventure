@@ -177,3 +177,25 @@ def test_action_bar_holds_the_five_game_actions(client, party):
     assert 'class="adv-actions"' in html
     for btn in ("btn-search", "btn-party-inventory", "btn-camp", "btn-extract", "btn-hearth"):
         assert f'id="{btn}"' in html, f"{btn} fell out of the action bar"
+
+
+def test_adventure_mounts_the_character_panel(client, party):
+    html = client.get("/adventure").get_data(as_text=True)
+
+    assert 'class="adv-character"' in html, "no mount point for the character panel"
+    assert "equipment-panel.js" in html
+
+
+def test_adventure_no_longer_ships_the_old_panels(client, party):
+    """One paper doll, not two -- the point of this chunk."""
+    html = client.get("/adventure").get_data(as_text=True)
+
+    assert "equipment-enhanced.js" not in html
+    assert "js/equipment.js" not in html
+
+
+def test_bag_button_is_gone_from_the_frames(client, party):
+    """Slots, doll and bag live in one panel, so the frame needs one target."""
+    html = client.get("/adventure").get_data(as_text=True)
+
+    assert "btn-bag-panel" not in html

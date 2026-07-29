@@ -14,8 +14,12 @@ ADVENTURE_BASE_URL (default http://localhost:5000). The CI job
     E2E=1 ADVENTURE_BASE_URL=http://localhost:5000 pytest e2e -q
 """
 
+import json
 import os
+import subprocess
+import sys
 import time
+from pathlib import Path
 
 import pytest
 
@@ -26,6 +30,123 @@ playwright_sync = pytest.importorskip("playwright.sync_api")
 BASE_URL = os.environ.get("ADVENTURE_BASE_URL", "http://localhost:5000")
 USERNAME = f"e2e_smoke_{int(time.time())}"
 PASSWORD = "e2e-smoke-pass-1"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+_SEED_SCRIPT = """
+import json, random, sys
+from app import create_app, db
+from app.loot.generator import generate_item
+from app.models.models import Character
+
+app = create_app()
+with app.app_context():
+    ch = db.session.get(Character, int(sys.argv[1]))
+    if ch is None:
+        raise SystemExit(f"no character {sys.argv[1]}")
+    instance = generate_item(level=2, rarity="common", slot=sys.argv[2], rng=random.Random(4242))
+    items = json.loads(ch.items) if ch.items else []
+    if not isinstance(items, list):
+        items = []
+    items.append(instance)
+    ch.items = json.dumps(items)
+    db.session.commit()
+    print(json.dumps(instance))
+"""
+
+# Same out-of-process rules as _SEED_SCRIPT (see _seed_procedural_item). A
+# potion is a catalogue row, not a generated instance, so this ensures the row
+# exists (server.py seeds it at boot, but a database that predates that seed
+# would otherwise leave the bag entry unresolvable and the cell unrendered)
+# and then puts a stack in the character's bag.
+_SEED_POTION_SCRIPT = """
+import json, sys
+from app import create_app, db
+from app.models.models import Character, Item
+
+app = create_app()
+with app.app_context():
+    ch = db.session.get(Character, int(sys.argv[1]))
+    if ch is None:
+        raise SystemExit(f"no character {sys.argv[1]}")
+    slug, qty = sys.argv[2], int(sys.argv[3])
+    if Item.query.filter_by(slug=slug).first() is None:
+        db.session.add(Item(slug=slug, name="Potion of Healing", type="potion",
+                            description="Restores a small amount of HP.", value_copper=150))
+    items = json.loads(ch.items) if ch.items else []
+    if not isinstance(items, list):
+        items = []
+    items = [obj for obj in items if not (isinstance(obj, dict) and obj.get("slug") == slug)]
+    items.append({"slug": slug, "qty": qty})
+    ch.items = json.dumps(items)
+    db.session.commit()
+    print(json.dumps({"slug": slug, "qty": qty}))
+"""
+
+
+def _run_seed(script, *args):
+    """Run one of the seed scripts above in a subprocess against the server's
+    own database. See _seed_procedural_item for why this is out-of-process and
+    why DATABASE_URL is passed explicitly rather than inherited."""
+    database_url = os.environ.get("DATABASE_URL")
+    assert database_url, (
+        "DATABASE_URL must be set for the e2e suite to seed, and it must be "
+        "the exact database the server under test (ADVENTURE_BASE_URL) was started with -- "
+        "see ci.yml's e2e step and _seed_procedural_item's docstring."
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script, *[str(a) for a in args]],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        timeout=30,
+        env={**os.environ, "DATABASE_URL": database_url},
+    )
+    assert result.returncode == 0, f"seeding failed: {result.stderr}"
+    return json.loads(result.stdout.strip().splitlines()[-1])
+
+
+def _seed_potions(char_id, slug="potion-healing", qty=3):
+    """Put a stack of drinkable potions in a party member's bag."""
+    return _run_seed(_SEED_POTION_SCRIPT, char_id, slug, qty)
+
+
+def _seed_procedural_item(char_id, slot="hands"):
+    """Seed one procedural gear instance directly into a party member's bag.
+
+    Run out-of-process (a subprocess that imports `app` on its own) rather
+    than importing `app`/`db` here: this module is a black-box browser test
+    against a live server (see the module docstring) and must not import the
+    app package or rebind a DB session itself. There is no HTTP route that
+    grants gear directly -- app/loot/generator.py:generate_item is the same
+    pure function tests/test_procedural_gear_equip.py uses server-side.
+
+    DATABASE_URL is required and passed to the subprocess explicitly (not
+    left to ambient inheritance): app/__init__.py imports at module scope
+    and raises immediately if DATABASE_URL is unset, so on CI (no .env in
+    the checkout, and this pytest step's own env previously carried only
+    E2E/ADVENTURE_BASE_URL) the subprocess used to die before it could seed
+    anything -- see ci.yml's e2e step, which now sets it to match the
+    server's own database. Passing it explicitly rather than relying on
+    inheritance also matters locally: a shell with a TEST_DATABASE_URL habit
+    can easily have some *other* DATABASE_URL set, pointing at a database the
+    running server under test never reads from. That doesn't crash -- it
+    seeds silently into the wrong place, and the failure then surfaces as a
+    null dereference inside page.evaluate (the bag cell the test looks for
+    was never written to the database the server actually queries) instead
+    of anything that says "wrong database."
+
+    Returns the seeded instance dict (uid, slot, name, ...).
+
+    Leaves the seeded item in the character's items/gear JSON rather than
+    deleting it afterward -- the character itself belongs to this run's own
+    throwaway e2e_smoke_<timestamp> account (registered fresh, never reused
+    across runs, and nothing else in this file cleans up its own registered
+    accounts either), so the marginal cost is one extra key inside already-
+    ephemeral test data, not a separately-tracked row that accumulates
+    unboundedly on its own.
+    """
+    return _run_seed(_SEED_SCRIPT, char_id, slot)
 
 
 @pytest.fixture(scope="module")
@@ -244,6 +365,120 @@ def test_hud_panels_do_not_cover_the_party_or_each_other(page):
     # 540px the rail has between --space-2 and --hud-inset-bottom. It will
     # recur on a font-size change, a fifth party slot, or an extra stat row.
     assert result["railOverflow"] <= 1, f"the party rail overflows its own box by {result['railOverflow']}px"
+
+
+def test_character_panel_opens_from_a_party_frame(page):
+    """The rail is the character selector, and the panel it opens is the one
+    that can equip procedural gear (it posts uid). The old dungeon panel could
+    not, which is the defect this chunk exists to fix.
+
+    Everything up to the drag-drop only proves the panel opens in the right
+    place with the right scripts loaded -- it would pass unchanged even if
+    the drop posted {slug, slot}, posted nothing, or the slot stayed empty.
+    The uid assertion at the end is the one that actually proves the defect
+    is fixed: a procedural item, seeded directly into a party member's bag
+    (there is no route that grants gear), dropped on its slot from this
+    panel, sends a request whose body is {"uid": ...} -- not the old
+    dungeon panel's {slug, slot}, which 404s for a generated item.
+    """
+    page.set_viewport_size({"width": 1366, "height": 768})
+    page.goto(f"{BASE_URL}/adventure")
+    page.wait_for_load_state("networkidle")
+
+    scripts = page.evaluate("() => Array.from(document.scripts).map(s => s.src).filter(Boolean).join(' ')")
+    assert "equipment-panel.js" in scripts
+    assert "equipment-enhanced.js" not in scripts, "two paper dolls again"
+    assert "/equipment.js" not in scripts, "the old dungeon panel is still loaded"
+
+    char_id = page.evaluate("() => document.querySelector('.adv-party-rail .adv-frame-open')?.dataset.charId")
+    assert char_id, "no deployed party member to open a panel for"
+
+    page.click(".adv-party-rail .adv-frame-open")
+    panel = page.locator(".adv-character")
+    panel.wait_for(state="visible", timeout=3000)
+
+    box = panel.bounding_box()
+    rail = page.locator(".adv-party-rail").bounding_box()
+    assert box["x"] >= rail["x"] + rail["width"] - 1, "the panel is covering the rail it selects from"
+
+    instance = _seed_procedural_item(char_id, slot="hands")
+    page.reload()
+    page.wait_for_load_state("networkidle")
+    page.click(".adv-party-rail .adv-frame-open")
+    panel.wait_for(state="visible", timeout=3000)
+
+    with page.expect_request(lambda req: req.url.endswith("/equip") and req.method == "POST") as req_info:
+        page.evaluate(
+            """([uid, slot]) => {
+                const cell = document.querySelector(`.bag-grid-cell[data-item-uid="${uid}"]`);
+                const target = document.querySelector(`.equipment-slot[data-slot="${slot}"]`);
+                const dt = new DataTransfer();
+                cell.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+                target.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
+                target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+            }""",
+            [instance["uid"], instance["slot"]],
+        )
+    equip_request = req_info.value
+    equip_body = json.loads(equip_request.post_data)
+    assert (
+        equip_body.get("uid") == instance["uid"]
+    ), f"the dungeon panel did not send uid for the dropped item: {equip_body}"
+    assert "slug" not in equip_body and "slot" not in equip_body, (
+        "this is the old dungeon panel's request shape ({slug, slot}), which 404s for a "
+        f"generated item with no catalogue row: {equip_body}"
+    )
+
+
+def test_a_potion_in_the_bag_can_be_drunk_from_the_panel(page):
+    """The client's consume path, guarded where it was actually lost.
+
+    Out-of-combat drinking disappeared once already and nothing failed,
+    because what went missing was the *panel's* route to /consume, not the
+    route itself -- which stayed live and stayed tested the whole time.
+    tests/test_bag_potion_consumption.py covers the server round trip, but it
+    would still pass with consumeItem deleted from equipment-panel.js, so it
+    cannot be the guard against a second silent loss. This is: it clicks the
+    cell a player clicks and asserts the request that click must produce.
+
+    The two assertions divide the job. `data-consumable="true"` proves the
+    grid still recognises a potion as drinkable rather than wearable -- the
+    exact judgement whose absence made a potion click try to *equip* it. The
+    expect_request proves the click on that cell reaches /consume with the
+    potion's slug, and not /equip, which answers 400 for a slotless item.
+    """
+    page.set_viewport_size({"width": 1366, "height": 768})
+    page.goto(f"{BASE_URL}/adventure")
+    page.wait_for_load_state("networkidle")
+
+    char_id = page.evaluate("() => document.querySelector('.adv-party-rail .adv-frame-open')?.dataset.charId")
+    assert char_id, "no deployed party member to open a panel for"
+
+    # Seeded rather than taken from the starting kit: most kits carry a
+    # healing potion, but which class autofill rolled is not this test's to
+    # depend on, and an earlier case in this module may already have drunk it.
+    potion = _seed_potions(char_id, qty=3)
+    page.reload()
+    page.wait_for_load_state("networkidle")
+    page.click(".adv-party-rail .adv-frame-open")
+    page.locator(".adv-character").wait_for(state="visible", timeout=3000)
+
+    cell = page.locator(f'.bag-grid-cell[data-item-slug="{potion["slug"]}"]').first
+    cell.wait_for(state="visible", timeout=3000)
+    assert cell.get_attribute("data-consumable") == "true", (
+        "the bag grid no longer treats a potion as drinkable, so its cell would "
+        "try to equip it -- which is a 400 for an item with no slot"
+    )
+
+    with page.expect_request(lambda req: req.url.endswith("/consume") and req.method == "POST") as req_info:
+        cell.click()
+    body = json.loads(req_info.value.post_data)
+    assert body.get("slug") == potion["slug"], f"the panel drank the wrong thing: {body}"
+
+    page.wait_for_timeout(500)
+    assert (
+        page.locator(f'.bag-grid-cell[data-item-slug="{potion["slug"]}"] .cell-qty').first.inner_text().strip() == "2"
+    ), "the panel did not repaint the bag after drinking"
 
 
 def test_csrf_guard_rejects_bare_mutation(page):

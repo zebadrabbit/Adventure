@@ -286,6 +286,18 @@
 
     // Movement queue helpers (restored after refactor)
     function queueMove(dir) {
+      // The character panel covers the camera's target point while open (see
+      // adventure-hud.css) -- acceptable only because it is transient and
+      // dismissible, on condition the player never walks blind underneath
+      // it. This is the real choke point for every move regardless of how
+      // it was issued (keyboard today; the disabled-button click path at
+      // moveNorthBtn etc. below, if those buttons ever return to the
+      // markup), so it's where that condition gets enforced -- a check
+      // living at one keydown call site could drift the moment a second
+      // entry point exists.
+      if (window.EquipmentPanel && window.EquipmentPanel.isOpen()) {
+        window.EquipmentPanel.close();
+      }
       moveQueue.push(dir);
       if (!moveInFlight) processNextMove();
     }
@@ -827,6 +839,18 @@
     function updateLastRollUI(roll) {
       if (!roll || typeof roll !== 'object') return;
       const ch = roll.character || null;
+      // `.character-card` matches nothing in adventure.html -- the party-rail
+      // card is `.operative-card` -- so `who` below is always null on this
+      // page and every call falls through to the "show above the log"
+      // fallback. That makes the party rail's `.last-roll-line` permanently
+      // empty here, which is why adventure-hud.css/adventure.html let the
+      // encumbrance marker (`.frame-encumbrance`) share that row instead of
+      // opening its own: the row's height was already being paid for and
+      // nothing else was using it. If you fix this selector, `.last-roll-line`
+      // will start rendering real (unbounded-length) text again -- re-measure
+      // the party rail at 1366x768 with both a roll message and an
+      // encumbrance marker showing before shipping that fix; see the party
+      // rail's .frame-encumbrance / .party-status-line rules for the budget.
       const who = ch && (ch.id != null) ? document.querySelector(`.character-card .last-roll-line[data-char-id="${ch.id}"]`) : null;
       const text = (function () {
         const parts = [];

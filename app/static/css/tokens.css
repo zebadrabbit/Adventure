@@ -221,6 +221,11 @@
     --rarity-rare: #6d9ed6;
     --rarity-epic: #a78bfa;
     --rarity-legendary: #e8b64c;
+    --rarity-mythic: #e3789a;
+    /* rose-magenta — the one rarity beyond legendary's coin-gold, still
+       clearly a step apart from --rarity-epic's violet. Added for the
+       equipment panel restyle: app/loot/data/rarities.py's RARITY_ORDER
+       has six tiers, but only five existed here. */
 
     /* Class identity — fixed in both realms, for the same reason. One hue per
        class; badges, header strips and border rings all derive from it.

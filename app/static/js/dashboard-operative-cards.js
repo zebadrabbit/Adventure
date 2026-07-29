@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', function () {
     updateSelectButtons();
 
     // Add equipped item badges
-    if (window.equipmentManager) {
+    if (window.EquipmentPanel) {
         document.querySelectorAll('.operative-card').forEach(card => {
             const charId = card.dataset.id;
             if (!charId) return;

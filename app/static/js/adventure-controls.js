@@ -151,6 +151,40 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const key = e.key.toLowerCase();
 
+            // The character panel is the same "acting blind under an
+            // overlay" hazard close-on-move exists to prevent, just for the
+            // action keys instead of movement: with the panel open and focus
+            // still on body (its bag cells carry no tabindex), Space fires a
+            // real Search -- 2 turns and an encounter roll the player can't
+            // see -- and C/E/H fire Camp/Extract/Hearth the same way.
+            // Movement is deliberately exempt: it already closes the panel
+            // itself (adventure.js's queueMove), so W/A/S/D is how the player
+            // gets back to seeing the map, not something done blind.
+            //
+            // Space is scoped to e.target === document.body -- the exact
+            // condition the Space handler below already uses, and the only
+            // one under which Space could have fired Search in the first
+            // place. An earlier version of this guard suppressed Space
+            // unconditionally, which also ran (and preventDefault()'d)
+            // while focus sat on a button inside the panel itself: Space on
+            // a focused <button> synthesizes a click on release, and
+            // preventDefault() on keydown blocks that -- so a keyboard user
+            // tabbed to the panel's header X, footer Close, or an
+            // [data-action="unequip"] button lost Space as a way to press
+            // it, which is exactly the affordance this suppression exists
+            // alongside, not instead of. C/E/H have no such native
+            // collision (unlike Space/Enter, letter keys don't activate a
+            // focused button on their own), so they stay unconditional.
+            if (window.EquipmentPanel && window.EquipmentPanel.isOpen()) {
+                if (key === ' ' && e.target === document.body) {
+                    e.preventDefault(); // Space's default is to scroll the page
+                    return;
+                }
+                if (key === 'c' || key === 'e' || key === 'h') {
+                    return;
+                }
+            }
+
             // Movement
             if (key === 'w' || key === 'arrowup') {
                 e.preventDefault();
@@ -192,14 +226,32 @@ document.addEventListener('DOMContentLoaded', function () {
                 const hearthBtn = document.getElementById('btn-hearth');
                 if (hearthBtn && !hearthBtn.disabled) hearthBtn.click();
             } else if (key === 'i') {
-                // Open first character's bag panel
-                const bagBtn = document.querySelector('.btn-bag-panel');
-                if (bagBtn) bagBtn.click();
+                // Slots, doll and bag are one panel now (no more standalone
+                // .btn-bag-panel). Toggle, not open: this used to click the
+                // *first* .btn-equip-panel unconditionally, so pressing I
+                // while looking at the fourth character's gear silently swapped
+                // the panel to the first character's -- an inventory key that
+                // changes who you are looking at. Closing is what a player
+                // means by pressing the open key again; picking a different
+                // character is what the party rail is for.
+                if (window.EquipmentPanel && window.EquipmentPanel.isOpen()) {
+                    window.EquipmentPanel.close();
+                } else {
+                    const equipBtn = document.querySelector('.btn-equip-panel');
+                    if (equipBtn) equipBtn.click();
+                }
             } else if (key === 'escape') {
-                // Close hotkeys panel
-                const panel = document.getElementById('hotkeys-panel');
-                if (panel && panel.style.display !== 'none') {
-                    panel.style.display = 'none';
+                // Escape closes whichever transient overlay is open. Only one
+                // of the two: the character panel sits above the map and
+                // blocks play, so it takes priority, and a single keypress
+                // must not also close the hotkeys panel underneath it.
+                if (window.EquipmentPanel && window.EquipmentPanel.isOpen()) {
+                    window.EquipmentPanel.close();
+                } else {
+                    const panel = document.getElementById('hotkeys-panel');
+                    if (panel && panel.style.display !== 'none') {
+                        panel.style.display = 'none';
+                    }
                 }
             }
         });
@@ -232,17 +284,22 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Clicking anywhere on a party frame opens that character, same as the
-    // frame's equip button. The paper doll itself is the next chunk
-    // (specs/2026-07-28-character-panel-redesign.md); this is the hook it
-    // will reuse.
+    // The party rail is the character selector: clicking a frame opens that
+    // character's panel, and clicking another swaps the contents rather than
+    // closing and reopening. The panel sits beside the rail, never over it.
+    //
+    // Let every button handle its own click, including .btn-equip-panel:
+    // equipment-panel.js now wires that button itself (a delegated listener
+    // registered at module load, see its "panel owns its trigger" comment),
+    // so without this bail a click on the equip button ran open() twice --
+    // once from that listener, once from this one -- doubling the
+    // GET /api/characters/<id> the panel makes on every open.
     document.addEventListener('click', (e) => {
         const frame = e.target.closest('.adv-frame-open');
         if (!frame) return;
-        // Let the frame's own buttons handle their own clicks.
         if (e.target.closest('button')) return;
-        const equipBtn = frame.querySelector('.btn-equip-panel');
-        if (equipBtn) equipBtn.click();
+        const charId = frame.dataset.charId;
+        if (charId && window.EquipmentPanel) window.EquipmentPanel.open(charId);
     });
 
     document.addEventListener('keydown', (e) => {
@@ -250,9 +307,15 @@ document.addEventListener('DOMContentLoaded', function () {
         const frame = e.target.closest?.('.adv-frame-open');
         if (!frame || e.target !== frame) return;
         e.preventDefault();
-        const equipBtn = frame.querySelector('.btn-equip-panel');
-        if (equipBtn) equipBtn.click();
+        const charId = frame.dataset.charId;
+        if (charId && window.EquipmentPanel) window.EquipmentPanel.open(charId);
     });
+
+    // Mount the character panel once, into the HUD's own mount point. open()
+    // re-renders into it on every frame click; nothing else here needs to
+    // create or tear down the container.
+    const eqPanelHost = document.getElementById('adv-character-panel');
+    if (eqPanelHost && window.EquipmentPanel) window.EquipmentPanel.mount(eqPanelHost);
 });
 
 // ---------------------------------------------------------------- party cards
@@ -291,6 +354,32 @@ document.addEventListener('DOMContentLoaded', function () {
         set('.mana-bar', member.mana, member.mana_max, 'MP');
         // A downed character should be obvious at a glance.
         card.classList.toggle('is-downed', Number(member.hp) <= 0);
+
+        // Encumbrance is state, not a number: "you are slower" belongs on the
+        // frame, the weight belongs in the panel. It shares last-roll-line's
+        // row (.party-status-line) rather than opening its own -- that row's
+        // reserved height is already spent whether or not a roll message is
+        // showing, so painting the marker there costs the rail nothing. A
+        // badge in the header row was tried first and rejected: it measured
+        // fine but clipped in the browser once a real (long) class name sat
+        // next to it. The DEX penalty moves to a hover title so the badge
+        // text itself stays short.
+        const enc = member.encumbrance || {};
+        const marker = card.querySelector('.frame-encumbrance');
+        if (marker) {
+            const status = enc.status || 'normal';
+            const pen = Number(enc.dex_penalty) || 0;
+            if (status === 'normal') {
+                marker.hidden = true;
+                marker.textContent = '';
+                marker.removeAttribute('title');
+            } else {
+                marker.hidden = false;
+                marker.textContent = status === 'blocked' ? 'Overloaded' : 'Encumbered';
+                marker.title = pen ? `${marker.textContent} (-${pen} DEX)` : marker.textContent;
+            }
+            marker.classList.toggle('is-blocked', status === 'blocked');
+        }
     }
 
     let inFlight = false;
