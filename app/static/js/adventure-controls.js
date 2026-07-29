@@ -346,7 +346,10 @@ document.addEventListener('DOMContentLoaded', function () {
         card.classList.toggle('is-downed', Number(member.hp) <= 0);
 
         // Encumbrance is state, not a number: "you are slower" belongs on the
-        // frame, the weight belongs in the panel.
+        // frame, the weight belongs in the panel. This sits in the badge row
+        // (beside class/level) rather than its own line -- a rail this tight
+        // can't spend ~20px of height per frame on it, so the word alone is
+        // the badge and the DEX penalty moves to a hover title instead.
         const enc = member.encumbrance || {};
         const marker = card.querySelector('.frame-encumbrance');
         if (marker) {
@@ -355,11 +358,11 @@ document.addEventListener('DOMContentLoaded', function () {
             if (status === 'normal') {
                 marker.hidden = true;
                 marker.textContent = '';
+                marker.removeAttribute('title');
             } else {
                 marker.hidden = false;
-                marker.textContent = status === 'blocked'
-                    ? `Overloaded${pen ? ` (-${pen} DEX)` : ''}`
-                    : `Encumbered${pen ? ` (-${pen} DEX)` : ''}`;
+                marker.textContent = status === 'blocked' ? 'Overloaded' : 'Encumbered';
+                marker.title = pen ? `${marker.textContent} (-${pen} DEX)` : marker.textContent;
             }
             marker.classList.toggle('is-blocked', status === 'blocked');
         }

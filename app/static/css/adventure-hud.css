@@ -414,6 +414,8 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover .avatar-circle {
 .adv-hud .adv-party-rail .last-roll-line {
     min-height: 1rem;
     font-size: var(--text-2xs);
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .adv-hud .adv-party-rail .party-card-action-btn {
@@ -421,16 +423,32 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover .avatar-circle {
     font-size: var(--text-2xs);
 }
 
-/* Encumbrance state on the frame. Warn by default; danger when the character
-   cannot carry any more. The number lives in the character panel. */
+/* The row last-roll-line already occupied (a fixed min-height every frame
+   pays for, encumbered or not) also holds the encumbrance badge now. A
+   header-row badge was tried first and measured too narrow: at 1366x768
+   with real class names, a third badge pushed "Overloaded" past the card's
+   right edge and .operative-card's overflow: hidden clipped it silently.
+   This row has no competing content -- last-roll-line's selector never
+   matches anything on this page's markup, so it is always empty here. */
+.adv-hud .adv-party-rail .party-status-line {
+    min-height: 1rem;
+}
+
+/* Encumbrance state. Warn by default; danger when the character cannot
+   carry any more. The weight numbers stay in the character panel; the DEX
+   penalty detail moves to this badge's title (JS) rather than its text, to
+   keep the badge itself short. */
 .adv-hud .adv-party-rail .frame-encumbrance {
-    font-size: var(--text-2xs);
-    letter-spacing: var(--tracking-label);
-    text-transform: uppercase;
+    flex: 0 0 auto;
+    border-radius: var(--radius);
+    border: 1px solid var(--warn-line);
+    background: var(--warn-wash);
     color: var(--warn);
 }
 
 .adv-hud .adv-party-rail .frame-encumbrance.is-blocked {
+    border-color: var(--danger-line);
+    background: var(--danger-wash);
     color: var(--danger);
 }
 
