@@ -19,13 +19,7 @@ from app.inventory.utils import (
     load_inventory,
     remove_one,
 )
-
-# The one gear-slot vocabulary. Defined by the loot generator, which is what
-# every procedural item, prefix and suffix keys off, so it is what the player
-# actually finds. This module used to restate a thirteen-name union of this
-# list and an older one, which let the same kind of item land in two different
-# slots depending on which code path equipped it.
-from app.loot.data.archetypes import SLOTS as _SLOTS
+from app.loot.data.archetypes import SLOTS as _ARCHETYPE_SLOTS
 from app.models import CharacterStatusEffect
 from app.models.models import Character, Item
 from app.models.xp import xp_for_level
@@ -33,6 +27,13 @@ from app.services.progression import progression_config
 from app.services.time_service import advance_for
 
 bp_inventory = Blueprint("inventory", __name__)
+
+# The one gear-slot vocabulary. Defined by the loot generator, which is what
+# every procedural item, prefix and suffix keys off, so it is what the player
+# actually finds. This module used to restate a thirteen-name union of this
+# list and an older one, which let the same kind of item land in two different
+# slots depending on which code path equipped it.
+_SLOTS = tuple(_ARCHETYPE_SLOTS)
 
 
 # ----------------------- Helpers -----------------------
