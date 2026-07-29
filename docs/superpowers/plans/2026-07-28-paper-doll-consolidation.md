@@ -187,8 +187,24 @@ The payoff. The dungeon gets the good panel, the party rail becomes its characte
 - Modify: `app/templates/adventure.html`
 - Modify: `app/static/css/adventure-hud.css`
 - Modify: `app/static/js/adventure-controls.js`
-- Delete: `app/static/js/equipment.js`
+- Modify: `app/static/js/equipment-panel.js` (self-wiring, see Step 3a)
+- Modify: `app/templates/dashboard.html`
+- Delete: `app/static/js/equipment.js`, `app/static/js/equipment-shared.js`
 - Modify: `tests/test_adventure_hud.py`, `e2e/test_smoke.py`
+
+> **Two corrections to this plan, found during Task 1.** Both are recorded here
+> because a future reader following the original text would reproduce them.
+>
+> 1. `equipment-shared.js`'s deletion was listed under Task 1, but its last
+>    consumer — `equipment.js` on `/adventure` — does not die until this task.
+>    Deleting it early left `/adventure` 404ing on a missing script and
+>    throwing on `window.EquipmentShared`. Both files are deleted **here**,
+>    together with the two script tags at `adventure.html:157-158`.
+> 2. Deleting `equipment.js` also removes the **dashboard's** `.btn-equip-panel`
+>    wiring — Task 1 deliberately leaned on it via a `window.equipmentManager`
+>    alias. The replacement below lives in `adventure-controls.js`, which
+>    `/dashboard` never loads, so without Step 3a the dashboard's equip button
+>    silently loses its handler and no test covers it.
 
 **Interfaces:**
 - Consumes: `window.EquipmentPanel` from Task 1; `.adv-frame-open` and `.adv-party-rail` from the HUD work; `--hud-inset-left` / `--hud-inset-bottom` declared on `.adv-hud`.
@@ -384,6 +400,30 @@ In the `{% block scripts %}`, replace the two old panel scripts with the one:
 ```html
   <script src="{{ asset_url('js/equipment-panel.js') }}"></script>
 ```
+
+- [ ] **Step 3a: Make the panel wire its own trigger**
+
+`equipment.js` is what currently binds `.btn-equip-panel` on the dashboard, and it is deleted in Step 6. Rather than duplicating the wiring into a dashboard-only script, give the panel a single delegated listener of its own, in `equipment-panel.js`'s `mount()`:
+
+```js
+        // The panel owns its trigger. Both screens use .btn-equip-panel on an
+        // element carrying data-char-id; the adventure screen additionally
+        // opens from anywhere on a party frame (see adventure-controls.js).
+        // Bound once per page, not per mount.
+        if (!document.body.dataset.eqPanelDelegated) {
+            document.body.dataset.eqPanelDelegated = '1';
+            document.addEventListener('click', (e) => {
+                const btn = e.target.closest('.btn-equip-panel');
+                if (!btn) return;
+                const host = btn.closest('[data-char-id]');
+                if (host && host.dataset.charId) window.EquipmentPanel.open(host.dataset.charId);
+            });
+        }
+```
+
+Then remove the `window.equipmentManager` compatibility alias Task 1 added.
+
+Verify on `/dashboard` after Step 6 that the equip button still opens the panel — that is the regression this step exists to prevent, and nothing automated covers it.
 
 - [ ] **Step 4: Wire the rail to the panel**
 
