@@ -119,6 +119,113 @@
         }
     }
 
+    // Display grouping for each effect kind the resolver can produce
+    // (item_effects.resolve_potion_effect's contract: restore_hp,
+    // restore_mp, status -- see combat_service._party_item_payload, which
+    // sends the kind straight from that same resolver call rather than
+    // making the client guess it from a slug or a name). An unrecognised
+    // kind (defensive; should not happen) falls back to the Elixirs bucket
+    // rather than vanishing.
+    const ITEM_KIND_GROUPS = {
+        restore_hp: { label: 'Healing', icon: 'bi-heart-pulse-fill', btnClass: 'btn-combat-heal' },
+        restore_mp: { label: 'Mana', icon: 'bi-droplet-fill', btnClass: 'btn-combat-spell' },
+        status: { label: 'Elixirs', icon: 'bi-flask-fill', btnClass: '' },
+    };
+    const DEFAULT_ITEM_GROUP = ITEM_KIND_GROUPS.status;
+    const ITEM_GROUP_ORDER = ['Healing', 'Mana', 'Elixirs'];
+
+    // Renders the active character's usable potions into the static
+    // .combat-item-panel container (combat.html), grouped by effect kind so
+    // a bag holding many tiers reads as a few short rows instead of a wall
+    // of buttons -- see combat.css's cap/scroll on the container itself for
+    // the worst case (a character can hold up to ~43 distinct resolvable
+    // slugs at once).
+    //
+    // Both the count and the kind/name come straight from state.party
+    // (item_counts/item_meta) -- both built server-side, together, by
+    // combat_service._party_item_payload, which is also what decides which
+    // slugs are real. There is no client-side fetch, cache, or re-render
+    // dance here, and no slug or name text is ever pattern-matched: the
+    // kind is a fact handed down, not a guess made here.
+    //
+    // Buttons are plain data-action="use_item" elements with a data-slug;
+    // they're picked up by the generic clone-and-replace button loop in
+    // render() below like any other action button, so disabling on
+    // !canAct and listener binding both come from there, not from here.
+    function renderItemButtons(actionPanel, charId, charClass, state) {
+        const container = actionPanel.querySelector('.combat-item-panel');
+        if (!container) return;
+        container.innerHTML = '';
+
+        const itemCounts = (state.party && state.party.item_counts) || {};
+        const itemMeta = (state.party && state.party.item_meta) || {};
+
+        const groups = new Map(); // label -> { meta, entries: [{slug, count, name}] }
+        Object.keys(itemCounts).forEach(slug => {
+            const byChar = itemCounts[slug] || {};
+            const count = byChar[String(charId)] || 0;
+            if (count <= 0) return;
+
+            const info = itemMeta[slug] || {};
+            if (info.kind === 'restore_mp' && MANALESS_CLASSES.has(charClass)) return; // no mana resource to restore, same as the mana bar itself
+            const kindGroup = ITEM_KIND_GROUPS[info.kind] || DEFAULT_ITEM_GROUP;
+
+            if (!groups.has(kindGroup.label)) groups.set(kindGroup.label, { meta: kindGroup, entries: [] });
+            // item_meta.name falls back to the slug server-side (see
+            // _party_item_payload) for the rare case of a resolvable slug
+            // with no catalogue row, so info.name is never missing here --
+            // the `|| slug` is a second, defensive fallback only.
+            groups.get(kindGroup.label).entries.push({ slug, count, name: info.name || slug });
+        });
+
+        if (groups.size === 0) {
+            // Either the character holds nothing resolvable, or everything
+            // held fell into a group hidden for this character (e.g. only
+            // mana potions on a manaless class).
+            container.hidden = true;
+            return;
+        }
+        container.hidden = false;
+
+        ITEM_GROUP_ORDER.forEach(label => {
+            const group = groups.get(label);
+            if (!group || group.entries.length === 0) return;
+            group.entries.sort((a, b) => a.name.localeCompare(b.name));
+
+            const section = document.createElement('div');
+            section.className = 'combat-item-group';
+            section.setAttribute('role', 'group');
+            const headingId = `combat-item-group-${label.toLowerCase()}`;
+            section.setAttribute('aria-labelledby', headingId);
+
+            const heading = document.createElement('div');
+            heading.className = 'combat-item-group-label';
+            heading.id = headingId;
+            heading.textContent = label;
+            section.appendChild(heading);
+
+            const grid = document.createElement('div');
+            grid.className = 'combat-item-grid';
+            group.entries.forEach(({ slug, count, name }) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `btn-combat btn-combat-item${group.meta.btnClass ? ' ' + group.meta.btnClass : ''}`;
+                btn.dataset.action = 'use_item';
+                btn.dataset.slug = slug;
+                const icon = document.createElement('i');
+                icon.className = `bi ${group.meta.icon}`;
+                btn.appendChild(icon);
+                // Count is visible in the button's own text, not tucked into a
+                // title tooltip -- that was the specific complaint about the
+                // two fixed buttons this panel replaced.
+                btn.appendChild(document.createTextNode(` ${name} ×${count}`));
+                grid.appendChild(btn);
+            });
+            section.appendChild(grid);
+            container.appendChild(section);
+        });
+    }
+
     function classifyAndTransform(msg) {
         let cls = '';
         // Order matters: more specific patterns first
@@ -293,7 +400,6 @@
         const activeIndex = state.active_index;
         const party = (state.party && state.party.members) || [];
         const active = initiative[activeIndex];
-        const itemCounts = (state.party && state.party.item_counts) || {};
         const template = document.getElementById('party-member-template');
 
         let activeCharId = null;
@@ -412,45 +518,22 @@
             actionPanel.classList.remove('d-none');
             actionPanel.style.display = '';
 
-            // Update action buttons
             const activeCharClass = (activeMember.char_class || 'fighter').toLowerCase();
+
+            // Build the actor's potion panel before the generic button loop
+            // below runs -- it needs the freshly-created item buttons already
+            // in the DOM so they get disabled/wired up like every other
+            // action button, rather than inventing a second listener path.
+            renderItemButtons(actionPanel, activeCharId, activeCharClass, state);
+
+            // Update action buttons
             actionPanel.querySelectorAll('button[data-action]').forEach(btn => {
-                // Mana potion button is irrelevant for manaless classes (e.g. barbarian),
-                // same as the mana bar itself.
-                if (btn.dataset.needsManaPotion && MANALESS_CLASSES.has(activeCharClass)) {
-                    btn.style.display = 'none';
-                    return;
-                }
                 btn.style.display = '';
 
                 if (!canAct) {
                     btn.disabled = true;
                 } else {
                     btn.disabled = false;
-                }
-
-                // Potion availability — per-character, not a shared party pool.
-                if (btn.dataset.needsPotion) {
-                    const potionsByChar = itemCounts['potion-healing'] || {};
-                    const potCount = potionsByChar[String(activeCharId)] || 0;
-                    if (potCount <= 0) {
-                        btn.disabled = true;
-                        btn.title = 'No potions available';
-                    } else {
-                        btn.title = potCount + ' potion' + (potCount === 1 ? '' : 's') + ' remaining';
-                    }
-                }
-
-                // Mana potion availability — per-character, not a shared party pool.
-                if (btn.dataset.needsManaPotion) {
-                    const manaPotionsByChar = itemCounts['potion-mana'] || {};
-                    const manaPotCount = manaPotionsByChar[String(activeCharId)] || 0;
-                    if (manaPotCount <= 0) {
-                        btn.disabled = true;
-                        btn.title = 'No mana potions available';
-                    } else {
-                        btn.title = manaPotCount + ' mana potion' + (manaPotCount === 1 ? '' : 's') + ' remaining';
-                    }
                 }
 
                 // Mana gating
@@ -464,9 +547,28 @@
 
                 // Remove old listeners and add new one
                 const action = btn.dataset.action;
+                const slug = btn.dataset.slug || null;
                 const newBtn = btn.cloneNode(true);
                 btn.parentNode.replaceChild(newBtn, btn);
-                newBtn.addEventListener('click', () => doAction(action, state.version, activeCharId));
+                newBtn.addEventListener('click', () => doAction(action, state.version, activeCharId, slug));
+
+                if (slug) {
+                    // Potion entries are activated by Enter like any button,
+                    // but holding Enter down auto-repeats the browser's own
+                    // keydown-driven activation (Space does not -- its
+                    // default click fires once, on keyup). Left unguarded,
+                    // holding the key would fire one /use_item POST per
+                    // repeat tick and drain a whole stack in a couple of
+                    // seconds -- the same bug already hit once on the bag
+                    // grid's own key handler. Narrowed to the two activation
+                    // keys specifically -- a bare `if (e.repeat)` would also
+                    // swallow every repeat of an unrelated held key (e.g. an
+                    // arrow key used to scroll) while focus sits on the
+                    // button.
+                    newBtn.addEventListener('keydown', (e) => {
+                        if (e.repeat && (e.key === 'Enter' || e.key === ' ')) e.preventDefault();
+                    });
+                }
             });
 
             renderSkillButtons(actionPanel, activeCharId, canAct, state.version, activeMember ? activeMember.mana : undefined);
@@ -474,6 +576,8 @@
             actionPanel.classList.add('d-none');
             const stale = actionPanel.querySelector('.skill-buttons-group');
             if (stale) stale.remove();
+            const itemPanel = actionPanel.querySelector('.combat-item-panel');
+            if (itemPanel) { itemPanel.innerHTML = ''; itemPanel.hidden = true; }
         }
         // If combat complete, show a return to dungeon action area (once)
         if (state.status === 'complete') {
@@ -547,7 +651,7 @@
         } catch (e) { /* ignore */ }
     }
 
-    async function doAction(action, version, actorId) {
+    async function doAction(action, version, actorId, slug) {
         let endpoint;
         let payload = { version: version, actor_id: actorId };
         let spellType = null;
@@ -569,14 +673,12 @@
             payload.spell = 'lightning';
             spellType = 'lightning';
         }
-        else if (action === 'use_potion') {
+        else if (action === 'use_item') {
+            // Slug comes from the clicked entry (see renderItemButtons) --
+            // there is no longer a fixed slug baked into the action itself,
+            // now that the panel lists whatever the actor actually carries.
             endpoint = '/api/combat/' + combatId + '/use_item';
-            payload.slug = 'potion-healing';
-            spellType = 'heal';
-        }
-        else if (action === 'use_mana_potion') {
-            endpoint = '/api/combat/' + combatId + '/use_item';
-            payload.slug = 'potion-mana';
+            payload.slug = slug;
             spellType = 'heal';
         }
         else if (action === 'flee') endpoint = '/api/combat/' + combatId + '/flee';
@@ -590,8 +692,13 @@
             if (casterCard && targetPanel) {
                 window.combatEffects.createParticles(casterCard, targetPanel, spellType);
 
-                // Add casting glow to button
-                const btn = document.querySelector(`[data-action="${action}"]`);
+                // Add casting glow to button. Several potion entries can now
+                // share data-action="use_item", so the slug has to be part
+                // of the match too or this would always glow the first one.
+                const btnSelector = slug
+                    ? `[data-action="${action}"][data-slug="${slug}"]`
+                    : `[data-action="${action}"]`;
+                const btn = document.querySelector(btnSelector);
                 if (btn) {
                     btn.classList.add('casting');
                     setTimeout(() => btn.classList.remove('casting'), 800);
@@ -614,8 +721,29 @@
         try {
             const r = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             const j = await r.json();
+            if (j.message) {
+                // Refusals (no_effect / not_carried / not_your_turn / ...)
+                // carry a player-readable message and consume neither the
+                // item nor the turn -- surface it, or the refusal is
+                // invisible, same as the old silent catch below used to
+                // make it. appendTransientLogLine is defined further down
+                // this file but hoisted, like every other `function` here.
+                //
+                // Checked *before* j.state rather than after it: the turn and
+                // version refusals carry both, and when the state branch came
+                // first it re-rendered and dropped the sentence on the floor,
+                // so the player was told nothing at all about why the draught
+                // went undrunk.
+                appendTransientLogLine(j.message);
+            }
             if (j.state) {
                 render(j.state);
+            } else if (!j.message && j.error) {
+                // An error shape carrying neither state nor a player-facing
+                // message -- still better than nothing, mirroring
+                // doSkillAction's own fallback below for its own message-less
+                // errors (on_cooldown aside).
+                appendTransientLogLine(`Action could not be completed (${j.error}).`);
             }
         } catch (e) { /* ignore */ }
     }

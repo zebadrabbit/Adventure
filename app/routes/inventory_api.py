@@ -23,10 +23,25 @@ from app.loot.data.archetypes import SLOTS as _ARCHETYPE_SLOTS
 from app.models import CharacterStatusEffect
 from app.models.models import Character, Item
 from app.models.xp import xp_for_level
+from app.services.character_stats import compute_hp_mana_max
+from app.services.item_effects import REFUSAL_ITEM_REMOVAL_FAILED, REFUSAL_NO_EFFECT, resolve_potion_effect
 from app.services.progression import progression_config
 from app.services.time_service import advance_for
 
 bp_inventory = Blueprint("inventory", __name__)
+
+# The refusals consume_item can return. The bag grid and the combat item panel
+# both show the player whatever ``message`` comes back, so a branch without one
+# puts a machine code on screen -- which is what "not consumable" and friends
+# were doing next door to the two refusals that already answered in prose.
+# (item_removal_failed's wording is shared with the combat path and so lives in
+# item_effects; it is distinct from "item not in bag" -- ownership was verified
+# against the same in-memory inv list a few lines earlier, so a miss there is a
+# genuine bug, e.g. a lost race, not a normal refusal.)
+_REFUSAL_MISSING_SLUG = "Name the item you mean to use."
+_REFUSAL_ITEM_UNKNOWN = "No such item is known in these lands."
+_REFUSAL_NOT_IN_BAG = "You carry no such thing among your provisions."
+_REFUSAL_NOT_CONSUMABLE = "That is not something you can drink."
 
 # The one gear-slot vocabulary. Defined by the loot generator, which is what
 # every procedural item, prefix and suffix keys off, so it is what the player
@@ -505,8 +520,11 @@ def equip_item(cid: int):
         return jsonify({"error": "item not found"}), 404
     inv = load_inventory(ch.items)
     gear = _normalize_gear(_safe_json_load(ch.gear, {}))
-    # Require at least one instance
-    if not any(o["slug"] == slug for o in inv):
+    # Require at least one instance. .get, not [...]: load_inventory preserves
+    # procedural gear instances verbatim and those carry a uid, not a slug, so
+    # subscripting raises KeyError -- a 500 -- the moment the bag holds any
+    # generated gear ahead of the item being looked for.
+    if not any(o.get("slug") == slug for o in inv):
         return jsonify({"error": "item not in bag"}), 400
     slot = data.get("slot") or _slot_for_item(item, gear)
     if slot not in _SLOTS:
@@ -599,37 +617,76 @@ def consume_item(cid: int):
     data = request.get_json(silent=True) or {}
     slug = (data.get("slug") or "").strip()
     if not slug:
-        return jsonify({"error": "missing slug"}), 400
+        return jsonify({"error": "missing slug", "message": _REFUSAL_MISSING_SLUG}), 400
     item = Item.query.filter_by(slug=slug).first()
     if not item:
-        return jsonify({"error": "item not found"}), 404
+        return jsonify({"error": "item not found", "message": _REFUSAL_ITEM_UNKNOWN}), 404
     inv = load_inventory(ch.items)
-    if not any(o["slug"] == slug for o in inv):
-        return jsonify({"error": "item not in bag"}), 400
+    # .get, not [...]: see the same check in equip_item. A gear instance in the
+    # bag has no "slug" key, and any() short-circuits, so this only blew up for
+    # a potion picked up *after* the character looted gear -- and the 500's
+    # non-JSON body reached the player as the panel's generic "Nothing happens."
+    if not any(o.get("slug") == slug for o in inv):
+        return jsonify({"error": "item not in bag", "message": _REFUSAL_NOT_IN_BAG}), 400
     # Only allow potions for now
     if (item.type or "").lower() != "potion":
-        return jsonify({"error": "not consumable"}), 400
+        return jsonify({"error": "not consumable", "message": _REFUSAL_NOT_CONSUMABLE}), 400
+
+    # The resolver (app.services.item_effects) is the only place a slug
+    # becomes an effect -- see its module docstring. A slug it doesn't
+    # recognise is refused, not guessed at: this used to match unanchored
+    # substrings ("healing" against a catalogue that spells it "heal"), so
+    # 127 of the catalogue's 154 potions were removed from the bag for zero
+    # effect. Resolved before anything is touched, mirroring
+    # combat_service.player_use_item's resolve -> verify -> apply -> decrement
+    # order (ownership against ``inv`` was already verified above).
+    effect = resolve_potion_effect(slug)
+    if effect is None:
+        return jsonify({"error": "no_effect", "message": REFUSAL_NO_EFFECT}), 400
+
     base_stats = _safe_json_load(ch.stats, {})
-    # Simple effects
+    hp_max, mana_max = compute_hp_mana_max(ch)
     heal = 0
     mana = 0
     applied_regen_buff = False
-    sl = (item.slug or "").lower()
-    if "regen" in sl:
+    status_name = None
+    status_ticks = 0
+    status_data: dict = {}
+
+    kind = effect.get("kind")
+    if kind == "restore_hp":
+        current_hp = int(base_stats.get("hp", hp_max))
+        new_hp = min(hp_max, current_hp + int(effect.get("amount", 0)))
+        heal = new_hp - current_hp  # what actually landed, not the raw potion amount, so a
+        # near-full character isn't told a 25-point potion healed them for 25 when only 3 of it fit.
+        base_stats["hp"] = new_hp
+    elif kind == "restore_mp":
+        # current_mana is the key combat and camp both prefer (falling back
+        # to the legacy "mana" key); both are written back below so neither
+        # goes stale relative to the other.
+        current_mana = int(base_stats.get("current_mana", base_stats.get("mana", mana_max)))
+        new_mana = min(mana_max, current_mana + int(effect.get("amount", 0)))
+        mana = new_mana - current_mana  # actual amount restored, same reasoning as heal above.
+        base_stats["mana"] = new_mana
+        base_stats["current_mana"] = new_mana
+    elif kind == "status":
         applied_regen_buff = True
-    elif "healing" in sl:
-        heal = 5
-    elif "mana" in sl:
-        mana = 5
-    # Apply
-    if heal:
-        base_stats["hp"] = int(base_stats.get("hp", 0)) + heal
-    if mana:
-        base_stats["mana"] = int(base_stats.get("mana", 0)) + mana
-    # Remove potion from bag
+        status_name = effect["name"]
+        status_ticks = int(effect.get("ticks", 0))
+        status_data = effect.get("data", {}) or {}
+    else:
+        # The resolver's contract only emits the three kinds above; an
+        # unrecognised kind is a resolver/route mismatch, not a player
+        # mistake -- refuse rather than consume the potion for an effect
+        # nothing here knows how to apply.
+        return jsonify({"error": "no_effect", "message": REFUSAL_NO_EFFECT}), 400
+
+    # Only now remove the potion from the bag -- a potion is never consumed
+    # unless its effect was actually applied above.
     removed = remove_one(inv, slug)
-    if removed:
-        ch.items = dump_inventory(inv)
+    if not removed:
+        return jsonify({"error": "item_removal_failed", "message": REFUSAL_ITEM_REMOVAL_FAILED}), 500
+    ch.items = dump_inventory(inv)
     ch.stats = _safe_json_dump(base_stats)
     db.session.commit()
     try:
@@ -637,17 +694,17 @@ def consume_item(cid: int):
     except Exception:
         pass
     if applied_regen_buff:
-        # Apply the persisted regen_buff after the tick-decay call above so the
+        # Apply the persisted buff after the tick-decay call above so the
         # freshly-granted buff starts at its full duration (matching the
-        # combat-side regen_buff convention) instead of being immediately
-        # decremented by the same action's own time advancement.
-        CharacterStatusEffect.query.filter_by(character_id=ch.id, name="regen_buff").delete()
+        # combat-side convention) instead of being immediately decremented by
+        # this same action's own time advancement.
+        CharacterStatusEffect.query.filter_by(character_id=ch.id, name=status_name).delete()
         db.session.add(
             CharacterStatusEffect(
                 character_id=ch.id,
-                name="regen_buff",
-                remaining=5,
-                data=json.dumps({"hp_mult": 3.0, "mp_mult": 3.0}),
+                name=status_name,
+                remaining=status_ticks,
+                data=json.dumps(status_data),
             )
         )
         db.session.commit()

@@ -111,6 +111,58 @@ def _seed_potions(char_id, slug="potion-healing", qty=3):
     return _run_seed(_SEED_POTION_SCRIPT, char_id, slug, qty)
 
 
+# Starts a real combat session for char_id's party and forces their turn to
+# be the active one -- the combat item panel (Task 4 of the potion-resolver
+# work) only renders for whoever's turn it is, and initiative is a speed +
+# d20 roll (combat_service._calc_initiative), so leaving it to chance would
+# make this test flaky rather than exercising the panel. Seeding the potion
+# itself is *not* this script's job -- _seed_combat_with_potion below calls
+# _seed_potions for that half, rather than a second copy of
+# _SEED_POTION_SCRIPT's Item-row-plus-bag-entry logic.
+_SEED_COMBAT_START_SCRIPT = """
+import json, sys
+from app import create_app, db
+from app.models.models import Character
+from app.services import combat_service
+
+app = create_app()
+with app.app_context():
+    char_id = int(sys.argv[1])
+    ch = db.session.get(Character, char_id)
+    if ch is None:
+        raise SystemExit(f"no character {char_id}")
+
+    monster = {
+        "slug": "e2e-item-panel-mob", "name": "Panel Test Mob", "level": 1,
+        "hp": 999, "damage": 1, "armor": 0, "speed": 1, "rarity": "common",
+        "family": "test", "traits": [], "resistances": {}, "damage_types": [],
+        "loot_table": "", "special_drop_slug": None, "xp": 1, "boss": False,
+    }
+    session = combat_service.start_session(ch.user_id, monster)
+
+    initiative = json.loads(session.initiative_json)
+    idx = next(
+        i for i, entry in enumerate(initiative)
+        if entry.get("type") == "player" and entry.get("id") == char_id
+    )
+    session.active_index = idx
+    db.session.commit()
+
+    print(json.dumps({"combat_id": session.id, "char_id": char_id}))
+"""
+
+
+def _seed_combat_with_potion(char_id, slug="potion-healing", qty=3):
+    """Seed a stack of slug into char_id's bag (via the existing
+    _seed_potions helper) and start a live combat session for their party,
+    forced to already be their turn."""
+    _seed_potions(char_id, slug=slug, qty=qty)
+    result = _run_seed(_SEED_COMBAT_START_SCRIPT, char_id)
+    result["slug"] = slug
+    result["qty"] = qty
+    return result
+
+
 def _seed_procedural_item(char_id, slot="hands"):
     """Seed one procedural gear instance directly into a party member's bag.
 
@@ -479,6 +531,43 @@ def test_a_potion_in_the_bag_can_be_drunk_from_the_panel(page):
     assert (
         page.locator(f'.bag-grid-cell[data-item-slug="{potion["slug"]}"] .cell-qty').first.inner_text().strip() == "2"
     ), "the panel did not repaint the bag after drinking"
+
+
+def test_combat_item_panel_lists_and_uses_a_carried_potion(page):
+    """The panel that replaced the two hardcoded heal/mana buttons.
+
+    Before this, combat.html had exactly two potion buttons, wired to the
+    literal slugs potion-healing and potion-mana regardless of what the actor
+    actually carried -- a looted tiered potion, or potion-regen (implemented
+    server-side but with no button at all), was simply unusable in a fight.
+    The panel now lists whatever item_counts says the active character holds.
+
+    This clicks the entry a player clicks and asserts the request it must
+    produce, the same shape as test_a_potion_in_the_bag_can_be_drunk_from_the_panel's
+    /consume assertion: the count is on the button (not hidden in a title),
+    and the POST it fires carries that entry's own slug, not a fixed one.
+    """
+    page.set_viewport_size({"width": 1366, "height": 768})
+    page.goto(f"{BASE_URL}/adventure")
+    page.wait_for_load_state("networkidle")
+
+    char_id = page.evaluate("() => document.querySelector('.adv-party-rail .adv-frame-open')?.dataset.charId")
+    assert char_id, "no deployed party member to seed a combat session for"
+
+    seeded = _seed_combat_with_potion(char_id, slug="potion-healing", qty=3)
+
+    page.goto(f"{BASE_URL}/combat/{seeded['combat_id']}")
+    page.wait_for_load_state("networkidle")
+
+    entry = page.locator(".combat-item-grid .btn-combat-item").first
+    entry.wait_for(state="visible", timeout=5000)
+    entry_text = entry.inner_text()
+    assert "×3" in entry_text, f"the panel does not show the seeded count visibly on the button: {entry_text!r}"
+
+    with page.expect_request(lambda req: req.url.endswith("/use_item") and req.method == "POST") as req_info:
+        entry.click()
+    body = json.loads(req_info.value.post_data)
+    assert body.get("slug") == seeded["slug"], f"clicked entry posted the wrong slug: {body}"
 
 
 def test_csrf_guard_rejects_bare_mutation(page):

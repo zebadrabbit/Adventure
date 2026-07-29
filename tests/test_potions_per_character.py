@@ -11,8 +11,14 @@ import json
 import random
 
 from app import db
-from app.models.models import Character, User
+from app.models.models import Character, CombatSession, User
 from app.services import combat_service
+
+
+def _login_as(client, user_id):
+    with client.session_transaction() as sess:
+        sess["user_id"] = user_id
+        sess["_user_id"] = str(user_id)
 
 
 def _simple_monster():
@@ -98,6 +104,47 @@ def test_using_potion_deducts_from_the_actors_own_inventory_only(test_app, monke
         else:
             assert second_qty == 0, "the acting character's own potion should be consumed"
             assert first_qty == 3, "the non-acting character's potions must be untouched"
+
+
+def test_old_session_backfill_is_persisted_not_just_patched_into_one_response(client, monkeypatch):
+    """A session started before item_counts existed must keep its item panel
+    for the whole fight, not only on the load that backfilled it.
+
+    /api/combat/<id>/state patched a throwaway row.to_dict(). Every other
+    response path -- the dungeon action route, the sibling combat routes, the
+    combat_update emit -- returns to_dict() straight off party_snapshot_json,
+    unpatched. So a mid-deploy session rendered its potions on load and lost
+    them from the first attack onward, and with the two fixed buttons gone
+    there was no way to drink anything for the rest of that fight short of
+    reloading the page.
+    """
+    session, user, first, _second = _two_character_session(monkeypatch)
+    combat_id = session.id
+
+    # Age the session: strip what a pre-branch snapshot never had.
+    party = json.loads(session.party_snapshot_json)
+    party.pop("item_counts", None)
+    party.pop("item_meta", None)
+    session.party_snapshot_json = json.dumps(party)
+    db.session.commit()
+
+    _login_as(client, user.id)
+    resp = client.get(f"/api/combat/{combat_id}/state")
+    assert resp.status_code == 200, resp.get_json()
+    assert resp.get_json()["state"]["party"]["item_counts"]["potion-healing"][str(first.id)] == 3
+
+    # The fix: it was written back, so the next response from any other path
+    # carries it too.
+    row = db.session.get(CombatSession, combat_id)
+    db.session.refresh(row)
+    later = row.to_dict()["party"]
+    assert "item_counts" in later, "the first attack after loading would have lost the item panel"
+    assert "item_meta" in later, "without kind/name the panel falls back to raw slugs"
+    assert later["item_counts"]["potion-healing"][str(first.id)] == 3
+
+    # Only the backfill is persisted -- hp_pct/mana_pct are recomputed per
+    # response and would go stale the moment anything took damage.
+    assert all("hp_pct" not in m for m in later.get("members", [])), later.get("members")
 
 
 def _two_character_mana_session(monkeypatch):

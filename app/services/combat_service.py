@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 import structlog
 
 from app import db, socketio
-from app.models.models import Character, CombatSession
+from app.models.models import Character, CombatSession, Item
 from app.models.dungeon_instance import DungeonInstance
 from app.services import extraction_service
 
@@ -52,12 +52,30 @@ from .combat_constants import (
     PLAYER_USE_ITEM,
 )
 from .combat_utils import apply_resistances
-from .loot_service import _loot_summary, roll_loot
+from .item_effects import REFUSAL_ITEM_REMOVAL_FAILED, REFUSAL_NO_EFFECT, resolve_potion_effect
+from .loot_service import _item_display_name, _loot_summary, roll_loot
 from .monster_ai import select_action
-from .status_effects import apply_start_of_turn, can_act
+from .status_effects import apply_start_of_turn, can_act, replace_effect
 from .time_service import set_combat_state
 
 logger = structlog.get_logger()
+
+# Player-facing refusal when the acting character's own pack doesn't hold the
+# named potion -- same register as item_effects.REFUSAL_NO_EFFECT (prose, not
+# a machine code). Ownership is checked before an effect is ever applied, so
+# this is what an exploited "use an item you don't have" attempt now gets.
+_REFUSAL_NOT_CARRIED = "No such potion turns up among your provisions."
+
+# The remaining refusals player_use_item can return. The item panel shows the
+# player whatever comes back, so every branch of that one function needs prose
+# -- no_effect and not_carried arriving as sentences while their immediate
+# neighbours still answered with machine codes is how "cannot_use" ended up on
+# screen. (The item-removal failure shares its wording with the out-of-combat
+# path, so it lives in item_effects alongside REFUSAL_NO_EFFECT.)
+_REFUSAL_ITEM_REQUIRED = "Name the draught you mean to drink."
+_REFUSAL_CANNOT_USE = "No such hero stands with the party in this fight."
+_REFUSAL_NOT_YOUR_TURN = "It is not your turn to act."
+_REFUSAL_VERSION_CONFLICT = "The fight has moved on since you last looked. Take stock and try again."
 
 
 def _now():
@@ -214,9 +232,24 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
     }
 
 
+def _party_characters(user_id: int) -> List[Character]:
+    """The up to 4 characters that make up ``user_id``'s combat party -- the
+    same scope _base_player_snapshot uses to build ``members``.
+
+    Every item_counts call site must query this exact set, not just "all of
+    this user's characters": a character outside the active party can never
+    be ``actor_id`` in this session, so counting their potions produces
+    entries no combat action can ever touch, and (worse) a user with 5+
+    characters would otherwise get a session-start item_counts that omits
+    characters 5+ while every later recompute (reward grant, item use,
+    backfill) silently includes them.
+    """
+    return Character.query.filter_by(user_id=user_id).order_by(Character.id.asc()).limit(4).all()
+
+
 def _base_player_snapshot(user_id: int) -> Dict[str, Any]:
     # Build party from user's characters (up to 4)
-    chars = Character.query.filter_by(user_id=user_id).order_by(Character.id.asc()).limit(4).all()
+    chars = _party_characters(user_id)
     members = [_derive_stats(c) for c in chars] or [
         {
             "controller_id": user_id,
@@ -239,18 +272,18 @@ def _base_player_snapshot(user_id: int) -> Dict[str, Any]:
             "buffs": [],
         }
     ]
-    # Per-character inventory counts surfaced for UI gating (e.g. potion button
-    # visibility) — each character's potions are their own, not a shared pool.
+    # Per-character inventory counts (plus kind/name metadata) surfaced for UI
+    # gating and grouping — each character's potions are their own, not a
+    # shared pool. Every slug the resolver recognises is counted, not just
+    # the two legacy ones, so tiered potions show up too.
     try:
-        potion_counts = _potion_counts_by_character(chars, "potion-healing")
-        mana_potion_counts = _potion_counts_by_character(chars, "potion-mana")
+        item_payload = _party_item_payload(chars)
     except Exception as e:
         logger.warning("Failed to parse inventory", exc_info=e)
-        potion_counts = {}
-        mana_potion_counts = {}
+        item_payload = {"item_counts": {}, "item_meta": {}}
     return {
         "members": members,
-        "item_counts": {"potion-healing": potion_counts, "potion-mana": mana_potion_counts},
+        **item_payload,
     }
 
 
@@ -462,31 +495,192 @@ def _player_ref(party: Dict[str, Any], char_id: int):
     return None
 
 
-def _count_potion(character, slug: str) -> int:
-    """Count units of a given potion slug in a single character's own inventory."""
-    count = 0
+def _entry_qty(entry: Any) -> int:
+    """Parse the ``qty`` of a stacked ``{"slug", "qty"}`` inventory entry.
+
+    Defaults to 1 for a missing qty, and to 1 for an unparseable one (never
+    raises) -- the one place that parse happens, so a malformed qty can't
+    make ownership and decrement disagree about how many units an entry
+    represents (ownership would see it as present, decrement would raise).
+    """
     try:
-        if character and character.items:
-            inv_raw = json.loads(character.items)
-            if isinstance(inv_raw, list):
-                for entry in inv_raw:
-                    if isinstance(entry, str) and entry == slug:
-                        count += 1
-                    elif isinstance(entry, dict) and entry.get("slug") == slug:
-                        try:
-                            count += int(entry.get("qty", 1))
-                        except Exception:
-                            count += 1
+        return int(entry.get("qty", 1))
     except Exception:
-        logger.debug("suppressed_exception", where="_count_potion", exc_info=True)
-    return count
+        return 1
 
 
-def _potion_counts_by_character(chars, slug: str) -> Dict[str, int]:
-    """Per-character potion counts for a given slug, keyed by character id
-    (string, for JSON round-tripping). Each character's potions are their
-    own — there is no shared/party-wide potion pool."""
-    return {str(c.id): _count_potion(c, slug) for c in chars}
+def _entry_matches_slug(entry: Any, slug: str) -> bool:
+    """True if a single inventory entry -- bare string (legacy, one unit) or
+    ``{"slug", "qty"}`` dict (stacked) -- represents at least one unit of
+    ``slug``. The one predicate both "does this character hold this item"
+    (ownership) and "remove one unit of this item" (decrement) are built on,
+    so those two checks cannot disagree about what counts as holding it."""
+    if isinstance(entry, str):
+        return entry == slug
+    if isinstance(entry, dict):
+        return entry.get("slug") == slug and _entry_qty(entry) > 0
+    return False
+
+
+def _character_holds_slug(character, slug: str) -> bool:
+    """True if this character's own inventory currently holds at least one
+    unit of ``slug``. Ownership must be verified with this *before* a potion's
+    effect is applied, not after -- see player_use_item."""
+    if not character or not character.items:
+        return False
+    try:
+        inv = json.loads(character.items)
+    except Exception:
+        return False
+    if not isinstance(inv, list):
+        return False
+    return any(_entry_matches_slug(entry, slug) for entry in inv)
+
+
+def _decrement_character_slug(character, slug: str) -> bool:
+    """Remove one unit of ``slug`` from this character's own inventory.
+
+    Handles both inventory entry formats (see _entry_matches_slug). Returns
+    True and mutates ``character.items`` if a unit was found and removed;
+    returns False and leaves the character untouched otherwise.
+    """
+    if not character or not character.items:
+        return False
+    try:
+        inv = json.loads(character.items)
+    except Exception:
+        return False
+    if not isinstance(inv, list):
+        return False
+    new_inv = []
+    removed = False
+    for entry in inv:
+        if not removed and _entry_matches_slug(entry, slug):
+            removed = True
+            if isinstance(entry, dict):
+                qty = _entry_qty(entry) - 1
+                if qty > 0:
+                    new_inv.append(dict(entry, qty=qty))
+            continue
+        new_inv.append(entry)
+    if not removed:
+        return False
+    character.items = json.dumps(new_inv)
+    return True
+
+
+def _grant_slug_to_inventory(inv: List[Any], slug: str, qty: int = 1) -> None:
+    """Add ``qty`` units of ``slug`` to a raw inventory list *in the shape that
+    list is already in*, mutating it in place.
+
+    The bag is stored in one of two shapes and inventory.utils.load_inventory
+    picks its branch by sniffing ``data[0]`` alone -- then discards every entry
+    of the other kind. So the shape of the existing list is not cosmetic:
+    appending a bare string to a list of dicts (which is what combat rewards
+    used to do) means load_inventory takes the canonical branch and drops the
+    reward, leaving a potion that combat's own parser can see and spend but
+    that never appears in the bag grid, and that the next load/dump round-trip
+    deletes outright. Appending a dict to a legacy list of strings is the same
+    bug pointed the other way, and it would take procedural gear instances with
+    it, so neither shape may simply be imposed on the other.
+
+    Legacy lists therefore get bare strings and canonical lists get a merged
+    ``{"slug", "qty"}`` stack. An empty list is canonical: the first entry it
+    gets decides the branch for good, and canonical is the format everything
+    else writes. Gear instances (dicts with a ``uid`` and no ``slug``) are never
+    merged into -- they are not stacks and hold no qty.
+    """
+    if qty <= 0:
+        return
+    if inv and isinstance(inv[0], str):
+        inv.extend([slug] * qty)
+        return
+    for entry in inv:
+        if isinstance(entry, dict) and not entry.get("uid") and entry.get("slug") == slug:
+            entry["qty"] = _entry_qty(entry) + qty
+            return
+    inv.append({"slug": slug, "qty": qty})
+
+
+def _item_counts_by_character(chars) -> Dict[str, Dict[str, int]]:
+    """Per-character counts of every potion the resolver recognises, keyed
+    ``{slug: {char_id: count}}``. Each character's potions are their own --
+    there is no shared/party-wide potion pool.
+
+    The single place the counts get built. All four sites that used to call
+    this directly -- session start (_base_player_snapshot), reward grants
+    (_check_end), the use_item decrement, and the old-session backfill
+    (combat_api.combat_state) -- now go through _party_item_payload instead,
+    which calls this and pairs it with item_meta (kind/name) built from the
+    same counts, so the two can never drift apart. Keeping this function
+    itself narrow (counts only, no catalogue lookup) is what let
+    potion-regen end up counted at session start but never decremented when
+    spent, once upon a time -- that drift is now impossible because there is
+    exactly one place ("which slugs count") both the count and the metadata
+    are derived from.
+    """
+    counts: Dict[str, Dict[str, int]] = {}
+    for c in chars:
+        if not c.items:
+            continue
+        try:
+            inv = json.loads(c.items)
+        except Exception:
+            continue
+        if not isinstance(inv, list):
+            continue
+        for entry in inv:
+            if isinstance(entry, str):
+                slug, qty = entry, 1
+            elif isinstance(entry, dict):
+                slug = entry.get("slug")
+                qty = _entry_qty(entry)
+            else:
+                continue
+            if not slug or qty <= 0 or resolve_potion_effect(slug) is None:
+                continue
+            per_char = counts.setdefault(slug, {})
+            per_char[str(c.id)] = per_char.get(str(c.id), 0) + qty
+    return counts
+
+
+def _party_item_payload(chars) -> Dict[str, Any]:
+    """``item_counts`` plus the display metadata (kind, name) the combat UI
+    needs to group and label potions -- built together so the two can never
+    disagree about which slugs are recognised.
+
+    _item_counts_by_character already calls resolve_potion_effect(slug) to
+    decide what counts, so the kind is known at the exact moment the map is
+    built. Nothing downstream should have to re-derive it: item_effects.py's
+    own contract is that adding a family is one table entry, no other file
+    needs to change -- the combat UI matching a potion's *name* against a
+    regex to guess its kind (an earlier version of this panel) had quietly
+    become that second file.
+
+    ``item_counts`` keeps its original flat shape ({slug: {char_id: count}})
+    unchanged -- tests/test_potions_per_character.py asserts that shape
+    directly -- so item_meta is a sibling map, not a nested addition.
+
+    A slug can be counted here (resolve_potion_effect recognises it) with no
+    matching Item catalogue row: bag_payload (inventory_api._serialize_item)
+    silently drops those, since _item_counts_by_character is a pure slug
+    parse with no catalogue lookup of its own. item_meta's name falls back
+    to the slug itself for exactly that case, rather than the client finding
+    out the hard way.
+    """
+    counts = _item_counts_by_character(chars)
+    names: Dict[str, str] = {}
+    if counts:
+        try:
+            names = {i.slug: i.name for i in Item.query.filter(Item.slug.in_(counts)).all()}
+        except Exception:
+            names = {}
+    return {
+        "item_counts": counts,
+        "item_meta": {
+            slug: {"kind": resolve_potion_effect(slug)["kind"], "name": names.get(slug, slug)} for slug in counts
+        },
+    }
 
 
 def _spell_power(caster: Dict[str, Any]) -> float:
@@ -770,20 +964,27 @@ def _check_end(session: CombatSession):
                             inv_items = []
                     except Exception:
                         inv_items = []
+                # Every append goes through _grant_slug_to_inventory, which
+                # matches the shape the bag is already in. These three loops
+                # used to append bare strings unconditionally, so a reward
+                # dropped into a canonical bag (any character who has ever
+                # equipped or consumed anything) was visible to combat's own
+                # parser and invisible to load_inventory: in the item panel and
+                # drinkable mid-fight, absent from the bag grid and the
+                # dashboard, and destroyed by the next load/dump round-trip.
                 if isinstance(rewards.get("items"), dict):
                     for slug, qty in rewards.get("items", {}).items():
                         try:
                             q = int(qty)
                         except Exception:
                             q = 1
-                        for _ in range(max(1, q)):
-                            inv_items.append(slug)
+                        _grant_slug_to_inventory(inv_items, slug, max(1, q))
                 elif isinstance(rewards.get("items"), list):
                     for slug in rewards.get("items", []):
-                        inv_items.append(slug)
+                        _grant_slug_to_inventory(inv_items, slug)
                 if isinstance(rewards.get("items_list"), list):
                     for slug in rewards.get("items_list"):
-                        inv_items.append(slug)
+                        _grant_slug_to_inventory(inv_items, slug)
                 first.items = json.dumps(inv_items)
                 db.session.add(first)
             if rewards.get("gear"):
@@ -809,11 +1010,11 @@ def _check_end(session: CombatSession):
             party = json.loads(session.party_snapshot_json or "{}") or {}
             if rewards.get("items") or rewards.get("items_list"):
                 # Recompute per-character (not just whichever character happened to
-                # receive the loot) — each character's potions are their own.
-                reward_chars = Character.query.filter_by(user_id=session.user_id).all()
-                counts = party.setdefault("item_counts", {})
-                counts["potion-healing"] = _potion_counts_by_character(reward_chars, "potion-healing")
-                counts["potion-mana"] = _potion_counts_by_character(reward_chars, "potion-mana")
+                # receive the loot) — each character's potions are their own. Same
+                # party scope _base_player_snapshot used at session start (up to 4
+                # characters), not every character this user owns.
+                reward_chars = _party_characters(session.user_id)
+                party.update(_party_item_payload(reward_chars))
                 session.party_snapshot_json = json.dumps(party)
         except Exception:
             logger.debug("suppressed_exception", where="_check_end", exc_info=True)
@@ -1568,11 +1769,18 @@ def player_defend(combat_id: int, user_id: int, version: int, actor_id: Optional
 def player_use_item(
     combat_id: int, user_id: int, version: int, slug: str, actor_id: Optional[int] = None
 ) -> Dict[str, Any]:
-    """Consume / apply a combat item (healing potion, mana potion, regen potion) for actor.
+    """Consume / apply a combat item (healing potion, mana potion, regen potion, ...) for actor.
 
-    Removes one instance of the item from first character inventory if present
-    (supports legacy & stacked formats) and updates HP. Advances turn whether
-    or not monster defeated on heal (heals cannot end combat).
+    The slug is resolved through item_effects.resolve_potion_effect -- the one
+    place a slug becomes an effect -- before anything else happens. Ownership
+    of the item is verified against the acting character's own inventory
+    *before* the effect is applied, and the item is only removed *after* the
+    effect has actually been applied: a potion is never consumed unless an
+    effect was applied, and no effect is applied unless the acting character
+    genuinely holds it (checking client-side only let an empty bag heal
+    repeatably). Advances turn whether or not monster defeated on heal (heals
+    cannot end combat). A refusal (no_effect / not_carried / cannot_use)
+    leaves the item, the party snapshot, and the turn untouched.
     """
     session = _load_session(combat_id)
     if not session:
@@ -1580,105 +1788,104 @@ def player_use_item(
     if session.status != "active":
         return {"error": "inactive", "state": session.to_dict()}
     if session.version != version:
-        return {"error": "version_conflict", "state": session.to_dict()}
+        return {"error": "version_conflict", "message": _REFUSAL_VERSION_CONFLICT, "state": session.to_dict()}
     initiative = json.loads(session.initiative_json or "[]")
     actor = initiative[session.active_index]
     if actor["type"] != "player":
-        return {"error": "not_your_turn", "state": session.to_dict()}
+        return {"error": "not_your_turn", "message": _REFUSAL_NOT_YOUR_TURN, "state": session.to_dict()}
     if actor_id is None:
         actor_id = actor.get("id")
     if actor.get("controller_id") != user_id:
-        return {"error": "not_your_turn", "state": session.to_dict()}
+        return {"error": "not_your_turn", "message": _REFUSAL_NOT_YOUR_TURN, "state": session.to_dict()}
     if actor.get("id") != actor_id:
         # Allow stale actor id (client cached) by rebinding to current initiative actor
         actor_id = actor.get("id")
     if not slug:
-        return {"error": "item_required"}
-    # Only simple healing potion for now
+        return {"error": "item_required", "message": _REFUSAL_ITEM_REQUIRED}
     party = json.loads(session.party_snapshot_json or "{}") or {}
     skip_result = _skip_if_unconscious(session, party, actor_id)
     if skip_result is not None:
         return skip_result
-    used = False
-    for m in party.get("members", []):
-        if m.get("char_id") == actor_id:
-            if slug == "potion-healing":
-                heal = 25
-                m["hp"] = min(m.get("max_hp", 100), m.get("hp", 0) + heal)
-                used = True
-            elif slug == "potion-mana":
-                # Mirrors the flat restore amount inventory_api.consume_item applies
-                # out of combat, so the potion behaves consistently in both contexts.
-                mana_restore = 5
-                m["mana"] = min(m.get("mana_max", 0), m.get("mana", 0) + mana_restore)
-                used = True
-            elif slug == "potion-regen":
-                from app.services.status_effects import replace_effect
 
-                m["effects"] = replace_effect(m.get("effects", []) or [], "regen_buff", 5, hp_mult=3.0, mp_mult=3.0)
-                used = True
-            break
-    if not used:
-        return {"error": "cannot_use"}
-    # Remove the item from the ACTING character's own inventory — potions are not
-    # a shared party pool, each character carries their own.
-    removed_successfully = False
+    # 1. Resolve the effect from the slug before touching any state at all.
+    effect = resolve_potion_effect(slug)
+    if effect is None:
+        return {"error": "no_effect", "message": REFUSAL_NO_EFFECT}
+
+    member = _player_ref(party, actor_id)
+    if member is None:
+        # Actor isn't part of this session's party snapshot -- nothing to
+        # apply an effect to. Distinct from "not carried"; shouldn't happen
+        # via the real callers, all of which derive actor_id from initiative.
+        return {"error": "cannot_use", "message": _REFUSAL_CANNOT_USE}
+
+    # 2. Ownership: ONLY the acting character's own bag counts, checked
+    # before the effect is applied -- this is the gate that was missing.
+    char_row = db.session.get(Character, actor_id)
+    if not _character_holds_slug(char_row, slug):
+        return {"error": "not_carried", "message": _REFUSAL_NOT_CARRIED}
+
+    # 3. Apply the descriptor to the party-snapshot member. `or <fallback>`,
+    # not `.get(key, <fallback>)`: a present-but-falsy (0/None) cap must not
+    # win over the fallback either, or a snapshot member missing its cap
+    # clamps healing down to 0 -- a healing potion that kills. Unreachable
+    # today (_derive_stats and the no-characters fallback below both always
+    # set these), but the clamp itself must not depend on that holding.
+    # Fallbacks match the synthetic "no characters" member's own values.
+    kind = effect.get("kind")
+    if kind == "restore_hp":
+        max_hp = member.get("max_hp") or 100
+        member["hp"] = min(max_hp, member.get("hp", 0) + effect.get("amount", 0))
+    elif kind == "restore_mp":
+        mana_max = member.get("mana_max") or 30
+        member["mana"] = min(mana_max, member.get("mana", 0) + effect.get("amount", 0))
+    elif kind == "status":
+        member["effects"] = replace_effect(
+            member.get("effects", []) or [], effect["name"], effect["ticks"], **effect.get("data", {})
+        )
+    else:
+        # The resolver's contract only emits the three kinds above; an
+        # unrecognised kind is a resolver/combat mismatch, not a player
+        # mistake. Refuse rather than silently doing nothing while still
+        # spending the potion and the turn.
+        return {"error": "no_effect", "message": REFUSAL_NO_EFFECT}
+
+    # 4. Only now decrement inventory -- and stop swallowing failure. Having
+    # just verified ownership against the same row, this should never miss;
+    # if it does, that's a real bug (e.g. a lost race), not something to log
+    # at debug and move on from while the effect above has already applied.
+    if not _decrement_character_slug(char_row, slug):
+        logger.error(
+            "potion_decrement_failed_after_effect_applied",
+            char_id=actor_id,
+            slug=slug,
+            combat_id=combat_id,
+        )
+        return {"error": "item_removal_failed", "message": REFUSAL_ITEM_REMOVAL_FAILED}
+    db.session.add(char_row)
+
+    # item_counts/item_meta are rebuilt from the acting character's party
+    # roster (same scope _base_player_snapshot/_check_end use -- up to 4
+    # characters, not every character this user owns) so it can never drift
+    # from what the party actually carries now that the inventory just
+    # changed. Guarded like the other three item_counts call sites: the
+    # effect and the decrement have already succeeded and nothing has been
+    # persisted yet, so a failure here should leave item_counts stale rather
+    # than turn an otherwise-successful item use into a 500.
     try:
-        char_row = db.session.get(Character, actor_id)
-        if char_row and char_row.items:
-            inv = []
-            try:
-                inv = json.loads(char_row.items)
-            except Exception:
-                inv = []
-            changed = False
-            # Inventory may be list of strings or list of {slug,qty}
-            new_inv = []
-            removed = False
-            for entry in inv:
-                if removed:
-                    new_inv.append(entry)
-                    continue
-                if isinstance(entry, str):
-                    if entry == slug:
-                        removed = True
-                        changed = True
-                        removed_successfully = True
-                        continue
-                    new_inv.append(entry)
-                elif isinstance(entry, dict):
-                    if entry.get("slug") == slug:
-                        qty = int(entry.get("qty", 1)) - 1
-                        if qty > 0:
-                            entry["qty"] = qty
-                            new_inv.append(entry)
-                        changed = True
-                        removed = True
-                        removed_successfully = True
-                    else:
-                        new_inv.append(entry)
-                else:
-                    new_inv.append(entry)
-            if changed:
-                char_row.items = json.dumps(new_inv)
-                db.session.add(char_row)
-    except Exception:
-        logger.debug("suppressed_exception", where="player_use_item", exc_info=True)
-    # Decrement the acting character's own surfaced item count (per-character,
-    # not a shared party pool).
-    try:
-        if removed_successfully:
-            all_counts = party.setdefault("item_counts", {})
-            if slug in ("potion-healing", "potion-mana"):
-                per_char = all_counts.setdefault(slug, {})
-                current = int(per_char.get(str(actor_id), 0))
-                per_char[str(actor_id)] = max(0, current - 1)
-    except Exception:
-        logger.debug("suppressed_exception", where="player_use_item", exc_info=True)
+        party.update(_party_item_payload(_party_characters(user_id)))
+    except Exception as e:
+        logger.warning("item_counts_recompute_failed", char_id=actor_id, slug=slug, exc_info=e)
+
     session.party_snapshot_json = json.dumps(party)
-    user_ref = _player_ref(party, actor_id)
-    user_name = user_ref.get("name", "Player") if user_ref else "Player"
-    _append_log(session, f"{user_name} uses {slug}.", code=PLAYER_USE_ITEM)
+    user_name = member.get("name", "Player")
+    # The catalogue name, never the raw slug: before the tiered catalogue only
+    # two legacy hyphenated slugs could reach this line, and now forty
+    # underscore-and-tier machine strings can, which made "Hero uses
+    # potion_heal_l4." ordinary play. _item_display_name is the same lookup
+    # (and the same title-cased fallback for a slug with no catalogue row) that
+    # _loot_summary uses two lines up the very same log.
+    _append_log(session, f"{user_name} drinks {_item_display_name(slug)}.", code=PLAYER_USE_ITEM)
     session.phase = "end"
     _progress_phase(session)
     _check_end(session)

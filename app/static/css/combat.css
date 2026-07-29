@@ -345,6 +345,66 @@ a:hover {
 }
 
 /* ========================================
+   COMBAT ITEM PANEL
+   The actor's carried potions, grouped by effect kind (combat.js builds this
+   from item_counts). Capped and independently scrollable rather than left to
+   grow the whole action panel -- a character can hold up to ~43 distinct
+   resolvable slugs, and this is the "not a wall" requirement from the panel
+   that used to be two fixed buttons.
+   ======================================== */
+
+.combat-item-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    /* Fits a realistic loadout (a handful of tiers across all three groups)
+       without scrolling -- 260px measured against six held slugs across
+       Healing/Mana/Elixirs at 1366x768. Still caps the pathological case
+       (up to ~43 distinct resolvable slugs at once) rather than letting the
+       panel grow into a wall. */
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+.combat-item-panel[hidden] {
+    display: none;
+}
+
+.combat-item-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.combat-item-group-label {
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-semibold);
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    color: var(--ui-text-dim);
+}
+
+/* Wraps rather than stacking one-per-row, so several tiers of the same
+   potion read as a compact block instead of a tall list. */
+.combat-item-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+}
+
+.btn-combat-item {
+    /* Shrinkable (0 1 auto, not 0 0 auto) with min-width: 0 so a name/count
+       combination longer than today's longest can wrap inside the button
+       instead of forcing a horizontal scrollbar inside the panel -- a flex
+       item's default min-width is auto (its content's width), which
+       overrides max-width on the parent grid and defeats wrapping. */
+    flex: 0 1 auto;
+    min-width: 0;
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--text-xs);
+}
+
+/* ========================================
    COMBAT LOG - Terminal Style
    ======================================== */
 
