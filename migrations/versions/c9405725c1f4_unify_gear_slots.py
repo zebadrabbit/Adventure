@@ -58,7 +58,16 @@ def _bag(items, value, aggregate_shaped):
         return
     for entry in items:
         if isinstance(entry, dict) and entry.get("slug") == slug and "uid" not in entry:
-            entry["qty"] = int(entry.get("qty") or 1) + 1
+            # Mirror load_inventory's own read of this field exactly (falls
+            # back to 1 on anything int() rejects, including a present-but-
+            # None qty) rather than treating a falsy-but-valid 0 the same way
+            # -- `or 1` would turn a reader-invisible qty:0 into a phantom
+            # extra item (0 -> 1, then +1 -> 2 instead of the correct 1).
+            try:
+                q = int(entry.get("qty", 1))
+            except (TypeError, ValueError):
+                q = 1
+            entry["qty"] = q + 1
             return
     items.append({"slug": slug, "qty": 1})
 
@@ -135,11 +144,29 @@ def upgrade():
         if not isinstance(gear, dict):
             continue
         if not isinstance(items, list):
-            continue  # can't safely bag into a non-list; leave the row for a human
+            # Can't safely bag a displaced item into something that isn't a
+            # list -- leaving it for a human to look at, but say so, or no
+            # one finds out this row was skipped.
+            print(
+                f"gear-slot migration: character {row.id} left unchanged -- "
+                f"items column is not a list (got {type(items).__name__})"
+            )
+            continue
         if not any(slot in SLOT_MAP for slot in gear):
             continue  # already canonical
 
         new_gear, new_items = remap_gear(gear, items)
+        if new_gear == gear and new_items == items:
+            # remap_gear only returns its input back unchanged when it hit a
+            # displaced gear instance with no lossless home in this row's
+            # bare-string items list (see its docstring) -- every other path
+            # through a row with a legacy key changes at least that key.
+            print(
+                f"gear-slot migration: character {row.id} left unchanged -- "
+                "a displaced gear instance has no lossless representation in "
+                "this character's bare-string items list"
+            )
+            continue
         conn.execute(
             sa.text('UPDATE "character" SET gear = :gear, items = :items WHERE id = :id'),
             {"gear": json.dumps(new_gear), "items": json.dumps(new_items), "id": row.id},

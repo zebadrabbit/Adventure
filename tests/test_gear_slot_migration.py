@@ -16,6 +16,11 @@ infers the whole list's shape from its first entry and a mismatched shape
 would make the item invisible on the next load. A displaced gear instance
 that would need a bare-string items list to grow a dict entry is not bagged
 at all -- the whole row is left untouched rather than dropping the item.
+Stacking onto an existing bag entry reads that entry's qty exactly as
+load_inventory does: a present-but-invalid or present-but-None qty reads as
+1, and a genuine 0 (invisible to the reader, since it drops qty <= 0 on load)
+reads as 0, not 1 -- so it must not raise, and must not conjure a phantom
+extra item.
 
 Nothing is ever destroyed.
 
@@ -106,6 +111,29 @@ def test_displaced_slug_stacks_onto_an_existing_bag_entry(remap):
 
     assert gear == {}
     assert _slugs(items) == {"plate-leggings": 3}
+
+
+def test_displaced_slug_stacking_treats_an_existing_qty_zero_as_the_reader_does(remap):
+    """load_inventory drops any entry with qty <= 0 -- it's invisible on read.
+
+    Stacking must add exactly one physical item, landing at qty 1, not treat
+    the invisible 0 as "nothing here yet" and default it to 1 before adding,
+    which would conjure a phantom second item.
+    """
+    gear, items = remap({"legs": "plate-leggings"}, [{"slug": "plate-leggings", "qty": 0}])
+
+    assert gear == {}
+    assert _slugs(items) == {"plate-leggings": 1}
+
+
+def test_displaced_slug_stacking_survives_a_non_numeric_qty(remap):
+    """A corrupt qty must not raise -- that would abort the whole migration
+    run partway through and, since _ensure_schema swallows the exception,
+    leave the database silently un-migrated with no visible error."""
+    gear, items = remap({"legs": "plate-leggings"}, [{"slug": "plate-leggings", "qty": "oops"}])
+
+    assert gear == {}
+    assert _slugs(items) == {"plate-leggings": 2}
 
 
 def test_gear_instances_survive_displacement_as_dicts(remap):
