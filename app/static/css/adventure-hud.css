@@ -439,7 +439,19 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover .avatar-circle {
    penalty detail moves to this badge's title (JS) rather than its text, to
    keep the badge itself short. */
 .adv-hud .adv-party-rail .frame-encumbrance {
-    flex: 0 0 auto;
+    /* flex: 0 1 auto (not 0 0) + min-width: 0 lets this badge shrink instead
+       of forcing the row wider than the card -- .operative-card's
+       overflow: hidden turns any overrun into a silent clip otherwise (the
+       same failure mode the header-row attempt was rejected for). Uppercase
+       text runs ~13% wider than mixed-case for words this size, which is
+       roughly the entire gutter .party-card-body's padding leaves at the
+       1366x768 floor, so ellipsis is the real fallback, not a formality.
+       The full word is still in the title attribute (JS) either way. */
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     border-radius: var(--radius);
     border: 1px solid var(--warn-line);
     background: var(--warn-wash);
