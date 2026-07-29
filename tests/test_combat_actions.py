@@ -188,6 +188,155 @@ def test_use_item_heals_and_consumes(auth_client, monkeypatch):
     # Only assert healing effect took place; consumption validation can be added once inventory system unified.
 
 
+def _fresh_user_and_char(items):
+    """A user + single character with a caller-controlled inventory, isolated
+    from the shared "tester"/"Hero" fixture other tests in this file reuse
+    (and mutate) across the same test run."""
+    user = User(username=f"item-check-{random.randint(1, 10**9)}", email=None)
+    user.set_password("pw")
+    db.session.add(user)
+    db.session.commit()
+    char = Character(
+        user_id=user.id,
+        name="Hero",
+        stats=json.dumps({"str": 12, "dex": 10, "int": 10, "con": 12}),
+        gear="{}",
+        items=json.dumps(items),
+    )
+    db.session.add(char)
+    db.session.commit()
+    return user, char
+
+
+def _login_as(client, user_id):
+    with client.session_transaction() as sess:
+        sess["user_id"] = user_id
+        sess["_user_id"] = str(user_id)
+
+
+def test_using_a_potion_you_do_not_have_is_refused(client, monkeypatch):
+    """The exploit: the effect used to be applied on a slug match, with the
+    inventory decrement running afterwards inside a swallowing try/except -- so
+    an empty bag healed 25 and burned a turn, repeatably."""
+    user, _char = _fresh_user_and_char([])  # empty bag
+    _login_as(client, user.id)
+    session = _start(user.id, monkeypatch)
+    cid = session.id
+    state = session.to_dict()
+    version = state["version"]
+    active_index_before = state["active_index"]
+    combat_turn_before = state["combat_turn"]
+    init = state["initiative"]
+    actor_id = init[active_index_before]["id"]
+    hp_before = state["party"]["members"][0]["hp"]
+
+    resp = client.post(
+        f"/api/dungeon/combat/{cid}/action",
+        json={"action": "use_item", "version": version, "actor_id": actor_id, "slug": "potion-healing"},
+    )
+    data = resp.get_json()
+    assert not data.get("ok"), data
+    assert data.get("error"), data
+
+    after = combat_service._load_session(cid).to_dict()  # type: ignore
+    assert after["party"]["members"][0]["hp"] == hp_before, "an unowned potion must not heal"
+    assert after["active_index"] == active_index_before, "a refusal must not advance the turn"
+    assert after["combat_turn"] == combat_turn_before, "a refusal must not advance the turn"
+
+
+def test_an_unimplemented_potion_is_refused_and_kept(client, monkeypatch):
+    """127 of 154 potions had no effect. They must not vanish for nothing."""
+    from app.services.item_effects import REFUSAL_NO_EFFECT
+
+    user, char = _fresh_user_and_char(["potion_buff_speed_l3"])
+    char_id = char.id
+    _login_as(client, user.id)
+    session = _start(user.id, monkeypatch)
+    cid = session.id
+    state = session.to_dict()
+    version = state["version"]
+    active_index_before = state["active_index"]
+    combat_turn_before = state["combat_turn"]
+    init = state["initiative"]
+    actor_id = init[active_index_before]["id"]
+    member_before = state["party"]["members"][0]
+    hp_before = member_before["hp"]
+    mana_before = member_before["mana"]
+
+    resp = client.post(
+        f"/api/dungeon/combat/{cid}/action",
+        json={"action": "use_item", "version": version, "actor_id": actor_id, "slug": "potion_buff_speed_l3"},
+    )
+    data = resp.get_json()
+    assert data.get("error") == "no_effect", data
+    assert data.get("message") == REFUSAL_NO_EFFECT, data  # prose, not a machine code
+
+    char = db.session.get(Character, char_id)
+    items = json.loads(char.items)
+    assert "potion_buff_speed_l3" in items, "an unimplemented potion must be kept, not consumed for nothing"
+
+    after = combat_service._load_session(cid).to_dict()  # type: ignore
+    assert after["party"]["members"][0]["hp"] == hp_before
+    assert after["party"]["members"][0]["mana"] == mana_before
+    assert after["active_index"] == active_index_before, "a refusal must not advance the turn"
+    assert after["combat_turn"] == combat_turn_before, "a refusal must not advance the turn"
+
+
+def _use_potion_and_measure_heal(client, cid, slug, hp_deficit=40):
+    """Knock the sole party member's hp down by ``hp_deficit`` (clear of both
+    max_hp and any cap), use ``slug`` through the real HTTP action route, and
+    return how much hp it actually restored.
+
+    Resetting the baseline immediately before each call means whatever the
+    monster's own counter-attack does between potions (the default _start
+    initiative rolls make it whiff against this build, but that's not load-
+    bearing here) can't bias the comparison.
+    """
+    session = combat_service._load_session(cid)  # type: ignore
+    party = json.loads(session.party_snapshot_json)
+    member = party["members"][0]
+    max_hp = member["max_hp"]
+    hp_before = max(1, max_hp - hp_deficit)
+    member["hp"] = hp_before
+    session.party_snapshot_json = json.dumps(party)
+    db.session.commit()
+
+    state = session.to_dict()
+    version = state["version"]
+    init = state["initiative"]
+    active = init[state["active_index"]]
+    assert active["type"] == "player", "expected the player's turn"
+    actor_id = active["id"]
+
+    resp = client.post(
+        f"/api/dungeon/combat/{cid}/action",
+        json={"action": "use_item", "version": version, "actor_id": actor_id, "slug": slug},
+    )
+    data = resp.get_json()
+    assert data.get("ok") is True, data
+    hp_after = data["state"]["party"]["members"][0]["hp"]
+    return hp_after - hp_before
+
+
+def test_a_tiered_heal_potion_scales_with_its_suffix(client, monkeypatch):
+    """potion_heal_l4 restores more than potion_heal_l1.
+
+    Both potions live in one character's bag and are used back to back in one
+    combat session (rather than two separately-logged-in sessions) -- this
+    test harness keeps a single app context open for the whole test, and
+    flask-login caches the resolved user on it, so a second from-scratch
+    login partway through the same test doesn't reliably take effect.
+    """
+    user, _char = _fresh_user_and_char(["potion_heal_l1", "potion_heal_l4"])
+    _login_as(client, user.id)
+    session = _start(user.id, monkeypatch)
+    cid = session.id
+
+    delta_l1 = _use_potion_and_measure_heal(client, cid, "potion_heal_l1")
+    delta_l4 = _use_potion_and_measure_heal(client, cid, "potion_heal_l4")
+    assert delta_l4 > delta_l1, (delta_l1, delta_l4)
+
+
 def test_cast_spell_costs_mana_and_deals_damage(auth_client, monkeypatch):
     user = User.query.filter_by(username="tester").first()
     assert user
