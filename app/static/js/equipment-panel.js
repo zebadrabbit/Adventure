@@ -291,8 +291,8 @@
          * open() uses.
          *
          * This is the one rule for every async fetch-then-render path in the
-         * panel -- open(), refresh(), equipItem(), unequipItem() and
-         * consumeItem() all go through it or repeat it exactly. The mutation
+         * panel -- open() and refresh() go through it or repeat it exactly,
+         * and the three mutation paths reach it via refresh(). The mutation
          * paths used to call loadCharacter(), which assigned this.character
          * with no gate at all: drop an item on character A's slot, click
          * frame B while the POST is in flight, and A's reload lands after
@@ -302,6 +302,11 @@
          * every later click reads (bag lookups, the id in the next POST), so
          * a stale response winning there is a wrong-character mutation and
          * not merely a wrong-character picture.
+         *
+         * The guard only orders calls against each other; it cannot tell that
+         * a *newer* call is fetching the *wrong* character. That is why the
+         * mutation paths must not pass their own captured id here -- see
+         * refresh().
          */
         async _reloadAndRender(charId) {
             const gen = ++this._openGen;
@@ -350,6 +355,16 @@
             // incoming open() already painted B, it would repaint the panel
             // back to A with no open() call involved. Guarding this fetch
             // the same way open() guards its own closes that path.
+            //
+            // This is also why equipItem/unequipItem/consumeItem reload
+            // through here rather than through _reloadAndRender(charId) with
+            // the id they captured for the POST. Equip on A, click frame B
+            // while the POST is in flight, open(B) completes and paints B,
+            // then the POST resolves: a reload of A started at that moment is
+            // the *newest* generation, so the guard passes it and A is
+            // painted over B -- the exact failure the guard exists to
+            // prevent, arrived at from the other side. _openCharId is read
+            // after the await and names whoever is actually on screen.
             await this._reloadAndRender(this._openCharId);
         }
 
@@ -703,6 +718,14 @@
                     // hotkey handler.
                     e.preventDefault();
                     e.stopPropagation();
+                    // Held keys auto-repeat at ~30/s after ~500ms, and
+                    // activateBagCell is not awaited by this handler -- so one
+                    // deliberate long press on a potion drank the whole stack,
+                    // irreversibly, for exactly the keyboard and motor-impaired
+                    // users this affordance was added for. A native <button>
+                    // does not behave that way (Space activates on keyup), so
+                    // neither does the control imitating one.
+                    if (e.repeat) return;
                     this.activateBagCell(cell, true);
                 });
             });
@@ -775,8 +798,15 @@
         async equipItem(item, slot) {
             // Read once, before the POST. this.character can be swapped out
             // from under us by an open() landing while the request is in
-            // flight, and the reload afterwards must reload the character we
-            // actually mutated, not whichever one the panel drifted to.
+            // flight, and the POST must address the character the player
+            // actually acted on, not whichever one the panel drifted to.
+            //
+            // The *reload* is the opposite question and must not reuse this
+            // id: see refresh() below. Mutating A and then reloading A would
+            // paint the outgoing character over an open(B) that has already
+            // finished -- and because that reload starts last, it is the
+            // newest generation, so the guard passes it. refresh() reloads
+            // _openCharId, which is whoever is actually on screen.
             const charId = this.character.id;
             // Procedural gear instances carry a `uid` and self-describe their
             // slot; equip them by uid. Legacy catalog items equip by slug +
@@ -792,7 +822,7 @@
             });
 
             if (response.ok) {
-                await this._reloadAndRender(charId);
+                await this.refresh();
             } else {
                 const d = await response.json().catch(() => ({}));
                 this.toast(this.refusalText(d, "Could not equip that."), false);
@@ -800,6 +830,8 @@
         }
 
         async unequipItem(slot) {
+            // POST addresses the mutated character; the reload follows the
+            // panel. See equipItem.
             const charId = this.character.id;
             const response = await fetch(`/api/characters/${charId}/unequip`, {
                 method: "POST",
@@ -808,7 +840,7 @@
             });
 
             if (response.ok) {
-                await this._reloadAndRender(charId);
+                await this.refresh();
             } else {
                 // Previously absent entirely, which made a refused unequip --
                 // an armour slot locked mid-fight, most commonly -- a button
@@ -829,6 +861,8 @@
          * never affected; they go through combat.js.
          */
         async consumeItem(item) {
+            // POST addresses the mutated character; the reload follows the
+            // panel. See equipItem.
             const charId = this.character.id;
             const response = await fetch(`/api/characters/${charId}/consume`, {
                 method: "POST",
@@ -841,7 +875,15 @@
                 // No mud-characters-state-invalidated dispatch: this panel is
                 // that event's only listener, so firing it here would just
                 // queue a second, identical fetch behind the reload below.
-                await this._reloadAndRender(charId);
+                await this.refresh();
+                // Drinking changes current HP, and the party rail is showing
+                // that exact number a few inches away. Without this the panel
+                // reads 10/30 and the frame behind it still reads 5/30 --
+                // the rail listens for nothing, so it would stay wrong until
+                // the next move. Camp calls the same function for the same
+                // reason. (Equipping does not move current HP, which is why
+                // it is only wired up here.)
+                if (window.refreshPartyCards) window.refreshPartyCards();
             } else {
                 const d = await response.json().catch(() => ({}));
                 this.toast(this.refusalText(d, "Nothing happens."), false);

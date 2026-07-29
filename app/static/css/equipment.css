@@ -446,6 +446,11 @@
     outline: none;
     background: var(--surface-hover);
     box-shadow: var(--focus-ring);
+    /* --focus-ring projects 4px outward into a 4px grid gap, and every cell is
+       position: relative -- so without this the next cell in DOM order paints
+       its own background over the ring's outer band and the focused cell looks
+       half-ringed. */
+    z-index: 1;
 }
 
 .bag-grid-cell[draggable="true"]:active {
