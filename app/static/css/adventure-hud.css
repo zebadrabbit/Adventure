@@ -444,6 +444,7 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover .avatar-circle {
     border: 1px solid var(--warn-line);
     background: var(--warn-wash);
     color: var(--warn);
+    text-transform: uppercase;
 }
 
 .adv-hud .adv-party-rail .frame-encumbrance.is-blocked {
