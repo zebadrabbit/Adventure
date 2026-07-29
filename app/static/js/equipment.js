@@ -108,7 +108,7 @@
 
   function renderCharPanel(ch) {
     const gear = ch.gear || {};
-    const slots = ['weapon', 'offhand', 'head', 'chest', 'legs', 'boots', 'gloves', 'ring1', 'ring2', 'amulet'];
+    const slots = ['weapon', 'offhand', 'head', 'chest', 'hands', 'feet', 'ring', 'amulet'];
     const bonusSummary = gearBonusSummary(gear);
     let html = `<div class="row g-3" data-char-id="${ch.id}">
       <div class="col-md-6">

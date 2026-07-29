@@ -19,6 +19,7 @@ from app.inventory.utils import (
     load_inventory,
     remove_one,
 )
+from app.loot.data.archetypes import SLOTS as _ARCHETYPE_SLOTS
 from app.models import CharacterStatusEffect
 from app.models.models import Character, Item
 from app.models.xp import xp_for_level
@@ -27,25 +28,15 @@ from app.services.time_service import advance_for
 
 bp_inventory = Blueprint("inventory", __name__)
 
+# The one gear-slot vocabulary. Defined by the loot generator, which is what
+# every procedural item, prefix and suffix keys off, so it is what the player
+# actually finds. This module used to restate a thirteen-name union of this
+# list and an older one, which let the same kind of item land in two different
+# slots depending on which code path equipped it.
+_SLOTS = tuple(_ARCHETYPE_SLOTS)
+
 
 # ----------------------- Helpers -----------------------
-
-_SLOTS = (
-    "head",
-    "chest",
-    "legs",
-    "boots",
-    "gloves",
-    "weapon",
-    "offhand",
-    "ring1",
-    "ring2",
-    "amulet",
-    # canonical 8-slot gear slots (procedural items)
-    "hands",
-    "feet",
-    "ring",
-)
 
 
 def _safe_json_load(s: str, default):
@@ -108,15 +99,14 @@ def _slot_for_item(item: Item, gear: dict) -> str | None:
         if any(k in slug or k in name for k in ("helm", "helmet", "hood", "cap")):
             return "head"
         if any(k in slug or k in name for k in ("boots", "greaves")):
-            return "boots"
+            return "feet"
         if any(k in slug or k in name for k in ("glove", "gauntlet")):
-            return "gloves"
-        if any(k in slug or k in name for k in ("legging", "pants", "trousers", "legs")):
-            return "legs"
+            return "hands"
+        # No legs slot: D&D body armour is one piece, so leg armour is part of
+        # the chest piece rather than its own slot.
         return "chest"
     if t == "ring":
-        # pick first free ring slot
-        return "ring1" if not gear.get("ring1") else "ring2"
+        return "ring"
     if t in ("amulet", "necklace", "talisman"):
         return "amulet"
     # tools, potions, scrolls not equippable
@@ -481,8 +471,6 @@ def equip_item(cid: int):
     # --- Gear-instance path: uid-based equip for procedural items ---
     uid = (data.get("uid") or "").strip()
     if uid:
-        from app.loot.data.archetypes import SLOTS as GEAR_SLOTS
-
         items_raw = json.loads(ch.items) if ch.items else []
         if not isinstance(items_raw, list):
             items_raw = []
@@ -493,7 +481,7 @@ def equip_item(cid: int):
         if not inst:
             return jsonify({"error": "not_in_inventory"}), 400
         slot = inst.get("slot")
-        if slot not in GEAR_SLOTS:
+        if slot not in _SLOTS:
             return jsonify({"error": "bad_slot"}), 400
         blocked = _reject_if_in_combat(ch, slot)
         if blocked:

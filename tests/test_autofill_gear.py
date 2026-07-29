@@ -27,14 +27,16 @@ def test_autofill_characters_have_basic_gear(gear_client):
     assert data["created"] == 4
     for ch in data["characters"]:
         gear = ch.get("gear")
-        # gear should be a dict mapping slot -> slug (may omit armor for some classes)
+        # gear should be a dict mapping canonical slot -> slug (may omit chest
+        # for classes whose starter kit has no armour, e.g. mage/monk/sorcerer)
         assert isinstance(gear, dict)
         # Weapon is mandatory if any starter weapon available
         assert "weapon" in gear
         assert isinstance(gear["weapon"], str) and len(gear["weapon"]) > 0
         # Armor is optional; if present must be non-empty string
-        if "armor" in gear:
-            assert isinstance(gear["armor"], str) and len(gear["armor"]) > 0
+        if "chest" in gear:
+            assert isinstance(gear["chest"], str) and len(gear["chest"]) > 0
+        assert "armor" not in gear, "body armour must use the canonical 'chest' slot"
 
 
 def test_manual_character_creation_auto_equip(client, test_app):

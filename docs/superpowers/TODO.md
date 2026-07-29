@@ -72,6 +72,17 @@ Full triage with code pointers:
       trap message on step, ambush pack appearing, respawn trickle.
 
 ## Engineering
+- [x] ~~Three gear-slot vocabularies~~ — `auto_equip_for` wrote `armor` (a name
+      in no vocabulary, so nothing could unequip it), `_slot_for_item` wrote the
+      legacy `boots`/`gloves`/`ring1`/`ring2`, and procedural loot wrote the
+      canonical eight, all into the same `gear` dict. Now single-sourced from
+      `archetypes.SLOTS`, with a data migration. Plan:
+      [plans/2026-07-28-gear-slot-unification.md](plans/2026-07-28-gear-slot-unification.md).
+- [ ] **Looted gear cannot be equipped during a run** — the dungeon's only equip
+      path (`equipment.js`) posts `{slug, slot}` and has no `uid` branch, so
+      procedural instances 404 on the legacy path. Fixed by consolidating the
+      two paper dolls onto the one that sends `uid`. Spec:
+      [specs/2026-07-28-character-panel-redesign.md](specs/2026-07-28-character-panel-redesign.md).
 - [ ] Shrine/camp write `stats["mana"]` instead of `current_mana`
       (pre-existing camp convention) — post-combat characters may not see
       the restore; small cleanup.
