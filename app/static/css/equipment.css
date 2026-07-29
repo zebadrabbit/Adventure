@@ -1,4 +1,8 @@
-/* Enhanced Equipment & Inventory System */
+/* Equipment & Inventory Panel — character equipment, bag grid, item tooltips.
+   Restyled onto the token system (docs/DESIGN_SYSTEM.md); every colour, radius
+   and shadow below comes from tokens.css. Realm-agnostic: this file renders
+   correctly on both /dashboard (warm) and /adventure (cold) because it never
+   states a literal hue, only semantic roles. */
 
 /* Equipment Panel Modal */
 .equipment-modal .modal-dialog {
@@ -6,44 +10,55 @@
 }
 
 .eq-modal-content {
-    background: linear-gradient(135deg, rgba(20,20,30,0.98), rgba(30,30,40,0.98));
-    border: 2px solid rgba(100,100,120,0.3);
+    background: var(--surface-overlay);
+    border: 2px solid var(--edge);
+    box-shadow: var(--elev-overlay);
 }
 
 .eq-modal-header {
-    border-bottom: 1px solid rgba(100,100,120,0.3);
+    border-bottom: 1px solid var(--edge-subtle);
 }
 
 .eq-modal-footer {
-    border-top: 1px solid rgba(100,100,120,0.3);
+    border-top: 1px solid var(--edge-subtle);
 }
 
 .equipment-grid {
     display: grid;
     grid-template-columns: 300px 1fr 1fr;
     gap: 2rem;
-    min-height: 600px;
+    /* Was a flat 600px floor regardless of context. The panel renders in two
+       presentations — a roomy scrollable modal on /dashboard and a
+       height-constrained HUD mount on /adventure (see adventure-hud.css) —
+       so a fixed pixel floor is wrong for one of them by definition. 100%
+       asks for "at least as tall as whatever this is given": on the modal it
+       still fills the dialog nicely when content is short; on the HUD, where
+       the immediate ancestor has no definite height, a percentage floor
+       resolves to auto, i.e. no floor at all, and the grid simply reports
+       its natural content height for `.adv-character`'s existing
+       overflow:auto (Task 2's, unchanged here) to handle. */
+    min-height: 100%;
 }
 
 .eq-panel-heading {
-    color: rgba(255,255,255,0.8);
+    color: var(--ink-muted);
     text-transform: uppercase;
     letter-spacing: 1px;
 }
 
 /* Equipment Slots */
 .equipment-slots {
-    background: linear-gradient(135deg, rgba(30, 30, 40, 0.95), rgba(20, 20, 30, 0.95));
-    border-radius: 12px;
+    background: var(--surface);
+    border-radius: var(--radius);
     padding: 1.5rem;
-    border: 1px solid rgba(100, 100, 120, 0.3);
+    border: 1px solid var(--edge);
 }
 
 .equipment-slot {
     position: relative;
-    background: rgba(40, 40, 50, 0.8);
-    border: 2px solid rgba(80, 80, 100, 0.5);
-    border-radius: 8px;
+    background: var(--surface-raised);
+    border: 2px solid var(--edge);
+    border-radius: var(--radius);
     padding: 1rem;
     margin-bottom: 0.75rem;
     min-height: 70px;
@@ -55,18 +70,18 @@
 }
 
 .equipment-slot:hover {
-    background: rgba(50, 50, 60, 0.9);
-    border-color: rgba(120, 120, 150, 0.7);
+    background: var(--surface-hover);
+    border-color: var(--edge-strong);
     transform: translateX(4px);
 }
 
 .equipment-slot[data-has-item="true"] {
-    border-color: rgba(100, 180, 255, 0.6);
+    border-color: var(--info-line);
 }
 
 .equipment-slot[data-drag-over="true"] {
-    background: rgba(100, 180, 255, 0.2);
-    border-color: #64b4ff;
+    background: var(--info-wash);
+    border-color: var(--info);
     border-style: dashed;
     animation: slotPulse 0.8s ease-in-out infinite;
 }
@@ -79,8 +94,8 @@
 .slot-icon {
     width: 48px;
     height: 48px;
-    background: radial-gradient(circle, rgba(100, 100, 120, 0.3), transparent);
-    border-radius: 6px;
+    background: radial-gradient(circle, color-mix(in srgb, var(--edge) 70%, transparent), transparent);
+    border-radius: var(--radius);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -101,27 +116,27 @@
     font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 1px;
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--ink-muted);
     font-weight: 600;
 }
 
 .slot-item-name {
     font-size: 0.95rem;
     font-weight: 500;
-    color: #e0e0e0;
+    color: var(--ink);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .slot-item-name.eq-slot-empty {
-    color: rgba(255,255,255,0.4);
+    color: var(--ink-faint);
     font-style: italic;
 }
 
 .slot-item-stats {
     font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--ink-muted);
     margin-top: 2px;
 }
 
@@ -134,27 +149,29 @@
     opacity: 1;
 }
 
-/* Rarity Colors — must match app/loot/data/rarities.py */
-.rarity-common    { color: #9d9d9d; }
-.rarity-uncommon  { color: #1eff00; }
-.rarity-rare      { color: #0070dd; }
-.rarity-epic      { color: #a335ee; }
-.rarity-legendary { color: #ff8000; }
-.rarity-mythic    { color: #e6cc80; }
+/* Rarity Colors — must match app/loot/data/rarities.py. Fixed across both
+   realms (tokens.css): a player has to be able to learn that purple means
+   epic and have it survive a realm change or a re-skin. */
+.rarity-common    { color: var(--rarity-common); }
+.rarity-uncommon  { color: var(--rarity-uncommon); }
+.rarity-rare      { color: var(--rarity-rare); }
+.rarity-epic      { color: var(--rarity-epic); }
+.rarity-legendary { color: var(--rarity-legendary); }
+.rarity-mythic    { color: var(--rarity-mythic); }
 
 /* Rarity border colours for bag grid cells */
-.bag-grid-cell.rarity-common    { border-color: #9d9d9d; }
-.bag-grid-cell.rarity-uncommon  { border-color: #1eff00; }
-.bag-grid-cell.rarity-rare      { border-color: #0070dd; }
-.bag-grid-cell.rarity-epic      { border-color: #a335ee; }
-.bag-grid-cell.rarity-legendary { border-color: #ff8000; }
-.bag-grid-cell.rarity-mythic    { border-color: #e6cc80; }
+.bag-grid-cell.rarity-common    { border-color: var(--rarity-common); }
+.bag-grid-cell.rarity-uncommon  { border-color: var(--rarity-uncommon); }
+.bag-grid-cell.rarity-rare      { border-color: var(--rarity-rare); }
+.bag-grid-cell.rarity-epic      { border-color: var(--rarity-epic); }
+.bag-grid-cell.rarity-legendary { border-color: var(--rarity-legendary); }
+.bag-grid-cell.rarity-mythic    { border-color: var(--rarity-mythic); }
 
 /* Portrait Panel (center column) */
 .eq-portrait-panel {
-    background: linear-gradient(135deg, rgba(40, 40, 50, 0.95), rgba(30, 30, 40, 0.95));
-    border-radius: 12px;
-    border: 1px solid rgba(100, 100, 120, 0.3);
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--edge);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -168,21 +185,32 @@
     font-weight: 600;
     font-size: 1rem;
     letter-spacing: 0.5px;
-    /* default fallback */
-    background: rgba(80, 80, 100, 0.6);
-    color: #fff;
+    /* Fallback for a class string with no matching .eq-class-bg-* rule. */
+    background: var(--surface-raised);
+    color: var(--ink);
 }
 
-/* Per-class header colours (CSS vars fallback to manual values) */
-.eq-class-bg-fighter  { background: var(--class-fighter-bg,  #7c2d12); color: var(--class-fighter-fg,  #fed7aa); }
-.eq-class-bg-mage     { background: var(--class-mage-bg,     #1e1b4b); color: var(--class-mage-fg,     #c4b5fd); }
-.eq-class-bg-rogue    { background: var(--class-rogue-bg,    #111827); color: var(--class-rogue-fg,     #6ee7b7); }
-.eq-class-bg-cleric   { background: var(--class-cleric-bg,   #713f12); color: var(--class-cleric-fg,    #fef08a); }
-.eq-class-bg-ranger   { background: var(--class-ranger-bg,   #14532d); color: var(--class-ranger-fg,    #bbf7d0); }
-.eq-class-bg-paladin  { background: var(--class-paladin-bg,  #312e81); color: var(--class-paladin-fg,   #e9d5ff); }
-.eq-class-bg-warlock  { background: var(--class-warlock-bg,  #4c0519); color: var(--class-warlock-fg,   #fda4af); }
-.eq-class-bg-bard     { background: var(--class-bard-bg,     #4a1d96); color: var(--class-bard-fg,      #fde68a); }
-.eq-class-bg-adventurer { background: rgba(80,80,100,0.6); color: #fff; }
+/* Per-class header colours — one hue per class (tokens.css), header fill and
+   text both derived from it with color-mix() rather than restated. Twelve
+   classes exist in the game (app/loot/data/archetypes.py); the previous
+   version of this file only covered 8 of them via var(--class-fighter-bg,
+   #hex) fallbacks to custom properties that were never declared anywhere —
+   every one of the 8 was silently rendering its hard-coded fallback, and the
+   other 4 (druid, barbarian, monk, sorcerer) rendered no class colour at
+   all. All 12 are covered here now. */
+.eq-class-bg-fighter    { background: color-mix(in srgb, var(--class-fighter) 28%, var(--surface-raised));    color: color-mix(in srgb, var(--class-fighter) 65%, white); }
+.eq-class-bg-rogue      { background: color-mix(in srgb, var(--class-rogue) 28%, var(--surface-raised));      color: color-mix(in srgb, var(--class-rogue) 65%, white); }
+.eq-class-bg-mage       { background: color-mix(in srgb, var(--class-mage) 28%, var(--surface-raised));       color: color-mix(in srgb, var(--class-mage) 65%, white); }
+.eq-class-bg-cleric     { background: color-mix(in srgb, var(--class-cleric) 28%, var(--surface-raised));     color: color-mix(in srgb, var(--class-cleric) 65%, white); }
+.eq-class-bg-ranger     { background: color-mix(in srgb, var(--class-ranger) 28%, var(--surface-raised));     color: color-mix(in srgb, var(--class-ranger) 65%, white); }
+.eq-class-bg-druid      { background: color-mix(in srgb, var(--class-druid) 28%, var(--surface-raised));      color: color-mix(in srgb, var(--class-druid) 65%, white); }
+.eq-class-bg-barbarian  { background: color-mix(in srgb, var(--class-barbarian) 28%, var(--surface-raised));  color: color-mix(in srgb, var(--class-barbarian) 65%, white); }
+.eq-class-bg-bard       { background: color-mix(in srgb, var(--class-bard) 28%, var(--surface-raised));       color: color-mix(in srgb, var(--class-bard) 65%, white); }
+.eq-class-bg-monk       { background: color-mix(in srgb, var(--class-monk) 28%, var(--surface-raised));       color: color-mix(in srgb, var(--class-monk) 65%, white); }
+.eq-class-bg-paladin    { background: color-mix(in srgb, var(--class-paladin) 28%, var(--surface-raised));    color: color-mix(in srgb, var(--class-paladin) 65%, white); }
+.eq-class-bg-sorcerer   { background: color-mix(in srgb, var(--class-sorcerer) 28%, var(--surface-raised));   color: color-mix(in srgb, var(--class-sorcerer) 65%, white); }
+.eq-class-bg-warlock    { background: color-mix(in srgb, var(--class-warlock) 28%, var(--surface-raised));    color: color-mix(in srgb, var(--class-warlock) 65%, white); }
+.eq-class-bg-adventurer { background: var(--surface-raised); color: var(--ink); }
 
 .eq-class-label {
     font-size: 0.75rem;
@@ -198,17 +226,19 @@
 }
 
 .eq-bar-label {
-    color: rgba(255,255,255,0.8);
+    color: var(--ink);
     margin-bottom: 2px;
 }
 
 .eq-progress-bar {
     height: 8px;
-    background: rgba(100,100,120,0.3);
+    background: var(--surface-sunken);
+    border-radius: var(--radius);
+    box-shadow: var(--inset-well);
 }
 
 .eq-xp-fill {
-    background: linear-gradient(90deg, #7c3aed, #a78bfa);
+    background: var(--xp);
 }
 
 /* Stat grid (2×2) */
@@ -220,9 +250,9 @@
 }
 
 .eq-stat-cell {
-    background: rgba(40, 40, 50, 0.8);
-    border: 1px solid rgba(80, 80, 100, 0.4);
-    border-radius: 8px;
+    background: var(--surface-raised);
+    border: 1px solid var(--edge);
+    border-radius: var(--radius);
     padding: 0.5rem 0.75rem;
     text-align: center;
 }
@@ -231,22 +261,22 @@
     font-size: 0.65rem;
     text-transform: uppercase;
     letter-spacing: 1px;
-    color: rgba(255,255,255,0.5);
+    color: var(--ink-muted);
     margin-bottom: 2px;
 }
 
 .eq-stat-value {
     font-size: 1.1rem;
     font-weight: 700;
-    color: #64b4ff;
+    color: var(--ink-strong);
 }
 
 /* Inventory Bag */
 .inventory-bag {
-    background: linear-gradient(135deg, rgba(30, 30, 40, 0.95), rgba(20, 20, 30, 0.95));
-    border-radius: 12px;
+    background: var(--surface);
+    border-radius: var(--radius);
     padding: 1.5rem;
-    border: 1px solid rgba(100, 100, 120, 0.3);
+    border: 1px solid var(--edge);
     max-height: 600px;
     overflow-y: auto;
 }
@@ -261,9 +291,9 @@
 .bag-grid-cell {
     width: 48px;
     height: 48px;
-    background: rgba(40, 40, 50, 0.8);
-    border: 2px solid rgba(80, 80, 100, 0.5);
-    border-radius: 6px;
+    background: var(--surface-raised);
+    border: 2px solid var(--edge);
+    border-radius: var(--radius);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -274,7 +304,7 @@
 }
 
 .bag-grid-cell:not(.empty):hover {
-    background: rgba(60, 60, 80, 0.95);
+    background: var(--surface-hover);
     transform: scale(1.08);
 }
 
@@ -284,8 +314,8 @@
 
 .bag-grid-cell.empty {
     border-style: dotted;
-    border-color: rgba(80, 80, 100, 0.25);
-    background: rgba(20, 20, 30, 0.4);
+    border-color: var(--edge-subtle);
+    background: var(--surface-sunken);
     cursor: default;
 }
 
@@ -296,25 +326,28 @@
     right: 3px;
     font-size: 0.6rem;
     font-weight: 700;
-    color: #fff;
-    background: rgba(0,0,0,0.6);
-    border-radius: 3px;
+    color: var(--ink-strong);
+    background: var(--scrim);
+    border-radius: var(--radius);
     padding: 0 3px;
     line-height: 1.4;
     pointer-events: none;
 }
 
-/* Item Comparison Tooltip */
+/* Item Comparison Tooltip — genuinely above the page, so it may keep
+   --elev-overlay (and the realm-matched --glow-accent, since this tooltip's
+   accent border/glow was hard-coded blue before and --info is defined as
+   the realm accent — it now shifts with the realm like everything else). */
 .item-comparison-tooltip {
     position: absolute;
-    z-index: 10000;
-    background: linear-gradient(135deg, rgba(20, 20, 30, 0.98), rgba(30, 30, 40, 0.98));
-    border: 2px solid rgba(100, 180, 255, 0.4);
-    border-radius: 10px;
+    z-index: var(--z-tooltip);
+    background: var(--surface-overlay);
+    border: 2px solid var(--info-line);
+    border-radius: var(--radius);
     padding: 1rem;
     min-width: 300px;
     max-width: 400px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 40px rgba(100, 180, 255, 0.2);
+    box-shadow: var(--elev-overlay), var(--glow-accent);
     pointer-events: none;
     animation: tooltipFadeIn 0.2s ease;
 }
@@ -325,7 +358,7 @@
 }
 
 .tooltip-item-header {
-    border-bottom: 1px solid rgba(100, 100, 120, 0.3);
+    border-bottom: 1px solid var(--edge-subtle);
     padding-bottom: 0.75rem;
     margin-bottom: 0.75rem;
 }
@@ -338,7 +371,7 @@
 
 .tooltip-item-type {
     font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--ink-muted);
     text-transform: uppercase;
     letter-spacing: 1px;
 }
@@ -354,19 +387,19 @@
     font-size: 0.85rem;
 }
 
-.stat-positive { color: #4ade80; }
-.stat-negative { color: #ef4444; }
-.stat-neutral  { color: rgba(255, 255, 255, 0.7); }
+.stat-positive { color: var(--success); }
+.stat-negative { color: var(--danger); }
+.stat-neutral  { color: var(--ink-muted); }
 
 .tooltip-comparison {
-    border-top: 1px solid rgba(100, 100, 120, 0.3);
+    border-top: 1px solid var(--edge-subtle);
     padding-top: 0.75rem;
     margin-top: 0.75rem;
 }
 
 .tooltip-comparison-label {
     font-size: 0.7rem;
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--ink-muted);
     text-transform: uppercase;
     letter-spacing: 1px;
     margin-bottom: 0.5rem;
@@ -377,16 +410,16 @@
     margin-left: 0.5rem;
 }
 
-.comparison-diff.better { color: #4ade80; }
-.comparison-diff.worse  { color: #ef4444; }
+.comparison-diff.better { color: var(--success); }
+.comparison-diff.worse  { color: var(--danger); }
 
 .tooltip-description {
     font-size: 0.8rem;
     font-style: italic;
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--ink-muted);
     margin-top: 0.75rem;
     padding-top: 0.75rem;
-    border-top: 1px solid rgba(100, 100, 120, 0.2);
+    border-top: 1px solid var(--edge-subtle);
 }
 
 .tooltip-affixes {
@@ -395,44 +428,48 @@
     opacity: 0.9;
 }
 
-/* Set Bonus Display */
+/* Set Bonus Display — fixed rarity-epic violet in both realms, matching the
+   other item-identity colours (rarity, class): this is about the item, not
+   the realm, so it does not derive from --accent. */
 .set-bonus-indicator {
-    background: linear-gradient(90deg, rgba(168, 85, 247, 0.2), transparent);
-    border-left: 3px solid #a855f7;
+    background: color-mix(in srgb, var(--rarity-epic) 14%, transparent);
+    border-left: 3px solid var(--rarity-epic);
     padding: 0.5rem;
     margin-top: 0.75rem;
-    border-radius: 4px;
+    border-radius: var(--radius);
 }
 
 .set-bonus-name {
     font-size: 0.75rem;
     font-weight: 600;
-    color: #c084fc;
+    color: var(--rarity-epic);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 .set-bonus-progress {
     font-size: 0.7rem;
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--ink-muted);
     margin-top: 0.25rem;
 }
 
 .set-bonus-effect {
     font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--ink);
     margin-top: 0.25rem;
 }
 
 .set-bonus-active {
-    color: #4ade80;
+    color: var(--success);
 }
 
-/* Durability Indicator */
+/* Durability Indicator — a sunken track + flat fill, same shape as the
+   HP/MP/XP bars above. */
 .durability-bar {
     height: 4px;
-    background: rgba(100, 100, 120, 0.3);
-    border-radius: 2px;
+    background: var(--surface-sunken);
+    border-radius: var(--radius);
+    box-shadow: var(--inset-well);
     overflow: hidden;
     margin-top: 0.5rem;
 }
@@ -442,33 +479,33 @@
     transition: width 0.3s ease, background-color 0.3s ease;
 }
 
-.durability-fill.high   { background: linear-gradient(90deg, #4ade80, #22c55e); }
-.durability-fill.medium { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
-.durability-fill.low    { background: linear-gradient(90deg, #ef4444, #dc2626); }
+.durability-fill.high   { background: var(--success); }
+.durability-fill.medium { background: var(--warn); }
+.durability-fill.low    { background: var(--danger); }
 
 /* Stat display (kept for any legacy uses) */
 .stat-item {
     display: flex;
     justify-content: space-between;
     padding: 0.5rem;
-    border-bottom: 1px solid rgba(100, 100, 120, 0.2);
+    border-bottom: 1px solid var(--edge-subtle);
 }
 
 .stat-item:last-child { border-bottom: none; }
 
 .stat-label {
     font-size: 0.85rem;
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--ink-muted);
 }
 
 .stat-value {
     font-size: 0.85rem;
     font-weight: 600;
-    color: #64b4ff;
+    color: var(--ink-strong);
 }
 
 .stat-bonus {
-    color: #4ade80;
+    color: var(--success);
     font-size: 0.75rem;
     margin-left: 0.25rem;
 }
