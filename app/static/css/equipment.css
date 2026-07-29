@@ -40,18 +40,47 @@
     min-height: 100%;
 }
 
+/* "Equipped" and "Inventory" both sit inside a column that now scrolls on
+   its own (.equipment-slots, .inventory-bag — see below); sticky keeps the
+   heading in view while its list scrolls underneath it instead of it
+   scrolling away after the first couple of items. The opaque --surface
+   background is load-bearing here, not decorative: without it the list
+   items would show through/behind the heading text as they pass under it. */
 .eq-panel-heading {
+    position: sticky;
+    top: 0;
+    background: var(--surface);
     color: var(--ink-muted);
     text-transform: uppercase;
     letter-spacing: 1px;
 }
 
-/* Equipment Slots */
+/* Equipment Slots — capped and independently scrollable, the same pattern
+   .inventory-bag already used below. Without this, 8 slots at min-height
+   70px plus padding/margin are the tallest of the grid's three columns by a
+   wide margin (measured: ~863px), and because an auto grid row takes its
+   height from the tallest item, that dictated the whole row's height
+   regardless of how little room the container actually had — on the HUD
+   mount (adventure-hud.css's .adv-character, ~496px tall at the 1366x768
+   design floor) that pushed the bag column and the footer several hundred
+   pixels below the panel's own fold.
+
+   78vh rather than a flat pixel figure: this file renders in two contexts
+   with very different headroom (a roomy dashboard modal, a height-
+   constrained HUD panel; see the .equipment-grid comment above), and a
+   fixed cap tuned for the tight one wastes space in the roomy one. 78vh
+   measures out to 600px at the 1366x768 floor — same number .inventory-bag
+   already uses, so the two columns still crop at the same point there — but
+   scales with the viewport instead of freezing at that figure, so it stops
+   clipping content at all once there is genuinely enough room (measured:
+   no crop, no internal scrollbar, at 2560x1440). */
 .equipment-slots {
     background: var(--surface);
     border-radius: var(--radius);
     padding: 1.5rem;
     border: 1px solid var(--edge);
+    max-height: 78vh;
+    overflow-y: auto;
 }
 
 .equipment-slot {
@@ -192,24 +221,35 @@
 
 /* Per-class header colours — one hue per class (tokens.css), header fill and
    text both derived from it with color-mix() rather than restated. Twelve
-   classes exist in the game (app/loot/data/archetypes.py); the previous
+   classes exist in the game (CLASS_MAP, app/routes/main.py:325); the previous
    version of this file only covered 8 of them via var(--class-fighter-bg,
    #hex) fallbacks to custom properties that were never declared anywhere —
    every one of the 8 was silently rendering its hard-coded fallback, and the
    other 4 (druid, barbarian, monk, sorcerer) rendered no class colour at
-   all. All 12 are covered here now. */
-.eq-class-bg-fighter    { background: color-mix(in srgb, var(--class-fighter) 28%, var(--surface-raised));    color: color-mix(in srgb, var(--class-fighter) 65%, white); }
-.eq-class-bg-rogue      { background: color-mix(in srgb, var(--class-rogue) 28%, var(--surface-raised));      color: color-mix(in srgb, var(--class-rogue) 65%, white); }
-.eq-class-bg-mage       { background: color-mix(in srgb, var(--class-mage) 28%, var(--surface-raised));       color: color-mix(in srgb, var(--class-mage) 65%, white); }
-.eq-class-bg-cleric     { background: color-mix(in srgb, var(--class-cleric) 28%, var(--surface-raised));     color: color-mix(in srgb, var(--class-cleric) 65%, white); }
-.eq-class-bg-ranger     { background: color-mix(in srgb, var(--class-ranger) 28%, var(--surface-raised));     color: color-mix(in srgb, var(--class-ranger) 65%, white); }
-.eq-class-bg-druid      { background: color-mix(in srgb, var(--class-druid) 28%, var(--surface-raised));      color: color-mix(in srgb, var(--class-druid) 65%, white); }
-.eq-class-bg-barbarian  { background: color-mix(in srgb, var(--class-barbarian) 28%, var(--surface-raised));  color: color-mix(in srgb, var(--class-barbarian) 65%, white); }
-.eq-class-bg-bard       { background: color-mix(in srgb, var(--class-bard) 28%, var(--surface-raised));       color: color-mix(in srgb, var(--class-bard) 65%, white); }
-.eq-class-bg-monk       { background: color-mix(in srgb, var(--class-monk) 28%, var(--surface-raised));       color: color-mix(in srgb, var(--class-monk) 65%, white); }
-.eq-class-bg-paladin    { background: color-mix(in srgb, var(--class-paladin) 28%, var(--surface-raised));    color: color-mix(in srgb, var(--class-paladin) 65%, white); }
-.eq-class-bg-sorcerer   { background: color-mix(in srgb, var(--class-sorcerer) 28%, var(--surface-raised));   color: color-mix(in srgb, var(--class-sorcerer) 65%, white); }
-.eq-class-bg-warlock    { background: color-mix(in srgb, var(--class-warlock) 28%, var(--surface-raised));    color: color-mix(in srgb, var(--class-warlock) 65%, white); }
+   all. All 12 are covered here now.
+
+   Mix ratios: 27% class hue into --surface-raised for the fill, 62% class
+   hue into white for the text. Measured in-browser (getComputedStyle on
+   each .eq-class-bg-* header, both data-realm values, WCAG relative-
+   luminance contrast) for all 12 classes: worst case is 4.65:1 (warlock,
+   dungeon realm — fighter is next at 4.66:1), every other class clears
+   that, ceiling is 6.37:1 (paladin, town). An earlier 28%/65% pass measured
+   4.3–6.1:1 and missed that its own floor (fighter 4.35:1, warlock 4.35:1)
+   sat under WCAG AA's 4.5:1 for body text; a uniform 1–3pt ratio shift was
+   enough to clear every class with margin rather than singling out those
+   two. */
+.eq-class-bg-fighter    { background: color-mix(in srgb, var(--class-fighter) 27%, var(--surface-raised));    color: color-mix(in srgb, var(--class-fighter) 62%, white); }
+.eq-class-bg-rogue      { background: color-mix(in srgb, var(--class-rogue) 27%, var(--surface-raised));      color: color-mix(in srgb, var(--class-rogue) 62%, white); }
+.eq-class-bg-mage       { background: color-mix(in srgb, var(--class-mage) 27%, var(--surface-raised));       color: color-mix(in srgb, var(--class-mage) 62%, white); }
+.eq-class-bg-cleric     { background: color-mix(in srgb, var(--class-cleric) 27%, var(--surface-raised));     color: color-mix(in srgb, var(--class-cleric) 62%, white); }
+.eq-class-bg-ranger     { background: color-mix(in srgb, var(--class-ranger) 27%, var(--surface-raised));     color: color-mix(in srgb, var(--class-ranger) 62%, white); }
+.eq-class-bg-druid      { background: color-mix(in srgb, var(--class-druid) 27%, var(--surface-raised));      color: color-mix(in srgb, var(--class-druid) 62%, white); }
+.eq-class-bg-barbarian  { background: color-mix(in srgb, var(--class-barbarian) 27%, var(--surface-raised));  color: color-mix(in srgb, var(--class-barbarian) 62%, white); }
+.eq-class-bg-bard       { background: color-mix(in srgb, var(--class-bard) 27%, var(--surface-raised));       color: color-mix(in srgb, var(--class-bard) 62%, white); }
+.eq-class-bg-monk       { background: color-mix(in srgb, var(--class-monk) 27%, var(--surface-raised));       color: color-mix(in srgb, var(--class-monk) 62%, white); }
+.eq-class-bg-paladin    { background: color-mix(in srgb, var(--class-paladin) 27%, var(--surface-raised));    color: color-mix(in srgb, var(--class-paladin) 62%, white); }
+.eq-class-bg-sorcerer   { background: color-mix(in srgb, var(--class-sorcerer) 27%, var(--surface-raised));   color: color-mix(in srgb, var(--class-sorcerer) 62%, white); }
+.eq-class-bg-warlock    { background: color-mix(in srgb, var(--class-warlock) 27%, var(--surface-raised));    color: color-mix(in srgb, var(--class-warlock) 62%, white); }
 .eq-class-bg-adventurer { background: var(--surface-raised); color: var(--ink); }
 
 .eq-class-label {
@@ -235,6 +275,14 @@
     background: var(--surface-sunken);
     border-radius: var(--radius);
     box-shadow: var(--inset-well);
+}
+
+.eq-hp-fill {
+    background: var(--hp);
+}
+
+.eq-mp-fill {
+    background: var(--mp);
 }
 
 .eq-xp-fill {

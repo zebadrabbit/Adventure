@@ -118,7 +118,7 @@
                         <span id="eq-hp-text"></span>
                     </div>
                     <div class="progress eq-progress-bar">
-                        <div class="progress-bar bg-danger" id="eq-hp-bar" role="progressbar"></div>
+                        <div class="progress-bar eq-hp-fill" id="eq-hp-bar" role="progressbar"></div>
                     </div>
                 </div>
                 <div id="eq-mp-bar-wrap" class="mb-2">
@@ -127,7 +127,7 @@
                         <span id="eq-mp-text"></span>
                     </div>
                     <div class="progress eq-progress-bar">
-                        <div class="progress-bar bg-primary" id="eq-mp-bar" role="progressbar"></div>
+                        <div class="progress-bar eq-mp-fill" id="eq-mp-bar" role="progressbar"></div>
                     </div>
                 </div>
                 <div id="eq-xp-bar-wrap" class="mb-3">
