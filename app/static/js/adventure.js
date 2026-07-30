@@ -521,9 +521,6 @@
         }
         if (data && data.desc && output) {
           renderLogFromDesc(String(data.desc));
-          if (data.last_roll) {
-            try { updateLastRollUI(data.last_roll); } catch (e) { }
-          }
         }
 
         // Room events (shrine/trap/ambush) resolved on the tile just entered.
@@ -716,15 +713,10 @@
             const menu = document.createElement('ul');
             menu.className = 'dropdown-menu';
             menu.setAttribute('data-parent-loot-id', it.id);
-            // NOTE (socket-migration): Loot claim still uses REST because the current
-            // websocket event 'dungeon_claim_loot' does not accept a character_id for
-            // assignment. It simply rolls generic loot. To migrate fully we need a
-            // socket event that mirrors POST /api/dungeon/loot/claim/<id> and includes
-            // the chosen character. Until implemented, keep REST here for correctness.
-            if (!(window._lootClaimExplained)) {
-              window._lootClaimExplained = true;
-              console.debug('[loot] Claim remains REST for now due to character assignment requirement; socket event returns generic loot only.');
-            }
+            // Loot claim is REST: it needs the chosen character, and POST
+            // /api/dungeon/loot/claim/<id> is the only path that grants one.
+            // (The half-built 'dungeon_claim_loot' socket event this note used
+            // to defer to has been deleted -- it never worked.)
             const partyChars2 = (window.partyCharacters || []).filter(c => c && c.id && c.name);
             const template = document.getElementById('loot-dropdown-item-template');
             if (!partyChars2.length) {
@@ -800,41 +792,6 @@
     }
 
     // No global Search button anymore; inline buttons call doSearch()
-
-    function updateLastRollUI(roll) {
-      if (!roll || typeof roll !== 'object') return;
-      const ch = roll.character || null;
-      // `.character-card` matches nothing in adventure.html -- the party-rail
-      // card is `.operative-card` -- so `who` below is always null on this
-      // page and every call falls through to the "show above the log"
-      // fallback. That makes the party rail's `.last-roll-line` permanently
-      // empty here, which is why adventure-hud.css/adventure.html let the
-      // encumbrance marker (`.frame-encumbrance`) share that row instead of
-      // opening its own: the row's height was already being paid for and
-      // nothing else was using it. If you fix this selector, `.last-roll-line`
-      // will start rendering real (unbounded-length) text again -- re-measure
-      // the party rail at 1366x768 with both a roll message and an
-      // encumbrance marker showing before shipping that fix; see the party
-      // rail's .frame-encumbrance / .party-status-line rules for the budget.
-      const who = ch && (ch.id != null) ? document.querySelector(`.character-card .last-roll-line[data-char-id="${ch.id}"]`) : null;
-      const text = (function () {
-        const parts = [];
-        if (roll.skill) parts.push(String(roll.skill).charAt(0).toUpperCase() + String(roll.skill).slice(1));
-        const detail = `${roll.roll ?? '?'}${roll.die ? '' : ''}${typeof roll.mod === 'number' ? (roll.mod >= 0 ? ' +' + roll.mod : ' ' + roll.mod) : ''}`;
-        const total = (typeof roll.total === 'number') ? ` = ${roll.total}` : '';
-        const expr = roll.expr ? ` (${roll.expr})` : '';
-        return `Last roll: ${parts.join(' ')} ${detail}${total}${expr}`.trim();
-      })();
-      if (who) {
-        who.textContent = text;
-      } else {
-        // Fallback: show above the log
-        const line = document.createElement('div');
-        line.className = 'text-warning small';
-        line.textContent = text;
-        if (output) output.appendChild(line);
-      }
-    }
 
     function renderLogFromDesc(desc) {
       if (!output) return;
@@ -986,9 +943,6 @@
             .then(data => {
               if (data && data.desc && output) {
                 renderLogFromDesc(String(data.desc));
-                if (data.last_roll) {
-                  try { updateLastRollUI(data.last_roll); } catch (e) { }
-                }
               }
               if (data && Array.isArray(data.exits)) {
                 availableExits = data.exits.map(e => e.toLowerCase());

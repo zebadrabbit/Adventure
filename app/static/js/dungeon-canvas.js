@@ -244,8 +244,7 @@
 
         onMouseMove(e) {
             if (this.isDragging) {
-                this.offsetX = e.clientX - this.dragStartX;
-                this.offsetY = e.clientY - this.dragStartY;
+                this.setView(e.clientX - this.dragStartX, e.clientY - this.dragStartY);
                 this.render();
             }
         }
@@ -356,10 +355,11 @@
 
                 // Zoom toward mouse position
                 const zoomRatio = newZoom / this.zoom;
-                this.offsetX = mouseX - (mouseX - this.offsetX) * zoomRatio;
-                this.offsetY = mouseY - (mouseY - this.offsetY) * zoomRatio;
-
-                this.zoom = newZoom;
+                this.setView(
+                    mouseX - (mouseX - this.offsetX) * zoomRatio,
+                    mouseY - (mouseY - this.offsetY) * zoomRatio,
+                    newZoom
+                );
                 this.render();
             }
         }
@@ -378,8 +378,7 @@
             if (e.touches.length === 1 && this.isDragging) {
                 e.preventDefault();
                 const touch = e.touches[0];
-                this.offsetX = touch.clientX - this.dragStartX;
-                this.offsetY = touch.clientY - this.dragStartY;
+                this.setView(touch.clientX - this.dragStartX, touch.clientY - this.dragStartY);
                 this.render();
             }
         }
@@ -441,8 +440,10 @@
                 this.targetOffsetY = newOffsetY;
                 this.startAnimation();
             } else {
-                this.offsetX = newOffsetX;
-                this.offsetY = newOffsetY;
+                // targetZoom, not the live zoom: a resize is not the player
+                // touching the zoom, so a resize mid-button-zoom must not
+                // freeze it at whatever intermediate value the ease reached.
+                this.setView(newOffsetX, newOffsetY, this.targetZoom);
             }
         }
 
@@ -450,6 +451,18 @@
             if (this.animating) return;
             this.animating = true;
             this.animate();
+        }
+
+        // Every immediate (un-eased) camera write must land on the target too.
+        // animate()'s settle frame assigns offset/zoom := target, so a live
+        // value the target does not know about is discarded the moment
+        // anything eases: drag or resize, then zoom, and the camera yanks back
+        // to where it was before. Drag stays instantaneous — render() reads
+        // the live values only, so the target write is inert until an ease.
+        setView(x, y, zoom = this.zoom) {
+            this.offsetX = this.targetOffsetX = x;
+            this.offsetY = this.targetOffsetY = y;
+            this.zoom = this.targetZoom = zoom;
         }
 
         animate() {

@@ -419,6 +419,85 @@ def test_hud_panels_do_not_cover_the_party_or_each_other(page):
     assert result["railOverflow"] <= 1, f"the party rail overflows its own box by {result['railOverflow']}px"
 
 
+@pytest.mark.parametrize("vh", [768, 640])
+def test_floating_log_clears_the_zoom_controls(page, vh):
+    """The log grows upward from the viewport floor; the zoom controls hang
+    below the minimap at a fixed 276px. The log's ceiling was a constant, so
+    its panel was ~421px tall at every height and its top edge crossed the
+    controls below ~705px of viewport -- covering them once scrollback filled.
+    768 is the control case (no overlap before or after); 640 fails without
+    the viewport-relative second bound on the ceiling. 705 is deliberately
+    not a case: measured, the two edges meet there within a pixel, so it
+    passes either way and pins nothing.
+
+    The overlap check above runs at 768 with an empty log, so it could not
+    catch this: the log sits at its 120px min-height until scrollback fills.
+    """
+    page.set_viewport_size({"width": 1366, "height": vh})
+    page.goto(f"{BASE_URL}/adventure")
+    page.wait_for_load_state("networkidle")
+    page.wait_for_timeout(500)
+
+    result = page.evaluate(
+        """() => {
+            const log = document.querySelector('.adv-hud .adv-log');
+            const controls = document.querySelector('.adv-hud .map-controls');
+            if (!log || !controls) return { missing: true };
+            if (log.tagName === 'DETAILS') log.open = true;
+            const out = log.querySelector('.dungeon-output');
+            if (!out) return { missing: true };
+            for (let i = 0; i < 200; i++) {
+                const d = document.createElement('div');
+                d.textContent = 'scrollback line ' + i;
+                out.appendChild(d);
+            }
+            const a = log.getBoundingClientRect();
+            const b = controls.getBoundingClientRect();
+            return {
+                missing: false,
+                logTop: Math.round(a.top),
+                logHeight: Math.round(a.height),
+                controlsBottom: Math.round(b.bottom),
+                overlap: !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom),
+            };
+        }"""
+    )
+
+    assert not result["missing"], "the log or the zoom controls are not in the HUD"
+    # Without this the log could sit at its 120px min-height and the overlap
+    # check below would pass for the wrong reason.
+    assert result["logHeight"] > 150, f"the log did not grow with scrollback: {result}"
+    assert not result["overlap"], f"the floating log covers the zoom controls at {vh}px: {result}"
+
+
+def test_resize_then_zoom_keeps_the_camera_put(page):
+    """A resize recentres immediately (centerOnPlayer(false)); a button zoom
+    eases. animate()'s settle frame assigns offset := target, so when the
+    immediate write skipped the target, the next ease yanked the camera back
+    to where it had been before the resize. Drag and wheel-zoom diverged the
+    same way, which is why the fix is one setter rather than one branch.
+    """
+    page.set_viewport_size({"width": 1366, "height": 768})
+    page.goto(f"{BASE_URL}/adventure")
+    page.wait_for_load_state("networkidle")
+    page.wait_for_timeout(600)  # let the initial centreing settle
+
+    assert page.evaluate("() => !!window.dungeonCanvas"), "dungeonCanvas is not on window"
+
+    # Resize to a different box, so the recentre actually moves the camera.
+    page.set_viewport_size({"width": 1100, "height": 700})
+    page.wait_for_timeout(300)
+    before = page.evaluate("() => ({x: window.dungeonCanvas.offsetX, y: window.dungeonCanvas.offsetY})")
+
+    page.click("#btn-zoom-in")
+    page.wait_for_timeout(900)  # the ease is ~15 frames
+    after = page.evaluate("() => ({x: window.dungeonCanvas.offsetX, y: window.dungeonCanvas.offsetY})")
+
+    # A button zoom writes targetZoom only -- it must not move the camera.
+    assert abs(after["x"] - before["x"]) < 1.0, f"zoom moved the camera in x: {before} -> {after}"
+    assert abs(after["y"] - before["y"]) < 1.0, f"zoom moved the camera in y: {before} -> {after}"
+
+
 def test_character_panel_opens_from_a_party_frame(page):
     """The rail is the character selector, and the panel it opens is the one
     that can equip procedural gear (it posts uid). The old dungeon panel could

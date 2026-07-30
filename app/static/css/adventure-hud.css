@@ -21,6 +21,11 @@
     --hud-inset-left: 300px;
     --hud-inset-bottom: 220px;
 
+    /* Bottom edge of .map-controls: its 172px top (see the rule below) plus
+       three 32px buttons and two --space-1 gaps. Named here so the log's
+       ceiling can clear the controls without restating the number. */
+    --hud-controls-reserve: 276px;
+
     position: fixed;
     inset: 0;
     overflow: hidden;
@@ -411,25 +416,18 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover .avatar-circle {
     color: var(--ink-muted);
 }
 
-.adv-hud .adv-party-rail .last-roll-line {
-    min-height: 1rem;
-    font-size: var(--text-2xs);
-    flex: 1 1 auto;
-    min-width: 0;
-}
-
 .adv-hud .adv-party-rail .party-card-action-btn {
     padding: 2px 8px;
     font-size: var(--text-2xs);
 }
 
-/* The row last-roll-line already occupied (a fixed min-height every frame
-   pays for, encumbered or not) also holds the encumbrance badge now. A
-   header-row badge was tried first and measured too narrow: at 1366x768
-   with real class names, a third badge pushed "Overloaded" past the card's
-   right edge and .operative-card's overflow: hidden clipped it silently.
-   This row has no competing content -- last-roll-line's selector never
-   matches anything on this page's markup, so it is always empty here. */
+/* The encumbrance badge's own row. A header-row badge was tried first and
+   measured too narrow: at 1366x768 with real class names, a third badge
+   pushed "Overloaded" past the card's right edge and .operative-card's
+   overflow: hidden clipped it silently. The min-height here is what reserves
+   the row, so the rail budget is the same whether or not a marker shows.
+   (It used to be shared with a "last roll" readout; that feature was deleted
+   -- the server never sent last_roll, so it had never once rendered.) */
 .adv-hud .adv-party-rail .party-status-line {
     min-height: 1rem;
 }
@@ -607,13 +605,21 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover .avatar-circle {
    body (27px of head plus the panel's two 1px borders, so 32px is the nearest
    token that clears it). 440 - 16 - 32 = 392px of log at the 1366x768 floor,
    against the 280px max-height this replaces.
+   The second term keeps the panel's top edge clear of the zoom controls, which
+   share its right edge. The panel grows upward from bottom: --space-2, so its
+   top sits at 100vh - 8 - (392 + 32) = 100vh - 432; below 708px of viewport
+   that crossed the controls' 276px bottom edge and the log covered them once
+   scrollback filled. Outside the 768px design floor, but a 768px physical
+   screen has less than that once browser chrome is taken off.
    No resize handle. It was here to answer "the log window is too restrictive
    for looting", but the panel is anchored by its bottom edge, so the handle
    sat one --space-2 above the viewport floor with nowhere to travel: it could
    only ever make the log smaller. The ceiling is the real answer -- the body
    grows with the scrollback on its own and then scrolls. */
 .adv-hud .adv-log .dungeon-output {
-    max-height: calc(var(--hud-inset-bottom) * 2 - var(--space-2) * 2 - var(--space-6));
+    max-height: min(
+        calc(var(--hud-inset-bottom) * 2 - var(--space-2) * 2 - var(--space-6)),
+        calc(100vh - var(--hud-controls-reserve) - var(--space-2) * 3 - var(--space-6)));
     min-height: 120px;
     overflow: auto;
     margin: 0;
