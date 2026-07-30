@@ -1,7 +1,7 @@
 /**
  * Party Management System
  *
- * Handles party formations, shared inventory, member management, and party buffs.
+ * Handles party formations, member management, and party buffs.
  */
 
 class PartyManagementSystem {
@@ -98,9 +98,6 @@ class PartyManagementSystem {
                 break;
             case 'members':
                 this.renderMembersTab();
-                break;
-            case 'inventory':
-                this.renderInventoryTab();
                 break;
             case 'buffs':
                 this.renderBuffsTab();
@@ -244,54 +241,6 @@ class PartyManagementSystem {
                 </div>
             </div>
         `).join('');
-    }
-
-    /**
-     * Render shared inventory tab
-     */
-    async renderInventoryTab() {
-        if (!this.partyData) return;
-
-        try {
-            const response = await fetch(`/api/party/${this.currentPartyId}/inventory`);
-            if (!response.ok) throw new Error('Failed to load inventory');
-
-            const inventory = await response.json();
-
-            const container = document.getElementById('sharedItemsList');
-
-            if (inventory.items.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📦</div>
-                        <div class="empty-state-message">No shared items</div>
-                        <div class="empty-state-hint">Contribute items from your personal inventory</div>
-                    </div>
-                `;
-                return;
-            }
-
-            container.innerHTML = inventory.items.map(item => `
-                <div class="shared-item-card rarity-${item.rarity || 'common'}">
-                    <div class="shared-item-header">
-                        <div class="shared-item-name">${item.name}</div>
-                        <div class="shared-item-quantity">×${item.quantity}</div>
-                    </div>
-                    <div class="shared-item-description">${item.description || ''}</div>
-                    <div class="shared-item-actions">
-                        <button class="shared-item-btn" onclick="partySystem.takeItem('${item.slug}')">
-                            Take
-                        </button>
-                        <button class="shared-item-btn" onclick="partySystem.useItem('${item.slug}')">
-                            Use
-                        </button>
-                    </div>
-                </div>
-            `).join('');
-
-        } catch (error) {
-            console.error('Error loading shared inventory:', error);
-        }
     }
 
     /**
@@ -472,51 +421,6 @@ class PartyManagementSystem {
         } catch (error) {
             console.error('Error removing member:', error);
             this.showNotification('Failed to remove member', 'error');
-        }
-    }
-
-    /**
-     * Take an item from shared inventory
-     */
-    async takeItem(itemSlug) {
-        try {
-            const response = await fetch(`/api/party/${this.currentPartyId}/inventory/take`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ item_slug: itemSlug, quantity: 1 })
-            });
-
-            if (!response.ok) throw new Error('Failed to take item');
-
-            this.renderInventoryTab();
-            this.showNotification('Item taken', 'success');
-
-        } catch (error) {
-            console.error('Error taking item:', error);
-            this.showNotification('Failed to take item', 'error');
-        }
-    }
-
-    /**
-     * Use an item from shared inventory
-     */
-    async useItem(itemSlug) {
-        try {
-            const response = await fetch(`/api/party/${this.currentPartyId}/inventory/use`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ item_slug: itemSlug })
-            });
-
-            if (!response.ok) throw new Error('Failed to use item');
-
-            const result = await response.json();
-            this.renderInventoryTab();
-            this.showNotification(result.message || 'Item used', 'success');
-
-        } catch (error) {
-            console.error('Error using item:', error);
-            this.showNotification('Failed to use item', 'error');
         }
     }
 

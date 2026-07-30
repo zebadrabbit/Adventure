@@ -9,9 +9,8 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 from app import db
-from app.inventory.utils import add_item, remove_one
 from app.models.models import Character
-from app.models.party import Party, PartyBuff, PartyMember, PartySharedInventory
+from app.models.party import Party, PartyBuff, PartyMember
 
 bp_party = Blueprint("party", __name__)
 
@@ -112,137 +111,15 @@ def remove_party_member(party_id, member_id):
     return jsonify({"success": True, "message": "Member removed from party"})
 
 
-@bp_party.route("/api/party/<int:party_id>/inventory", methods=["GET"])
-def get_shared_inventory(party_id):
-    """Get party's shared inventory with item details."""
-    party = db.session.get(Party, party_id)
-    if not party:
-        return jsonify({"error": "Party not found"}), 404
-
-    inventory_items = PartySharedInventory.query.filter_by(party_id=party_id).all()
-
-    # Load item data (you'll need to adapt this to your item system)
-    items = []
-    for inv_item in inventory_items:
-        # This is a placeholder - you'll need to load actual item data
-        items.append(
-            {
-                "slug": inv_item.item_slug,
-                "name": inv_item.item_slug.replace("-", " ").title(),
-                "quantity": inv_item.quantity,
-                "rarity": "common",  # Load from actual item data
-                "description": "Shared party item",
-            }
-        )
-
-    return jsonify({"party_id": party_id, "shared_gold": party.shared_gold, "items": items})
-
-
-@bp_party.route("/api/party/<int:party_id>/inventory/contribute", methods=["POST"])
-def contribute_to_shared_inventory(party_id):
-    """Contribute an item from character inventory to shared inventory."""
-    data = request.get_json()
-    character_id = data.get("character_id")
-    item_slug = data.get("item_slug")
-    quantity = data.get("quantity", 1)
-
-    if not character_id or not item_slug:
-        return jsonify({"error": "Missing required fields"}), 400
-
-    # Get character and verify they're in the party
-    party_member = PartyMember.query.filter_by(party_id=party_id, character_id=character_id).first()
-
-    if not party_member:
-        return jsonify({"error": "Character not in party"}), 403
-
-    character = db.session.get(Character, character_id)
-    if not character:
-        return jsonify({"error": "Character not found"}), 404
-
-    # Remove item from character's inventory
-    if not remove_one(character, item_slug, quantity):
-        return jsonify({"error": "Item not found in inventory"}), 400
-
-    # Add to shared inventory
-    shared_item = PartySharedInventory.query.filter_by(party_id=party_id, item_slug=item_slug).first()
-
-    if shared_item:
-        shared_item.quantity += quantity
-    else:
-        shared_item = PartySharedInventory(
-            party_id=party_id, item_slug=item_slug, quantity=quantity, added_by=character_id
-        )
-        db.session.add(shared_item)
-
-    db.session.commit()
-
-    return jsonify({"success": True, "message": f"Contributed {quantity}× {item_slug} to party"})
-
-
-@bp_party.route("/api/party/<int:party_id>/inventory/take", methods=["POST"])
-def take_from_shared_inventory(party_id):
-    """Take an item from shared inventory to character inventory."""
-    data = request.get_json()
-    character_id = data.get("character_id")
-    item_slug = data.get("item_slug")
-    quantity = data.get("quantity", 1)
-
-    if not character_id or not item_slug:
-        return jsonify({"error": "Missing required fields"}), 400
-
-    # Verify party membership
-    party_member = PartyMember.query.filter_by(party_id=party_id, character_id=character_id).first()
-
-    if not party_member:
-        return jsonify({"error": "Character not in party"}), 403
-
-    # Get shared item
-    shared_item = PartySharedInventory.query.filter_by(party_id=party_id, item_slug=item_slug).first()
-
-    if not shared_item or shared_item.quantity < quantity:
-        return jsonify({"error": "Insufficient quantity in shared inventory"}), 400
-
-    # Add to character inventory
-    character = db.session.get(Character, character_id)
-    if not character:
-        return jsonify({"error": "Character not found"}), 404
-
-    add_item(character, item_slug, quantity)
-
-    # Remove from shared inventory
-    shared_item.quantity -= quantity
-    if shared_item.quantity <= 0:
-        db.session.delete(shared_item)
-
-    db.session.commit()
-
-    return jsonify({"success": True, "message": f"Took {quantity}× {item_slug}"})
-
-
-@bp_party.route("/api/party/<int:party_id>/inventory/use", methods=["POST"])
-def use_shared_item(party_id):
-    """Use a consumable item from shared inventory."""
-    data = request.get_json()
-    item_slug = data.get("item_slug")
-
-    if not item_slug:
-        return jsonify({"error": "Missing item_slug"}), 400
-
-    # Get shared item
-    shared_item = PartySharedInventory.query.filter_by(party_id=party_id, item_slug=item_slug).first()
-
-    if not shared_item or shared_item.quantity < 1:
-        return jsonify({"error": "Item not available"}), 400
-
-    # Apply item effect (placeholder - implement based on your item system)
-    # For now, just remove the item
-    shared_item.quantity -= 1
-    if shared_item.quantity <= 0:
-        db.session.delete(shared_item)
-
-    db.session.commit()
-
-    return jsonify({"success": True, "message": f"Used {item_slug}"})
+# The shared party inventory lived here: GET /inventory plus
+# /inventory/contribute, /inventory/take and /inventory/use. Removed 2026-07-30
+# -- bags are per-character in this game, and per-character encumbrance only
+# binds if every item sits in somebody's bag. Handing an item to an ally is
+# POST /api/characters/<cid>/give (app/routes/inventory_api.py), which is gated
+# on not being in combat.
+#
+# The /gold endpoints below are a different concept (a party purse on
+# Party.shared_gold) and were deliberately left alone.
 
 
 @bp_party.route("/api/party/<int:party_id>/buffs", methods=["GET"])
