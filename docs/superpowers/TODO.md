@@ -56,52 +56,44 @@ Full triage with code pointers:
 - [x] ~~Monster catalogue stops at level 20~~ — *mitigated*: spawns above the
       ceiling clamp to the deepest band instead of degrading to nameless
       stubs. The content gap (no monsters for levels 21-50) is still open.
-- [ ] **Author monsters for levels 21-50** — the catalogue holds 108 rows and
-      **none above level 20**. Two things were fixed on the way to this and are
-      no longer part of it: three families had *no ordinary monster at all* in
-      their top bands (humanoid 16-18, elemental and aberration 19-20), and
-      `spawn_service._eligible_monsters` applied its boss filter **after** the
-      level-ceiling fallback, so a boss-only band skipped the fallback and was
-      then emptied — `choose_monster` raised and the player silently fought a
-      nameless "Trash Monster" worth **zero XP and zero items**. Both fixed,
-      both pinned by `tests/test_monster_catalogue_coverage.py`.
-
-      **Before writing ~60 rows, two numbers need deciding, and a playtest is
-      the right input:**
-      - **The stat curve.** Extending the observed 1-20 slope to level 50 gives
-        an ordinary monster **282 damage per hit into a ~332 HP character** — a
-        one-shot — and 44 player hits to kill it, because the catalogue's growth
-        (hp +88/lvl, dmg +5.6/lvl in the top band) is superlinear against linear
-        player power (hp +5/lvl, damage +1/lvl). Anchoring to player power
-        instead — holding the level-20 hits-to-kill ratio — lands near hp
-        +24/lvl and dmg +2.5/lvl. Recommend the latter; record the verdict in
-        `sql/monsters_seed.sql` beside the existing curve comment.
-      - **XP, separately.** `app/models/xp.py` makes the requirement a **flat
-        50,000 per level above 20** and XP splits across the party, so
-        `kills_to_level = 200,000 / xp_base`. Today's top `xp_base` of 1,700
-        already means ~118 kills per level. Do *not* extrapolate +150/level;
-        pick a kills-per-level target and hold `xp_base` roughly flat across
-        21-50. Note `docs/Gameplay/xp_table_level_1_to_50.csv` is design-only
-        and is **not** what the engine reads.
-- [ ] **Ambient spawns do not scale with level at all.**
-      `MonsterCatalog.scaled_instance` clamps the requested level into
-      `[level_min, level_max]` and then emits `base_hp`/`base_damage`/`armor`
-      unchanged — only party size multiplies anything. So a level-45 ambient
-      spawn has a level-20 monster's numbers *and reports itself as level 20*,
-      which also caps its loot-table lookup. The archetype and tier systems do
-      rescale, but only for boss/elite set pieces. Fixing this is the same
-      curve decision as above, so it is deliberately left until that is settled.
+- [x] ~~**Author monsters for levels 21-50**~~ — **not needed. The cap is 20.**
+      The original aim was "Diablo with rifts"; the owner's correction was
+      "within a sane levelling system", and depth after the cap is the dungeon
+      tier ladder's job rather than more level numbers. Measured before
+      deciding: **81% of all XP in the game** (1.5M of 1.855M) sat in levels
+      21-50, which were 30 identical 50,000-XP steps fought against clamped
+      level-20 monsters, because the catalogue stops at 20. A survey of every
+      level-gated system found **nothing** that becomes reachable above 20
+      except dungeon tiers 4-7 — and those were already unreachable, since
+      `dashboard.py` clamps the tier to 1-3 and the only code that reads a
+      tier's level band is never called. So the cap cost nothing and deleted
+      the largest content task on this list.
+- [x] ~~**Ambient spawns do not scale with level**~~ — moot at the cap. The
+      clamp in `scaled_instance` only bit above level 20, which no longer
+      exists. Left as-is deliberately rather than "fixed": with a 1-20 game the
+      band a monster is authored for *is* its level range.
+- [ ] **The levelling curve is re-derived, and it is tuning, not truth.**
+      `app/models/xp.py` now rises monotonically in *kills* — 22 at level 1,
+      179 at 19->20, ~1,557 for a whole run by a four-party. The old 5e-derived
+      curve was **inverted**: hardest at 6->7 (~571 kills), easiest at 16->17
+      (~92), because monster `xp_base` grows ~27x from level 5 to 20 while 5e's
+      requirement grows ~10x. `tests/test_xp_curve_shape.py` pins the *shape*
+      against the real catalogue, not the numbers — re-derive the numbers when
+      monster XP changes and let that test judge the result. Playtest verdict
+      wanted on whether ~1,557 kills is the right length.
 - [ ] **`armor` is a dead stat above about level 5.** Evasion is `armor + 10`,
       against an accuracy of `attack + d20` where attack reaches ~46 by level
-      20 — so every attack auto-hits and armor changes nothing. Authoring
-      higher armor values into new content would be writing a number that does
-      not do anything; either give armor a real role (damage reduction?) or
-      stop pretending it has one.
+      20 — so every attack auto-hits and armor changes nothing. Either give it
+      a real role (damage reduction?) or stop pretending it has one.
 - [ ] **`traits` has no mechanical consumer.** All 108 rows carry them and
       nothing reads them for mechanics — `immune_fire` and `vulnerable_cold`
       are decoration. Related: `resistances` and `damage_types` are NULL on
-      every row, so `apply_resistances` is a no-op for every monster in the
-      game (already tracked under the potion families).
+      every row, so `apply_resistances` is a no-op for every monster.
+- [ ] **Level-gated content is thin now that the ladder is short.** Skills top
+      out at `required_level` 5 across all 34 seeded rows, item generation is
+      hard-capped at level 20, and the `level_reached` achievements never fire
+      (`check_achievements` is never called with that key). A 20-level game
+      wants things arriving *through* those 20 levels.
 - [ ] Item catalogue rarity spread: 225/229 common, almost all level 0-2, so
       loot tiers can only be separated by price.
 - [ ] Maze too spiralling: tune `dead_end_keep` / `extra_connection_chance` /

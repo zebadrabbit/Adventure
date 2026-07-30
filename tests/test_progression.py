@@ -4,6 +4,7 @@ import uuid
 
 from app import db
 from app.models.skill import CharacterTalentPoints
+from app.models.xp import MAX_LEVEL, xp_for_level
 from app.services import progression
 from tests.factories import create_character, create_user
 
@@ -18,20 +19,27 @@ def _char(level=1, xp=0):
 
 
 def test_level_for_xp_thresholds():
-    # D&D-5e cumulative table: L2=300, L3=900, L20=355000
+    # Derived from the table rather than restating it: the curve's numbers are
+    # tuning (see app/models/xp.py) and get re-derived when the monster
+    # catalogue's XP moves. What must hold is the relationship -- one XP short
+    # of a threshold is the level below, exactly on it is the level itself.
+    for level in (2, 3, 10, MAX_LEVEL):
+        need = xp_for_level(level)
+        assert progression.level_for_xp(need) == level, f"{need} XP should be level {level}"
+        assert progression.level_for_xp(need - 1) == level - 1, f"{need - 1} XP should still be level {level - 1}"
+
     assert progression.level_for_xp(0) == 1
-    assert progression.level_for_xp(299) == 1
-    assert progression.level_for_xp(300) == 2
-    assert progression.level_for_xp(899) == 2
-    assert progression.level_for_xp(900) == 3
-    assert progression.level_for_xp(355000) == 20
+
+
+def test_the_level_cap_holds():
+    assert progression.level_for_xp(xp_for_level(MAX_LEVEL) * 100) == MAX_LEVEL
 
 
 def test_grant_xp_no_level_change_below_threshold():
     c = _char(level=1, xp=0)
-    result = progression.grant_xp(c, 100)
+    result = progression.grant_xp(c, xp_for_level(2) - 1)
     db.session.commit()
-    assert c.xp == 100
+    assert c.xp == xp_for_level(2) - 1
     assert c.level == 1
     assert result["levels_gained"] == 0
     assert result["talent_points_awarded"] == 0
@@ -39,7 +47,7 @@ def test_grant_xp_no_level_change_below_threshold():
 
 def test_grant_xp_levels_up_and_awards_talent_points():
     c = _char(level=1, xp=0)
-    result = progression.grant_xp(c, 300)  # exactly L2
+    result = progression.grant_xp(c, xp_for_level(2))  # exactly L2
     db.session.commit()
     assert c.level == 2
     assert result["levels_gained"] == 1
@@ -52,7 +60,7 @@ def test_grant_xp_levels_up_and_awards_talent_points():
 
 def test_grant_xp_multi_level_jump():
     c = _char(level=1, xp=0)
-    result = progression.grant_xp(c, 900)  # L3 (skips through L2)
+    result = progression.grant_xp(c, xp_for_level(3))  # L3 (skips through L2)
     db.session.commit()
     assert c.level == 3
     assert result["levels_gained"] == 2
@@ -61,10 +69,10 @@ def test_grant_xp_multi_level_jump():
 
 
 def test_grant_xp_negative_is_ignored():
-    c = _char(level=2, xp=300)
+    c = _char(level=2, xp=xp_for_level(2))
     progression.grant_xp(c, -50)
     db.session.commit()
-    assert c.xp == 300
+    assert c.xp == xp_for_level(2)
     assert c.level == 2
 
 
