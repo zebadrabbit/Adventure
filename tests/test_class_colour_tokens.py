@@ -134,7 +134,7 @@ def test_the_runtime_injector_is_gone():
 # sweep, and glass-theme.css's six `!important` gradients got through the
 # unification sweep -- live on /combat, because combat.html:127 loads the
 # "admin and account" dialect in `{% block head %}`, i.e. after theme.css.
-# Neither was findable by grepping tokens.css. The three tests below are.
+# Neither was findable by grepping tokens.css. The two tests below are.
 
 CSS_DIR = TOKENS.parent
 
@@ -225,40 +225,15 @@ def _declarations(block):
             yield prop.strip().lower(), value.strip()
 
 
-# Orphaned stylesheets that still carry a pre-token class palette. Exempt ONLY
-# for as long as no template loads them -- test_the_exempt_orphans_are_still_
-# unreachable below enforces that, so linking one turns this exemption back into
-# a failure. tactical-theme.css (688 lines, six classes, hardcoded hexes) is
-# already marked for deletion in DESIGN_SYSTEM.md's orphan table; it is a ninth
-# source of class colour on disk but reaches no screen.
-EXEMPT_ORPHANS = {"tactical-theme.css"}
-TEMPLATES = TOKENS.parents[2] / "templates"
-_IMPORT = re.compile(r"""@import\s+url\(\s*["']?([A-Za-z0-9_.-]+\.css)""")
-
-
-def _reachable_stylesheets():
-    """Every stylesheet that can reach a browser, transitively.
-
-    A `<link>` in a template is not the only way in: app.css already pulls in
-    hoard-ui.css and dungeon-config.css with `@import`, and app.css loads on
-    every page. So `@import url("tactical-theme.css")` in any reachable file
-    would make the exempt palette live without a template changing at all.
-    Following imports is what makes the exemption below honest.
-    """
-    direct = set()
-    for path in TEMPLATES.rglob("*.html"):
-        direct.update(re.findall(r"css/([A-Za-z0-9_.-]+\.css)", path.read_text()))
-
-    imports = {p.name: set(_IMPORT.findall(p.read_text())) for p in CSS_DIR.glob("*.css")}
-
-    seen, queue = set(), list(direct)
-    while queue:
-        name = queue.pop()
-        if name in seen:
-            continue
-        seen.add(name)
-        queue.extend(imports.get(name, ()))
-    return seen
+# No stylesheet is exempt any more. tactical-theme.css used to be -- 688 lines,
+# six classes, hardcoded hexes -- excused only for as long as no template loaded
+# it, with a companion test that chased template <link>s and `@import`s to prove
+# it still reached no screen. That file is now deleted, and the exemption went
+# with it rather than being left as an empty set: a reachability test with
+# nothing to check passes on nothing, which reads like a guard and is not one.
+# Every *.css in this directory is now held to both rules below, reachable or
+# not, which is the stronger position anyway -- a palette on disk cannot go live
+# by someone adding one `<link>`.
 
 
 def test_no_stylesheet_sets_a_class_badge_colour_outside_the_tokens():
@@ -266,13 +241,10 @@ def test_no_stylesheet_sets_a_class_badge_colour_outside_the_tokens():
 
     A `.rogue-badge { background: <a literal> }` -- or a `.class-badge` rule
     that sets a colour through any property at all -- is a second palette by
-    definition, whatever file it hides in. Files in EXEMPT_ORPHANS are excused
-    only while unreachable; the test below enforces that.
+    definition, whatever file it hides in.
     """
     offenders = []
     for path, selector, block in _rules():
-        if path.name in EXEMPT_ORPHANS:
-            continue
         subject = _selector_subject(selector)
         if not (_CLASS_BADGE.search(subject) or _BARE_CLASS_BADGE.search(subject)):
             continue
@@ -283,24 +255,12 @@ def test_no_stylesheet_sets_a_class_badge_colour_outside_the_tokens():
     assert not offenders, "class badge colour not read from a token:\n  " + "\n  ".join(offenders)
 
 
-def test_the_exempt_orphans_are_still_unreachable():
-    """The exemption is conditional on the file reaching no screen. The moment
-    something links or @imports it, its palette is live again -- which is
-    precisely how glass-theme.css's six `!important` gradients ended up on
-    /combat while being documented as the admin-and-account dialect."""
-    linked = sorted(EXEMPT_ORPHANS & _reachable_stylesheets())
-    assert not linked, (
-        "exempt orphan is reachable again (a template <link> or an @import), so "
-        f"its class palette is live: {linked}. Delete the file or the reference."
-    )
-
-
 def test_no_class_badge_rule_uses_important():
     """`!important` is how the glass-theme block beat the tokens regardless of
     load order and specificity, so no amount of correct cascade could fix it."""
     offenders = []
     for path, selector, block in _rules():
-        if path.name in EXEMPT_ORPHANS or "!important" not in block:
+        if "!important" not in block:
             continue
         subject = _selector_subject(selector)
         if _CLASS_BADGE.search(subject) or _BARE_CLASS_BADGE.search(subject):

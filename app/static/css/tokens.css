@@ -352,9 +352,18 @@
        These live here, not in Layer 2, because a custom property that
        references another is resolved on the element that DECLARES it. Left
        at :root they would freeze at the town palette and stay warm
-       underground. Glows carry state, not decoration: one per meaning. */
+       underground. Glows carry state, not decoration: one per meaning.
+       14px/30% is the formula; a hover that hand-rolls its own blur radius
+       or alpha is a bug, because the drift is invisible until two of these
+       buttons sit side by side (-success used to glow at 12px/15% and
+       -danger at a raw rgba(139, 46, 46, 0.3), which read as two different
+       light sources on the same action bar).
+       There is deliberately no --glow-info: .tactical-btn-info was deleted
+       with the Party Stash button, so an -info glow would have no consumer.
+       Add it back when something hovers in that colour, not before. */
     --glow-accent: 0 0 14px color-mix(in srgb, var(--realm-accent) 30%, transparent);
     --glow-danger: 0 0 14px color-mix(in srgb, var(--ui-danger) 30%, transparent);
+    --glow-success: 0 0 14px color-mix(in srgb, var(--ui-success) 30%, transparent);
     --focus-ring: 0 0 0 2px var(--realm-bg), 0 0 0 4px color-mix(in srgb, var(--realm-accent) 40%, transparent);
 }
 

@@ -52,7 +52,7 @@ def upsert_user(page):
 def ensure_characters_and_party(page):
     page.goto(f"{BASE_URL}/dashboard")
     page.wait_for_load_state("networkidle")
-    cards = page.locator(".character-card")
+    cards = page.locator(".operative-card")
     if cards.count() == 0:
         page.request.post(f"{BASE_URL}/autofill_characters")
         page.goto(f"{BASE_URL}/dashboard")

@@ -95,8 +95,14 @@ def ensure_characters_and_party(page):
     # Hit dashboard; if no characters, call autofill API
     page.goto(f"{BASE_URL}/dashboard")
     page.wait_for_load_state("networkidle")
-    # Try to detect character cards
-    cards = page.locator(".character-card")
+    # Try to detect character cards. Party slots on the dashboard render as
+    # .operative-card; the .character-card class this used to look for was renamed
+    # out of the markup and never chased down here, so the locator matched nothing
+    # and the count() == 0 guard fired on every run. Harmless only because
+    # /autofill_characters is idempotent -- it tops the roster up to four and always
+    # rewrites the session party. The same stale selector was copied into
+    # screenshot_help.py and screenshot_storyboard.py.
+    cards = page.locator(".operative-card")
     if cards.count() == 0:
         # call autofill to create up to 4 characters
         try:

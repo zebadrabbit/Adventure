@@ -20,26 +20,11 @@ from typing import Tuple
 from flask_login import current_user
 
 from app import db
+from app.dungeon.api_helpers.perception import _perception_mod_from_stats
 from app.models import DungeonEntity
 from app.models.models import Character
 
 __all__ = ["claim_treasure_entity"]
-
-
-def _perception_mod_from_stats(stats_json: str) -> int:
-    if not stats_json:
-        return 0
-    try:
-        data = json.loads(stats_json)
-        if isinstance(data, dict):
-            if "perception" in data and isinstance(data["perception"], (int, float)):
-                return int(data["perception"])
-            wis = data.get("wis") or data.get("WIS") or data.get("wisdom")
-            if isinstance(wis, (int, float)):
-                return int((wis - 10) // 2)
-    except Exception:
-        return 0
-    return 0
 
 
 def _get_party_for_current_user():

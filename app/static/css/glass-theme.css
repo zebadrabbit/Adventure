@@ -178,40 +178,11 @@
    CHARACTER CARDS
    ======================================== */
 
-.character-card {
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 16px;
-    transition: all 0.3s ease;
-}
-
-.character-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 40px color-mix(in srgb, var(--adv-primary) 40%, transparent);
-    border-color: color-mix(in srgb, var(--adv-primary) 50%, transparent);
-}
-
-.character-card .card-header {
-    background: linear-gradient(135deg, color-mix(in srgb, var(--adv-primary) 30%, transparent), color-mix(in srgb, var(--adv-secondary) 30%, transparent));
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    color: #fff;
-    padding: 1rem;
-    border-radius: 16px 16px 0 0;
-}
-
-.character-card .card-body {
-    background: rgba(255, 255, 255, 0.05);
-    color: #fff;
-    padding: 1.5rem;
-}
-
-.character-card .card-footer {
-    background: rgba(255, 255, 255, 0.05);
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
-    padding: 1rem;
-    border-radius: 0 0 16px 16px;
-}
+/* `.character-card` used to be styled here, and again in the responsive block
+   below. Nothing emits it: the party rail and the dashboard roster both render
+   `.operative-card`, and the last mention in app/ went with the dead last-roll
+   readout in the 2026-07-29 triage. `.character-item` (account/profile.html) is
+   all this section still dresses. */
 
 .character-item {
     background: rgba(255, 255, 255, 0.1);
@@ -592,8 +563,7 @@
 
 @media (max-width: 768px) {
 
-    .glass-card,
-    .character-card {
+    .glass-card {
         margin-bottom: 1rem;
     }
 
