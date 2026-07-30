@@ -155,3 +155,38 @@ def test_the_pack_pull_in_is_off_by_default(test_app):
         session = db.session.get(CombatSession, result["combat_id"])
         assert len(combat_service._monsters(session)) == 1
         assert db.session.get(DungeonEntity, neighbour_id) is not None, "the neighbour was dragged in"
+
+
+def test_the_pack_cap_can_be_changed_without_a_restart(test_app):
+    """combat_pack_max is a balance knob whose right value is a playtest
+    verdict, so it reads a live GameConfig row before the code default. Without
+    this, trying a pack size mid-session means an edit and a restart."""
+    from app.dungeon.api_helpers.encounters import combat_pack_cap
+    from app.models.models import GameConfig
+
+    with test_app.app_context():
+        assert combat_pack_cap() == 1, "the shipped default must stay 1"
+
+        db.session.add(GameConfig(key="combat_pack_max", value="4"))
+        db.session.commit()
+        try:
+            assert combat_pack_cap() == 4, "the live config row was ignored"
+        finally:
+            GameConfig.query.filter_by(key="combat_pack_max").delete()
+            db.session.commit()
+
+        assert combat_pack_cap() == 1, "removing the row must fall back to the default"
+
+
+def test_a_junk_pack_cap_falls_back_rather_than_breaking_encounters(test_app):
+    from app.dungeon.api_helpers.encounters import combat_pack_cap
+    from app.models.models import GameConfig
+
+    with test_app.app_context():
+        db.session.add(GameConfig(key="combat_pack_max", value="not a number"))
+        db.session.commit()
+        try:
+            assert combat_pack_cap() == 1
+        finally:
+            GameConfig.query.filter_by(key="combat_pack_max").delete()
+            db.session.commit()

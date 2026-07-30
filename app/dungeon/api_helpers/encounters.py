@@ -29,10 +29,22 @@ __all__ = ["trigger_collision_combat", "run_monster_patrols"]
 def combat_pack_cap() -> int:
     """How many monsters a single encounter may field.
 
-    One seam rather than a bare attribute read, so the knob can move to
-    GameConfig later without touching the encounter, and so a test can opt in to
-    pack combat without reaching into a dataclass's captured field defaults.
+    Reads the live ``GameConfig`` row ``combat_pack_max`` first, so packs can be
+    turned on and off during a play session without a restart -- this is a
+    balance knob whose right value is a playtest verdict, not a constant. Falls
+    back to ``SpawnConfig.combat_pack_max`` (1) when the row is absent or junk.
+
+    One seam rather than a bare read at the call site, so tests can opt in
+    without reaching into a dataclass's captured field defaults.
     """
+    try:
+        from app.models.models import GameConfig
+
+        raw = GameConfig.get("combat_pack_max")
+        if raw is not None:
+            return max(1, int(str(raw).strip().strip('"')))
+    except Exception:
+        logger.debug("suppressed_exception", where="combat_pack_cap", exc_info=True)
     try:
         from app.dungeon.spawn_manager import SpawnConfig
 
