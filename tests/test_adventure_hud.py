@@ -171,12 +171,16 @@ def test_log_keeps_the_inline_search_button_selector(client, party):
     assert 'class="dungeon-output' in html
 
 
-def test_action_bar_holds_the_five_game_actions(client, party):
+def test_action_bar_holds_the_four_game_actions(client, party):
     html = client.get("/adventure").get_data(as_text=True)
 
     assert 'class="adv-actions"' in html
-    for btn in ("btn-search", "btn-party-inventory", "btn-camp", "btn-extract", "btn-hearth"):
+    for btn in ("btn-search", "btn-camp", "btn-extract", "btn-hearth"):
         assert f'id="{btn}"' in html, f"{btn} fell out of the action bar"
+    # btn-party-inventory was the fifth. Deleted: bags are per-character, and
+    # per-character encumbrance only binds if every item sits in somebody's
+    # bag, so a shared party container is the wrong model here.
+    assert 'id="btn-party-inventory"' not in html, "the shared party stash came back"
 
 
 def test_adventure_mounts_the_character_panel(client, party):

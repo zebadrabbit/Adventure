@@ -516,19 +516,21 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover .avatar-circle {
 
 .adv-hud .adv-actions .tactical-btn-primary,
 .adv-hud .adv-actions .tactical-btn-secondary,
-.adv-hud .adv-actions .tactical-btn-info,
 .adv-hud .adv-actions .tactical-btn-success,
 .adv-hud .adv-actions .tactical-btn-danger {
     width: 100%;
     /* Deviation from the brief (documented in the task report): at
-       var(--space-2) vertical padding, five stacked buttons measure ~235px,
-       which overflows the 212px actually free in the reserved bottom band
+       var(--space-2) vertical padding, five stacked buttons measured ~235px,
+       which overflowed the 212px actually free in the reserved bottom band
        (--hud-inset-bottom minus the --space-2 the panel sits off the
-       viewport edge) and rides up under the party rail -- the rail is later
+       viewport edge) and rode up under the party rail -- the rail is later
        in DOM order so it wins the overlap and swallows clicks on Search.
-       var(--space-1) brings the stack to ~195px, clear of the rail with
-       room to spare -- and now also clear of the max-height above, so this
-       is headroom rather than the only thing holding the line. */
+       var(--space-1) brought the stack to ~195px, clear of the rail with
+       room to spare -- and also clear of the max-height above, so this is
+       headroom rather than the only thing holding the line. The bar is four
+       buttons now (Party Stash was deleted), so there is more slack still;
+       --hud-inset-bottom is a fixed 220px and was left alone, since it is
+       also the camera's contract in dungeon-canvas.js. */
     padding: var(--space-1) var(--space-3);
     font-size: var(--text-sm);
     letter-spacing: var(--tracking-wide);

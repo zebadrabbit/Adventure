@@ -826,13 +826,17 @@ body {
     border-color: #d87070;
 }
 
-/* -primary, -info and -success were used but defined nowhere, so they fell
-   back to bare browser buttons. Repo-wide that is exactly three elements,
-   all in adventure.html's action bar: Search (-primary), Party Stash (-info)
-   and Extract (-success). -primary is the screen's principal action, so it
-   is filled solid like the reference .btn-primary in auth.css; -info and
-   -success follow -secondary/-danger's wash-and-line outline shape,
-   differing only in hue. */
+/* -primary and -success were used but defined nowhere, so they fell back to
+   bare browser buttons. Both live in adventure.html's action bar: Search
+   (-primary) and Extract (-success). -primary is the screen's principal
+   action, so it is filled solid like the reference .btn-primary in auth.css;
+   -success follows -secondary/-danger's wash-and-line outline shape,
+   differing only in hue.
+   There was a -info alongside them, worn by one element: the Party Stash
+   button. That button was deleted (a shared party container is the wrong
+   model against per-character encumbrance), which left the class with zero
+   users repo-wide, so it went too. The --info-* tokens stay -- auth.css and
+   equipment.css still read them. */
 
 .tactical-btn-primary {
     background: var(--accent);
@@ -849,23 +853,6 @@ body {
     border-color: var(--accent-hover);
     color: var(--ink-on-accent);
     box-shadow: var(--glow-accent);
-}
-
-.tactical-btn-info {
-    background: var(--info-wash);
-    border: 2px solid var(--info-line);
-    color: var(--ink);
-    letter-spacing: 0.5px;
-    padding: 11px 20px;
-    transition: all 0.2s ease;
-    font-family: var(--ui-font);
-}
-
-.tactical-btn-info:hover {
-    border-color: var(--info);
-    background: color-mix(in srgb, var(--info) 25%, transparent);
-    color: var(--info);
-    box-shadow: 0 0 12px color-mix(in srgb, var(--info) 15%, transparent);
 }
 
 .tactical-btn-success {
