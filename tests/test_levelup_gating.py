@@ -6,6 +6,7 @@ import uuid
 import pytest
 
 from app import db
+from app.models.xp import xp_for_level
 from app.services import progression
 from tests.factories import create_character, create_user
 
@@ -37,7 +38,7 @@ def test_grant_xp_awards_stat_points():
 
     GameConfig.set("progression", '{"stat_points_per_level": 2, "talent_points_per_level": 1}')
     _user, char = _char(0)
-    progression.grant_xp(char, 300)  # -> level 2 (one level)
+    progression.grant_xp(char, xp_for_level(2))  # -> level 2 (one level)
     db.session.commit()
     assert char.level == 2
     assert char.stat_points == 2

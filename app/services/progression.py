@@ -21,7 +21,7 @@ from typing import Dict
 from app import db
 from app.models.models import GameConfig
 from app.models.skill import CharacterTalentPoints
-from app.models.xp import xp_for_level
+from app.models.xp import MAX_LEVEL, xp_for_level
 
 _DEFAULT_PROGRESSION = {
     "xp_difficulty_mod": 1.0,
@@ -33,8 +33,12 @@ _DEFAULT_PROGRESSION = {
     "early_extraction_xp_penalty": 0.20,
 }
 
-# Upper bound for level search; the xp table extrapolates beyond 20.
-_MAX_LEVEL = 50
+# The level cap. Twenty levels, each costing more fights than the last -- see
+# app/models/xp.py for the curve and the measurements behind it. It used to be
+# 50, which meant 30 levels of flat 50,000 XP steps fought against clamped
+# level-20 monsters, because the catalogue stops at 20. Depth past the cap is
+# the dungeon tier ladder's job, not the level counter's.
+_MAX_LEVEL = MAX_LEVEL
 
 
 def progression_config() -> dict:

@@ -202,14 +202,17 @@ def complete_quest():
 
     # XP
     if rewards.get("xp"):
-        character.xp += int(rewards["xp"])
+        # Through progression.grant_xp, the one place that turns XP into levels.
+        # This used to add to character.xp directly and run its own level-up
+        # loop against `combat_service._xp_required` -- a function that does not
+        # exist, so the import raised ImportError and claiming any quest with an
+        # XP reward answered 500. Had it existed, the loop would also have
+        # ignored the level cap, and `while xp >= required(level)` never
+        # terminates once the requirement stops rising at the cap.
+        from app.services import progression
+
+        progression.grant_xp(character, int(rewards["xp"]))
         granted["xp"] = rewards["xp"]
-
-        # Check for level up
-        from app.services.combat_service import _xp_required
-
-        while character.xp >= _xp_required(character.level):
-            character.level += 1
 
     # Gold (would need gold field on Character)
     if rewards.get("gold"):
