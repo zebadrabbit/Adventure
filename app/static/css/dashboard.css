@@ -13,19 +13,9 @@ body {
     pointer-events: none;
 }
 
-/* Adventure page character cards */
-.character-card .small-bar {
-    max-width: 140px;
-}
-
-.character-card .progress {
-    height: 0.9rem;
-}
-
-.character-card .progress-bar {
-    font-size: 0.65rem;
-    line-height: 0.9rem;
-}
+/* Three `.character-card` descendant rules sized the bars on the adventure page
+   until nothing emitted `.character-card` any more -- the rail and the roster
+   both render `.operative-card`. Deleted with the rest of the selector. */
 
 /* Glass cards for adventure page */
 .card {
@@ -204,12 +194,6 @@ body {
     color: #fff;
     background: color-mix(in srgb, var(--adv-primary) 15%, transparent);
     border-bottom: 2px solid color-mix(in srgb, var(--adv-primary) 80%, transparent);
-}
-
-/* "OPEN" status badge on Hub Actions merchant buttons */
-.badge-open {
-    background: color-mix(in srgb, var(--adv-success) 25%, transparent);
-    font-size: 0.65rem;
 }
 
 /* Operative card XP bar background */

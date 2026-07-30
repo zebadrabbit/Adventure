@@ -276,7 +276,7 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover .avatar-circle {
 }
 
 .adv-hud .adv-party-rail .operative-card {
-    /* .operative-card carries height: 100% (tactical-theme.css, for the
+    /* .operative-card carries height: 100% (theme.css, for the
        dashboard's equal-height card grid). Against this rail's definite
        height that makes every frame a flex item asking for the full 540px,
        which the four of them then shrink to share exactly -- the rail could
@@ -330,7 +330,7 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover .avatar-circle {
 }
 
 /* Deviation from the brief (documented in the task report): .operative-header
- * and .operative-body (tactical-theme.css, shared with the roomy dashboard
+ * and .operative-body (theme.css, shared with the roomy dashboard
  * card) carry 14-18px padding and gap sized for that card. Left at the
  * brief's own padding override alone, four frames measure ~169px each --
  * 677px total -- well past the 540px the rail actually has between

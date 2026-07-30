@@ -209,11 +209,12 @@ colour at a call site.
 > `Theme` DB row (Layer 0 primitives), not by stacking stylesheets.
 
 `tests/test_class_colour_tokens.py` enforces this: all twelve classes have a
-hue and a derived triplet, no derived value restates a literal, no *reachable*
-stylesheet sets a `.class-badge` or `.<class>-badge` colour outside
-`var(--class-*)`, and every hue clears 4.5:1 against both realm grounds. The one
-exemption — `tactical-theme.css`, an orphan awaiting deletion — holds only while
-nothing `<link>`s or `@import`s it; the test checks both routes.
+hue and a derived triplet, no derived value restates a literal, no stylesheet
+sets a `.class-badge` or `.<class>-badge` colour outside `var(--class-*)`, and
+every hue clears 4.5:1 against both realm grounds. There is no longer any
+exemption: the one orphan that held one, `tactical-theme.css`, has been deleted,
+and the rule now applies to every stylesheet on disk whether a template loads it
+or not.
 
 ## Tests
 

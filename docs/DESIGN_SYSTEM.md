@@ -321,7 +321,11 @@ retired.
 values: `--elev-flat` (`none`, the default for every panel), `--elev-overlay`
 (modals, dropdowns, tooltips — and nothing else), `--inset-well` (sunken
 tracks: HP bars, log wells, inputs). Glows carry state, not decoration:
-`--glow-accent`, `--glow-danger`. `--focus-ring` is the only focus treatment.
+`--glow-accent`, `--glow-danger`, `--glow-success` — all three at 14px/30%, so
+no hover restates a blur radius or an alpha. (There is no `--glow-info`: its one
+consumer, `.tactical-btn-info`, was deleted with the Party Stash button, and a
+token with no consumer is just another thing to keep true.) `--focus-ring` is
+the only focus treatment.
 
 **Motion.** `--dur-fast` 120ms · `--dur` 200ms · `--dur-slow` 320ms · `--ease`.
 All collapse to `0ms` under `prefers-reduced-motion`, handled once in
@@ -436,11 +440,13 @@ stylesheet sets a `.class-badge` or `.<class>-badge` colour outside
 `var(--class-*)`, and none uses `!important`**, every hue clears 4.5:1 against
 both realm grounds, and no two classes sit close in both hue and lightness.
 
-One file is exempt: `tactical-theme.css` still carries six pre-token class
-rules, and is excused **only while it is unreachable** — no template `<link>`s
-it and nothing `@import`s it. The test follows both routes, so linking or
-importing it fails the suite rather than silently reviving a tenth palette.
-Deleting the file (it is already on the orphan list) removes the exemption.
+No file is exempt. `tactical-theme.css` used to be — six pre-token class rules,
+excused only while nothing `<link>`ed or `@import`ed it, with a companion test
+that chased both routes to prove it. That file has since been **deleted**, and
+the exemption went with it rather than being left as an empty set: a
+reachability check with nothing to check passes on nothing and reads like a
+guard. Every stylesheet on disk is now held to the rule whether it is reachable
+or not, so a stray palette cannot go live by someone adding one `<link>`.
 
 > **Known wart:** `combat.html` loads `glass-theme.css` in its `{% block head %}`,
 > which breaks the admin-and-account boundary stated above. That is how six
@@ -619,7 +625,7 @@ Four of these style markup that is **live in the app right now**:
 
 | File | Lines | Status |
 |---|---|---|
-| `tactical-theme.css` | 688 | Superseded — `theme.css` carries a newer superset. Delete. |
+| `tactical-theme.css` | 688 | **Deleted** (2026-07-30). Superseded — `theme.css` carried a newer superset all along, since no template ever loaded this file. |
 | `utilities.css` | 220 | Merged into `app.css`. Delete. (`wc -l` now reports **211** — a pre-existing 9-line drift from the 2026-07-27 count, not re-tabulated here so the column keeps summing to 1,422. Re-measure the whole column when phase 2 runs.) |
 | `class-badges.css` | 164 | **Deleted** (class-colour-unification, Task 2). Superseded once `theme.css`'s badges were pointed at `tokens.css`. |
 | `adv-theme.css` | 40 | Abandoned CRT palette. Delete. |

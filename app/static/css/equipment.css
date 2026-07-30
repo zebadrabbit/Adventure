@@ -400,6 +400,25 @@
     margin-bottom: 2px;
 }
 
+/* The panel's icons used to carry Bootstrap's text-danger/text-warning/
+   text-info, which is a second palette by definition -- those resolve to
+   Bootstrap's hues, not the realm's, so they did not shift between the warm
+   and cold grounds like everything around them. The stat-label icons are
+   decorative (the label next to them already says STR, CON, DEX), so they
+   simply inherit --ink-muted from the rule above now. These two carry meaning
+   and keep a colour, taken from tokens. */
+.eq-icon-hp {
+    color: var(--danger);
+}
+
+.eq-icon-xp {
+    color: var(--accent);
+}
+
+#gear-bonus-summary {
+    color: var(--info);
+}
+
 .eq-stat-value {
     font-size: 1.1rem;
     font-weight: 700;

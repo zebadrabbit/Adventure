@@ -92,7 +92,7 @@ def ensure_characters_and_party(page):
     page.wait_for_load_state("networkidle")
     # Create up to 4 via autofill if none present
     try:
-        cards = page.locator(".character-card")
+        cards = page.locator(".operative-card")
         if cards.count() == 0:
             page.request.post(f"{BASE_URL}/autofill_characters")
             page.goto(f"{BASE_URL}/dashboard")
@@ -249,9 +249,10 @@ def main():
         # 10: Back to dashboard inventory
         page.goto(f"{BASE_URL}/dashboard")
         page.wait_for_load_state("networkidle")
-        # Capture first character card including Inventory
+        # Capture the first party card. Its .operative-detail pane (attributes,
+        # XP, coin purse) ships `hidden`, so this frame is the card at rest.
         try:
-            card = page.locator(".character-card").first
+            card = page.locator(".operative-card").first
             path = os.path.join(out, f"10-inventory-{datetime.utcnow().strftime('%H%M%S')}.png")
             card.screenshot(path=path)
             print(path)

@@ -11,6 +11,16 @@ item(id INTEGER PK, slug TEXT UNIQUE, name TEXT, type TEXT, description TEXT, va
 - `items_potions.sql` – Healing & mana potions (levels 1-20), offensive/defensive/speed buff elixirs, antidotes, elemental resistance potions (sparse tier milestones).
 - `items_misc.sql` – Tools, scrolls, gems, crafting materials, consumables, and generic keys used for future locked/secret door mechanics.
 - `monsters_seed.sql` – Catalog of monsters (common, named elite, bosses) with level bands, base stats, rarity tiers, and optional special drops referencing existing item slugs.
+- `dungeon_tiers_seed.sql` – Creates `dungeon_tier` and seeds the seven difficulty tiers (Novice → Mythic) with level bands, monster level modifiers, loot quality bonuses, and XP multipliers.
+- `dungeon_affixes_seed.sql` – Creates `dungeon_affix` and seeds ten run modifiers (Frenzied, Bolstered, Volcanic, …) with HP/damage/speed multipliers, a player damage-taken multiplier, and a `special_effect` JSON blob.
+- `enemy_archetypes_seed.sql` – Creates `enemy_archetype` and seeds the eight combat roles (Trash → Boss) with base and per-level HP, damage, armor class, XP, and a loot multiplier.
+- `weapon_categories_seed.sql` – Creates `weapon_category` and seeds twelve weapon families with damage dice, primary stat, crit multiplier, attack speed, tags, and allowed classes.
+- `achievement_system_migration.sql` – Creates `achievement`, `character_achievement`, and `achievement_category` plus their indexes, then seeds six categories and eighteen starter achievements.
+- `skill_system_migration.sql` – Creates `skill_tree`, `skill`, `character_skill`, and `character_talent_points` plus their indexes, then seeds the Warrior/Mage/Cleric trees with five skills each across tiers 1-3.
+- `party_system_migration.sql` – Creates `party`, `party_member`, `party_buff`, and `party_shared_inventory` plus their indexes, then seeds one default party from the existing characters.
+- `trading_system_migration.sql` – Adds `character.gold` and creates `merchant`, `merchant_stock`, and `trade_transaction` plus their indexes, then seeds three starter merchants (general, weapons, armor).
+
+The four `*_migration.sql` files are Postgres dialect (`SERIAL`, `ON CONFLICT`, `ADD COLUMN IF NOT EXISTS`) and are applied with `psql` — each system's doc under `docs/` gives the exact command. The `*_seed.sql` files above them are SQLite dialect (`AUTOINCREMENT`), so the two sets are not interchangeable and neither loads cleanly under the other engine.
 
 ## Conventions
 - Slug pattern: `<category>_<subcat>_l<level>` for level-scaled gear; non-leveled utility items drop the `_l<level>` suffix.

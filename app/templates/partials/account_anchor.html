@@ -1,6 +1,16 @@
 {# Corner account affordance for chrome="minimal" screens. Same dropdown the
    navbar carries; only the trigger shrinks to an avatar. Positioned by the
-   page's own stylesheet, not here. #}
+   page's own stylesheet, not here.
+
+   The is_authenticated guard is not redundant with the route. chrome is a
+   template flag, not a route decorator: today the only screen that sets
+   chrome="minimal" is /adventure, which is @login_required, but the combat
+   screen is expected to want the same bare chrome and nothing forces it to
+   carry the same gate. Unguarded, the first ungated caller renders
+   current_user.username[0] against an AnonymousUserMixin and 500s the whole
+   page over a corner avatar. The navbar dropdown this was lifted from has
+   always guarded; the lift dropped it. #}
+{% if current_user.is_authenticated %}
 <div id="account-anchor" class="dropdown">
   <a class="account-anchor-trigger" href="#" id="accountAnchorMenu" role="button" data-bs-toggle="dropdown"
     aria-expanded="false" aria-label="Account menu">
@@ -29,3 +39,4 @@
           class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
   </ul>
 </div>
+{% endif %}

@@ -131,7 +131,7 @@
             <div class="eq-portrait-body">
                 <div id="eq-hp-bar-wrap" class="mb-2">
                     <div class="d-flex justify-content-between small eq-bar-label">
-                        <span><i class="bi bi-heart-fill text-danger me-1"></i>HP</span>
+                        <span><i class="bi bi-heart-fill eq-icon-hp me-1"></i>HP</span>
                         <span id="eq-hp-text"></span>
                     </div>
                     <div class="progress eq-progress-bar">
@@ -149,26 +149,26 @@
                 </div>
                 <div id="eq-xp-bar-wrap" class="mb-3">
                     <div class="d-flex justify-content-between small eq-bar-label">
-                        <span><i class="bi bi-star-fill text-warning me-1"></i>XP</span>
+                        <span><i class="bi bi-star-fill eq-icon-xp me-1"></i>XP</span>
                         <span id="eq-xp-text"></span>
                     </div>
                     <div class="progress eq-progress-bar">
                         <div class="progress-bar eq-xp-fill" id="eq-xp-bar" role="progressbar"></div>
                     </div>
                 </div>
-                <div id="gear-bonus-summary" class="small text-info mb-2"></div>
+                <div id="gear-bonus-summary" class="small mb-2"></div>
                 <div id="encumbrance-bar" class="mb-3"></div>
                 <div class="eq-stat-grid">
                     <div class="eq-stat-cell" id="eq-stat-atk">
-                        <div class="eq-stat-label"><i class="bi bi-sword text-warning"></i> STR</div>
+                        <div class="eq-stat-label"><i class="bi bi-sword"></i> STR</div>
                         <div class="eq-stat-value" id="eq-val-atk">—</div>
                     </div>
                     <div class="eq-stat-cell" id="eq-stat-def">
-                        <div class="eq-stat-label"><i class="bi bi-shield-fill text-info"></i> CON</div>
+                        <div class="eq-stat-label"><i class="bi bi-shield-fill"></i> CON</div>
                         <div class="eq-stat-value" id="eq-val-def">—</div>
                     </div>
                     <div class="eq-stat-cell" id="eq-stat-hp">
-                        <div class="eq-stat-label"><i class="bi bi-heart-fill text-danger"></i> DEX</div>
+                        <div class="eq-stat-label"><i class="bi bi-heart-fill"></i> DEX</div>
                         <div class="eq-stat-value" id="eq-val-hp">—</div>
                     </div>
                     <div class="eq-stat-cell" id="eq-stat-mp">

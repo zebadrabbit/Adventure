@@ -1395,93 +1395,17 @@ def open_locked_cache(entity_id: int):
 # _char_to_type moved to app.dungeon.api_helpers.tiles.char_to_type
 
 
-def _get_party_for_current_user():
-    """Return list of Character rows for the current session party if available; otherwise all user's characters.
-
-    We attempt to match characters by name from session['party'] to DB rows for a more accurate stat pull.
-    """
-    party_meta = session.get("party") or []
-    names = set()
-    for m in party_meta:
-        try:
-            nm = (m.get("name") or "").strip()
-            if nm:
-                names.add(nm)
-        except Exception:
-            continue
-    q = Character.query.filter_by(user_id=current_user.id)
-    if names:
-        rows = q.filter(Character.name.in_(list(names))).all()
-        # Fallback to all if names mismatched
-        if rows:
-            return rows
-    return q.all()
-
-
-def _perception_mod_from_stats(stats_json: str) -> int:
-    """Compute a perception modifier from a stats JSON string.
-
-    Prioritizes explicit 'perception' value; otherwise derives from Wisdom (wis) using (wis-10)//2.
-    """
-    if not stats_json:
-        return 0
-    try:
-        data = json.loads(stats_json)
-        if isinstance(data, dict):
-            if "perception" in data:
-                val = data.get("perception")
-                if isinstance(val, (int, float)):
-                    return int(val)
-            wis = data.get("wis") or data.get("WIS") or data.get("wisdom")
-            if isinstance(wis, (int, float)):
-                return int((wis - 10) // 2)
-    except Exception:
-        return 0
-    return 0
-
-
-def _roll_perception_for_user():
-    """Return the best party perception roll details.
-
-    Returns a dict: {
-        'skill': 'perception', 'die': 'd20', 'roll': int, 'mod': int, 'total': int,
-        'expr': '1d20+X', 'character': { 'id': int|None, 'name': str|None }
-    }
-
-    Behavior is unchanged from before: we roll a single d20 and add the best party modifier.
-    We attribute the modifier to the character with the highest effective perception.
-    If no characters, we use a default +1 and leave character as None.
-    """
-    import random as _random
-
-    rows = _get_party_for_current_user()
-    best = {"char": None, "mod": 1}
-    if rows:
-        # Choose the character with the highest effective modifier
-        top = None
-        top_mod = None
-        for c in rows:
-            try:
-                eff = _perception_mod_from_stats(c.stats) + max(0, int(c.level) // 2)
-            except Exception:
-                eff = _perception_mod_from_stats(getattr(c, "stats", None))
-            if top_mod is None or eff > top_mod:
-                top_mod = int(eff)
-                top = c
-        if top is not None and top_mod is not None:
-            best["char"] = top
-            best["mod"] = int(top_mod)
-    die_roll = _random.randint(1, 20)
-    total = die_roll + int(best["mod"])
-    return {
-        "skill": "perception",
-        "die": "d20",
-        "roll": int(die_roll),
-        "mod": int(best["mod"]),
-        "total": int(total),
-        "expr": f"1d20+{int(best['mod'])}",
-        "character": ({"id": int(best["char"].id), "name": best["char"].name} if best["char"] is not None else None),
-    }
+# _perception_mod_from_stats, _roll_perception_for_user and _get_party_for_current_user
+# used to sit here. When the perception logic moved to app.dungeon.api_helpers.perception
+# these were left behind and nothing ever called them again, so the copies quietly drifted
+# apart. The helpers module is the only surviving home; go there rather than reintroducing
+# a route-layer copy.
+#
+# _get_party_for_current_user in particular is not a helper to resurrect casually: it
+# matches the session party by NAME and falls back to returning *every* character the user
+# owns, so using it as an authorisation guard silently passes everyone. The run's party is
+# `session["last_party_ids"]` -- see the same-run guards in hoard_api.loot_body and
+# inventory_api.give_item.
 
 
 @bp_dungeon.route("/api/dungeon/notices", methods=["GET"])

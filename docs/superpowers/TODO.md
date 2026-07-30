@@ -260,24 +260,32 @@ misbehave today.
       already-tracked badge-to-chip conversion in `DESIGN_SYSTEM.md`'s
       migration plan (phase 7 — "chips": square, hairline outline, no
       radius).
-- [ ] `tactical-theme.css:193` (`.panel-header .badge`, no `:not()`
-      exclusion) would flatten class badges the same way the
-      `dashboard.css` rule above did — but the file is referenced by no
-      template, route or script (a third orphan; `DESIGN_SYSTEM.md`'s
-      appendix already marks it "Superseded — delete"). Unverified in a
-      browser since nothing loads it.
+- [x] ~~`tactical-theme.css:193` (`.panel-header .badge`) would flatten class
+      badges~~ — the whole file is **deleted** (688 lines). Unreachability was
+      re-verified four ways first: no `css/tactical-theme.css` in any template,
+      no `@import` of it from any reachable stylesheet, no route/JS/script
+      reference, and no bundler or asset manifest in the repo.
+      `tests/test_class_colour_tokens.py` lost its exemption machinery with it —
+      an empty exemption set plus a reachability check with nothing to check is
+      a guard that passes on nothing. Both surviving tests now apply to every
+      stylesheet on disk, reachable or not, which is strictly stronger.
 - [ ] `dashboard.css:210`'s `.badge-open` is dead code — grep finds only its
       own declaration.
 - [ ] `party-management.css`'s `.rarity-*` block was `!important` and defeated
       the rarity tokens on both screens — fixed, but the same `!important`
       pattern is worth sweeping for elsewhere.
-- [ ] `--info` is a literal alias of `--accent` (`tokens.css:191`), so
-      `tactical-btn-info` and `-primary` share a hue and differ only by fill vs
-      wash. Decide whether info deserves its own hue or the alias is intended.
-- [ ] Hover glows are inconsistent: `--glow-accent`/`--glow-danger` exist at
-      14px/30%, `-info`/`-success` hand-roll 12px/15%, and `-danger`'s own hover
-      uses a raw `rgba()`. Add `--glow-info`/`--glow-success` and point all four
-      at tokens.
+- [ ] `--info` is a literal alias of `--accent` (`tokens.css`), so anything
+      reading it shares a hue with `-primary`. Still an open judgement call, but
+      lower stakes now: `.tactical-btn-info`, its only button consumer, was
+      deleted with the Party Stash button. Remaining readers are `auth.css`,
+      `equipment.css` and the character panel's gear-bonus summary.
+- [x] ~~Hover glows are inconsistent~~ — `--glow-success` added at the same
+      14px/30% formula as `--glow-accent`/`--glow-danger`, and the two hovers
+      that hand-rolled their own (including `-danger`'s raw `rgba()`) now read
+      tokens. No `--glow-info` was added: its only consumer was the deleted
+      `.tactical-btn-info`, and a token with no reader is one more thing to keep
+      true. Note this is a real pixel change — both hovers are now brighter and
+      slightly wider than before.
 
 ### Interaction and accessibility
 
@@ -294,12 +302,17 @@ misbehave today.
       the `78vh` cap on `.equipment-slots`/`.inventory-bag` — a dashboard-modal
       number applied to a HUD mount that has ~494px. Real fix is
       `.equipment-slot` sizing or a markup change.
-- [ ] `account_anchor.html` has no `is_authenticated` guard (the navbar dropdown
-      it was lifted from did). Unreachable today — `/adventure` is
-      `@login_required` — and live the moment `chrome="minimal"` reaches an
-      ungated route, which the combat screen is expected to want.
-- [ ] Four decorative icons in the character panel still carry Bootstrap's
-      `text-danger`/`text-warning` rather than tokens.
+- [x] ~~`account_anchor.html` has no `is_authenticated` guard~~ — wrapped in
+      the same guard shape `base.html` uses on the navbar dropdown it was lifted
+      from. Still unreachable today, but the combat screen is expected to want
+      `chrome="minimal"` on a route that may not be gated.
+- [x] ~~Four decorative icons in the character panel still carry Bootstrap's
+      `text-danger`/`text-warning`~~ — six of them, in fact, all in
+      `equipment-panel.js`. Bootstrap's hues are a second palette: they do not
+      shift between the warm and cold grounds like everything around them. The
+      three stat-label icons are decorative (the label beside them already says
+      STR/CON/DEX) and now inherit `--ink-muted`; the HP and XP icons and the
+      gear-bonus summary keep a colour, taken from tokens.
 
 ### Hygiene
 
@@ -308,27 +321,41 @@ misbehave today.
       unrelated later page instead of being lost visibly.
 - [ ] `<main class="chrome-minimal">` has no CSS anywhere — dead hook or
       missing rule.
-- [ ] `.character-card` is dead everywhere, in three media. No template emits
-      it (the rail and roster both emit `.operative-card`), yet
-      `scripts/screenshot_adventure.py:99`, `screenshot_help.py:55` and
-      `screenshot_storyboard.py:95,254` all locate on it — so those scripts
-      have been measuring zero cards — and `glass-theme.css:181-215,596` still
-      styles it. Turned up by the 2026-07-29 live-defect triage while deleting
-      the dead last-roll readout, which was the fourth user of the selector.
-- [ ] Three copies of `_perception_mod_from_stats`
-      (`dungeon/api_helpers/perception.py:56` — the one `room_events` imports,
-      `dungeon/api_helpers/treasure.py:29`, and `routes/dungeon_api.py:1421`).
-      The `dungeon_api` copy is reachable only from `_roll_perception_for_user`
-      (`:1443`), which has **no callers at all** — both are orphans and can go;
-      the treasure copy should import from `perception.py` instead.
+- [x] ~~`.character-card` is dead everywhere, in three media.~~ All cleared:
+      four Playwright locators repointed to `.operative-card`, and the rules in
+      `glass-theme.css` and `dashboard.css` deleted. One correction to the
+      original note — the class was not imaginary: `git log -S` shows
+      `dashboard.html` carried `class="card character-card h-100"` until
+      `7dfcf1e` renamed it, and the scripts were never updated. Their
+      `count() == 0` guard meant the breakage was silent rather than loud.
+- [x] ~~Three copies of `_perception_mod_from_stats`~~ — down to one, in
+      `dungeon/api_helpers/perception.py`. `treasure.py` now imports it (the two
+      bodies were byte-identical, checked with a real diff, so the collapse is
+      behaviour-preserving). `dungeon_api.py`'s copy went along with
+      `_roll_perception_for_user`, which had no callers — and with
+      `_get_party_for_current_user`, which that dead function was the last
+      caller of. A comment marks the spot warning against resurrecting the
+      latter: it matches the party by **name** and falls back to returning every
+      character the user owns, so using it as a guard passes everyone. The run's
+      party is `session["last_party_ids"]`.
 - [ ] The gear-slot migration's `_unbaggable`
       (`migrations/versions/c9405725c1f4_unify_gear_slots.py:39`) has the same
       uid-less-dict hole the app side just closed with `add_gear_value`. The
       migration is already applied, so it was deliberately left alone; if it is
       ever hardened, mirror that helper's clause rather than diverging again.
-- [ ] `sql/README.md`'s Files section omits eight `.sql` files that do exist.
-- [ ] `dashboard_helpers.render_dashboard` imports inside a per-character loop
-      (`:82,88`) — same shape as the one fixed in `build_party_payload`.
+- [x] ~~`sql/README.md`'s Files section omits eight `.sql` files~~ — all eight
+      added, each described from the file's actual contents. Also recorded the
+      dialect split the Loading section silently straddles: the four
+      `*_migration.sql` files are Postgres (`SERIAL`, `ON CONFLICT`) while the
+      `*_seed.sql` files use SQLite `AUTOINCREMENT`, so the instruction to pipe
+      them all into `sqlite3` cannot be right for both.
+- [x] ~~`dashboard_helpers` imports inside a per-character loop~~ — hoisted out
+      of the loop in `serialize_character_list` (the TODO named
+      `render_dashboard`, which calls it), matching `build_party_payload`'s
+      approach: function scope, not module scope, since these stay deferred to
+      avoid a cycle. One import deliberately stays inside the loop's `try` and
+      now says so, so a later pass does not hoist away its degrade-to-empty
+      behaviour.
 - [ ] Dev-database throwaway accounts from Playwright verification runs; 11
       removed, more will accumulate. Worth a cleanup helper rather than manual
       FK-walking each time.

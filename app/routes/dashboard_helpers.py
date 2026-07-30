@@ -74,22 +74,27 @@ def serialize_character_list(user_id: int) -> list[dict[str, Any]]:
     backfilled = False
     from app.models.models import Item
 
+    # Deferred to function scope, as this module does throughout, but hoisted
+    # out of the loop below: this was being re-imported twice per character,
+    # which is a dictionary lookup the loop pays for and reads as if each
+    # iteration might resolve something different.
+    from app.services.character_stats import compute_hp_mana_max
+
     for c in characters:
         stats = json.loads(c.stats)
         for key in ("str", "dex", "int", "wis", "con", "cha"):
             stats.setdefault(key, 0)
         if "hp" not in stats or "mana" not in stats:
-            from app.services.character_stats import compute_hp_mana_max
-
             hp_max, mana_max = compute_hp_mana_max(c)
             stats.setdefault("hp", hp_max)
             stats.setdefault("mana", mana_max)
 
-        from app.services.character_stats import compute_hp_mana_max
-
         hp_max, mana_max = compute_hp_mana_max(c)
 
         try:
+            # Stays inside the try on purpose: the except arm is what makes a
+            # missing status-effect table degrade to an empty badge row instead
+            # of taking the whole dashboard down with it.
             from app.models import CharacterStatusEffect
 
             effects_display = [

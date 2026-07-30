@@ -822,7 +822,7 @@ body {
 
 .tactical-btn-danger:hover {
     background: rgba(139, 46, 46, 0.5);
-    box-shadow: 0 0 10px rgba(139, 46, 46, 0.3);
+    box-shadow: var(--glow-danger);
     border-color: #d87070;
 }
 
@@ -869,7 +869,7 @@ body {
     border-color: var(--success);
     background: color-mix(in srgb, var(--success) 25%, transparent);
     color: var(--success);
-    box-shadow: 0 0 12px color-mix(in srgb, var(--success) 15%, transparent);
+    box-shadow: var(--glow-success);
 }
 
 /* ========================================
