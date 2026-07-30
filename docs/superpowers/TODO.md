@@ -482,6 +482,21 @@ entry plus a handler:
       `defense` is *evasion* only, so a defence potion makes you harder to
       hit, not tougher. Highest leverage of the blocked families — unblocks
       three at once.
+
+      **Design decided by the owner, 2026-07-30:**
+      - **Expiry rides the existing game clock.** There is already a
+        `GameClock` and an `advance_for(action)` cost table driving tick decay,
+        so a buff's remaining duration is ticks against that, not a second
+        timebase. `status_effects.py` + `apply_tick_decay` are the existing
+        machinery to extend rather than parallel.
+      - **Combat buffs fall off when combat ends, regardless of the clock.**
+        A buff bought for a fight must not survive the fight just because few
+        ticks passed. So an effect needs to know whether it is combat-scoped,
+        and combat teardown has to clear those — the clock alone is not the
+        whole rule.
+      - **Durations need a balance pass.** Whatever numbers the first
+        implementation picks are a guess until playtested; they belong with the
+        other tuning verdicts below rather than being treated as settled.
 - [ ] `antidote` (5 potions) needs a `remove_effect` primitive.
       `status_effects.py` can add and replace an effect but never remove
       one; expiry is the only route today. It must also delete the

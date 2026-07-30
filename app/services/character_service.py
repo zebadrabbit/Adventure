@@ -35,12 +35,12 @@ OWNED_TABLES = (
 )
 
 # References that survive the character, and are nullable, so they are cleared
-# rather than deleted: a party outlives its leader, and shared loot outlives
-# whoever contributed it.
-CLEARED_REFERENCES = (
-    ("party", "leader_id"),
-    ("party_shared_inventory", "added_by"),
-)
+# rather than deleted: a party outlives its leader.
+# (party_shared_inventory.added_by was here until the shared party inventory was
+# removed -- bags are per-character. This list is executed as raw SQL against
+# literal table names, so an entry for a dropped table raises UndefinedTable on
+# every character deletion.)
+CLEARED_REFERENCES = (("party", "leader_id"),)
 
 
 def delete_character(char: Character) -> dict:

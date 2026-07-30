@@ -97,29 +97,9 @@ class PartyBuff(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
-class PartySharedInventory(db.Model):
-    """Shared party storage for consumables and resources.
-
-    Attributes:
-        id: Primary key
-        party_id: FK to Party
-        item_slug: Item identifier
-        quantity: How many in shared storage
-        added_by: Character ID who added it
-        added_at: When item was added
-    """
-
-    __tablename__ = "party_shared_inventory"
-
-    id = db.Column(db.Integer, primary_key=True)
-    party_id = db.Column(db.Integer, db.ForeignKey("party.id"), nullable=False)
-    item_slug = db.Column(db.String(100), nullable=False)
-    quantity = db.Column(db.Integer, nullable=False, default=1)
-    added_by = db.Column(db.Integer, db.ForeignKey("character.id"))
-    added_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-
-    # Relationships
-    contributor = db.relationship("Character", backref="party_contributions")
-
-    # One entry per item per party
-    __table_args__ = (db.UniqueConstraint("party_id", "item_slug", name="unique_party_item"),)
+# PartySharedInventory lived here until 2026-07-30. Bags are per-character in
+# this game, and per-character encumbrance only binds if every item sits in
+# somebody's bag -- a communal container is a hole straight through it. Handing
+# an item to an ally is POST /api/characters/<cid>/give, which is refused during
+# combat. Party.shared_gold and its /gold endpoints are a separate concept and
+# were left standing.

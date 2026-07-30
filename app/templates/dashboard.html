@@ -586,7 +586,6 @@
         <div class="party-tabs">
             <button class="party-tab active" data-tab="formation" onclick="partySystem.switchTab('formation')">Formation</button>
             <button class="party-tab" data-tab="members" onclick="partySystem.switchTab('members')">Members</button>
-            <button class="party-tab" data-tab="inventory" onclick="partySystem.switchTab('inventory')">Shared Inventory</button>
             <button class="party-tab" data-tab="buffs" onclick="partySystem.switchTab('buffs')">Buffs</button>
         </div>
         <div class="party-tab-content">
@@ -610,16 +609,6 @@
                 </div>
             </div>
             <div id="membersTab" class="party-tab-pane"><div class="party-members-grid" id="partyMembersList"></div></div>
-            <div id="inventoryTab" class="party-tab-pane">
-                <div class="shared-inventory-header">
-                    <div class="shared-gold-display"><span>Party Treasury:</span><span class="shared-gold-amount" id="sharedGoldAmount">0</span></div>
-                    <div class="shared-inventory-actions">
-                        <button class="shared-inventory-btn">Contribute Items</button>
-                        <button class="shared-inventory-btn">Contribute Gold</button>
-                    </div>
-                </div>
-                <div class="shared-items-grid" id="sharedItemsList"></div>
-            </div>
             <div id="buffsTab" class="party-tab-pane"><div class="party-buffs-grid" id="partyBuffsList"></div></div>
         </div>
     </div>
