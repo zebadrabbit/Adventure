@@ -402,6 +402,15 @@ class CombatSession(db.Model):
     phase_step = db.Column(db.Integer, nullable=False, default=0)  # numeric progress inside phase if needed
     # Participants snapshot
     party_snapshot_json = db.Column(db.Text, nullable=True)  # list of character stat dicts
+    # Every monster in the encounter: a JSON list, each entry an ordinary spawn
+    # payload plus a session-local ``id``, a current ``hp`` and an ``hp_max``.
+    # This is the source of truth. ``monster_json``/``monster_hp`` below are kept
+    # as a denormalised view of the first entry so the readers that predate
+    # multi-enemy keep working; combat_service._save_monsters is the one writer
+    # that keeps them in step. NULL on rows written before this column existed --
+    # combat_service._monsters() derives the list from the legacy pair in that
+    # case, which is why no data migration was needed.
+    monsters_json = db.Column(db.Text, nullable=True)
     monster_hp = db.Column(db.Integer, nullable=True)
     # Logging & outcome
     log_json = db.Column(db.Text, nullable=True)  # JSON list of log line dicts
