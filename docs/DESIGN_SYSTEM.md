@@ -523,7 +523,7 @@ revertable.
 | 1 | Fix the three [theme-layer defects](#known-defects-in-the-theme-layer); call `seed-themes` from `bootstrap_db.sh` | **every page** — but it is what stops two palettes rendering at once |
 | 2 | Delete the 1,607 lines of never-loaded CSS; **link** the four orphans whose markup is live and unstyled | small; four screens visibly *improve* |
 | 3 | Component layer, items 1–3 in [the table above](#designed-replacements--what-they-should-look-like): bars, panel, buttons | dashboard, adventure, combat — the highest-value visual work in the project |
-| 4 | Delete the competing `:root` blocks in `base.css`, `app.css`, `adv-theme.css`, `classes.css`, `footer.css`, `home.css` | every page; do after phase 1, with a rendering pass per screen |
+| 4 | Delete the competing `:root` blocks in `base.css`, `app.css`, `adv-theme.css`, `footer.css`, `home.css` (`classes.css`'s is gone — the file was deleted in class-colour-unification, Task 2) | every page; do after phase 1, with a rendering pass per screen |
 | 5 | Apply `data-realm="dungeon"` to the adventure and combat templates | those two screens go cold — the payoff for all of the above |
 | 6 | The generated-CSS cohort (below): 340 of the 619 hex literals | all dashboard tabs; convert one file per commit |
 | 7 | Component layer, items 4–7: fields, modals, remaining cards, chips | dashboard, adventure, combat |
@@ -581,9 +581,9 @@ Four of these style markup that is **live in the app right now**:
 |---|---|---|
 | `tactical-theme.css` | 688 | Superseded — `theme.css` carries a newer superset. Delete. |
 | `utilities.css` | 220 | Merged into `app.css`. Delete. |
-| `class-badges.css` | 164 | Superseded by `theme.css`'s badges. Delete after diffing. |
+| `class-badges.css` | 164 | **Deleted** (class-colour-unification, Task 2). Superseded once `theme.css`'s badges were pointed at `tokens.css`. |
 | `adv-theme.css` | 40 | Abandoned CRT palette. Delete. |
-| `classes.css` | 21 | Superseded by `base.css`. Delete. |
+| `classes.css` | 21 | **Deleted** (class-colour-unification, Task 2). Superseded by the twelve-class palette in `tokens.css`, not `base.css` — `base.css`'s own six-class block was dropped in the same task. |
 | `chat-widget.css` | 240 | **Live markup, unstyled.** `.mud-chat-widget` renders on the dashboard with only `dashboard.css`'s partial rules. |
 | `hoard-ui.css` | 128 | **Live markup, unstyled.** `hoard.js` builds `.hoard-layout` / `.hoard-char-strip`; nothing styles them. |
 | `dungeon-config.css` | 63 | **Live markup, unstyled.** `.difficulty-btn-group`, `.affix-grid`, `.fs-heroic-note` are in `dashboard.html`. |
