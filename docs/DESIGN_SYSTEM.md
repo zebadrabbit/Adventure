@@ -407,10 +407,16 @@ apart is what stops them merging into a third thing.
 
 ### Class identity
 
-Twelve classes, one hue each (`--class-fighter` … `--class-warlock`), three
-presentations derived from it: `.class-badge.<class>-badge`,
-`.class-header-<class>`, `.border-<class>`. Never hard-code a class colour at a
-call site.
+Twelve classes, one hue each: `--class-fighter` … `--class-warlock` in
+`tokens.css`. `-bg`, `-fg` and `-border` are derived from that hue with
+`color-mix()`, in `tokens.css`, for all twelve — not restated, not
+hand-picked. Three presentations read the derived names:
+`.class-badge.<class>-badge`, `.class-header-<class>`, `.border-<class>`.
+Never hard-code a class colour at a call site — `tests/test_class_colour_tokens.py`
+enforces it: all twelve classes have a hue and derived `-bg/-fg/-border`, the
+derived values reference the hue rather than a hex literal, every hue clears
+4.5:1 against both realm grounds, and no two classes sit close in both hue
+and lightness.
 
 ---
 
