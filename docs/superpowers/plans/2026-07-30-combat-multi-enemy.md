@@ -112,13 +112,13 @@ also gives the screen the greyed-out corpses the spec wants.
       mid-fight instead of getting four deaths at once at the end.
 
 ### Task 10: monsters act as themselves
-- [ ] `monster_auto_turn` takes the acting monster from `_active_monster`, and
+- [x] `monster_auto_turn` takes the acting monster from `_active_monster`, and
       every write-back goes through `_save_monsters`.
-- [ ] `last_turn` becomes per-monster — left shared, one monster acting puts the
+- [x] `last_turn` becomes per-monster — left shared, one monster acting puts the
       whole pack on cooldown and the fight goes quiet.
 
 ### Task 11: consecutive monster turns
-- [ ] `_auto_progress_monster_after_player` loops while it is a monster's turn,
+- [x] `_auto_progress_monster_after_player` loops while it is a monster's turn,
       bounded by `len(initiative)`. Today it runs exactly one, so two adjacent
       monsters leave the client waiting on a turn nobody drives.
 
@@ -129,9 +129,9 @@ also gives the screen the greyed-out corpses the spec wants.
 - [x] `combat_api` payloads carry it, keeping the `version` optimistic lock.
 
 ### Task 13: the screen
-- [ ] `to_dict` emits a `monsters` list, keeping `monster`/`monster_hp`/
+- [x] `to_dict` emits a `monsters` list, keeping `monster`/`monster_hp`/
       `monster_max_hp` as the first entry.
-- [ ] The combat screen lists enemies with name + HP bar, one selected as target,
+- [x] The combat screen lists enemies with name + HP bar, one selected as target,
       corpses greyed. Follow the combat item panel's shape — it is the sibling
       component. Mind that `combat.html` loads `glass-theme.css` in `{% block head %}`,
       a documented wart that has broken class colours on this screen before.

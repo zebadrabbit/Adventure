@@ -438,6 +438,28 @@ class CombatSession(db.Model):
         import json
 
         try:
+            raw_monsters = json.loads(self.monsters_json) if self.monsters_json else None
+        except Exception:
+            raw_monsters = None
+        if not isinstance(raw_monsters, list) or not raw_monsters:
+            first = self.monster() or {}
+            raw_monsters = [{**first, "id": 0, "hp": self.monster_hp, "hp_max": first.get("hp", 0)}]
+        monsters = [
+            {
+                "id": m.get("id", i),
+                "name": m.get("name"),
+                "slug": m.get("slug"),
+                "hp": m.get("hp", 0),
+                "hp_max": m.get("hp_max", m.get("hp", 0)),
+                "level": m.get("level"),
+                "archetype": m.get("archetype"),
+                "boss": bool(m.get("boss")),
+                "alive": int(m.get("hp", 0) or 0) > 0,
+            }
+            for i, m in enumerate(raw_monsters)
+        ]
+
+        try:
             initiative = json.loads(self.initiative_json) if self.initiative_json else []
         except Exception:
             initiative = []
@@ -464,6 +486,10 @@ class CombatSession(db.Model):
         return {
             "id": self.id,
             "status": self.status,
+            # Every combatant monster. `monster`/`monster_hp`/`monster_max_hp`
+            # below stay as the first entry so clients written against the
+            # single-monster shape keep working while the screen catches up.
+            "monsters": monsters,
             "monster": self.monster(),
             "monster_hp": self.monster_hp,
             "monster_max_hp": self.monster().get("hp", 0),

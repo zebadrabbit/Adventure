@@ -132,13 +132,21 @@ with app.app_context():
     if ch is None:
         raise SystemExit(f"no character {char_id}")
 
-    monster = {
-        "slug": "e2e-item-panel-mob", "name": "Panel Test Mob", "level": 1,
-        "hp": 999, "damage": 1, "armor": 0, "speed": 1, "rarity": "common",
-        "family": "test", "traits": [], "resistances": {}, "damage_types": [],
-        "loot_table": "", "special_drop_slug": None, "xp": 1, "boss": False,
-    }
-    session = combat_service.start_session(ch.user_id, monster)
+    def _mob(name):
+        return {
+            "slug": "e2e-item-panel-mob", "name": name, "level": 1,
+            "hp": 999, "damage": 1, "armor": 0, "speed": 1, "rarity": "common",
+            "family": "test", "traits": [], "resistances": {}, "damage_types": [],
+            "loot_table": "", "special_drop_slug": None, "xp": 1, "boss": False,
+        }
+
+    # argv[2], when given, is how many monsters the encounter fields.
+    count = int(sys.argv[2]) if len(sys.argv) > 2 else 1
+    if count > 1:
+        monsters = [_mob(f"Panel Test Mob {i + 1}") for i in range(count)]
+    else:
+        monsters = _mob("Panel Test Mob")
+    session = combat_service.start_session(ch.user_id, monsters)
 
     initiative = json.loads(session.initiative_json)
     idx = next(
@@ -152,12 +160,12 @@ with app.app_context():
 """
 
 
-def _seed_combat_with_potion(char_id, slug="potion-healing", qty=3):
+def _seed_combat_with_potion(char_id, slug="potion-healing", qty=3, monsters=1):
     """Seed a stack of slug into char_id's bag (via the existing
     _seed_potions helper) and start a live combat session for their party,
-    forced to already be their turn."""
+    forced to already be their turn. ``monsters`` fields a pack."""
     _seed_potions(char_id, slug=slug, qty=qty)
-    result = _run_seed(_SEED_COMBAT_START_SCRIPT, char_id)
+    result = _run_seed(_SEED_COMBAT_START_SCRIPT, char_id, monsters)
     result["slug"] = slug
     result["qty"] = qty
     return result
@@ -720,3 +728,41 @@ def test_csrf_guard_rejects_bare_mutation(page):
         headers={"Content-Type": "application/json"},
     )
     assert resp.status == 403, f"expected csrf_rejected 403, got {resp.status}"
+
+
+def test_a_pack_is_listed_and_can_be_targeted(page):
+    """Phase 1's whole point: several enemies on screen, and a choice of which
+    to hit.
+
+    The enemy list is deliberately hidden for a single-monster encounter, so
+    the existing combat test above cannot cover it -- this seeds a real pack.
+    Both assertions matter: that all three render with their own HP, and that
+    choosing one puts its id in the request. Without the second, the list would
+    be decoration and every swing would still land on whoever the server picked.
+    """
+    page.set_viewport_size({"width": 1366, "height": 768})
+    page.goto(f"{BASE_URL}/adventure")
+    page.wait_for_load_state("networkidle")
+
+    char_id = page.evaluate("() => document.querySelector('.adv-party-rail .adv-frame-open')?.dataset.charId")
+    assert char_id, "no deployed party member to seed a combat session for"
+
+    seeded = _seed_combat_with_potion(char_id, slug="potion-healing", qty=1, monsters=3)
+
+    page.goto(f"{BASE_URL}/combat/{seeded['combat_id']}")
+    page.wait_for_load_state("networkidle")
+
+    rows = page.locator("#enemy-list .enemy-row")
+    rows.first.wait_for(state="visible", timeout=5000)
+    assert rows.count() == 3, f"the pack did not render as three enemies: {rows.count()}"
+
+    # Target the third, then attack: the request must name it.
+    third = rows.nth(2)
+    monster_id = third.get_attribute("data-monster-id")
+    third.click()
+    assert third.get_attribute("aria-checked") == "true", "clicking an enemy did not select it"
+
+    with page.expect_request(lambda r: r.url.endswith("/attack") and r.method == "POST") as req_info:
+        page.click(".btn-combat-attack")
+    body = json.loads(req_info.value.post_data)
+    assert body.get("target_id") == int(monster_id), f"the attack ignored the chosen target: {body}"

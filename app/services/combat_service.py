@@ -1636,6 +1636,19 @@ def monster_auto_turn(session: CombatSession):
         return
     if not _is_monster_turn(session):
         return
+    # Whichever monster holds this initiative slot -- not monsters[0]. `acting`
+    # is an element of `monsters`, so mutating it and calling _save_monsters
+    # persists; that is why the list is fetched once here rather than per write.
+    monsters = _monsters(session)
+    _actor = _active_actor(session)
+    acting = _monster_ref(monsters, _actor.get("id")) if _actor else None
+    if acting is None:
+        # The initiative slot names a monster this session no longer has.
+        # Advance rather than stall, or nobody can drive the turn.
+        _advance_turn(session)
+        db.session.commit()
+        _emit_session("combat_update", session)
+        return
     party = json.loads(session.party_snapshot_json or "{}") or {}
     # Cooldown gate: if monster_ai.cooldown_turns > 0 and last action turn stored in monster['last_turn'] >= current - (cooldown-1), skip action
     try:
@@ -1650,7 +1663,7 @@ def monster_auto_turn(session: CombatSession):
             if isinstance(cfg_obj, dict):
                 cooldown_turns = int(cfg_obj.get("cooldown_turns", 0))
         if cooldown_turns > 0:
-            monster_preview = session.monster() or {}
+            monster_preview = acting
             last_turn = monster_preview.get("last_turn")
             if isinstance(last_turn, int) and session.combat_turn - last_turn < cooldown_turns:
                 _append_log(session, f"{monster_preview.get('name')} waits (cooldown).", code=MONSTER_COOLDOWN_WAIT)
@@ -1667,7 +1680,7 @@ def monster_auto_turn(session: CombatSession):
     if not members:
         # No viable targets; log an explicit wait so client sees monster acted
         try:
-            monster_preview = session.monster() or {}
+            monster_preview = acting
             _append_log(
                 session, f"{monster_preview.get('name','Monster')} waits (no targets).", code=MONSTER_NO_TARGET_WAIT
             )
@@ -1681,7 +1694,7 @@ def monster_auto_turn(session: CombatSession):
         m.setdefault("effects", [])
     _default_idx, _default_target = _pick_monster_target(members)
     target = _default_target if _default_target is not None else members[0]
-    monster = session.monster() or {}
+    monster = acting
     # Start-of-turn effects for monster (e.g., poison on monster)
     monster.setdefault("effects", [])
     start_logs = []
@@ -1692,7 +1705,7 @@ def monster_auto_turn(session: CombatSession):
     for msg in start_logs:
         _append_log(session, msg)
     # If monster died to DoT before acting
-    if (session.monster_hp is not None and session.monster_hp <= 0) or monster.get("hp", session.monster_hp) <= 0:
+    if int(monster.get("hp", 0) or 0) <= 0:
         _advance_turn(session)
         _check_end(session)
         db.session.commit()
@@ -1740,7 +1753,7 @@ def monster_auto_turn(session: CombatSession):
                 for log in logs:
                     _append_log(session, log)
                 session.party_snapshot_json = json.dumps(party)
-                session.monster_json = json.dumps(monster)
+                _save_monsters(session, monsters)
                 _advance_turn(session)
                 _check_end(session)
                 db.session.commit()
@@ -1751,7 +1764,7 @@ def monster_auto_turn(session: CombatSession):
                 logs = boss_abilities.execute_boss_buff(monster)
                 for log in logs:
                     _append_log(session, log)
-                session.monster_json = json.dumps(monster)
+                _save_monsters(session, monsters)
                 _advance_turn(session)
                 _check_end(session)
                 db.session.commit()
@@ -1762,7 +1775,7 @@ def monster_auto_turn(session: CombatSession):
                 logs = boss_abilities.execute_boss_heal(monster)
                 for log in logs:
                     _append_log(session, log)
-                session.monster_json = json.dumps(monster)
+                _save_monsters(session, monsters)
                 _advance_turn(session)
                 _check_end(session)
                 db.session.commit()
@@ -1773,7 +1786,7 @@ def monster_auto_turn(session: CombatSession):
                 logs = boss_abilities.execute_boss_summon(monster, session)
                 for log in logs:
                     _append_log(session, log)
-                session.monster_json = json.dumps(monster)
+                _save_monsters(session, monsters)
                 _advance_turn(session)
                 _check_end(session)
                 db.session.commit()
@@ -1876,9 +1889,8 @@ def monster_auto_turn(session: CombatSession):
             damage_track = {"to_party": {target.get("char_id"): {"amount": 0, "is_miss": True, "is_critical": False}}}
             session.last_damage_json = json.dumps(damage_track)
             try:
-                monster_data = session.monster() or {}
-                monster_data["last_turn"] = session.combat_turn
-                session.monster_json = json.dumps(monster_data)
+                acting["last_turn"] = session.combat_turn
+                _save_monsters(session, monsters)
             except Exception:
                 logger.debug("suppressed_exception", where="monster_auto_turn", exc_info=True)
             _advance_turn(session)
@@ -1896,9 +1908,8 @@ def monster_auto_turn(session: CombatSession):
             damage_track = {"to_party": {target.get("char_id"): {"amount": 0, "is_miss": True, "is_critical": False}}}
             session.last_damage_json = json.dumps(damage_track)
             try:
-                monster_data = session.monster() or {}
-                monster_data["last_turn"] = session.combat_turn
-                session.monster_json = json.dumps(monster_data)
+                acting["last_turn"] = session.combat_turn
+                _save_monsters(session, monsters)
             except Exception:
                 logger.debug("suppressed_exception", where="monster_auto_turn", exc_info=True)
             _advance_turn(session)
@@ -1934,9 +1945,8 @@ def monster_auto_turn(session: CombatSession):
     # (already coded above - kept for clarity)
     # Persist last action turn onto monster JSON so cooldown can reference next cycle
     try:
-        monster_data = session.monster() or {}
-        monster_data["last_turn"] = session.combat_turn
-        session.monster_json = json.dumps(monster_data)
+        acting["last_turn"] = session.combat_turn
+        _save_monsters(session, monsters)
     except Exception:
         logger.debug("suppressed_exception", where="monster_auto_turn", exc_info=True)
     # Monster completes its action; advance to next turn via end phase progression
@@ -2410,12 +2420,23 @@ def _auto_progress_monster_after_player(session: CombatSession) -> CombatSession
             return session
         # Ensure we have latest DB state before deciding (commit already done by caller)
         db.session.refresh(session)
-        if _is_monster_turn(session):
+        # Loop, don't run one: with a pack, two monsters can hold adjacent
+        # initiative slots, and running only the first leaves the client waiting
+        # on a turn nobody drives. Bounded by the initiative length -- a monster
+        # path that failed to advance would otherwise make this an infinite
+        # HTTP request, which is worse than a stalled turn.
+        try:
+            rounds = len(json.loads(session.initiative_json or "[]")) or 1
+        except Exception:
+            rounds = 1
+        for _ in range(rounds):
+            if session.status != "active" or not _is_monster_turn(session):
+                break
             monster_auto_turn(session)  # commits & emits internally
-            # Reload to pick up monster action effects
             refreshed = _load_session(session.id)
-            if refreshed:
-                return refreshed
+            if not refreshed:
+                break
+            session = refreshed
     except Exception:
         logger.debug("suppressed_exception", where="_auto_progress_monster_after_player", exc_info=True)
     return session

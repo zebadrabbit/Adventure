@@ -71,6 +71,10 @@
                         </div>
                     </div>
                     <div id="monster-traits" class="monster-traits flex-grow-1"></div>
+                    {# The pack. Hidden while an encounter holds a single
+                       monster, so a 1v4 fight reads exactly as it always did;
+                       combat.js unhides it from state.monsters.length. #}
+                    <div id="enemy-list" class="enemy-list" role="radiogroup" aria-label="Choose a target" hidden></div>
                 </div>
             </div>
         </div>

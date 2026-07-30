@@ -663,3 +663,72 @@ a:hover {
     color: var(--ui-text-dim);
     font-style: italic;
 }
+
+/* The pack. Hidden entirely for a single-monster encounter -- combat.js only
+   unhides this when state.monsters holds more than one -- so the 1v1 screen is
+   untouched. Rows are buttons because choosing a target is an action, and the
+   group carries role="radiogroup": exactly one target is selected at a time.
+   Deliberately plain: this screen loads glass-theme.css in its {% block head %}
+   (a documented wart, DESIGN_SYSTEM.md), whose `!important` rules beat ordinary
+   declarations regardless of order, so nothing here relies on winning a
+   cascade fight with it. */
+.enemy-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.enemy-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px var(--space-2);
+    width: 100%;
+    padding: var(--space-1) var(--space-2);
+    text-align: left;
+    background: var(--surface-overlay);
+    border: 1px solid var(--edge);
+    border-radius: var(--radius);
+    color: var(--ink);
+    font-size: var(--text-xs);
+}
+
+.enemy-row:hover:not(:disabled) {
+    border-color: var(--edge-strong);
+}
+
+.enemy-row:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+/* The target reads as selected without colour alone carrying it: the left rule
+   is a second, non-chromatic cue. */
+.enemy-row.is-target {
+    border-color: var(--accent);
+    border-left-width: 3px;
+}
+
+.enemy-row.is-dead {
+    opacity: 0.45;
+}
+
+.enemy-row-hp {
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-muted);
+}
+
+.enemy-row-track {
+    grid-column: 1 / -1;
+    height: 3px;
+    background: var(--surface-sunken);
+}
+
+.enemy-row-fill {
+    display: block;
+    height: 100%;
+    background: var(--danger);
+}
+
+.enemy-row.is-dead .enemy-row-fill {
+    background: var(--ink-muted);
+}

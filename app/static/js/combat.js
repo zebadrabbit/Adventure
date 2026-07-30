@@ -362,20 +362,80 @@
         latestHighlightNode = node;
     }
 
+    // --- The pack ----------------------------------------------------------
+    // Which monster the next offensive action names. Null means "the server
+    // picks", which is what every action did before targeting existed and is
+    // still the right answer for a single-monster fight.
+    let selectedTargetId = null;
+    const enemyListEl = document.getElementById('enemy-list');
+
+    function renderEnemyList(monsters) {
+        if (!enemyListEl) return;
+        // One monster is the old encounter: no list, no target picker.
+        if (!monsters || monsters.length < 2) {
+            enemyListEl.hidden = true;
+            enemyListEl.innerHTML = '';
+            return;
+        }
+        enemyListEl.hidden = false;
+        enemyListEl.innerHTML = monsters.map(mon => {
+            const max = mon.hp_max || 0;
+            const pct = max > 0 ? Math.max(0, Math.min(100, (mon.hp / max) * 100)) : 0;
+            const dead = !mon.alive;
+            const selected = mon.id === selectedTargetId && !dead;
+            return `
+<button type="button" class="enemy-row${dead ? ' is-dead' : ''}${selected ? ' is-target' : ''}"
+        role="radio" aria-checked="${selected ? 'true' : 'false'}" data-monster-id="${mon.id}"
+        ${dead ? 'disabled aria-disabled="true"' : ''}>
+    <span class="enemy-row-name">${escapeHtml(mon.name || 'Monster')}</span>
+    <span class="enemy-row-hp">${dead ? 'slain' : mon.hp + ' / ' + max}</span>
+    <span class="enemy-row-track"><span class="enemy-row-fill" style="width:${pct}%"></span></span>
+</button>`;
+        }).join('');
+    }
+
+    function escapeHtml(str) {
+        return String(str).replace(/[&<>"']/g, c => (
+            { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+        ));
+    }
+
+    // Delegated: the list is replaced wholesale on every render.
+    if (enemyListEl) {
+        enemyListEl.addEventListener('click', (e) => {
+            const row = e.target.closest('.enemy-row');
+            if (!row || row.disabled) return;
+            selectedTargetId = Number(row.dataset.monsterId);
+            enemyListEl.querySelectorAll('.enemy-row').forEach(el => {
+                const on = Number(el.dataset.monsterId) === selectedTargetId;
+                el.classList.toggle('is-target', on);
+                el.setAttribute('aria-checked', on ? 'true' : 'false');
+            });
+        });
+    }
+
     function render(state) {
         if (!state) return;
         if (typeof state.version === 'number') {
             if (state.version < lastRenderedVersion) return; // stale/out-of-order — ignore
             lastRenderedVersion = state.version;
         }
-        const m = state.monster || {};
+        const monsters = Array.isArray(state.monsters) && state.monsters.length ? state.monsters : null;
+        // The header keeps showing one monster: whichever is targeted, so the
+        // big HP bar tracks what your next swing will hit. With a single
+        // monster that is the same thing it always showed.
+        const focus = monsters ? (monsters.find(x => x.id === selectedTargetId && x.alive)
+            || monsters.find(x => x.alive) || monsters[0]) : null;
+        if (focus) selectedTargetId = focus.id;
+        const m = focus || state.monster || {};
         monsterNameEl.textContent = m.name || 'Monster';
         monsterLevelEl.textContent = 'Lv ' + (m.level || '?');
-        const maxHp = state.monster_max_hp || m.hp || 0;
-        const curHp = state.monster_hp ?? maxHp;
+        const maxHp = focus ? (focus.hp_max || 0) : (state.monster_max_hp || m.hp || 0);
+        const curHp = focus ? (focus.hp ?? 0) : (state.monster_hp ?? maxHp);
         const pct = maxHp > 0 ? Math.max(0, Math.min(100, (curHp / maxHp) * 100)) : 0;
         monsterHpBar.style.width = pct + '%';
         if (monsterHpText) monsterHpText.textContent = curHp + ' / ' + maxHp;
+        renderEnemyList(monsters);
 
         // Show damage if HP changed
         if (window.combatEffects && state.last_damage_to_monster) {
@@ -654,6 +714,10 @@
     async function doAction(action, version, actorId, slug) {
         let endpoint;
         let payload = { version: version, actor_id: actorId };
+        // Null means "the server picks the first living monster", which is what
+        // every action did before targeting existed -- so a single-monster
+        // fight sends exactly the payload it always did.
+        if (selectedTargetId !== null) payload.target_id = selectedTargetId;
         let spellType = null;
 
         if (action === 'attack') endpoint = '/api/combat/' + combatId + '/attack';
@@ -764,7 +828,11 @@
             const r = await fetch(`/api/combat/${combatId}/cast_skill`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ version: version, actor_id: actorId, skill_id: skillId }),
+                body: JSON.stringify(
+                    selectedTargetId === null
+                        ? { version: version, actor_id: actorId, skill_id: skillId }
+                        : { version: version, actor_id: actorId, skill_id: skillId, target_id: selectedTargetId }
+                ),
             });
             const j = await r.json();
             if (j.state) {
