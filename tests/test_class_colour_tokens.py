@@ -134,14 +134,80 @@ def test_the_runtime_injector_is_gone():
 # sweep, and glass-theme.css's six `!important` gradients got through the
 # unification sweep -- live on /combat, because combat.html:127 loads the
 # "admin and account" dialect in `{% block head %}`, i.e. after theme.css.
-# Neither was findable by grepping tokens.css. These two tests are.
+# Neither was findable by grepping tokens.css. The three tests below are.
 
 CSS_DIR = TOKENS.parent
-# The properties through which a class colour can actually reach the screen.
-COLOUR_PROPS = {"background", "background-color", "color", "border", "border-color"}
+
+# Every property through which a colour can reach a badge. `background-image`
+# and `-webkit-text-fill-color` are here because they are the same class of
+# bypass as `background` and `color`: the deleted glass-theme block did its
+# damage through a `linear-gradient()`, i.e. background-image.
+_SIDES = ("top", "right", "bottom", "left")
+COLOUR_PROPS = (
+    {"background", "background-color", "background-image", "color", "-webkit-text-fill-color"}
+    | {"border", "border-color"}
+    | {f"border-{s}" for s in _SIDES}
+    | {f"border-{s}-color" for s in _SIDES}
+)
+# `border`/`border-<side>` shorthands may legitimately carry width and style
+# with no colour at all -- theme.css's `.class-badge { border: 1px solid }` is
+# correct, because it leaves the colour to `.<class>-badge`'s border-color.
+_BORDER_SHORTHANDS = {"border"} | {f"border-{s}" for s in _SIDES}
+_BORDER_KEYWORDS = {
+    "none",
+    "hidden",
+    "dotted",
+    "dashed",
+    "solid",
+    "double",
+    "groove",
+    "ridge",
+    "inset",
+    "outset",
+    "thin",
+    "medium",
+    "thick",
+}
+_LENGTH = re.compile(r"^[\d.]+(px|em|rem|%|pt|vw|vh)?$")
+
 _COMMENT = re.compile(r"/\*.*?\*/", re.S)
 _RULE = re.compile(r"([^{}]*)\{([^{}]*)\}", re.S)
 _CLASS_BADGE = re.compile(rf"\.({'|'.join(CLASSES)})-badge\b")
+# Bare `.class-badge` too. This is NOT optional: it is the shape the real defect
+# took. glass-theme.css set `.class-badge { border: 1px solid rgba(255,255,255,.3) }`,
+# and because the `border` shorthand writes border-*-color it beat every
+# `.<class>-badge { border-color: var(--class-*-border) }` on /combat -- greying
+# the ring for all twelve classes. A guard that only matched `.<class>-badge`
+# would have watched that happen.
+_BARE_CLASS_BADGE = re.compile(r"\.class-badge\b")
+
+# `.badge:where(:not(.class-badge))` mentions .class-badge in order to EXCLUDE
+# it -- the three specificity guards in theme.css/combat.css/dashboard.css all
+# look like this, and matching them would flag the very rules that protect class
+# badges. Strip the arguments of :not()/:where()/:is()/:has() before matching, so
+# only a genuine subject like `.class-badge:hover` counts. Applied repeatedly so
+# nesting collapses from the inside out.
+_FUNCTIONAL = re.compile(r":(?:not|where|is|has)\(([^()]*)\)")
+
+
+def _selector_subject(selector):
+    previous = None
+    while previous != selector:
+        previous = selector
+        selector = _FUNCTIONAL.sub("", selector)
+    return selector
+
+
+def _specifies_a_colour(prop, value):
+    """Does this declaration actually put a colour on the element?
+
+    Only the border shorthands are ambiguous; for every other property in
+    COLOUR_PROPS the presence of a value is itself a colour.
+    """
+    if prop not in _BORDER_SHORTHANDS:
+        return bool(value.strip())
+    remainder = [tok for tok in value.split() if tok.lower() not in _BORDER_KEYWORDS and not _LENGTH.match(tok)]
+    return bool(remainder)
 
 
 def _rules():
@@ -167,52 +233,76 @@ def _declarations(block):
 # source of class colour on disk but reaches no screen.
 EXEMPT_ORPHANS = {"tactical-theme.css"}
 TEMPLATES = TOKENS.parents[2] / "templates"
+_IMPORT = re.compile(r"""@import\s+url\(\s*["']?([A-Za-z0-9_.-]+\.css)""")
 
 
-def _stylesheets_templates_load():
-    refs = set()
+def _reachable_stylesheets():
+    """Every stylesheet that can reach a browser, transitively.
+
+    A `<link>` in a template is not the only way in: app.css already pulls in
+    hoard-ui.css and dungeon-config.css with `@import`, and app.css loads on
+    every page. So `@import url("tactical-theme.css")` in any reachable file
+    would make the exempt palette live without a template changing at all.
+    Following imports is what makes the exemption below honest.
+    """
+    direct = set()
     for path in TEMPLATES.rglob("*.html"):
-        refs.update(re.findall(r"css/([A-Za-z0-9_-]+\.css)", path.read_text()))
-    return refs
+        direct.update(re.findall(r"css/([A-Za-z0-9_.-]+\.css)", path.read_text()))
+
+    imports = {p.name: set(_IMPORT.findall(p.read_text())) for p in CSS_DIR.glob("*.css")}
+
+    seen, queue = set(), list(direct)
+    while queue:
+        name = queue.pop()
+        if name in seen:
+            continue
+        seen.add(name)
+        queue.extend(imports.get(name, ()))
+    return seen
 
 
 def test_no_stylesheet_sets_a_class_badge_colour_outside_the_tokens():
-    """Every per-class badge colour must be a var(--class-*), in any file.
+    """Every class badge colour must be a var(--class-*), in any file.
 
-    A `.rogue-badge { background: <a literal> }` anywhere in app/static/css is
-    a second palette by definition, whatever file it hides in.
+    A `.rogue-badge { background: <a literal> }` -- or a `.class-badge` rule
+    that sets a colour through any property at all -- is a second palette by
+    definition, whatever file it hides in. Files in EXEMPT_ORPHANS are excused
+    only while unreachable; the test below enforces that.
     """
-    offenders = {}
+    offenders = []
     for path, selector, block in _rules():
-        if not _CLASS_BADGE.search(selector):
+        if path.name in EXEMPT_ORPHANS:
+            continue
+        subject = _selector_subject(selector)
+        if not (_CLASS_BADGE.search(subject) or _BARE_CLASS_BADGE.search(subject)):
             continue
         for prop, value in _declarations(block):
-            if prop in COLOUR_PROPS and "var(--class-" not in value:
-                offenders.setdefault(path.name, []).append(f"{selector} {{ {prop}: {value} }}")
+            if prop in COLOUR_PROPS and _specifies_a_colour(prop, value) and "var(--class-" not in value:
+                offenders.append(f"{path.name}: {selector} {{ {prop}: {value} }}")
 
-    live = [f"{name}: {d}" for name, decls in offenders.items() if name not in EXEMPT_ORPHANS for d in decls]
-    assert not live, "class badge colour not read from a token:\n  " + "\n  ".join(live)
-
-    unexpected = sorted(set(offenders) - EXEMPT_ORPHANS - _stylesheets_templates_load())
-    assert not unexpected, f"new orphan carrying a class palette (delete it or add it to EXEMPT_ORPHANS): {unexpected}"
+    assert not offenders, "class badge colour not read from a token:\n  " + "\n  ".join(offenders)
 
 
 def test_the_exempt_orphans_are_still_unreachable():
-    """The exemption above is conditional on the file reaching no screen. If a
-    template starts loading it, it becomes a live second palette -- which is
+    """The exemption is conditional on the file reaching no screen. The moment
+    something links or @imports it, its palette is live again -- which is
     precisely how glass-theme.css's six `!important` gradients ended up on
     /combat while being documented as the admin-and-account dialect."""
-    loaded = _stylesheets_templates_load()
-    linked = sorted(EXEMPT_ORPHANS & loaded)
-    assert not linked, f"exempt orphan is now loaded by a template, so its palette is live again: {linked}"
+    linked = sorted(EXEMPT_ORPHANS & _reachable_stylesheets())
+    assert not linked, (
+        "exempt orphan is reachable again (a template <link> or an @import), so "
+        f"its class palette is live: {linked}. Delete the file or the reference."
+    )
 
 
 def test_no_class_badge_rule_uses_important():
     """`!important` is how the glass-theme block beat the tokens regardless of
     load order and specificity, so no amount of correct cascade could fix it."""
-    offenders = [
-        f"{path.name}: {selector}"
-        for path, selector, block in _rules()
-        if ("class-badge" in selector or _CLASS_BADGE.search(selector)) and "!important" in block
-    ]
+    offenders = []
+    for path, selector, block in _rules():
+        if path.name in EXEMPT_ORPHANS or "!important" not in block:
+            continue
+        subject = _selector_subject(selector)
+        if _CLASS_BADGE.search(subject) or _BARE_CLASS_BADGE.search(subject):
+            offenders.append(f"{path.name}: {selector}")
     assert not offenders, "!important in a class-badge rule:\n  " + "\n  ".join(offenders)

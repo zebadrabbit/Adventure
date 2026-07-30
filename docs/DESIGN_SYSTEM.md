@@ -431,10 +431,16 @@ earlier version of this section listed them as live; they are not, and a
 
 Never hard-code a class colour at a call site — `tests/test_class_colour_tokens.py`
 enforces it: all twelve classes have a hue and derived `-bg/-fg/-border`, the
-derived values reference the hue rather than a hex literal, **no stylesheet
-anywhere sets a `.<class>-badge` colour outside `var(--class-*)` and none uses
-`!important`**, every hue clears 4.5:1 against both realm grounds, and no two
-classes sit close in both hue and lightness.
+derived values reference the hue rather than a hex literal, **no reachable
+stylesheet sets a `.class-badge` or `.<class>-badge` colour outside
+`var(--class-*)`, and none uses `!important`**, every hue clears 4.5:1 against
+both realm grounds, and no two classes sit close in both hue and lightness.
+
+One file is exempt: `tactical-theme.css` still carries six pre-token class
+rules, and is excused **only while it is unreachable** — no template `<link>`s
+it and nothing `@import`s it. The test follows both routes, so linking or
+importing it fails the suite rather than silently reviving a tenth palette.
+Deleting the file (it is already on the orphan list) removes the exemption.
 
 > **Known wart:** `combat.html` loads `glass-theme.css` in its `{% block head %}`,
 > which breaks the admin-and-account boundary stated above. That is how six

@@ -423,12 +423,18 @@ body {
    fell back to .class-badge's bare `border: 1px solid` (resolving to
    currentColor) with no fill at all. Neutral surface and ink rather than a
    thirteenth hue, so it reads as "unassigned" instead of as one more class.
-   equipment.css:308's .eq-class-bg-adventurer is the same fallback for the
-   header strip; this is its badge counterpart. */
+   equipment.css:317's .eq-class-bg-adventurer is the same fallback for the
+   header strip; this is its badge counterpart.
+
+   --edge-strong rather than --edge for the ring: against this fill --edge is
+   1.12:1 (town) / 1.27:1 (dungeon), i.e. invisible, where the twelve class
+   rings sit at 2.22-3.67:1. --edge-strong lands at 2.54:1 / 2.69:1, inside
+   that range, so the fallback reads as the same kind of object as the twelve
+   rather than as a badge someone forgot to outline. */
 .adventurer-badge {
     background: var(--surface-raised);
     color: var(--ink);
-    border-color: var(--edge);
+    border-color: var(--edge-strong);
 }
 
 .operative-body {
