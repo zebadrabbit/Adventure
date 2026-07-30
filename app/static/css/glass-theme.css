@@ -232,51 +232,33 @@
    CLASS BADGES
    ======================================== */
 
+/* SHAPE ONLY — no colour. Six per-class rules used to live here, each an
+   `!important` gradient for fighter/mage/rogue/cleric/ranger/druid. They were
+   an eighth source of class colour and they beat tokens.css on /combat, which
+   loads this file in `{% block head %}` (combat.html:127) — i.e. AFTER
+   theme.css — so a Rogue's badge was a yellow gradient there and slate violet
+   on the dashboard. Deleted; the twelve token-derived rules in theme.css are
+   the only source now.
+
+   `border-width`/`border-style` rather than the `border` shorthand: the
+   shorthand set border-*-color to translucent white, and at equal specificity
+   (0,1,0) loading after theme.css it beat `.<class>-badge`'s
+   `border-color: var(--class-*-border)` for all twelve classes, greying the
+   ring around a token-coloured fill. Naming only the two non-colour longhands
+   leaves the token ring to win.
+
+   Nothing in admin or account renders `.class-badge` (only dashboard.html,
+   adventure.html, combat.html and dashboard-lobby.js do), so this whole
+   section only ever affected /combat. */
 .class-badge {
-    /* Base styling - specific class colors defined below */
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-width: 1px;
+    border-style: solid;
     padding: 0.35rem 0.75rem;
     font-weight: 600;
     font-size: 0.75rem;
     border-radius: 6px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-}
-
-/* Fighter - Brown */
-.fighter-badge {
-    background: linear-gradient(135deg, rgba(120, 80, 40, 0.8), rgba(90, 60, 30, 0.8)) !important;
-    color: #fff !important;
-}
-
-/* Mage - Blue */
-.mage-badge {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.8), rgba(37, 99, 235, 0.8)) !important;
-    color: #fff !important;
-}
-
-/* Rogue - Yellow */
-.rogue-badge {
-    background: linear-gradient(135deg, rgba(234, 179, 8, 0.8), rgba(202, 138, 4, 0.8)) !important;
-    color: #1f2937 !important;
-}
-
-/* Cleric - White */
-.cleric-badge {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(229, 231, 235, 0.9)) !important;
-    color: #1f2937 !important;
-}
-
-/* Ranger - Green */
-.ranger-badge {
-    background: linear-gradient(135deg, rgba(34, 197, 94, 0.8), rgba(22, 163, 74, 0.8)) !important;
-    color: #fff !important;
-}
-
-/* Druid - Orange */
-.druid-badge {
-    background: linear-gradient(135deg, rgba(249, 115, 22, 0.8), rgba(234, 88, 12, 0.8)) !important;
-    color: #fff !important;
 }
 
 /* ========================================

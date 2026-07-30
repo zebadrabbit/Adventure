@@ -66,7 +66,7 @@ body {
 }
 
 /* Badge styling. :where(:not(.class-badge)) -- same reason as the exclusion
-   in theme.css (:237) and combat.css (:551): an unscoped .badge here would
+   in theme.css (:243) and combat.css (:554): an unscoped .badge here would
    tie the specificity of the single-class .fighter-badge/.warlock-badge/etc
    rules, and this file loads after theme.css, so it would win and silently
    flatten a class badge's background/border back to translucent grey

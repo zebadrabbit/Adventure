@@ -37,6 +37,11 @@ CLASSES = [
 ]
 
 # The two realm grounds a class colour must be legible against.
+# NOTE: these are hardcoded, but only the cold one is fixed in tokens.css.
+# --class-*-bg derives from --realm-bg, which in the town realm is --ui-bg --
+# and app/models/theme.py:132 overwrites --ui-bg from Theme.body_bg at runtime.
+# Every seeded theme is dark, so nothing fails today, but the guarantee below is
+# scoped to the DEFAULT town ground; it is not unconditional across all themes.
 GROUNDS = {"warm": "#0f0c09", "cold": "#0b0d11"}
 CONTRAST_FLOOR = 4.5
 
@@ -120,3 +125,94 @@ def test_the_runtime_injector_is_gone():
     assert not (root / "app" / "static" / "css" / "classes.css").exists(), "orphaned classes.css still present"
     assert "CLASS_COLORS" not in (root / "app" / "routes" / "config_api.py").read_text()
     assert "class_colors" not in (root / "app" / "static" / "js" / "adventure.js").read_text()
+
+
+# --- No stylesheet may be a second source ----------------------------------
+# The three tests above all read tokens.css, so they say nothing about what the
+# other 20-odd stylesheets do. That is exactly how two sources survived two
+# audits: theme.css's twelve hardcoded badge rules got through the original
+# sweep, and glass-theme.css's six `!important` gradients got through the
+# unification sweep -- live on /combat, because combat.html:127 loads the
+# "admin and account" dialect in `{% block head %}`, i.e. after theme.css.
+# Neither was findable by grepping tokens.css. These two tests are.
+
+CSS_DIR = TOKENS.parent
+# The properties through which a class colour can actually reach the screen.
+COLOUR_PROPS = {"background", "background-color", "color", "border", "border-color"}
+_COMMENT = re.compile(r"/\*.*?\*/", re.S)
+_RULE = re.compile(r"([^{}]*)\{([^{}]*)\}", re.S)
+_CLASS_BADGE = re.compile(rf"\.({'|'.join(CLASSES)})-badge\b")
+
+
+def _rules():
+    """(path, selector, declarations) for every flat rule in app/static/css."""
+    for path in sorted(CSS_DIR.glob("*.css")):
+        text = _COMMENT.sub("", path.read_text())
+        for match in _RULE.finditer(text):
+            yield path, match.group(1).strip(), match.group(2)
+
+
+def _declarations(block):
+    for chunk in block.split(";"):
+        prop, _, value = chunk.partition(":")
+        if value:
+            yield prop.strip().lower(), value.strip()
+
+
+# Orphaned stylesheets that still carry a pre-token class palette. Exempt ONLY
+# for as long as no template loads them -- test_the_exempt_orphans_are_still_
+# unreachable below enforces that, so linking one turns this exemption back into
+# a failure. tactical-theme.css (688 lines, six classes, hardcoded hexes) is
+# already marked for deletion in DESIGN_SYSTEM.md's orphan table; it is a ninth
+# source of class colour on disk but reaches no screen.
+EXEMPT_ORPHANS = {"tactical-theme.css"}
+TEMPLATES = TOKENS.parents[2] / "templates"
+
+
+def _stylesheets_templates_load():
+    refs = set()
+    for path in TEMPLATES.rglob("*.html"):
+        refs.update(re.findall(r"css/([A-Za-z0-9_-]+\.css)", path.read_text()))
+    return refs
+
+
+def test_no_stylesheet_sets_a_class_badge_colour_outside_the_tokens():
+    """Every per-class badge colour must be a var(--class-*), in any file.
+
+    A `.rogue-badge { background: <a literal> }` anywhere in app/static/css is
+    a second palette by definition, whatever file it hides in.
+    """
+    offenders = {}
+    for path, selector, block in _rules():
+        if not _CLASS_BADGE.search(selector):
+            continue
+        for prop, value in _declarations(block):
+            if prop in COLOUR_PROPS and "var(--class-" not in value:
+                offenders.setdefault(path.name, []).append(f"{selector} {{ {prop}: {value} }}")
+
+    live = [f"{name}: {d}" for name, decls in offenders.items() if name not in EXEMPT_ORPHANS for d in decls]
+    assert not live, "class badge colour not read from a token:\n  " + "\n  ".join(live)
+
+    unexpected = sorted(set(offenders) - EXEMPT_ORPHANS - _stylesheets_templates_load())
+    assert not unexpected, f"new orphan carrying a class palette (delete it or add it to EXEMPT_ORPHANS): {unexpected}"
+
+
+def test_the_exempt_orphans_are_still_unreachable():
+    """The exemption above is conditional on the file reaching no screen. If a
+    template starts loading it, it becomes a live second palette -- which is
+    precisely how glass-theme.css's six `!important` gradients ended up on
+    /combat while being documented as the admin-and-account dialect."""
+    loaded = _stylesheets_templates_load()
+    linked = sorted(EXEMPT_ORPHANS & loaded)
+    assert not linked, f"exempt orphan is now loaded by a template, so its palette is live again: {linked}"
+
+
+def test_no_class_badge_rule_uses_important():
+    """`!important` is how the glass-theme block beat the tokens regardless of
+    load order and specificity, so no amount of correct cascade could fix it."""
+    offenders = [
+        f"{path.name}: {selector}"
+        for path, selector, block in _rules()
+        if ("class-badge" in selector or _CLASS_BADGE.search(selector)) and "!important" in block
+    ]
+    assert not offenders, "!important in a class-badge rule:\n  " + "\n  ".join(offenders)

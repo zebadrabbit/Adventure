@@ -234,10 +234,13 @@ body {
     letter-spacing: 0.5px;
 }
 
-/* :not(.class-badge): this 2-class selector's specificity otherwise always
-   beats the single-class .fighter-badge/.warlock-badge/etc rules below,
-   flattening every class badge to this generic accent color. */
-.panel-header .badge:not(.class-badge) {
+/* :where(:not(.class-badge)): this selector otherwise always beats the
+   single-class .fighter-badge/.warlock-badge/etc rules below, flattening every
+   class badge to this generic accent colour. :where() rather than a bare
+   :not() so the exclusion costs no specificity — see dashboard.css (:68) for
+   the full reasoning; a bare :not() carries its argument's specificity and
+   raises the rule a level for no benefit. */
+.panel-header .badge:where(:not(.class-badge)) {
     font-family: var(--ui-font);
     font-size: 0.75rem;
     padding: 4px 10px;
@@ -412,6 +415,20 @@ body {
     background: var(--class-warlock-bg);
     color: var(--class-warlock-fg);
     border-color: var(--class-warlock-border);
+}
+
+/* Not a class — the absence of one. dungeon_api.py:2120 falls back to
+   "Adventurer" for a party member with no class and adventure.html:118
+   lowercases it into `adventurer-badge`, which matched nothing here: the badge
+   fell back to .class-badge's bare `border: 1px solid` (resolving to
+   currentColor) with no fill at all. Neutral surface and ink rather than a
+   thirteenth hue, so it reads as "unassigned" instead of as one more class.
+   equipment.css:308's .eq-class-bg-adventurer is the same fallback for the
+   header strip; this is its badge counterpart. */
+.adventurer-badge {
+    background: var(--surface-raised);
+    color: var(--ink);
+    border-color: var(--edge);
 }
 
 .operative-body {
