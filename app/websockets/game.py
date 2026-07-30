@@ -19,7 +19,6 @@ from flask_login import current_user
 from flask_socketio import emit, join_room, leave_room
 
 from app import db, socketio
-from app.models import DungeonEntity
 from app.models.dungeon_instance import DungeonInstance
 from app.routes.dungeon_api import advance_non_combat_time
 
@@ -201,45 +200,13 @@ def ws_dungeon_search_tile(_payload):  # pragma: no cover - thin wrapper over se
     emit("dungeon_search_result", resp)
 
 
-@socketio.on("dungeon_claim_loot", namespace="/game")
-def ws_dungeon_claim_loot(payload):  # pragma: no cover
-    entity_id = (payload or {}).get("entity_id")
-    if not isinstance(entity_id, int):
-        return _emit_error("invalid_entity_id")
-    dungeon_instance_id = session.get("dungeon_instance_id")
-    if not dungeon_instance_id:
-        return _emit_error("no_instance", code="no_instance")
-    instance = db.session.get(DungeonInstance, dungeon_instance_id)
-    if not instance:
-        return _emit_error("no_instance", code="no_instance")
-    row = db.session.get(DungeonEntity, entity_id)
-    if not row or row.instance_id != instance.id:
-        return _emit_error("not_found", code="not_found")
-    if row.type != "treasure":
-        return _emit_error("wrong_type", code="wrong_type")
-    from app.services import loot_service as _loot_service
-
-    # Minimal loot roll: treat treasure as chest using row.slug as key
-    items = _loot_service.roll_loot(row.slug or "treasure", rolls=1)
-    try:
-        db.session.delete(row)
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-        return _emit_error("db_error", code="db_error")
-    tick_val = None
-    patrol_resp = {}
-    try:
-        tick_val = advance_non_combat_time(instance, tick_amount=1, resp=patrol_resp)
-    except Exception:
-        pass
-    resp = {
-        "claimed": True,
-        "items": [i.to_dict() if hasattr(i, "to_dict") else getattr(i, "slug", str(i)) for i in items],
-        "count": len(items),
-    }
-    if tick_val is not None:
-        resp["game_tick"] = int(tick_val)
-    if "encounter" in patrol_resp:
-        resp["encounter"] = patrol_resp["encounter"]
-    emit("dungeon_claim_result", resp)
+# There is no ``dungeon_claim_loot`` handler here on purpose. One existed and
+# was deleted: it called ``roll_loot(row.slug, rolls=1)`` -- a str where the
+# signature wants a monster dict, plus a keyword the function does not take --
+# so it raised TypeError on every emit, and no shipped client ever emitted it.
+# Repairing the call would not have been enough: it also skipped the adjacency
+# check and the hidden-chest perception roll, ignored the per-entity
+# ``data.loot_table`` override, and deleted the chest without granting anything.
+# All of that already works, once, in ``dungeon.api_helpers.treasure``'s
+# ``claim_treasure_entity``, which the REST path uses. If a socket claim is
+# ever wanted, delegate to that -- do not re-implement it.

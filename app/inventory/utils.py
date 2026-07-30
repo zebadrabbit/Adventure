@@ -32,6 +32,7 @@ State categories:
 from __future__ import annotations
 
 import json
+import uuid
 from typing import Any, Dict, List, Tuple
 
 from app.models.models import GameConfig, Item
@@ -99,6 +100,30 @@ def add_item(inv: List[Dict[str, Any]], slug: str, qty: int = 1) -> List[Dict[st
             break
     else:  # not found
         inv.append({"slug": slug, "qty": qty})
+    return inv
+
+
+def add_gear_value(inv: List[Dict[str, Any]], value: Any) -> List[Dict[str, Any]]:
+    """Put a value taken out of a ``gear`` slot back into a bag list, in place.
+
+    Gear slots hold two shapes: a legacy slug string, or a procedural gear
+    instance dict. Only the first is an ``add_item`` argument. Handing it an
+    instance stores ``{"slug": {...}, "qty": 1}``, which ``load_inventory``
+    then discards on the next read because ``slug`` is not a str -- one click,
+    item gone. Instances go in verbatim, the shape ``load_inventory`` keeps.
+
+    Every path that unequips or swaps gear must come through here; three of
+    them each had their own unguarded ``add_item``/``append`` before this.
+    """
+    if isinstance(value, dict):
+        if not value.get("uid"):
+            # load_inventory keeps a dict only by its uid. Nothing in app/
+            # writes a slot value without one, but legacy rows may hold one,
+            # and appending it bare is the same silent loss as the bug above.
+            value = {**value, "uid": uuid.uuid4().hex[:12]}
+        inv.append(value)
+    elif isinstance(value, str) and value:
+        add_item(inv, value, 1)
     return inv
 
 

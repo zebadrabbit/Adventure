@@ -356,14 +356,12 @@ document.addEventListener('DOMContentLoaded', function () {
         card.classList.toggle('is-downed', Number(member.hp) <= 0);
 
         // Encumbrance is state, not a number: "you are slower" belongs on the
-        // frame, the weight belongs in the panel. It shares last-roll-line's
-        // row (.party-status-line) rather than opening its own -- that row's
-        // reserved height is already spent whether or not a roll message is
-        // showing, so painting the marker there costs the rail nothing. A
-        // badge in the header row was tried first and rejected: it measured
-        // fine but clipped in the browser once a real (long) class name sat
-        // next to it. The DEX penalty moves to a hover title so the badge
-        // text itself stays short.
+        // frame, the weight belongs in the panel. It gets its own row
+        // (.party-status-line), whose reserved height the rail budget already
+        // pays for whether or not a marker shows. A badge in the header row
+        // was tried first and rejected: it measured fine but clipped in the
+        // browser once a real (long) class name sat next to it. The DEX
+        // penalty moves to a hover title so the badge text itself stays short.
         const enc = member.encumbrance || {};
         const marker = card.querySelector('.frame-encumbrance');
         if (marker) {

@@ -96,40 +96,82 @@ misbehave today.
       to be — it was reachable only as a duplicate; the guard now accepts
       either key. Three tests pin the count against `roll_loot`'s real dual
       shape, including that a genuine `qty: 2` stays 2.
-- [ ] **`websockets/game.py:223` cannot open a treasure.** It calls
-      `roll_loot(row.slug or "treasure", rolls=1)` — a `str` where the
-      signature wants a `Dict`, plus a `rolls=` keyword the function does not
-      accept. The `TypeError` fires first, so that socket path raises on every
-      treasure open. Found while fixing the doubled grant; the REST treasure
-      path (`dungeon/api_helpers/treasure.py:129`) calls it correctly.
-- [ ] **`unequip_item` destroys a malformed gear value.** The legacy branch
-      (`inventory_api.py:577-581`) calls `add_item(inv, <dict>, 1)`, producing
-      `{"slug": {...}, "qty": 1}`, which `load_inventory` then discards because
-      `slug` is not a string. One click, item gone. The gear-slot migration was
-      hardened against exactly this shape; the live app path was not.
-- [ ] **`consume` has no HP clamp.** `inventory_api.py:626` adds HP without
-      capping at max, so drinking at full HP burns the potion for nothing — now
-      one click away in the bag grid, where a mis-click costs a potion.
-- [ ] **Server refusals are machine codes.** Only the in-combat lock
-      (`inventory_api.py:454`) sends a human `message`; the other ~10
-      (`item not equippable`, `bad_slot`, `not_in_inventory`, `empty slot`,
-      `item not in bag`, `not consumable`, …) are bare codes. The panel now
-      shows the player whatever it gets, so these are player-facing strings and
-      fall under the D&D-register rule.
-- [ ] **Resize-then-zoom snaps the camera off-centre.** `resizeCanvas` calls
-      `centerOnPlayer`, which writes `offsetX/Y` without syncing
-      `targetOffsetX/Y`, so the next zoom eases back toward the pre-resize
-      target. Pre-existing in kind — `onMouseMove` and `onWheel` diverge the
-      same way, so drag-then-zoom has always snapped.
-- [ ] **`adventure.js:842`'s `.character-card` selector is dead**, so the
-      per-character "last roll" readout has never worked on the party rail —
-      every roll silently takes the fallback above the log. Now load-bearing:
-      the encumbrance marker occupies that row, so repairing the selector means
-      re-measuring the rail budget. Warning comments are at both sites.
-- [ ] **The floating log collides with the zoom controls below a 705px viewport
-      height.** The log's ceiling is a constant ~421px, so it is outside the
-      768px design floor but reachable on a 768px physical screen once
-      scrollback fills.
+- [x] ~~**`websockets/game.py:223` cannot open a treasure.**~~ Deleted rather
+      than repaired. The handler called `roll_loot(row.slug, rolls=1)` — a
+      `str` where the signature wants a `Dict`, plus a keyword the function
+      does not accept — so it raised `TypeError` on every emit, and no shipped
+      client ever emitted it (`adventure.js` carried a note explaining why it
+      kept using REST). Repairing the call was not enough to be worth it: the
+      handler also skipped the adjacency check and the hidden-chest perception
+      roll, ignored the per-entity `data.loot_table` override, and deleted the
+      chest while granting nothing. All of that already works, once, in
+      `claim_treasure_entity`, which the REST path uses. The TypeError fired
+      before `db.session.delete`, so nothing was ever destroyed by it.
+- [x] ~~**`unequip_item` destroys a malformed gear value.**~~ It was worse than
+      filed: the branch named here is unreachable (nothing writes a uid-less
+      dict into `gear`, and `_serialize_gear_slot` renders no unequip button
+      for one), but two *click-reachable* siblings were destroying ordinary
+      items. Equipping a catalogue item over a looted one sent the instance
+      through `add_item(inv, <dict>, 1)` → `{"slug": {...}, "qty": 1}`, which
+      `load_inventory` drops; and the uid path appended a displaced legacy
+      slug string into a list of dicts, which `load_inventory`'s canonical
+      branch skips. Both are one click and the item is gone. Now one guard —
+      `add_gear_value` in `app/inventory/utils.py` — on all four paths, and
+      the uid path reads/writes through `load_inventory`/`dump_inventory`
+      instead of raw JSON, which removes the mixed-list hazard that made the
+      shapes diverge in the first place (and let it reuse `find_instance` /
+      `remove_instance`, which already existed unused).
+      `tests/test_gear_swap_preserves_items.py` pins all four; each was
+      confirmed to fail with the guard backed out.
+- [x] ~~**`consume` has no HP clamp.**~~ Already fixed by the potion-resolver
+      chunk — `consume_item` clamps both HP and MP against
+      `compute_hp_mana_max` and writes `mana`/`current_mana` together. The
+      *shrine* was the live residue and is fixed here: it read a `max_mana`
+      key only level-up ever writes, so it fell back to *current* mana and
+      restored `min(cur, cur + cur×pct)` — exactly nothing — and wrote only
+      the legacy `mana` key, so combat's `_derive_stats` discarded even that.
+      Now mirrors camp: computed cap, `current_mana`-first read, both keys
+      written, and a "resting can only help" floor.
+- [x] ~~**Server refusals are machine codes.**~~ Thirteen returns across
+      `equip_item`/`unequip_item`/`consume_item` now carry a player-facing
+      `message`; four new constants, four reused. `error` codes are unchanged
+      — they are API surface — so only `message` was added. One reclassified:
+      the `remove_one` miss after ownership was already verified against the
+      same in-memory `inv` is a lost race, not a refusal, and now answers
+      `item_removal_failed`/500 like `consume_item`'s equivalent rather than
+      telling the player they are not carrying something they are.
+- [x] ~~**Resize-then-zoom snaps the camera off-centre.**~~ One `setView()`
+      setter in `dungeon-canvas.js` writes live and target together, with the
+      four immediate writers (mouse drag, touch drag, wheel zoom, the
+      non-smooth `centerOnPlayer` that `resizeCanvas` calls) routed through
+      it. The eased writers are deliberately left alone — target-only is what
+      easing means. The resize site passes `targetZoom` rather than the live
+      zoom, so a resize mid-button-zoom no longer freezes it at the
+      intermediate value. Pinned by
+      `e2e/test_smoke.py::test_resize_then_zoom_keeps_the_camera_put`,
+      confirmed failing with the setter backed out.
+- [x] ~~**`adventure.js`'s `.character-card` selector is dead**~~ — and so was
+      the whole feature behind it. `last_roll` appears in **zero** Python
+      files: the server has never sent it, so `updateLastRollUI` never ran and
+      the "fallback above the log" that the selector bug supposedly forced
+      every roll into had never fired either. Deleted the function, both
+      guarded call sites, the `.last-roll-line` div, its CSS rule, and the
+      three comments describing the row as shared. The encumbrance marker now
+      owns that row outright; its height was always reserved by
+      `.party-status-line`'s own `min-height`, so the rail budget is
+      unchanged (`test_hud_panels_do_not_cover_the_party_or_each_other` still
+      passes). Making the readout *work* is a feature build — server support
+      plus an overflow treatment plus a re-measure — not a selector fix.
+- [x] ~~**The floating log collides with the zoom controls below a 705px
+      viewport height.**~~ The ceiling gained a second, viewport-relative
+      bound via `min()`, plus a `--hud-controls-reserve: 276px` token naming
+      the controls' bottom edge (172px top + three 32px buttons + two
+      `--space-1` gaps) so the log can clear it without restating the number.
+      Nothing moves at the 768px floor — the existing constant still wins
+      there. Pinned by `test_floating_log_clears_the_zoom_controls` at 768
+      (control) and 640 (fails without the bound). Residual: below ~436px of
+      viewport the log's `min-height: 120px` wins and the collision returns;
+      that is far under any supported size.
 
 ### One vocabulary, many times over
 
@@ -253,6 +295,24 @@ misbehave today.
       unrelated later page instead of being lost visibly.
 - [ ] `<main class="chrome-minimal">` has no CSS anywhere — dead hook or
       missing rule.
+- [ ] `.character-card` is dead everywhere, in three media. No template emits
+      it (the rail and roster both emit `.operative-card`), yet
+      `scripts/screenshot_adventure.py:99`, `screenshot_help.py:55` and
+      `screenshot_storyboard.py:95,254` all locate on it — so those scripts
+      have been measuring zero cards — and `glass-theme.css:181-215,596` still
+      styles it. Turned up by the 2026-07-29 live-defect triage while deleting
+      the dead last-roll readout, which was the fourth user of the selector.
+- [ ] Three copies of `_perception_mod_from_stats`
+      (`dungeon/api_helpers/perception.py:56` — the one `room_events` imports,
+      `dungeon/api_helpers/treasure.py:29`, and `routes/dungeon_api.py:1421`).
+      The `dungeon_api` copy is reachable only from `_roll_perception_for_user`
+      (`:1443`), which has **no callers at all** — both are orphans and can go;
+      the treasure copy should import from `perception.py` instead.
+- [ ] The gear-slot migration's `_unbaggable`
+      (`migrations/versions/c9405725c1f4_unify_gear_slots.py:39`) has the same
+      uid-less-dict hole the app side just closed with `add_gear_value`. The
+      migration is already applied, so it was deliberately left alone; if it is
+      ever hardened, mirror that helper's clause rather than diverging again.
 - [ ] `sql/README.md`'s Files section omits eight `.sql` files that do exist.
 - [ ] `dashboard_helpers.render_dashboard` imports inside a per-character loop
       (`:82,88`) — same shape as the one fixed in `build_party_payload`.
@@ -289,14 +349,16 @@ misbehave today.
 - [x] ~~Looted gear cannot be equipped during a run~~ — the dungeon's only equip
       path posted `{slug, slot}` with no `uid` branch, so procedural instances
       404'd on the legacy path. The promoted panel sends `uid`.
-- [ ] Shrine (`app/dungeon/room_events.py:163-166`, `_resolve_shrine`) still
-      writes `stats["mana"]` instead of `current_mana` (pre-existing camp
-      convention). Camp (`dungeon_api.py:1744-1745`) and `consume_item`
-      (`inventory_api.py:656-657`) both write both keys now — camp already
-      did, and the potion-resolver chunk fixed `consume_item` — so the
-      shrine is the one live remaining instance. Combat's `_derive_stats`
-      prefers `current_mana`, so a mana restore from a shrine can be
-      silently discarded the moment the party enters its next fight.
+- [x] ~~Shrine (`app/dungeon/room_events.py`, `_resolve_shrine`) still writes
+      `stats["mana"]` instead of `current_mana`~~ — fixed, and it turned out
+      to be restoring nothing at all: the cap came from `stats["max_mana"]`,
+      a key only `level_up_character` ever writes, so for almost every
+      character it fell back to *current* mana and the restore collapsed to
+      `min(cur, cur + cur×pct) == cur`. The existing test hid this by seeding
+      `max_mana` into stats by hand. Now uses `compute_hp_mana_max` like camp,
+      reads `current_mana` first, writes both keys, and floors at "resting can
+      only help". Two tests in `test_room_events_resolution.py`, one of them
+      specifically for a character with no stored `max_mana`.
 
 Potion families the resolver refuses (111 of 154 potions) have no combat
 mechanic to attach to yet. `app/services/item_effects.py`'s

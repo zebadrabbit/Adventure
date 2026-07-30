@@ -131,15 +131,13 @@
             </div>
           </div>
         </div>
-        <!-- Shares its row with last-roll-line rather than opening a new one:
-             the header's badge row measured too narrow for a third badge
-             (class name + "Overloaded" clipped past the card edge at
-             1366x768 with real class names), and this line is already
-             reserved height every frame pays for, encumbered or not, whether
-             or not a roll message is showing. A marker here costs nothing
-             the layout wasn't already spending. -->
-        <div class="d-flex align-items-center justify-content-between gap-2 party-status-line">
-          <div class="text-warning small last-roll-line" data-char-id="{{ m.id }}" aria-live="polite"></div>
+        <!-- The encumbrance marker gets its own row rather than a third badge
+             in the header: that row measured too narrow (class name +
+             "Overloaded" clipped past the card edge at 1366x768 with real
+             class names). The height is reserved by .party-status-line's own
+             min-height, so an unencumbered frame costs the same as a loaded
+             one and the rail budget does not move. -->
+        <div class="d-flex align-items-center justify-content-end gap-2 party-status-line">
           <span class="badge party-card-badge frame-encumbrance" data-char-id="{{ m.id }}" aria-live="polite"
             hidden></span>
         </div>

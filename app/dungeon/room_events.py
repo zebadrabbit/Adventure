@@ -152,6 +152,7 @@ def _resolve_shrine(instance, ent) -> dict:
     dungeon_camp grants). Mirrors camp's replace-not-stack CharacterStatusEffect
     handling."""
     from app.models.status_effect import CharacterStatusEffect
+    from app.services.character_stats import compute_hp_mana_max
 
     pct = EVENT_TUNING["shrine_mana_restore_pct"]
     ticks = EVENT_TUNING["shrine_regen_ticks"]
@@ -161,9 +162,17 @@ def _resolve_shrine(instance, ent) -> dict:
             continue
         try:
             stats = json.loads(char.stats)
-            max_mana = int(stats.get("max_mana", stats.get("mana", 0)))
-            cur_mana = int(stats.get("mana", 0))
-            stats["mana"] = min(max_mana, cur_mana + int(max_mana * pct))
+            # Same three rules camp follows (dungeon_api.dungeon_camp):
+            # caps are computed and never stored -- "max_mana" is written by
+            # level-up alone, so reading it here fell back to *current* mana
+            # and the shrine restored exactly nothing; current_mana is the key
+            # combat prefers; and both keys are written back, or combat's
+            # _derive_stats discards the restore on the next fight.
+            _, max_mana = compute_hp_mana_max(char)
+            cur_mana = int(stats.get("current_mana", stats.get("mana", max_mana)))
+            new_mana = max(cur_mana, min(max_mana, cur_mana + int(max_mana * pct)))
+            stats["mana"] = new_mana
+            stats["current_mana"] = new_mana
             char.stats = json.dumps(stats)
             db.session.add(char)
         except Exception:

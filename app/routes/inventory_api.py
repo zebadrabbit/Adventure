@@ -13,10 +13,13 @@ from flask_login import current_user, login_required
 
 from app import db
 from app.inventory.utils import (
+    add_gear_value,
     apply_encumbrance_penalty,
     dump_inventory,
     encumbrance_state,
+    find_instance,
     load_inventory,
+    remove_instance,
     remove_one,
 )
 from app.loot.data.archetypes import SLOTS as _ARCHETYPE_SLOTS
@@ -30,10 +33,12 @@ from app.services.time_service import advance_for
 
 bp_inventory = Blueprint("inventory", __name__)
 
-# The refusals consume_item can return. The bag grid and the combat item panel
+# The refusals this module can return. The bag grid and the combat item panel
 # both show the player whatever ``message`` comes back, so a branch without one
 # puts a machine code on screen -- which is what "not consumable" and friends
 # were doing next door to the two refusals that already answered in prose.
+# The ``error`` codes are API surface and stay byte-identical; only ``message``
+# is added. Wording follows DESIGN_SYSTEM rule 8 -- D&D register, not UI-speak.
 # (item_removal_failed's wording is shared with the combat path and so lives in
 # item_effects; it is distinct from "item not in bag" -- ownership was verified
 # against the same in-memory inv list a few lines earlier, so a miss there is a
@@ -42,6 +47,10 @@ _REFUSAL_MISSING_SLUG = "Name the item you mean to use."
 _REFUSAL_ITEM_UNKNOWN = "No such item is known in these lands."
 _REFUSAL_NOT_IN_BAG = "You carry no such thing among your provisions."
 _REFUSAL_NOT_CONSUMABLE = "That is not something you can drink."
+_REFUSAL_NO_CHARACTER = "No such hero answers to your banner."
+_REFUSAL_BAD_SLOT = "There is nowhere on your person to wear that."
+_REFUSAL_NOT_EQUIPPABLE = "That is not something you can wear or wield."
+_REFUSAL_EMPTY_SLOT = "You wear nothing there to remove."
 
 # The one gear-slot vocabulary. Defined by the loot generator, which is what
 # every procedural item, prefix and suffix keys off, so it is what the player
@@ -480,44 +489,45 @@ def _reject_if_in_combat(character: Character, slot: str):
 def equip_item(cid: int):
     ch = _char_owned(cid)
     if not ch:
-        return jsonify({"error": "not found"}), 404
+        return jsonify({"error": "not found", "message": _REFUSAL_NO_CHARACTER}), 404
     data = request.get_json(silent=True) or {}
 
     # --- Gear-instance path: uid-based equip for procedural items ---
     uid = (data.get("uid") or "").strip()
     if uid:
-        items_raw = json.loads(ch.items) if ch.items else []
-        if not isinstance(items_raw, list):
-            items_raw = []
-        gear_raw = json.loads(ch.gear) if ch.gear else {}
-        if not isinstance(gear_raw, dict):
-            gear_raw = {}
-        inst = next((i for i in items_raw if isinstance(i, dict) and i.get("uid") == uid), None)
+        # load_inventory, not a raw json.loads: it is the one reader of this
+        # column, so writing back anything it cannot read is a silent loss.
+        # It preserves instances verbatim, and canonicalises a legacy
+        # list-of-slugs -- which is what a raw list would have kept, and what
+        # made appending a dict to it drop the dict on the next read.
+        inv = load_inventory(ch.items)
+        gear_raw = _normalize_gear(_safe_json_load(ch.gear, {}))
+        inst = find_instance(inv, uid)
         if not inst:
-            return jsonify({"error": "not_in_inventory"}), 400
+            return jsonify({"error": "not_in_inventory", "message": _REFUSAL_NOT_IN_BAG}), 400
         slot = inst.get("slot")
         if slot not in _SLOTS:
-            return jsonify({"error": "bad_slot"}), 400
+            return jsonify({"error": "bad_slot", "message": _REFUSAL_BAD_SLOT}), 400
         blocked = _reject_if_in_combat(ch, slot)
         if blocked:
             return blocked
-        # Swap any currently-equipped item in that slot back into items
+        # Swap any currently-equipped item in that slot back into the bag
         if gear_raw.get(slot):
-            items_raw.append(gear_raw[slot])
+            add_gear_value(inv, gear_raw[slot])
         gear_raw[slot] = inst
-        items_raw = [i for i in items_raw if not (isinstance(i, dict) and i.get("uid") == uid)]
-        ch.gear = json.dumps(gear_raw)
-        ch.items = json.dumps(items_raw)
+        remove_instance(inv, uid)
+        ch.gear = _safe_json_dump(gear_raw)
+        ch.items = dump_inventory(inv)
         db.session.commit()
         return jsonify({"ok": True, "slot": slot, "gear": gear_raw})
 
     # --- Legacy slug-based equip path ---
     slug = (data.get("slug") or "").strip()
     if not slug:
-        return jsonify({"error": "missing slug"}), 400
+        return jsonify({"error": "missing slug", "message": _REFUSAL_MISSING_SLUG}), 400
     item = Item.query.filter_by(slug=slug).first()
     if not item:
-        return jsonify({"error": "item not found"}), 404
+        return jsonify({"error": "item not found", "message": _REFUSAL_ITEM_UNKNOWN}), 404
     inv = load_inventory(ch.items)
     gear = _normalize_gear(_safe_json_load(ch.gear, {}))
     # Require at least one instance. .get, not [...]: load_inventory preserves
@@ -525,16 +535,16 @@ def equip_item(cid: int):
     # subscripting raises KeyError -- a 500 -- the moment the bag holds any
     # generated gear ahead of the item being looked for.
     if not any(o.get("slug") == slug for o in inv):
-        return jsonify({"error": "item not in bag"}), 400
+        return jsonify({"error": "item not in bag", "message": _REFUSAL_NOT_IN_BAG}), 400
     slot = data.get("slot") or _slot_for_item(item, gear)
     if slot not in _SLOTS:
-        return jsonify({"error": "invalid slot"}), 400
+        return jsonify({"error": "invalid slot", "message": _REFUSAL_BAD_SLOT}), 400
     # Enforce compatibility
     inferred = _slot_for_item(item, gear)
     if inferred and inferred != slot:
         slot = inferred  # prefer inferred slot
     if _slot_for_item(item, gear) is None:
-        return jsonify({"error": "item not equippable"}), 400
+        return jsonify({"error": "item not equippable", "message": _REFUSAL_NOT_EQUIPPABLE}), 400
     # Legacy slug path needs the same combat lock as the gear-instance path
     # above; guarding only one of the two would leave the loophole open.
     blocked = _reject_if_in_combat(ch, slot)
@@ -543,13 +553,16 @@ def equip_item(cid: int):
     # Perform equip: remove from bag, move current slot (if any) back to bag
     removed = remove_one(inv, slug)
     if not removed:
-        return jsonify({"error": "item not in bag"}), 400
+        # Ownership was verified against this same in-memory inv above, so a
+        # miss here is a genuine bug (a lost race), not a normal refusal --
+        # same treatment consume_item gives it.
+        return jsonify({"error": "item_removal_failed", "message": REFUSAL_ITEM_REMOVAL_FAILED}), 500
     existing = gear.get(slot)
     if existing:
-        # return existing to inventory
-        from app.inventory.utils import add_item
-
-        add_item(inv, existing, 1)
+        # Return existing to the bag. This is a gear *value*, not a slug: the
+        # uid path above writes a whole instance dict into the slot, so an
+        # add_item here destroyed any looted item the player equipped over.
+        add_gear_value(inv, existing)
     gear[slot] = slug
     ch.items = dump_inventory(inv)
     ch.gear = _safe_json_dump(gear)
@@ -566,37 +579,33 @@ def equip_item(cid: int):
 def unequip_item(cid: int):
     ch = _char_owned(cid)
     if not ch:
-        return jsonify({"error": "not found"}), 404
+        return jsonify({"error": "not found", "message": _REFUSAL_NO_CHARACTER}), 404
     data = request.get_json(silent=True) or {}
     slot = (data.get("slot") or "").strip()
     if slot not in _SLOTS:
-        return jsonify({"error": "invalid slot"}), 400
+        return jsonify({"error": "invalid slot", "message": _REFUSAL_BAD_SLOT}), 400
     blocked = _reject_if_in_combat(ch, slot)
     if blocked:
         return blocked
     gear = _normalize_gear(_safe_json_load(ch.gear, {}))
     equipped = gear.get(slot)
     if not equipped:
-        return jsonify({"error": "empty slot"}), 400
+        return jsonify({"error": "empty slot", "message": _REFUSAL_EMPTY_SLOT}), 400
 
     # Gear-instance path: equipped value is a dict with uid
     if isinstance(equipped, dict) and equipped.get("uid"):
-        items_raw = json.loads(ch.items) if ch.items else []
-        if not isinstance(items_raw, list):
-            items_raw = []
-        items_raw.append(equipped)
+        inv = load_inventory(ch.items)
+        add_gear_value(inv, equipped)
         del gear[slot]
-        ch.gear = json.dumps(gear)
-        ch.items = json.dumps(items_raw)
+        ch.gear = _safe_json_dump(gear)
+        ch.items = dump_inventory(inv)
         db.session.commit()
         return jsonify({"ok": True, "gear": gear})
 
     # Legacy slug-based path
     slug = equipped
     inv = load_inventory(ch.items)
-    from app.inventory.utils import add_item
-
-    add_item(inv, slug, 1)
+    add_gear_value(inv, slug)
     gear[slot] = None
     ch.items = dump_inventory(inv)
     ch.gear = _safe_json_dump(gear)
@@ -613,7 +622,7 @@ def unequip_item(cid: int):
 def consume_item(cid: int):
     ch = _char_owned(cid)
     if not ch:
-        return jsonify({"error": "not found"}), 404
+        return jsonify({"error": "not found", "message": _REFUSAL_NO_CHARACTER}), 404
     data = request.get_json(silent=True) or {}
     slug = (data.get("slug") or "").strip()
     if not slug:
