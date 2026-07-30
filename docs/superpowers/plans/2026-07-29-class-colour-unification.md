@@ -251,14 +251,65 @@ all, which is why a runtime injector existed to fill the gap."
 
 ---
 
-### Task 2: Delete the other four sources
+### Task 2: Point the live stylesheet at the tokens, and delete the rest
+
+> **Scope corrected during Task 1.** Browser verification found a **sixth**
+> source, and it is the one that actually paints badges: `theme.css:337-417`
+> declares twelve single-class rules (`.fighter-badge` … `.warlock-badge`) with
+> every value hardcoded and no reference to `var(--class-*)`. `theme.css` is
+> loaded on every page (`base.html:16`), so it — not `base.css` — is what a
+> player sees. **Task 1 therefore changed nothing visible**, and cannot have:
+> a new palette in `tokens.css` is invisible while a loaded stylesheet hardcodes
+> past it.
+>
+> Two further corrections: `class-badges.css` is a **second orphan** (loaded by
+> no template, recorded as "deferred" at `app.css:15`) and is the one file that
+> correctly reads the derived tokens. And `adventure.html:118` emits
+> `class-badge-{{ class_lower }}` — one token — where every selector is
+> `.class-badge.<name>-badge`, two tokens, so the party-rail badge matches
+> nothing and renders unstyled (from `7dfcf1e`, not the HUD work).
+>
+> The spec's "six classes have no colour outside the dungeon" claim was wrong:
+> all twelve are coloured everywhere, by `theme.css`, in a palette that agrees
+> with none of the others. The defect is disagreement, not absence.
 
 **Files:**
-- Delete: `app/static/css/classes.css`
+- Modify: `app/static/css/theme.css:337-417` — the twelve badge rules read the tokens
+- Modify: `app/templates/adventure.html:118` — emit the two-token form
+- Delete: `app/static/css/classes.css`, `app/static/css/class-badges.css`
 - Modify: `app/static/css/base.css:34+`, `app/routes/config_api.py`, `app/static/js/adventure.js:106-148`
 
 **Interfaces:**
-- Consumes Task 1's derived tokens. Produces no new interface — this task only removes.
+- Consumes Task 1's derived tokens. Produces no new interface.
+
+- [ ] **Step 0: Make the loaded stylesheet read the tokens**
+
+This is the step that makes `tokens.css` the source of truth in practice rather than on paper.
+
+In `app/static/css/theme.css`, replace the hardcoded values in `.class-badge` and the twelve `.<name>-badge` rules with the derived tokens — `var(--class-<name>-bg)`, `-fg`, `-border`. Keep the selectors and the specificity exactly as they are: the comment at `:237-239` records that `.panel-header .badge:not(.class-badge)` exists precisely because a two-class selector was beating these single-class rules, so changing their shape risks re-opening that fight.
+
+Then delete `app/static/css/class-badges.css`. It is an orphan, and once `theme.css` reads the tokens it is also a duplicate. Confirm first:
+
+```bash
+grep -rn "class-badges" app/ docs/ --include=*.html --include=*.py --include=*.md
+```
+Expected: only the `app.css` comment block that records it as deferred — update that comment to say it was deleted and why.
+
+- [ ] **Step 0b: Fix the party-rail badge markup**
+
+`app/templates/adventure.html:118` emits a single class token that matches no selector:
+
+```html
+<span class="badge class-badge-{{ class_lower }} party-card-badge">
+```
+
+Make it the two-token form the rest of the codebase uses (`dashboard.html:112`, `combat.js:437`):
+
+```html
+<span class="badge class-badge {{ class_lower }}-badge party-card-badge">
+```
+
+Check `adventure-hud.css`'s `.party-card-badge` rules still apply and that the badge is legible against the frame's `--surface-overlay` background — the rail is the one place a class badge sits on a translucent panel over the map.
 
 - [ ] **Step 1: Confirm the orphan before deleting it**
 
@@ -270,6 +321,8 @@ Expected: no template reference. If a doc mentions it, update the doc.
 ```bash
 git rm app/static/css/classes.css
 ```
+
+Note this is the *second* orphan; `class-badges.css` went in Step 0.
 
 - [ ] **Step 2: Drop `base.css`'s block**
 
@@ -293,7 +346,14 @@ Expected: no hits.
 ```bash
 grep -rn "class-[a-z]*-bg\|class-[a-z]*-fg\|class-[a-z]*-border" app/static app/templates
 ```
-Expected: only *readers* — `class-badges.css`, `hoard.js`, `equipment.css`, and `tokens.css`'s own declarations. No other declaration sites.
+Expected: only *readers* — `theme.css`, `hoard.js`, `equipment.css` — and `tokens.css`'s own declarations. No other declaration sites.
+
+Then confirm nothing hardcodes a class colour any more:
+
+```bash
+grep -nE "\.(fighter|rogue|mage|cleric|ranger|druid|barbarian|bard|monk|paladin|sorcerer|warlock)-badge" -A4 app/static/css/theme.css | grep "#" || echo "(no hardcoded class colours)"
+```
+Expected: no hits.
 
 - [ ] **Step 6: Run the tests**
 
@@ -306,6 +366,8 @@ Expected: all PASS, including `test_the_runtime_injector_is_gone`. Baseline is `
 - [ ] **Step 7: Look at it, on both screens**
 
 All twelve classes, `/dashboard` and `/adventure`, with a browser console open. The two screens must now agree for every class — that is the bug this chunk exists to fix. Confirm no console error from the removed fetch, and check the party rail's `border-<class>` ring and the character panel's class header as well as the badges.
+
+**This is the first step in the whole plan that can actually show the new palette**, because Task 1's tokens were being hardcoded past by `theme.css`. Expect a visible change on every screen for every class. If a class looks unchanged, something still hardcodes it — find it rather than accepting it.
 
 - [ ] **Step 8: Commit**
 

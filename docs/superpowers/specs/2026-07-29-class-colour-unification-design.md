@@ -5,9 +5,46 @@ Direction from the project owner, 2026-07-29:
 > "class colors has always been an issue and we need to hammer it down now; pick
 > proper colors for classes so that theyre distinct and solidify those as SOT."
 
+## Correction (2026-07-29, during Task 1)
+
+Two claims below were wrong, found while verifying Task 1 in a browser. The
+decisions stand; the diagnosis needed widening.
+
+**There is a sixth source, and it is the one that actually paints badges.**
+`theme.css:337-417` declares `.class-badge` plus twelve single-class rules
+(`.fighter-badge` … `.warlock-badge`), **none of which reference
+`var(--class-*)`** — every value is hardcoded. `theme.css` is loaded by
+`base.html:16` on every page, so it, not `base.css`, is what a player actually
+sees. There is even a comment at `theme.css:237-239` documenting a specificity
+fight someone already had with these rules.
+
+**So "six of the twelve classes have no colour outside the dungeon" is false.**
+All twelve are coloured everywhere — by `theme.css`, hardcoded, in a palette
+that agrees with none of the others. The real defect is not absence but
+disagreement, and Task 1 could not have fixed it: pointing `tokens.css` at a new
+palette changes nothing while a loaded stylesheet hardcodes past it.
+
+**`class-badges.css` is a second orphan.** Loaded by no template
+(`app.css:15` records it as "deferred"), and it is the one file that
+*correctly* reads `--class-<name>-bg/-fg/-border`. The file that does the right
+thing is the file nobody loads.
+
+**A live markup bug, unrelated to the palette.** `adventure.html:118` emits
+`class-badge-{{ class_lower }}` — a single class token, e.g.
+`class-badge-fighter`. Every selector in the codebase is `.class-badge.fighter-badge`
+or `.fighter-badge`, two tokens. So the party rail's class badge matches no rule
+at all and renders unstyled. Introduced by `7dfcf1e` ("Fix HP/MP persistence
+throughout dungeon and combat"), not by the recent HUD work.
+`dashboard.html:112` and `combat.js:437` both emit the correct two-token form.
+
+Consequences for the plan: Task 2 must additionally point `theme.css`'s twelve
+badge rules at the derived tokens, delete `class-badges.css` as well as
+`classes.css`, and fix `adventure.html:118`. Without the `theme.css` change,
+"one source of truth" remains false no matter what else is deleted.
+
 ## What exists
 
-Five sources. Measured, not estimated.
+Six sources. Measured, not estimated.
 
 | # | source | covers | live? |
 |---|---|---|---|
