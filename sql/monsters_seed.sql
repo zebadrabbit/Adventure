@@ -237,6 +237,26 @@ VALUES
  ('beast_worldscar_behemoth_t6','Worldscar Behemoth',19,20,1250,108,12,11,'elite','beast','maul,charge,thick_hide','beast_named',1720, false),
  ('humanoid_ashen_conqueror_t6','Ashen Conqueror',19,20,1000,100,18,12,'elite','humanoid','leader,charge,shielded','humanoid_named',1680, false);
 
+-- The same hole, in the three places the block above missed. Verified against
+-- the catalogue rather than assumed: elemental and aberration had no non-boss
+-- row at 19-20, and humanoid's only 16-18 row is The Pale Tyrant, a boss. A
+-- themed dungeon of any of those, at those depths, therefore had an empty
+-- non-boss pool and every ambient kill paid zero xp and zero items.
+--
+-- (The ordering bug that let an empty pool go unnoticed is fixed alongside
+-- this, in spawn_service._eligible_rows: the boss filter used to run after the
+-- level-ceiling fallback, so a boss-only band never triggered the fallback.
+-- These rows close today's holes; that fix stops the next one being silent.)
+--
+-- Numbers interpolated from the surrounding bands, not invented: the 19-20
+-- elites sit at hp 1000-1300 / dmg 92-108 / xp 1600-1720, and the 16-18 elites
+-- at hp 820-950 / dmg 84-98 / xp 1250-1450.
+INSERT INTO monster_catalog (slug, name, level_min, level_max, base_hp, base_damage, armor, speed, rarity, family, traits, loot_table, xp_base, boss)
+VALUES
+ ('elemental_stormheart_titan_t6','Stormheart Titan',19,20,1150,98,15,12,'elite','elemental','chain_lightning,slam,resist_physical','elemental_named',1660, false),
+ ('aberration_void_rendmind_t6','Void Rendmind',19,20,1080,106,13,14,'elite','aberration','mind_flay,phase,aura_fear','aberration_named',1690, false),
+ ('humanoid_iron_marshal_t5','Iron Marshal',16,18,930,90,17,12,'elite','humanoid','leader,shielded,charge','humanoid_named',1320, false);
+
 COMMIT;
 
 -- Usage:

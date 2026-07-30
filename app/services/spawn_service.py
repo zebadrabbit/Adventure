@@ -100,16 +100,48 @@ def _eligible_monsters(level: int, include_boss: bool = False, family: Optional[
     # into a bare "Trash Monster" stub with no name, loot table or resistances.
     # The catalogue currently stops at level 20 while characters reach 50, so
     # every spawn for a high-level party degraded silently. Fall back to the
-    # deepest band that does exist: the archetype and tier systems scale the
-    # stats anyway, so a level-40 party fights a properly-scaled version of the
-    # nastiest thing in the book rather than a nameless stub.
-    if not rows:
-        deepest = q.order_by(MonsterCatalog.level_max.desc()).first()
-        if deepest is not None and level > int(deepest.level_max or 0):
-            rows = q.filter(MonsterCatalog.level_max == deepest.level_max).all()
-
+    # deepest band that does exist, so a level-40 party fights the nastiest
+    # thing in the book rather than a nameless stub.
+    #
+    # Be clear about what this does NOT do: MonsterCatalog.scaled_instance
+    # clamps the requested level into [level_min, level_max] and then emits
+    # base_hp/base_damage/armor unchanged -- level scales nothing, only party
+    # size does. So a level-45 ambient spawn has a level-20 monster's numbers
+    # and reports itself as level 20, which also caps its loot-table lookup.
+    # The archetype and tier systems do rescale, but only for boss/elite set
+    # pieces, not for this path. Making ambient spawns scale with level is a
+    # balance change waiting on a curve decision -- see the TODO.
+    # Filter bosses BEFORE testing emptiness, not after. Ordered the other way,
+    # a band whose only rows are bosses looked non-empty, skipped the fallback,
+    # and was then emptied by this filter -- so choose_monster raised and
+    # populate_spawn_stats swallowed it into a nameless "Trash Monster" with no
+    # xp and no loot_table. That was live, not hypothetical: humanoid at levels
+    # 16-18, and elemental and aberration at 19+, had no non-boss row at all,
+    # so every ambient kill in those themed dungeons paid nothing.
     if not include_boss:
         rows = [r for r in rows if not r.boss]
+
+    if not rows:
+        # Nearest band that actually has something we can spawn, measured from
+        # the requested level. Two distinct holes land here:
+        #   * above the catalogue's ceiling, where nothing matches at all; and
+        #   * a band whose only rows are bosses while an ordinary monster was
+        #     asked for -- which the old "only if level > ceiling" condition
+        #     never covered, because such a band sits *below* the ceiling.
+        # Nearest rather than deepest matters: falling back to the deepest band
+        # would hand a level-11 party the nastiest thing in the book.
+        candidates = q.filter(MonsterCatalog.boss.is_(False)).all() if not include_boss else q.all()
+        if candidates:
+
+            def _distance(r):
+                if level < int(r.level_min or 0):
+                    return int(r.level_min) - level
+                if level > int(r.level_max or 0):
+                    return level - int(r.level_max)
+                return 0
+
+            best = min(_distance(r) for r in candidates)
+            rows = [r for r in candidates if _distance(r) == best]
     _ELIGIBLE_CACHE[key] = (now, rows)
     # Simple cap (avoid unbounded growth if level range large)
     if len(_ELIGIBLE_CACHE) > 128:
