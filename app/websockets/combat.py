@@ -143,14 +143,23 @@ class CombatNamespace(Namespace):  # pragma: no cover - thin glue
         extra = {}
         try:
             if action == "attack":
-                result = _svc.player_attack(combat_id, current_user.id, version, actor_id=actor_id)
+                result = _svc.player_attack(
+                    combat_id, current_user.id, version, actor_id=actor_id, target_id=payload.get("target_id")
+                )
             elif action == "flee":
                 result = _svc.player_flee(combat_id, current_user.id, version, actor_id=actor_id)
             elif action == "defend":
                 result = _svc.player_defend(combat_id, current_user.id, version, actor_id=actor_id)
             elif action == "cast":
                 spell = payload.get("spell") if isinstance(payload, dict) else None
-                result = _svc.player_cast_spell(combat_id, current_user.id, version, spell, actor_id=actor_id)
+                result = _svc.player_cast_spell(
+                    combat_id,
+                    current_user.id,
+                    version,
+                    spell,
+                    actor_id=actor_id,
+                    target_id=payload.get("target_id"),
+                )
             elif action == "use_item":
                 slug = payload.get("slug") if isinstance(payload, dict) else None
                 result = _svc.player_use_item(combat_id, current_user.id, version, slug, actor_id=actor_id)

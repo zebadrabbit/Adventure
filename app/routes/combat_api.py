@@ -113,7 +113,8 @@ def combat_state(combat_id: int):
 def combat_attack(combat_id: int):
     version = int(request.json.get("version", 0)) if request.is_json else 0
     actor_id = request.json.get("actor_id") if request.is_json else None
-    result = combat_service.player_attack(combat_id, current_user.id, version, actor_id=actor_id)
+    target_id = request.json.get("target_id") if request.is_json else None
+    result = combat_service.player_attack(combat_id, current_user.id, version, actor_id=actor_id, target_id=target_id)
     code = 200 if result.get("ok") or result.get("error") not in ("not_found",) else 404
     return jsonify(result), code
 
@@ -144,7 +145,10 @@ def combat_cast_spell(combat_id: int):
     version = int(request.json.get("version", 0)) if request.is_json else 0
     actor_id = request.json.get("actor_id") if request.is_json else None
     spell = request.json.get("spell") if request.is_json else None
-    result = combat_service.player_cast_spell(combat_id, current_user.id, version, spell, actor_id=actor_id)
+    target_id = request.json.get("target_id") if request.is_json else None
+    result = combat_service.player_cast_spell(
+        combat_id, current_user.id, version, spell, actor_id=actor_id, target_id=target_id
+    )
     code = 200 if result.get("ok") or result.get("error") not in ("not_found",) else 404
     return jsonify(result), code
 
@@ -155,7 +159,10 @@ def combat_cast_skill(combat_id: int):
     version = int(request.json.get("version", 0)) if request.is_json else 0
     actor_id = request.json.get("actor_id") if request.is_json else None
     skill_id = request.json.get("skill_id") if request.is_json else None
-    result = combat_service.player_cast_skill(combat_id, current_user.id, version, skill_id, actor_id=actor_id)
+    target_id = request.json.get("target_id") if request.is_json else None
+    result = combat_service.player_cast_skill(
+        combat_id, current_user.id, version, skill_id, actor_id=actor_id, target_id=target_id
+    )
     code = 200 if result.get("ok") or result.get("error") not in ("not_found",) else 404
     return jsonify(result), code
 

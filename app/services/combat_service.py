@@ -287,7 +287,17 @@ def _base_player_snapshot(user_id: int) -> Dict[str, Any]:
     }
 
 
-def _calc_initiative(party: Dict[str, Any], monster: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _calc_initiative(party: Dict[str, Any], monsters: Any) -> List[Dict[str, Any]]:
+    """Initiative across every combatant, one entry per monster.
+
+    Still accepts a bare monster dict: ``encounters.py`` and ~50 test call sites
+    pass one, and this spends a ``random.randint`` per combatant -- about a dozen
+    test files feed a finite ``iter([...])`` to ``random.randint`` and depend on
+    the exact roll ordering, so the single-monster path must consume exactly the
+    rolls it always did.
+    """
+    if not isinstance(monsters, list):
+        monsters = [monsters]
     order = []
     for member in party["members"]:
         roll = member.get("speed", 10) + random.randint(1, 20)
@@ -300,8 +310,9 @@ def _calc_initiative(party: Dict[str, Any], monster: Dict[str, Any]) -> List[Dic
                 "roll": roll,
             }
         )
-    m_roll = monster.get("speed", 8) + random.randint(1, 20)
-    order.append({"type": "monster", "id": monster.get("id"), "name": monster.get("name"), "roll": m_roll})
+    for monster in monsters:
+        m_roll = monster.get("speed", 8) + random.randint(1, 20)
+        order.append({"type": "monster", "id": monster.get("id"), "name": monster.get("name"), "roll": m_roll})
     order.sort(key=lambda x: x["roll"], reverse=True)
     return order
 
@@ -376,20 +387,36 @@ def start_session(user_id: int, monster: Dict[str, Any]) -> CombatSession:
     CombatSession
         Newly persisted active session (``status='active'``).
     """
+    # One monster or a pack: callers still pass a bare dict (encounters.py and
+    # every existing test), so normalise here rather than at each call site.
+    monsters = [dict(m) for m in monster] if isinstance(monster, list) else [dict(monster)]
+    # Session-local ids, assigned once and never reused or compacted -- dead
+    # monsters are tombstoned, so an id must not be inferable from a position.
+    # The spawn payload's own "id" is the *catalog* id: usually None, and
+    # identical for every member of a same-slug pack, so it cannot be a target
+    # key. hp is current from here on; hp_max keeps the spawn value, which is
+    # what to_dict has always reported as monster_max_hp.
+    for i, m in enumerate(monsters):
+        m["id"] = i
+        m.setdefault("hp_max", m.get("hp", 50))
+        m["hp"] = m.get("hp", 50)
+    monster = monsters[0]
+
     party = _base_player_snapshot(user_id)
-    initiative = _calc_initiative(party, monster)
+    initiative = _calc_initiative(party, monsters)
     # Monster HP scaling already applied in monster dict (assumption)
     monster_hp = monster.get("hp", 50)
     dungeon_snapshot = _capture_dungeon_snapshot(user_id)
     session = CombatSession(
         user_id=user_id,
         monster_json=json.dumps(monster),
+        monsters_json=json.dumps(monsters),
         party_snapshot_json=json.dumps(party),
         initiative_json=json.dumps(initiative),
         monster_hp=monster_hp,
         combat_turn=1,
         active_index=0,
-        log_json=json.dumps([{"ts": _now().isoformat(), "m": f"Encounter starts vs {monster.get('name')}"}]),
+        log_json=json.dumps([{"ts": _now().isoformat(), "m": f"Encounter starts vs {_describe_pack(monsters)}"}]),
         version=1,
         # Add snapshot JSON if column exists (older DBs may not have migrated yet)
         **(
@@ -493,6 +520,174 @@ def _player_ref(party: Dict[str, Any], char_id: int):
         if m.get("char_id") == char_id:
             return m
     return None
+
+
+# --- The monster list -------------------------------------------------------
+# ``monsters_json`` is the source of truth: one entry per monster, each an
+# ordinary spawn payload plus a session-local ``id``, a current ``hp`` and an
+# ``hp_max``. Everything below goes through these three helpers so there is one
+# reader, one lookup and one writer.
+
+
+def _damage_monster(session: CombatSession, dmg: int, target_id: Any = None) -> Dict[str, Any]:
+    """Apply damage to one monster, persist the list, return the monster hit.
+
+    Every path that hurts a monster must come through here. ``monsters_json`` is
+    the source of truth that ``_check_end`` reads, so a path that decrements only
+    the denormalised ``session.monster_hp`` leaves the list holding the monster's
+    old HP -- and the "all monsters down" test then never becomes true, so the
+    fight cannot end.
+
+    ``target_id`` of None means the first living monster, which is what every
+    caller wanted back when there was only ever one.
+    """
+    monsters = _monsters(session)
+    target = _monster_ref(monsters, target_id) if target_id is not None else None
+    if target is None or int(target.get("hp", 0) or 0) <= 0:
+        target = next((m for m in monsters if int(m.get("hp", 0) or 0) > 0), None)
+    if target is None:
+        return {}
+    target["hp"] = max(0, int(target.get("hp", 0) or 0) - int(dmg))
+    _save_monsters(session, monsters)
+    return target
+
+
+def _merge_rewards(rolls) -> Dict[str, Any]:
+    """Fold one roll_loot() result per monster into a single rewards dict.
+
+    roll_loot returns the same drops twice -- ``items`` as a {slug: qty} map and
+    ``items_list`` as a flat mirror -- and the grant in _check_end is an
+    if/elif chain that must consume exactly one of them (iterating both is what
+    granted every drop twice until it was fixed). So a key is only created here
+    when at least one roll actually supplied it: synthesising ``items`` from an
+    ``items_list``-only roll would make the fallback branch unreachable again,
+    and that branch is pinned by tests/test_combat_reward_inventory_shape.py.
+    """
+    merged: Dict[str, Any] = {}
+    for r in rolls:
+        if not isinstance(r, dict):
+            continue
+        if "items" in r and isinstance(r.get("items"), dict):
+            bucket = merged.setdefault("items", {})
+            for slug, qty in r["items"].items():
+                bucket[slug] = bucket.get(slug, 0) + int(qty or 0)
+        if "items_list" in r and isinstance(r.get("items_list"), list):
+            merged.setdefault("items_list", []).extend(r["items_list"])
+        if r.get("gear"):
+            merged.setdefault("gear", []).extend(r["gear"])
+        if "rolls" in r:
+            merged.setdefault("rolls", []).append(r["rolls"])
+    return merged
+
+
+def _describe_pack(monsters: List[Dict[str, Any]]) -> str:
+    """ "a Goblin", "2 Goblins", "a Goblin and an Orc" -- for log lines.
+
+    Single-monster encounters must read exactly as they always did, so the
+    one-entry case returns the bare name.
+    """
+    names = [str(m.get("name") or "something") for m in monsters]
+    if len(names) == 1:
+        return names[0]
+    counts: Dict[str, int] = {}
+    for n in names:
+        counts[n] = counts.get(n, 0) + 1
+    parts = [(f"{c} {n}s" if c > 1 else n) for n, c in counts.items()]
+    if len(parts) == 1:
+        return parts[0]
+    return ", ".join(parts[:-1]) + f" and {parts[-1]}"
+
+
+def _monsters(session: CombatSession) -> List[Dict[str, Any]]:
+    """Every monster in the encounter, oldest sessions included.
+
+    Rows written before ``monsters_json`` existed -- including any session live
+    at the moment the app upgraded -- have it NULL. Wrapping the legacy
+    ``monster_json``/``monster_hp`` pair here is what let the migration skip a
+    backfill: a data migration could not have covered a fight that started
+    between the migration and the deploy, and this does.
+    """
+    try:
+        raw = json.loads(session.monsters_json) if session.monsters_json else None
+    except Exception:
+        raw = None
+    if isinstance(raw, list) and raw:
+        # Reconcile the denormalised column into the first entry. _save_monsters
+        # keeps the two in step, so a divergence means something wrote
+        # session.monster_hp directly -- which stays a supported way to say "the
+        # first monster took damage" for the compat period, and is what the
+        # reward tests and any un-migrated caller still do. Trusting the column
+        # here is what stops such a write being silently ignored, which would
+        # leave the fight unable to end.
+        if session.monster_hp is not None and int(raw[0].get("hp", 0) or 0) != int(session.monster_hp):
+            raw[0] = {**raw[0], "hp": int(session.monster_hp)}
+        return raw
+    legacy = session.monster() or {}
+    hp = session.monster_hp if session.monster_hp is not None else legacy.get("hp", 0)
+    return [{**legacy, "id": 0, "hp": hp, "hp_max": legacy.get("hp", hp)}]
+
+
+def _monster_ref(monsters: List[Dict[str, Any]], mid: Any) -> Optional[Dict[str, Any]]:
+    """The monster with this id.
+
+    By id, never by list position: dead monsters are tombstoned rather than
+    removed, so position and id stay equal only by accident, and a boss summon
+    would append with a fresh id rather than at its own index. ``None`` reads as
+    0 because legacy initiative entries carry ``"id": None`` -- ``_calc_initiative``
+    wrote ``monster.get("id")`` and the spawn payload has never had one. Without
+    that, every combat in flight at deploy time hangs on a monster turn nobody
+    can resolve.
+    """
+    key = 0 if mid is None else mid
+    for m in monsters:
+        if (0 if m.get("id") is None else m.get("id")) == key:
+            return m
+    return None
+
+
+def _save_monsters(session: CombatSession, monsters: List[Dict[str, Any]]) -> None:
+    """Persist the list, and mirror the first entry into the legacy columns.
+
+    ``monster_json``/``monster_hp`` are kept as a denormalised view rather than
+    dropped, so readers that predate multi-enemy keep working. This is the only
+    writer that keeps the two in step.
+    """
+    session.monsters_json = json.dumps(monsters)
+    if monsters:
+        first = monsters[0]
+        session.monster_json = json.dumps(first)
+        session.monster_hp = int(first.get("hp", 0) or 0)
+
+
+def _living_monsters(session: CombatSession) -> List[Dict[str, Any]]:
+    return [m for m in _monsters(session) if int(m.get("hp", 0) or 0) > 0]
+
+
+def _dead_monster_ids(session: CombatSession) -> set:
+    """Monster ids in this session at or below 0 HP. Mirrors _downed_player_ids."""
+    return {(0 if m.get("id") is None else m.get("id")) for m in _monsters(session) if int(m.get("hp", 0) or 0) <= 0}
+
+
+def _active_actor(session: CombatSession) -> Optional[Dict[str, Any]]:
+    """The initiative entry whose turn it is, or None if the list is unusable."""
+    try:
+        initiative = json.loads(session.initiative_json or "[]")
+    except Exception:
+        return None
+    if not initiative:
+        return None
+    idx = session.active_index
+    if idx < 0 or idx >= len(initiative):
+        return None
+    return initiative[idx]
+
+
+def _active_monster(session: CombatSession) -> Optional[Dict[str, Any]]:
+    """The monster acting right now, or None when it is a player's turn."""
+    actor = _active_actor(session)
+    if not actor or actor.get("type") != "monster":
+        return None
+    return _monster_ref(_monsters(session), actor.get("id"))
 
 
 def _entry_qty(entry: Any) -> int:
@@ -755,11 +950,9 @@ def _skip_if_unconscious(session: CombatSession, party: Dict[str, Any], char_id:
 
 
 def _is_monster_turn(session: CombatSession) -> bool:
-    initiative = json.loads(session.initiative_json or "[]")
-    if not initiative:
-        return False
-    actor = initiative[session.active_index]
-    return actor["type"] == "monster"
+    """Whether a monster is acting. Which one is _active_monster's job."""
+    actor = _active_actor(session)
+    return bool(actor) and actor.get("type") == "monster"
 
 
 def _downed_player_ids(session: CombatSession) -> set:
@@ -785,22 +978,39 @@ def _advance_turn(session: CombatSession):
         session.active_index = 0
         session.combat_turn += 1
 
-    # Step over downed party members instead of stopping on them. Each action
-    # handler already refuses to act while unconscious, but landing on a downed
-    # character still made their turn the *active* turn: the client offered
-    # their buttons and the player had to spend a click to burn it, which reads
-    # as "dead characters still take turns". Bounded by the initiative length;
-    # a fully downed party is resolved by _check_end, not here.
+    # Step over combatants who cannot act instead of stopping on them.
+    #
+    # Downed party members: each action handler already refuses to act while
+    # unconscious, but landing on a downed character still made their turn the
+    # *active* turn -- the client offered their buttons and the player had to
+    # spend a click to burn it, which reads as "dead characters still take
+    # turns".
+    #
+    # Dead monsters: corpses are tombstoned in the initiative list rather than
+    # removed, because active_index is persisted, echoed to the client and used
+    # as the turn-ownership key on three server paths -- filtering the list
+    # would silently change what a stale index means. So the same loop has to
+    # skip them, or the engine stops on a corpse's turn and nobody can drive it.
+    #
+    # Bounded by the initiative length: "at most one lap". If every entry is
+    # skippable it exits on an arbitrary index and _check_end resolves the
+    # encounter -- which is why this must not become a `while True`.
     downed = _downed_player_ids(session)
-    if downed:
-        for _ in range(len(initiative)):
-            actor = initiative[session.active_index]
-            if actor.get("type") != "player" or actor.get("id") not in downed:
-                break
-            session.active_index += 1
-            if session.active_index >= len(initiative):
-                session.active_index = 0
-                session.combat_turn += 1
+    dead = _dead_monster_ids(session)
+    for _ in range(len(initiative)):
+        actor = initiative[session.active_index]
+        kind = actor.get("type")
+        aid = actor.get("id")
+        if kind == "player" and aid in downed:
+            pass
+        elif kind == "monster" and (0 if aid is None else aid) in dead:
+            pass
+        else:
+            break
+        session.active_index += 1
+        if session.active_index >= len(initiative):
+            session.active_index = 0
+            session.combat_turn += 1
 
     # Reset phases for new actor
     session.phase = "start"
@@ -877,13 +1087,22 @@ def _progress_phase(session: CombatSession):
 
 
 def _check_end(session: CombatSession):
-    # Monster defeat path
-    if session.monster_hp is not None and session.monster_hp <= 0:
-        monster = session.monster()
-        rewards = roll_loot(monster) if monster else {}
+    # A completed session is never re-resolved. Neither end_turn endpoint
+    # refuses one, and after a win active_index has already stepped onto a
+    # player of the same user -- so a second end_turn used to re-enter here with
+    # the monster still at 0 HP and roll and grant the loot a second time. This
+    # guard also stops the pack path below re-rolling once per surviving check.
+    if session.status != "active":
+        return
+    # Monster defeat path: every monster down, not just the first. `monsters and`
+    # matters -- an empty list must never read as "all dead".
+    monsters = _monsters(session)
+    if monsters and all(int(m.get("hp", 0) or 0) <= 0 for m in monsters):
+        monster = monsters[0]
+        rewards = _merge_rewards(roll_loot(m) or {} for m in monsters)
         session.status = "complete"
         loot_text = _loot_summary(rewards)
-        _append_log(session, f"{monster.get('name')} defeated! Loot: {loot_text}", code=COMBAT_COMPLETE)
+        _append_log(session, f"{_describe_pack(monsters)} defeated! Loot: {loot_text}", code=COMBAT_COMPLETE)
 
         # Track boss kills and progress
         try:
@@ -896,33 +1115,40 @@ def _check_end(session: CombatSession):
             if instance_id and monster:
                 instance = db.session.get(DungeonInstance, instance_id)
                 if instance:
-                    # Track based on archetype
-                    archetype = monster.get("archetype", "")
+                    # Every corpse counts, not just the first.
+                    killed_a_boss = False
+                    for dead_monster in monsters:
+                        archetype = dead_monster.get("archetype", "")
 
-                    if boss_abilities.is_boss(monster):
-                        instance.bosses_defeated += 1
-                        _append_log(session, f"Boss defeated! ({instance.bosses_defeated}/{instance.bosses_total})")
+                        if boss_abilities.is_boss(dead_monster):
+                            killed_a_boss = True
+                            instance.bosses_defeated += 1
+                            _append_log(session, f"Boss defeated! ({instance.bosses_defeated}/{instance.bosses_total})")
+                        elif archetype == "Elite":
+                            instance.elites_defeated += 1
+                            try:
+                                from app.services import quest_progress_service
 
-                        # Check if all bosses defeated
-                        if instance.bosses_defeated >= instance.bosses_total:
-                            instance.extraction_available = True
-                            _append_log(session, "🎉 All bosses defeated! Extraction portal is now available!")
-                    elif archetype == "Elite":
-                        instance.elites_defeated += 1
-                        try:
-                            from app.services import quest_progress_service
+                                quest_progress_service.record_kill(session.user_id, is_elite=True)
+                            except Exception:
+                                logger.debug("suppressed_exception", where="_check_end", exc_info=True)
+                        else:
+                            instance.monsters_defeated += 1
+                            try:
+                                from app.services import quest_progress_service
 
-                            quest_progress_service.record_kill(session.user_id, is_elite=True)
-                        except Exception:
-                            logger.debug("suppressed_exception", where="_check_end", exc_info=True)
-                    else:
-                        instance.monsters_defeated += 1
-                        try:
-                            from app.services import quest_progress_service
+                                quest_progress_service.record_kill(session.user_id, is_elite=False)
+                            except Exception:
+                                logger.debug("suppressed_exception", where="_check_end", exc_info=True)
 
-                            quest_progress_service.record_kill(session.user_id, is_elite=False)
-                        except Exception:
-                            logger.debug("suppressed_exception", where="_check_end", exc_info=True)
+                    # Outside the loop deliberately: a pack holding two bosses
+                    # would otherwise announce the unlock once per boss. Still
+                    # gated on a boss having died this encounter -- unguarded,
+                    # an instance with bosses_total 0 satisfies 0 >= 0 and every
+                    # ordinary kill would unlock extraction.
+                    if killed_a_boss and instance.bosses_defeated >= instance.bosses_total:
+                        instance.extraction_available = True
+                        _append_log(session, "🎉 All bosses defeated! Extraction portal is now available!")
 
                     db.session.add(instance)
         except Exception as e:
@@ -932,7 +1158,7 @@ def _check_end(session: CombatSession):
         try:
             party = json.loads(session.party_snapshot_json or "{}") or {}
             char_rows = {c.id: c for c in Character.query.filter_by(user_id=session.user_id).all()}
-            xp_total = int(monster.get("xp", 0)) if monster else 0
+            xp_total = sum(int(m.get("xp", 0) or 0) for m in monsters)
             members = party.get("members", [])
             share = int(xp_total / len(members)) if members else xp_total
             xp_map = {}
@@ -1264,7 +1490,9 @@ def _persist_party_resources(session: CombatSession):
         logger.debug("suppressed_exception", where="_persist_party_resources", exc_info=True)
 
 
-def player_attack(combat_id: int, user_id: int, version: int, actor_id: Optional[int] = None) -> Dict[str, Any]:
+def player_attack(
+    combat_id: int, user_id: int, version: int, actor_id: Optional[int] = None, target_id: Optional[int] = None
+) -> Dict[str, Any]:
     """Execute a basic weapon attack for the active player initiative entry.
 
     Enforces turn ownership and optimistic version check. Miss / crit outcomes
@@ -1327,11 +1555,12 @@ def player_attack(combat_id: int, user_id: int, version: int, actor_id: Optional
     crit = acc_roll == 20
     if crit:
         dmg = int(dmg * 1.5)
-    session.monster_hp = max(0, (session.monster_hp or 0) - dmg)
+    hit = _damage_monster(session, dmg, target_id)
+    monster = hit or monster
     _append_log(
         session,
         f"{attacker_name} hits {monster.get('name')} for {dmg}{' (CRIT)' if crit else ''} damage "
-        f"(HP {session.monster_hp})",
+        f"(HP {monster.get('hp', 0)})",
         code=PLAYER_ATTACK_HIT,
     )
     # Track damage for visual effects
@@ -1906,7 +2135,12 @@ def player_use_item(
 
 
 def player_cast_spell(
-    combat_id: int, user_id: int, version: int, spell: str, actor_id: Optional[int] = None
+    combat_id: int,
+    user_id: int,
+    version: int,
+    spell: str,
+    actor_id: Optional[int] = None,
+    target_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Cast a supported spell (Firebolt, Ice Shard, Lightning) reducing mana and dealing damage.
 
@@ -2007,7 +2241,7 @@ def player_cast_spell(
         dmg = int(apply_resistances(dmg, [config["element"]], resistances))
     except Exception:
         logger.debug("suppressed_exception", where="player_cast_spell", exc_info=True)
-    session.monster_hp = max(0, (session.monster_hp or 0) - dmg)
+    hit = _damage_monster(session, dmg, target_id)
     session.party_snapshot_json = json.dumps(party)
     # Track damage for visual effects
     session.last_damage_json = json.dumps({"to_monster": {"amount": dmg, "is_miss": False, "is_critical": crit}})
@@ -2015,7 +2249,7 @@ def player_cast_spell(
     _append_log(
         session,
         f"{caster_name} casts {config['name']} for {dmg}{' (CRIT)' if crit else ''} damage "
-        f"(HP {session.monster_hp})",
+        f"(HP {(hit or {}).get('hp', session.monster_hp)})",
         code=PLAYER_SPELL_HIT,
     )
     session.phase = "end"
@@ -2030,7 +2264,12 @@ def player_cast_spell(
 
 
 def player_cast_skill(
-    combat_id: int, user_id: int, version: int, skill_id: int, actor_id: Optional[int] = None
+    combat_id: int,
+    user_id: int,
+    version: int,
+    skill_id: int,
+    actor_id: Optional[int] = None,
+    target_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Use an unlocked *active* skill in combat.
 
@@ -2111,11 +2350,12 @@ def player_cast_skill(
     mana_suffix = f" (-{mana_cost} mana)" if mana_cost > 0 else ""
     extra: Dict[str, Any] = {}
     if dmg > 0:
-        session.monster_hp = max(0, (session.monster_hp or 0) - dmg)
+        hit = _damage_monster(session, dmg, target_id)
         session.last_damage_json = json.dumps({"to_monster": {"amount": dmg, "is_miss": False, "is_critical": False}})
         _append_log(
             session,
-            f"{caster.get('name', 'Player')} uses {skill.name} for {dmg} damage (HP {session.monster_hp}){mana_suffix}",
+            f"{caster.get('name', 'Player')} uses {skill.name} for {dmg} damage "
+            f"(HP {(hit or {}).get('hp', session.monster_hp)}){mana_suffix}",
             code=PLAYER_SKILL,
         )
         extra["damage"] = dmg
