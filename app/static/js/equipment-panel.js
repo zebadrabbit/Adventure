@@ -606,10 +606,12 @@
                     ? `<span class="cell-qty">${item.qty}</span>`
                     : "";
                 const drinkable = this.isConsumable(item);
-                // draggable only for things that can actually land in a slot:
-                // dragging a potion onto one asked the server to equip it and
-                // earned a 400.
-                const draggable = drinkable ? "false" : "true";
+                // Everything filled is draggable. A potion still cannot land in
+                // an equipment slot -- onSlotDrop refuses it there -- but it is
+                // the single most likely thing a player hands to an ally, and
+                // making the cell undraggable took that away to prevent a 400
+                // the drop handler can decline for free.
+                const draggable = "true";
                 const verb = drinkable ? "drink" : "equip";
 
                 cells.push(`
@@ -790,9 +792,76 @@
             e.currentTarget.removeAttribute("data-drag-over");
 
             if (!this.draggedItem) return;
+            // Bag cells are all draggable so they can be handed to an ally;
+            // a potion still has no business in an equipment slot.
+            if (this.isConsumable(this.draggedItem)) {
+                this.toast("That is something to drink, not to wear.", false);
+                return;
+            }
 
             const targetSlot = e.currentTarget.dataset.slot;
             await this.equipItem(this.draggedItem, targetSlot);
+        }
+
+        // --- Giving an item to another party member -------------------------
+        // The drop target is a party-rail frame, which lives outside this
+        // panel's root, so these are registered as one delegated listener at
+        // module load rather than attached per frame. On the dashboard the
+        // selector simply never matches (the modal's backdrop covers the
+        // roster anyway), so the give is a dungeon-HUD affordance.
+
+        onFrameDragOver(e, frame) {
+            if (!this.draggedItem) return;
+            if (!this.canGiveTo(frame)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            frame.setAttribute("data-drag-over", "true");
+        }
+
+        canGiveTo(frame) {
+            const to = frame.dataset.charId;
+            if (!to || !this.character) return false;
+            // Your own frame is not a target, and neither is a corpse -- the
+            // server refuses both, but there is no reason to offer the gesture.
+            if (String(to) === String(this.character.id)) return false;
+            if (frame.classList.contains("is-downed")) return false;
+            return true;
+        }
+
+        async onFrameDrop(e, frame) {
+            e.preventDefault();
+            frame.removeAttribute("data-drag-over");
+
+            const item = this.draggedItem;
+            if (!item || !this.canGiveTo(frame)) return;
+
+            // Captured before the POST: this.character can be swapped out from
+            // under us by an open() landing mid-flight. The reload afterwards
+            // still goes through refresh(), which reads _openCharId.
+            const from = this.character.id;
+            const body = { to_character_id: Number(frame.dataset.charId) };
+            if (item.uid) body.uid = item.uid;
+            else body.slug = item.slug;
+
+            try {
+                const response = await fetch(`/api/characters/${from}/give`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                });
+                const d = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    this.toast(this.refusalText(d, "They cannot take that."), false);
+                    return;
+                }
+                this.toast(`${item.name} passed to ${d.to_name || "your ally"}.`);
+                await this.refresh();
+                // The receiver is never the open panel, so its frame is the
+                // only place the change shows -- same pair consumeItem uses.
+                if (window.refreshPartyCards) window.refreshPartyCards();
+            } catch (err) {
+                this.toast("They cannot take that.", false);
+            }
         }
 
         async equipItem(item, slot) {
@@ -1172,6 +1241,22 @@
         if (!btn) return;
         const host = btn.closest('[data-char-id]');
         if (host && host.dataset.charId) window.EquipmentPanel.open(host.dataset.charId);
+    });
+
+    // Giving: drag a bag cell onto another party member's frame. Registered
+    // the same way and for the same reason as the click delegate above -- the
+    // frames are server-rendered outside this panel's root, and drag events
+    // bubble, so one document listener covers all four without a per-frame
+    // attach or a re-attach hook. closest() no-ops on the dashboard, which has
+    // no rail.
+    ['dragover', 'dragleave', 'drop'].forEach((type) => {
+        document.addEventListener(type, (e) => {
+            const frame = e.target.closest && e.target.closest('.adv-frame-open');
+            if (!frame) return;
+            if (type === 'dragover') panel.onFrameDragOver(e, frame);
+            else if (type === 'dragleave') frame.removeAttribute('data-drag-over');
+            else panel.onFrameDrop(e, frame);
+        });
     });
 
     // Loot claimed elsewhere (adventure.js:774, adventure-extraction.js:89)

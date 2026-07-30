@@ -305,6 +305,18 @@ body[data-realm="dungeon"] .account-anchor-trigger:hover .avatar-circle {
     box-shadow: var(--focus-ring);
 }
 
+/* Drop target while dragging a bag item onto an ally to hand it over. Mirrors
+   .equipment-slot[data-drag-over="true"] (equipment.css) so the two drop
+   gestures in the same panel read identically — accent rather than info,
+   because the rail is warm and --info is an alias of --accent anyway. Only
+   frames the give can actually land on get the attribute (equipment-panel.js
+   canGiveTo: not yourself, not a corpse), so the affordance never lies. */
+.adv-hud .adv-party-rail .operative-card[data-drag-over="true"] {
+    border-color: var(--accent);
+    border-style: dashed;
+    background: linear-gradient(var(--accent-wash), var(--accent-wash)), var(--surface-overlay);
+}
+
 /* A downed character is unmissable — refreshPartyCards() sets this.
    The wash is layered over the frame's own surface, not swapped for it:
    --danger-wash is 14% opaque, so assigning it alone made the one frame that
