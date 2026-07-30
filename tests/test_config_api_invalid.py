@@ -37,7 +37,6 @@ def logged_in_client(test_app):
         "/api/config/starter_items",
         "/api/config/base_stats",
         "/api/config/class_map",
-        "/api/config/class_colors",
     ],
 )
 def test_config_api_requires_auth(endpoint, test_app):
@@ -54,7 +53,6 @@ def test_config_api_requires_auth(endpoint, test_app):
         "/api/config/starter_items",
         "/api/config/base_stats",
         "/api/config/class_map",
-        "/api/config/class_colors",
     ],
 )
 def test_config_api_success(endpoint, logged_in_client):

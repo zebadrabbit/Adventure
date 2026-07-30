@@ -101,51 +101,16 @@
         };
       } catch (e) { console.warn('[socket:/game] init failed', e); }
     })();
-    // ------------------------------------------------------------------
-    // Dynamic class color theming
-    // Fetch centralized class color config from /api/config/class_colors
-    // and apply as CSS variables. This allows future runtime palette tweaks
-    // or adding new classes without editing static CSS files. If new class
-    // slugs are returned that we don't have predefined .class-*/.border-* rules
-    // for, we inject them dynamically.
-    // ------------------------------------------------------------------
-    (function fetchAndApplyClassColors() {
-      const endpoint = '/api/config/class_colors';
-      fetch(endpoint, { headers: { 'Accept': 'application/json' } })
-        .then(r => { if (!r.ok) throw new Error('status ' + r.status); return r.json(); })
-        .then(map => {
-          if (!map || typeof map !== 'object') return;
-          const root = document.documentElement;
-          const predefined = new Set(['fighter', 'rogue', 'mage', 'cleric', 'druid', 'ranger']);
-          const dynamicRules = [];
-          for (const [slug, cfg] of Object.entries(map)) {
-            if (!cfg || typeof cfg !== 'object') continue;
-            const bg = cfg.bg || cfg.background || '#333';
-            const fg = cfg.fg || cfg.color || '#eee';
-            const border = cfg.border || cfg.accent || '#555';
-            root.style.setProperty(`--class-${slug}-bg`, bg);
-            root.style.setProperty(`--class-${slug}-fg`, fg);
-            root.style.setProperty(`--class-${slug}-border`, border);
-            if (!predefined.has(slug)) {
-              dynamicRules.push(`.class-${slug}{background:var(--class-${slug}-bg)!important;color:var(--class-${slug}-fg)!important;}`);
-              dynamicRules.push(`.border-${slug}{border:2px solid var(--class-${slug}-border)!important;}`);
-              dynamicRules.push(`.class-badge.${slug}-badge{background:var(--class-${slug}-bg);color:var(--class-${slug}-fg);border:1px solid var(--class-${slug}-border);}`);
-            }
-          }
-          if (dynamicRules.length) {
-            const styleEl = document.createElement('style');
-            styleEl.setAttribute('data-generated', 'class-colors');
-            styleEl.textContent = dynamicRules.join('\n');
-            document.head.appendChild(styleEl);
-          }
-        })
-        .catch(err => {
-          // Non-fatal: keep existing static palette. Silent in production; log compact info for debugging.
-          if (window && window.console) {
-            console.debug('[class-colors] fetch skipped/fallback:', err.message);
-          }
-        });
-    })();
+    // Dynamic class color theming (fetchAndApplyClassColors) removed
+    // 2026-07-29 (class-colour-unification, Task 2). It fetched the now-
+    // deleted per-class colour config endpoint and set
+    // --class-<slug>-bg/-fg/-border on documentElement, then injected a
+    // <style data-generated="class-colors"> block of !important rules for
+    // the six classes base.css didn't cover. That overrode the static
+    // palette on /adventure alone, which is why a class's badge disagreed
+    // between the dashboard and the dungeon. All twelve classes are now
+    // defined once, in tokens.css, and read directly by the static CSS --
+    // no runtime fetch or injection needed.
     // ------------------------------------------------------------
     // Seen tile persistence + throttled save (localStorage)
     // ------------------------------------------------------------

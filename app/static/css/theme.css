@@ -343,75 +343,75 @@ body {
 }
 
 .fighter-badge {
-    background: rgba(139, 46, 46, 0.25);
-    color: #d87070;
-    border-color: #8b2e2e;
+    background: var(--class-fighter-bg);
+    color: var(--class-fighter-fg);
+    border-color: var(--class-fighter-border);
 }
 
 .rogue-badge {
-    background: rgba(93, 63, 106, 0.25);
-    color: #b899c7;
-    border-color: #5d3f6a;
+    background: var(--class-rogue-bg);
+    color: var(--class-rogue-fg);
+    border-color: var(--class-rogue-border);
 }
 
 .mage-badge {
-    background: rgba(58, 90, 128, 0.25);
-    color: #7fa8d1;
-    border-color: #3a5a80;
+    background: var(--class-mage-bg);
+    color: var(--class-mage-fg);
+    border-color: var(--class-mage-border);
 }
 
 .cleric-badge {
-    background: rgba(193, 122, 58, 0.25);
-    color: #d4a574;
-    border-color: #c17a3a;
+    background: var(--class-cleric-bg);
+    color: var(--class-cleric-fg);
+    border-color: var(--class-cleric-border);
 }
 
 .ranger-badge {
-    background: rgba(74, 103, 65, 0.25);
-    color: #99b88f;
-    border-color: #4a6741;
+    background: var(--class-ranger-bg);
+    color: var(--class-ranger-fg);
+    border-color: var(--class-ranger-border);
 }
 
 .druid-badge {
-    background: rgba(82, 107, 70, 0.25);
-    color: #a0bf91;
-    border-color: #526b46;
+    background: var(--class-druid-bg);
+    color: var(--class-druid-fg);
+    border-color: var(--class-druid-border);
 }
 
 .barbarian-badge {
-    background: rgba(168, 67, 31, 0.55);
-    color: #ffd8c2;
-    border-color: #d9875c;
+    background: var(--class-barbarian-bg);
+    color: var(--class-barbarian-fg);
+    border-color: var(--class-barbarian-border);
 }
 
 .bard-badge {
-    background: rgba(184, 154, 58, 0.55);
-    color: #fbf0cf;
-    border-color: #d8c178;
+    background: var(--class-bard-bg);
+    color: var(--class-bard-fg);
+    border-color: var(--class-bard-border);
 }
 
 .monk-badge {
-    background: rgba(47, 125, 114, 0.55);
-    color: #d4f3ee;
-    border-color: #7fc4b8;
+    background: var(--class-monk-bg);
+    color: var(--class-monk-fg);
+    border-color: var(--class-monk-border);
 }
 
 .paladin-badge {
-    background: rgba(203, 182, 118, 0.55);
-    color: #fbf5e6;
-    border-color: #e3d6ad;
+    background: var(--class-paladin-bg);
+    color: var(--class-paladin-fg);
+    border-color: var(--class-paladin-border);
 }
 
 .sorcerer-badge {
-    background: rgba(168, 64, 122, 0.55);
-    color: #fbdcec;
-    border-color: #d488b8;
+    background: var(--class-sorcerer-bg);
+    color: var(--class-sorcerer-fg);
+    border-color: var(--class-sorcerer-border);
 }
 
 .warlock-badge {
-    background: rgba(58, 40, 99, 0.55);
-    color: #d8c9f5;
-    border-color: #8a6fd1;
+    background: var(--class-warlock-bg);
+    color: var(--class-warlock-fg);
+    border-color: var(--class-warlock-border);
 }
 
 .operative-body {

@@ -12,11 +12,12 @@
      3. utilities.css (generic utilities + movement pad + dungeon output)
      4. combat.css (combat layout & log)
      5. dashboard.css (if exists)  -> (deferred; keep for future merge)
-     6. class-badges.css (deferred; might have sprite/class color rules)
+     6. class-badges.css -- deleted 2026-07-29 (class-colour-unification, Task 2).
+        It was an orphan (loaded by no template) that duplicated the twelve
+        badge rules theme.css now reads from tokens.css directly.
 
    Deferred files (left separate for now due to page-specific weight):
      - dashboard.css
-     - class-badges.css
      - chat-widget.css
      - tooltips.css
      - auth.css, home.css (landing/auth specific styling)

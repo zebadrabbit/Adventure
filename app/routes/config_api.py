@@ -253,22 +253,6 @@ CLASS_MAP = {
     "warlock": "Warlock",
 }
 
-# Centralized class color configuration (background & text plus optional border accent)
-CLASS_COLORS = {
-    "fighter": {"bg": "#301d0b", "fg": "#f2e2d8", "border": "#271504"},
-    "rogue": {"bg": "#6F7A16", "fg": "#e5e5d1", "border": "#6d740f"},
-    "mage": {"bg": "#189bca", "fg": "#d2f2ff", "border": "#196e89"},
-    "cleric": {"bg": "#c3ccd1", "fg": "#f5f5f5", "border": "#9aa1a5"},
-    "druid": {"bg": "#FF7B00", "fg": "#d8f2dc", "border": "#574a2f"},
-    "ranger": {"bg": "#1a940a", "fg": "#d8eef5", "border": "#337d2c"},
-    "barbarian": {"bg": "#8b2e2e", "fg": "#ffd8d8", "border": "#6d1f1f"},
-    "bard": {"bg": "#9b59b6", "fg": "#f5e6ff", "border": "#7d3c98"},
-    "monk": {"bg": "#d4a574", "fg": "#2d2419", "border": "#a67c52"},
-    "paladin": {"bg": "#f39c12", "fg": "#2d1f0a", "border": "#c87f0a"},
-    "sorcerer": {"bg": "#e74c3c", "fg": "#fff5f5", "border": "#c0392b"},
-    "warlock": {"bg": "#2c3e50", "fg": "#ecf0f1", "border": "#1a252f"},
-}
-
 
 @bp_config.route("/api/config/name_pools")
 @login_required
@@ -320,15 +304,3 @@ def api_class_map():
         wants_json = "application/json" in (request.headers.get("Accept") or "")
         return (jsonify({"error": "unauthorized"}), 401) if wants_json else redirect(url_for("auth.login"))
     return jsonify(CLASS_MAP)
-
-
-@bp_config.route("/api/config/class_colors")
-@login_required
-def api_class_colors():
-    """Return centralized class color mapping.
-    Response: { 'fighter': { 'bg': '#xxxxxx', 'fg': '#yyyyyy', 'border': '#zzzzzz' }, ... }
-    """
-    if not current_user.is_authenticated or not session.get("_user_id"):
-        wants_json = "application/json" in (request.headers.get("Accept") or "")
-        return (jsonify({"error": "unauthorized"}), 401) if wants_json else redirect(url_for("auth.login"))
-    return jsonify(CLASS_COLORS)
