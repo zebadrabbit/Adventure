@@ -62,7 +62,10 @@ def test_shrine_restores_mana_and_grants_regen_buff(test_app):
         user = create_user("shrine_1")
         inst = create_instance(user, seed=7001)
         char = create_character(user, name="Hero")
-        _set_stats(char, hp=50, max_hp=50, mana=10, max_mana=100)
+        # int 40 -> compute_hp_mana_max gives 20 + 40*2 = 100 mana. The cap is
+        # computed, never stored, so it is seeded through the stat that feeds
+        # it rather than through a "max_mana" key nothing reads.
+        _set_stats(char, hp=50, mana=10, **{"int": 40})
 
         ent = _place(inst, "shrine", 5, 5, name="Ancient Shrine", slug="shrine")
         ent_id = ent.id
@@ -71,10 +74,33 @@ def test_shrine_restores_mana_and_grants_regen_buff(test_app):
 
         assert len(events) == 1
         assert events[0]["kind"] == "shrine"
-        # +50% of 100 max_mana instant restore, capped.
-        assert json.loads(db.session.get(type(char), char.id).stats)["mana"] == 60
+        # +50% of the 100 computed cap, capped.
+        after = json.loads(db.session.get(type(char), char.id).stats)
+        assert after["mana"] == 60
+        # Both keys, or combat's _derive_stats reads the stale one and the
+        # restore is silently discarded on the next fight.
+        assert after["current_mana"] == 60
         assert CharacterStatusEffect.query.filter_by(character_id=char.id, name="regen_buff").count() == 1
         assert db.session.get(DungeonEntity, ent_id) is None
+
+
+def test_shrine_restores_mana_without_a_stored_max_mana(test_app):
+    """The live case. Only level-up writes stats["max_mana"], so for almost
+    every character the shrine's old read fell back to *current* mana, making
+    the restore min(cur, cur + cur*pct) == cur -- exactly nothing."""
+    with test_app.app_context():
+        user = create_user("shrine_2")
+        inst = create_instance(user, seed=7003)
+        char = create_character(user, name="Drained")
+        _set_stats(char, hp=50, mana=4, **{"int": 40})
+        assert "max_mana" not in json.loads(char.stats)
+
+        _place(inst, "shrine", 5, 5, name="Ancient Shrine", slug="shrine")
+        resolve_events_at(inst, 5, 5)
+
+        after = json.loads(db.session.get(type(char), char.id).stats)
+        assert after["mana"] == 54, "shrine restored nothing"
+        assert after["current_mana"] == 54
 
 
 def test_trap_avoided_when_leader_perception_high(test_app):
