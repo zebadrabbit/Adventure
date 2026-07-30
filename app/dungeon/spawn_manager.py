@@ -84,7 +84,23 @@ class SpawnConfig:
     # placed as packs around anchor points that are kept apart, so encounters
     # are distinct and spread across the map instead of arriving all at once.
     group_size_min: int = 1
-    group_size_max: int = 3  # raise once combat can field a whole pack at once
+    group_size_max: int = 3  # how many monsters spawn as a cluster on the map
+
+    # How many of that cluster fight together when you walk into one.
+    #
+    # 1 is the historical behaviour: you fight the monster you stepped on, and
+    # its neighbours wait their turn. Combat can field up to 6 now (phase 1 of
+    # the tactical-combat spec, and tests/test_combat_multi_enemy.py proves the
+    # engine end to end) -- but turning it on is a BALANCE change, not an engine
+    # one, and the numbers are not ready:
+    #
+    #   at 3, tests/test_full_run_e2e.py wipes the party partway through a run.
+    #
+    # Every monster is costed for a solo appearance, there are still no monsters
+    # above level 20, and the item catalogue is 225/229 common, so the party
+    # cannot gear into it either. Raising this is a one-line change and belongs
+    # with the other tuning verdicts waiting on a playtest.
+    combat_pack_max: int = 1
     group_spread: int = 2  # members land within this radius of the anchor
     min_group_separation: int = 7  # Chebyshev distance between anchors
 

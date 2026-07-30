@@ -71,11 +71,25 @@ Full triage with code pointers:
       encumbrance, clickable to the paper doll) — **D&D lingo throughout is
       still open**, and "Party Stash" is the design system's own worked example
       of what not to say (`DESIGN_SYSTEM.md` rule 8).
-- [ ] **Combat overhaul** — designed: combat is its own screen and zooms into the
-      map tile the party occupies, 4 vs 1-6 on a grid. Phased in
-      [specs/2026-07-28-tactical-combat-design.md](specs/2026-07-28-tactical-combat-design.md);
-      phase 1 (multi-enemy, no grid) is the biggest win and unblocks raising
-      `SpawnConfig.group_size_max` above its current cap of 3.
+- [ ] **Combat overhaul** — phase 1 (multi-enemy) is **built**:
+      [plans/2026-07-30-combat-multi-enemy.md](plans/2026-07-30-combat-multi-enemy.md).
+      `monsters_json` is the source of truth, initiative spans every combatant,
+      corpses are tombstoned and skipped, monsters act as themselves with
+      per-monster cooldowns, loot/XP/kills fold across the pack, actions carry a
+      `target_id`, and the screen lists the enemies with a target picker.
+      Two live bugs fell out of the survey and are fixed: `_check_end` had no
+      re-entry guard, so a second `end_turn` after a win re-rolled and re-granted
+      the whole loot table; and the "all bosses defeated" unlock, once hoisted
+      out of the per-corpse loop, would have fired on every kill because
+      `0 >= 0`.
+      **It is switched off in play.** `SpawnConfig.combat_pack_max` ships at 1,
+      so you still fight one monster at a time. At 3 the full-run test wipes the
+      party: monsters are costed for a solo appearance, nothing exists above
+      level 20, and the catalogue is 225/229 common. Turning it on is one line
+      and belongs with the tuning verdicts below — it is the single highest-value
+      thing a playtest could settle now.
+      Phases 2 (the grid) and 3 (the zoom) are unstarted; spec:
+      [specs/2026-07-28-tactical-combat-design.md](specs/2026-07-28-tactical-combat-design.md).
 - [x] ~~**Adventure HUD**~~ — full-bleed map, chrome="minimal" render flag,
       account anchor top-right, party frames left, floating collapsible log,
       action bar bottom-left. Plan:

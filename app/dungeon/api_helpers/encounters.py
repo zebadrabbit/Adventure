@@ -17,9 +17,28 @@ from __future__ import annotations
 
 import json
 
+import structlog
+
 from app import db
 
+logger = structlog.get_logger(__name__)
+
 __all__ = ["trigger_collision_combat", "run_monster_patrols"]
+
+
+def combat_pack_cap() -> int:
+    """How many monsters a single encounter may field.
+
+    One seam rather than a bare attribute read, so the knob can move to
+    GameConfig later without touching the encounter, and so a test can opt in to
+    pack combat without reaching into a dataclass's captured field defaults.
+    """
+    try:
+        from app.dungeon.spawn_manager import SpawnConfig
+
+        return max(1, int(SpawnConfig().combat_pack_max))
+    except Exception:
+        return 1
 
 
 def trigger_collision_combat(instance) -> dict | None:
@@ -50,32 +69,66 @@ def trigger_collision_combat(instance) -> dict | None:
     if not monster_ent:
         return None
 
-    mdata = {}
-    try:
-        if monster_ent.data:
-            mdata = json.loads(monster_ent.data)
-    except Exception:
-        mdata = {}
+    def _payload(ent):
+        """Carry the whole spawn payload into combat: archetype drives boss/elite
+        kill tracking (and with it the extraction unlock), and xp/loot_table/
+        resistances all live here too. Only the live entity fields override it."""
+        data = {}
+        try:
+            if ent.data:
+                data = json.loads(ent.data)
+        except Exception:
+            data = {}
+        return {
+            **data,
+            "slug": ent.slug,
+            "name": ent.name or ent.slug,
+            "hp": ent.hp_current or data.get("hp", 30),
+            "damage": data.get("damage", 6),
+            "speed": data.get("speed", 10),
+        }
 
-    # Carry the whole spawn payload into combat: archetype drives boss/elite
-    # kill tracking (and with it the extraction unlock), and xp/loot_table/
-    # resistances all live here too. Only the live entity fields override it.
-    monster_payload = {
-        **mdata,
-        "slug": monster_ent.slug,
-        "name": monster_ent.name or monster_ent.slug,
-        "hp": monster_ent.hp_current or mdata.get("hp", 30),
-        "damage": mdata.get("damage", 6),
-        "speed": mdata.get("speed", 10),
-    }
+    # The pack, not just the one you walked into. Spawning already clusters
+    # monsters, so the ones standing next to the trigger are the group the
+    # design means by "zoom into the tile you are on" -- pulling them in is what
+    # stops a fight that looks like four-on-one from being resolved as four
+    # separate four-on-ones. Capped by SpawnConfig.combat_pack_max -- which is 1
+    # today, so this is dormant until the monster numbers are ready for it (see
+    # that field for why). Neighbours are ordered by id, so a given seed always
+    # fights the same pack.
+    fighters = [monster_ent]
+    cap = combat_pack_cap()
+    if cap > 1:
+        try:
+            neighbours = (
+                DungeonEntity.query.filter(
+                    DungeonEntity.instance_id == instance.id,
+                    DungeonEntity.type == "monster",
+                    DungeonEntity.z == instance.pos_z,
+                    DungeonEntity.id != monster_ent.id,
+                    DungeonEntity.x.between(instance.pos_x - 1, instance.pos_x + 1),
+                    DungeonEntity.y.between(instance.pos_y - 1, instance.pos_y + 1),
+                )
+                .order_by(DungeonEntity.id)
+                .limit(cap - 1)
+                .all()
+            )
+            fighters.extend(neighbours)
+        except Exception:
+            logger.debug("suppressed_exception", where="_start_encounter_neighbours", exc_info=True)
 
     from app.services import combat_service
 
-    session_row = combat_service.start_session(instance.user_id, monster_payload)
+    payloads = [_payload(e) for e in fighters]
+    monster_payload = payloads[0]  # the trigger, for the caller's response
+    session_row = combat_service.start_session(instance.user_id, payloads)
     combat_id = session_row.id
 
     try:
-        db.session.delete(monster_ent)
+        # Every monster now in the fight leaves the map, not just the trigger --
+        # otherwise the pack would still be standing there after the fight.
+        for ent in fighters:
+            db.session.delete(ent)
         db.session.commit()
     except Exception:
         db.session.rollback()

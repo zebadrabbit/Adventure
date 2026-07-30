@@ -277,3 +277,68 @@ def test_a_session_row_keeps_the_legacy_columns_in_step(party):
     fresh = db.session.get(CombatSession, session.id)
     assert fresh.monster_hp == 35, "the denormalised view drifted from the list"
     assert fresh.monster()["hp"] == 35
+
+
+# ------------------------------------------------------- monsters act as themselves
+
+
+def _force_monster_turn(session, monster_id):
+    """Point active_index at a specific monster's initiative slot."""
+    initiative = json.loads(session.initiative_json)
+    session.active_index = next(i for i, e in enumerate(initiative) if e["type"] == "monster" and e["id"] == monster_id)
+    db.session.commit()
+
+
+def test_the_acting_monster_is_the_one_whose_turn_it_is(party):
+    """Not monsters[0]. With a pack, reading session.monster() would make the
+    first monster take every monster turn in the round."""
+    session = combat_service.start_session(party.id, [_mob("Alpha", hp=30), _mob("Beta", hp=30)])
+    _force_monster_turn(session, 1)
+
+    acting = combat_service._active_monster(session)
+
+    assert acting is not None and acting["name"] == "Beta", acting
+
+
+def test_only_the_acting_monster_is_stamped_as_having_acted(party):
+    """`last_turn` is stamped on whoever acted, so it is the precise record of
+    attribution. Asserting on the log instead would be a tautology -- the
+    encounter-start line already names every monster in the pack."""
+    session = combat_service.start_session(party.id, [_mob("Alpha", hp=30), _mob("Beta", hp=30)])
+    _force_monster_turn(session, 1)
+
+    combat_service.monster_auto_turn(session)
+
+    after = combat_service._monsters(session)
+    assert after[1].get("last_turn") == 1, f"Beta did not act on its own turn: {after}"
+    assert after[0].get("last_turn") is None, f"Alpha acted on Beta's turn: {after}"
+
+
+def test_one_monster_on_cooldown_does_not_silence_the_pack(party):
+    """last_turn is per-monster. Shared, one monster acting would put every
+    other monster on cooldown and the fight would go quiet."""
+    session = combat_service.start_session(party.id, [_mob("Alpha", hp=30), _mob("Beta", hp=30)])
+    monsters = combat_service._monsters(session)
+    monsters[0]["last_turn"] = session.combat_turn
+    combat_service._save_monsters(session, monsters)
+
+    after = combat_service._monsters(session)
+    assert after[0].get("last_turn") == session.combat_turn
+    assert after[1].get("last_turn") is None, "the whole pack went on cooldown together"
+
+
+def test_the_state_payload_lists_every_monster(party):
+    session = combat_service.start_session(party.id, [_mob("Alpha", hp=30), _mob("Beta", hp=12)])
+    monsters = combat_service._monsters(session)
+    monsters[1]["hp"] = 0
+    combat_service._save_monsters(session, monsters)
+
+    state = session.to_dict()
+
+    assert [m["name"] for m in state["monsters"]] == ["Alpha", "Beta"]
+    assert state["monsters"][0]["alive"] is True
+    assert state["monsters"][1]["alive"] is False
+    assert state["monsters"][1]["hp_max"] == 12, "hp_max must survive the monster dying"
+    # The single-monster shape still answers, for clients that predate this.
+    assert state["monster"]["name"] == "Alpha"
+    assert state["monster_hp"] == 30
