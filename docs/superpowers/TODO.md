@@ -339,23 +339,59 @@ misbehave today.
 
 ## Party inventory model
 
-The intended model (owner, 2026-07-29) is per-character bags with exchange
-between characters outside combat. Two pieces of it do not exist yet.
+The intended model (owner, 2026-07-29): each character carries their own bag;
+items can be exchanged between characters **outside** combat; in combat a
+character may only use their own inventory; a character who dies and is not
+resurrected can be looted, and whatever is left on them is lost.
 
-- [ ] **No character-to-character item exchange.** Nothing hands an item from
-      one party member to another: `trading_api.py` is merchant buy/sell/repair
-      only, and there is no give/take endpoint anywhere in `app/routes/`. So
-      the potions land on whoever looted them and stay there for the whole
-      delve. Needs a give endpoint plus an encumbrance re-check on the
-      receiving side (the giver can only get lighter) and the same
-      `_reject_if_in_combat` lock `equip` uses — in combat a character may only
-      use their own inventory. The paper-doll panel is the natural surface,
-      since it already renders one character's bag and knows the party.
-- [ ] **Looting a corpse has no same-run guard** — already tracked as a Spec 2
-      follow-up: `POST /api/dungeon/loot-body` checks only that both characters
-      belong to the user and the donor `is_dead`, not that they are in the same
-      run. "Anything left on them is lost" is not enforced either; the body
-      keeps its remaining items indefinitely rather than the run consuming them.
+- [ ] **A second, contradictory shared-container system is still live.**
+      `app/routes/party_api.py:115-247` serves `/api/party/<id>/inventory`,
+      `/inventory/contribute`, `/inventory/take` and `/inventory/use` against a
+      `PartySharedInventory` model (`app/models/party.py:100`), plus
+      `/gold/contribute` and `/gold/withdraw` for a shared purse. The dashboard
+      renders a whole **"Shared Inventory"** tab for it with a "Party Treasury"
+      readout (`dashboard.html:589,614-621`), and `party-management.js:483`
+      calls `take`. This is precisely the model the Party Stash button was
+      deleted for contradicting, and it is reachable today. Deciding its fate
+      is an owner call, not a cleanup: it is an API, a model, a table and a UI
+      tab. Note the two "Contribute" buttons have no handler, so the tab is
+      already half-dead.
+
+- [x] ~~**No character-to-character item exchange.**~~ Built:
+      `POST /api/characters/<cid>/give` with `{to_character_id, uid|slug}`,
+      and on the client a bag cell dragged onto a party frame. Guards, in
+      order: id coercion (the target id comes from the body, so an unparseable
+      one 500s rather than refuses); ownership on both sides; **same-character
+      before any inventory is read** — `_char_owned` ends in
+      `db.session.get`, so a self-give returns the same mapped object twice
+      and reading two lists off it duplicates the item; item present; not in
+      combat; neither side downed; same-run; receiver's encumbrance. The
+      combat check is one call to `_active_combat_for`, not
+      `_reject_if_in_combat` — the latter returns `None` for any slot outside
+      `COMBAT_LOCKED_SLOTS`, so it fails *open* for a slotless operation.
+      Encumbrance is weighed on a prospective bag rather than via
+      `can_add_item`, which looks weight up by catalogue slug and so cannot
+      see a procedural instance's own `weight`.
+      Client note: bag cells were `draggable="false"` for anything drinkable,
+      which made a potion — the likeliest thing anyone hands over — the one
+      thing that could not be picked up. All filled cells are draggable now
+      and `onSlotDrop` refuses a potion instead, so equipment slots stay
+      protected. 13 server tests + 1 browser test; every guard confirmed by
+      backing it out.
+- [ ] **Whole stacks cannot be split.** A give moves exactly one unit of a
+      stack (or one whole instance). Handing over five potions is five drags.
+      The drop gesture cannot express a quantity; a shift-drag or a small
+      prompt would need designing. `hoard.js` has the same limitation.
+- [ ] **The give is dungeon-HUD only.** The dashboard mounts the same panel as
+      a `modal-xl` with a backdrop, so the roster cards behind it cannot
+      receive a drop. Acceptable today because the hoard tab is already the
+      town-side transfer surface, but it means the gesture is not learnable
+      from the dashboard.
+- [ ] **The give has no keyboard route.** Bag cells were deliberately made
+      `role="button" tabindex="0"` with a keydown activator, and page hotkeys
+      are suppressed to protect that. A drag-only affordance regresses against
+      that standard. The loot-claim dropdown (`adventure.js` +
+      `#loot-dropdown-item-template`) is the existing pattern to copy.
 
 ## Gameplay — waiting on playtest verdicts
 - [ ] Tune `EVENT_TUNING` (app/dungeon/room_events.py): shrine/trap/ambush

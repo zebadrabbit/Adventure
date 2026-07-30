@@ -14,6 +14,7 @@ from flask_login import current_user, login_required
 from app import db
 from app.inventory.utils import (
     add_gear_value,
+    add_item,
     apply_encumbrance_penalty,
     dump_inventory,
     encumbrance_state,
@@ -51,6 +52,12 @@ _REFUSAL_NO_CHARACTER = "No such hero answers to your banner."
 _REFUSAL_BAD_SLOT = "There is nowhere on your person to wear that."
 _REFUSAL_NOT_EQUIPPABLE = "That is not something you can wear or wield."
 _REFUSAL_EMPTY_SLOT = "You wear nothing there to remove."
+_REFUSAL_NO_TARGET = "Name the companion you mean to hand it to."
+_REFUSAL_SAME_CHARACTER = "That hero already carries it."
+_REFUSAL_GIVE_IN_COMBAT = "There is no time to pass things about in the middle of a fight."
+_REFUSAL_DOWNED = "The dead neither give nor take. Loot the body instead."
+_REFUSAL_NOT_IN_PARTY = "Only those who set out together may share the load."
+_REFUSAL_RECEIVER_LADEN = "They are carrying too much already."
 
 # The one gear-slot vocabulary. Defined by the loot generator, which is what
 # every procedural item, prefix and suffix keys off, so it is what the player
@@ -724,6 +731,114 @@ def consume_item(cid: int):
             "effects": {"hp": heal, "mana": mana, "regen_buff": applied_regen_buff},
         }
     )
+
+
+@bp_inventory.route("/api/characters/<int:cid>/give", methods=["POST"])
+@login_required
+def give_item(cid: int):
+    """Hand one item from one of the player's characters to another.
+
+    There is no shared party container -- bags are per-character, and
+    per-character encumbrance only binds if every item sits in somebody's bag.
+    This is the sanctioned way an item moves between two of your own heroes.
+
+    Body: ``{"to_character_id": int, "uid": str}`` for a procedural gear
+    instance, or ``{"to_character_id": int, "slug": str}`` for one unit of a
+    catalogue stack.
+    """
+    data = request.get_json(silent=True) or {}
+
+    # The route converter types ``cid``; the target id arrives in the body and
+    # nothing types it. db.session.get(Character, "seven") reaches Postgres as
+    # an invalid integer literal and 500s, so coerce before looking anything up.
+    raw_to = data.get("to_character_id")
+    try:
+        to_id = int(raw_to)
+    except (TypeError, ValueError):
+        return jsonify({"error": "missing_target", "message": _REFUSAL_NO_TARGET}), 400
+
+    giver = _char_owned(cid)
+    if not giver:
+        return jsonify({"error": "not found", "message": _REFUSAL_NO_CHARACTER}), 404
+    receiver = _char_owned(to_id)
+    if not receiver:
+        return jsonify({"error": "not found", "message": _REFUSAL_NO_CHARACTER}), 404
+
+    # Before any load_inventory: _char_owned ends in db.session.get, so giving
+    # to yourself returns the *same* mapped object twice. Reading two lists off
+    # it and writing both back would duplicate the item or lose it, depending
+    # on which write lands last.
+    if giver.id == receiver.id:
+        return jsonify({"error": "same_character", "message": _REFUSAL_SAME_CHARACTER}), 400
+
+    uid = (data.get("uid") or "").strip()
+    slug = (data.get("slug") or "").strip()
+    if not uid and not slug:
+        return jsonify({"error": "missing slug", "message": _REFUSAL_MISSING_SLUG}), 400
+
+    giver_inv = load_inventory(giver.items)
+    entry = find_instance(giver_inv, uid) if uid else next((o for o in giver_inv if o.get("slug") == slug), None)
+    if entry is None:
+        return jsonify({"error": "item not in bag", "message": _REFUSAL_NOT_IN_BAG}), 400
+
+    # One call, not two. Both characters passed _char_owned, so they share a
+    # user_id, and combat is per-user and party-wide -- _active_combat_for is
+    # already the whole check. _reject_if_in_combat is deliberately NOT used:
+    # it returns None for any slot outside COMBAT_LOCKED_SLOTS, so a slotless
+    # operation like this one would sail straight through it.
+    combat = _active_combat_for(giver)
+    if combat is not None:
+        return (
+            jsonify({"error": "in_combat", "message": _REFUSAL_GIVE_IN_COMBAT, "combat_id": combat.id}),
+            400,
+        )
+
+    # Give is the living-to-living verb. Looting a corpse is loot-body's job,
+    # and giving *to* one would be a way to destroy items.
+    if giver.is_dead or giver.permadeath or receiver.is_dead or receiver.permadeath:
+        return jsonify({"error": "character_downed", "message": _REFUSAL_DOWNED}), 400
+
+    # Same-run guard, mirroring hoard_api.loot_body: without it an uninvolved
+    # mule that never entered the dungeon could be handed the run's haul, which
+    # is banking to safety by another name. Gated on the key being populated --
+    # it is empty outside a run, where a give between roster characters is fine.
+    party_ids = session.get("last_party_ids") or []
+    if party_ids and (giver.id not in party_ids or receiver.id not in party_ids):
+        return jsonify({"error": "not_in_party", "message": _REFUSAL_NOT_IN_PARTY}), 403
+
+    receiver_inv = load_inventory(receiver.items)
+    base_stats = _safe_json_load(receiver.stats, {})
+    str_score = int(base_stats.get("str", 10)) if isinstance(base_stats, dict) else 10
+    # can_add_item looks its weight up by catalogue slug, which a procedural
+    # instance does not have -- it carries its own. Weigh the prospective bag
+    # instead, the way loot_api does, so both entry kinds are measured the same
+    # way compute_weight will actually charge for them.
+    prospective = receiver_inv + [entry if uid else {"slug": slug, "qty": 1}]
+    enc = encumbrance_state(str_score, prospective)
+    if enc.get("status") == "blocked":
+        return jsonify({"error": "encumbered", "message": _REFUSAL_RECEIVER_LADEN, "encumbrance": enc}), 400
+
+    # Move it. Same shape as hoard_service.withdraw_to_character: mutate both
+    # lists in memory, write both columns, one commit.
+    if uid:
+        if not remove_instance(giver_inv, uid):
+            return jsonify({"error": "item_removal_failed", "message": REFUSAL_ITEM_REMOVAL_FAILED}), 500
+        receiver_inv.append(entry)
+        given = entry.get("name") or uid
+    else:
+        if not remove_one(giver_inv, slug):
+            return jsonify({"error": "item_removal_failed", "message": REFUSAL_ITEM_REMOVAL_FAILED}), 500
+        add_item(receiver_inv, slug, 1)
+        given = slug
+
+    giver.items = dump_inventory(giver_inv)
+    receiver.items = dump_inventory(receiver_inv)
+    db.session.commit()
+    try:
+        advance_for("give", character_ids=[giver.id, receiver.id])
+    except Exception:
+        pass
+    return jsonify({"ok": True, "given": given, "to": receiver.id, "to_name": receiver.name})
 
 
 @bp_inventory.route("/api/characters/<int:cid>/level-up", methods=["POST"])

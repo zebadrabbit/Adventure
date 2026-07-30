@@ -612,6 +612,68 @@ def test_a_potion_in_the_bag_can_be_drunk_from_the_panel(page):
     ), "the panel did not repaint the bag after drinking"
 
 
+def test_a_potion_can_be_handed_to_another_party_member(page):
+    """Dragging a bag cell onto an ally's frame hands the item over.
+
+    Two things this pins that the server test cannot. First, that a potion is
+    draggable at all: bag cells used to be `draggable="false"` for anything
+    drinkable, to stop a potion being dropped on an equipment slot -- which
+    made the single most likely thing a player gives the one thing they could
+    not pick up. The rejection now lives in onSlotDrop instead, so the cell
+    stays draggable and the slot stays protected. Second, that the drop
+    reaches /give with the right body rather than /equip.
+
+    Deliberately ordered before the combat test below: that one starts a real
+    CombatSession for this user, and a give during a fight is refused (a
+    character may only use their own inventory in combat).
+    """
+    page.set_viewport_size({"width": 1366, "height": 768})
+    page.goto(f"{BASE_URL}/adventure")
+    page.wait_for_load_state("networkidle")
+
+    ids = page.evaluate(
+        "() => Array.from(document.querySelectorAll('.adv-party-rail .adv-frame-open'))"
+        ".map(el => el.dataset.charId).filter(Boolean)"
+    )
+    assert len(ids) >= 2, f"need two party members to hand an item between, got {ids}"
+    giver, receiver = ids[0], ids[1]
+
+    potion = _seed_potions(giver, qty=3)
+    page.reload()
+    page.wait_for_load_state("networkidle")
+    page.click(".adv-party-rail .adv-frame-open")
+    page.locator(".adv-character").wait_for(state="visible", timeout=3000)
+
+    cell = page.locator(f'.bag-grid-cell[data-item-slug="{potion["slug"]}"]').first
+    cell.wait_for(state="visible", timeout=3000)
+    assert cell.get_attribute("draggable") == "true", (
+        "a potion cell is not draggable, so it cannot be handed to an ally -- "
+        "the slot rejection belongs in onSlotDrop, not on the cell"
+    )
+
+    with page.expect_request(lambda req: req.url.endswith("/give") and req.method == "POST") as req_info:
+        page.evaluate(
+            """([slug, to]) => {
+                const cell = document.querySelector(`.bag-grid-cell[data-item-slug="${slug}"]`);
+                const frame = document.querySelector(`.adv-frame-open[data-char-id="${to}"]`);
+                const dt = new DataTransfer();
+                cell.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+                frame.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
+                frame.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+            }""",
+            [potion["slug"], receiver],
+        )
+    body = json.loads(req_info.value.post_data)
+    assert body.get("to_character_id") == int(receiver), f"gave to the wrong character: {body}"
+    assert body.get("slug") == potion["slug"], f"gave the wrong item: {body}"
+
+    # The panel repaints from the server, so the count dropping proves the
+    # give actually committed rather than just that a request was sent.
+    page.wait_for_timeout(700)
+    qty = page.locator(f'.bag-grid-cell[data-item-slug="{potion["slug"]}"] .cell-qty').first
+    assert qty.inner_text().strip() == "2", "the giver's stack did not shrink after handing one over"
+
+
 def test_combat_item_panel_lists_and_uses_a_carried_potion(page):
     """The panel that replaced the two hardcoded heal/mana buttons.
 
