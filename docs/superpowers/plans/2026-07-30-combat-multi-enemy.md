@@ -108,7 +108,7 @@ also gives the screen the greyed-out corpses the spec wants.
 - [x] XP is the sum across monsters, then split across members.
 - [x] Kill tracking loops per corpse; hoist the "all bosses defeated" unlock
       **out** of the loop or it fires once per boss.
-- [ ] Death lines move to where HP actually reaches 0, so the player is told
+- [x] Death lines move to where HP actually reaches 0, so the player is told
       mid-fight instead of getting four deaths at once at the end.
 
 ### Task 10: monsters act as themselves
@@ -137,8 +137,15 @@ also gives the screen the greyed-out corpses the spec wants.
       a documented wart that has broken class colours on this screen before.
 
 ### Task 14: let packs be packs
-- [ ] Only once everything above is green: raise `SpawnConfig.group_size_max`
-      above 3 and have the encounter path pass the pack rather than one monster.
+- [x] The encounter path gathers the monsters adjacent to the trigger and passes
+      the whole pack, deleting every one of them from the map.
+- [x] **Switched off by default.** `SpawnConfig.combat_pack_max` ships at 1, so
+      play is unchanged. Turning it on is a one-line change and a **balance**
+      decision, not an engine one: at 3, `tests/test_full_run_e2e.py` wipes the
+      party partway through a run. Every monster is costed for a solo
+      appearance, there are still no monsters above level 20, and the catalogue
+      is 225/229 common, so the party cannot gear into it either. This belongs
+      with the tuning verdicts waiting on a playtest.
 
 ## Verification
 

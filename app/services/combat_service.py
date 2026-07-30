@@ -547,7 +547,13 @@ def _damage_monster(session: CombatSession, dmg: int, target_id: Any = None) -> 
         target = next((m for m in monsters if int(m.get("hp", 0) or 0) > 0), None)
     if target is None:
         return {}
+    was_alive = int(target.get("hp", 0) or 0) > 0
     target["hp"] = max(0, int(target.get("hp", 0) or 0) - int(dmg))
+    # Announce the kill where it happens. _check_end names the pack as a whole
+    # when the fight ends, which with several monsters would tell the player
+    # about every death at once, after the fact.
+    if was_alive and target["hp"] <= 0 and len(monsters) > 1:
+        _append_log(session, f"{target.get('name', 'The monster')} falls!")
     _save_monsters(session, monsters)
     return target
 
