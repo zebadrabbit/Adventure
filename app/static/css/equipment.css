@@ -278,21 +278,30 @@
    text both derived from it with color-mix() rather than restated. Twelve
    classes exist in the game (CLASS_MAP, app/routes/main.py:325); the previous
    version of this file only covered 8 of them via var(--class-fighter-bg,
-   #hex) fallbacks to custom properties that were never declared anywhere —
-   every one of the 8 was silently rendering its hard-coded fallback, and the
-   other 4 (druid, barbarian, monk, sorcerer) rendered no class colour at
-   all. All 12 are covered here now.
+   #hex) fallbacks to custom properties that, at the time, were not declared
+   anywhere — every one of the 8 was silently rendering its hard-coded
+   fallback, and the other 4 (druid, barbarian, monk, sorcerer) rendered no
+   class colour at all. All 12 are covered here now. (--class-<name>-bg IS
+   declared now, for all twelve, in tokens.css — so those fallbacks would
+   resolve today. They are gone regardless.)
 
    Mix ratios: 27% class hue into --surface-raised for the fill, 62% class
-   hue into white for the text. Measured in-browser (getComputedStyle on
-   each .eq-class-bg-* header, both data-realm values, WCAG relative-
-   luminance contrast) for all 12 classes: worst case is 4.65:1 (warlock,
-   dungeon realm — fighter is next at 4.66:1), every other class clears
-   that, ceiling is 6.37:1 (paladin, town). An earlier 28%/65% pass measured
-   4.3–6.1:1 and missed that its own floor (fighter 4.35:1, warlock 4.35:1)
-   sat under WCAG AA's 4.5:1 for body text; a uniform 1–3pt ratio shift was
-   enough to clear every class with margin rather than singling out those
-   two. */
+   hue into white for the text. Recomputed for the twelve-hue palette
+   (class-colour-unification): floor 5.01:1 (fighter, dungeon realm — bard is
+   next at 5.02:1), ceiling 6.77:1 (paladin, town). Every pairing clears WCAG
+   AA's 4.5:1 for body text with at least half a point to spare.
+
+   NOTE for whoever edits the hues next: these figures are a property of the
+   palette, not of the mix ratios, so they go stale when a hue changes. They
+   have already done so once — the previous numbers here (floor 4.65:1
+   warlock, ceiling 6.37:1 paladin) were measured against the pre-unification
+   palette and survived the hue swap unnoticed. Re-derive, do not adjust.
+
+   The swap raised the floor by 0.36 (4.65 -> 5.01) but was not a uniform
+   improvement: ranger slipped marginally (5.18 -> 5.15 dungeon) and bard is
+   the one real regression (5.54 -> 5.02 dungeon, 6.20 -> 5.61 town). Both
+   still clear 4.5:1 by a wide margin, so this is a note for the record
+   rather than a defect — but "every class improved" would be wrong. */
 .eq-class-bg-fighter    { background: color-mix(in srgb, var(--class-fighter) 27%, var(--surface-raised));    color: color-mix(in srgb, var(--class-fighter) 62%, white); }
 .eq-class-bg-rogue      { background: color-mix(in srgb, var(--class-rogue) 27%, var(--surface-raised));      color: color-mix(in srgb, var(--class-rogue) 62%, white); }
 .eq-class-bg-mage       { background: color-mix(in srgb, var(--class-mage) 27%, var(--surface-raised));       color: color-mix(in srgb, var(--class-mage) 62%, white); }

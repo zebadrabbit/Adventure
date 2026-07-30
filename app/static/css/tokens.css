@@ -228,8 +228,19 @@
        has six tiers, but only five existed here. */
 
     /* Class identity — fixed in both realms, for the same reason. One hue per
-       class; badges, header strips and border rings all derive from it.
+       class, and two presentations derive from it:
+         - the roster / party / combat badges, via the -bg/-fg/-border triplet
+           below (`.class-badge.<class>-badge`, theme.css);
+         - the equipment panel's header strip, which consumes the hue directly
+           with its own mix ratios (`.eq-class-header` + `.eq-class-bg-*`,
+           equipment.css).
        Never hard-code a class colour at a call site.
+
+       There is NO border-ring presentation, despite what earlier comments
+       here claimed: `.border-<class>` and `.class-header-<class>` were defined
+       only in class-badges.css, which class-colour-unification deleted. No
+       markup ever emitted either class name, so they were dead selectors for
+       dead markup and nothing broke — but do not describe them as live.
 
        Replaces a palette where `bard` and `paladin` were the same hue, three
        golds sat within 6 degrees, and `fighter`, `warlock` and `rogue` fell

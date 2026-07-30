@@ -159,6 +159,34 @@ misbehave today.
       process: `adventure.html:118` emitted `class-badge-{{ class_lower }}`
       (one token) where every selector wants two, so the party-rail class
       badge rendered unstyled from `7dfcf1e` until this fixed it.
+      **It was eight, not seven.** A final review found
+      `glass-theme.css:246-282` — six per-class `!important` gradients, live
+      on `/combat` because `combat.html:127` loads that file in
+      `{% block head %}`, i.e. after `theme.css`. `!important` beat the
+      tokens regardless of order or specificity, so `/combat` rendered six
+      classes from one palette and six from another (a Rogue was a yellow
+      gradient there, slate violet on the dashboard). It survived two sweeps
+      because `DESIGN_SYSTEM.md:401` declares `glass-theme.css` the "admin
+      and account" dialect with an explicit "do not use `.glass-*` on a
+      player-facing screen" — so a sweep that trusted the doc never opened
+      it. Deleted, and the doc now records the `combat.html` violation as a
+      known wart. A **ninth** source exists on disk —
+      `tactical-theme.css:298-333`, six more hardcoded hexes — but that file
+      is loaded by no template and is already marked for deletion in the
+      orphan table; `tests/test_class_colour_tokens.py` exempts it only for
+      as long as it stays unreachable.
+- [ ] **Judgement call for the owner: `fighter` `#d1666d` and `sorcerer`
+      `#d16691` may be too close.** Identical saturation and lightness,
+      separated only by 20.2° of hue. Both clear the stated criterion (the
+      test requires <12° hue *and* <18 lightness to count as a collision, so
+      this pair passes on hue distance alone), and both clear the contrast
+      floor. But on a badge the size of the party rail's they are the pair a
+      player is most likely to conflate, and the criterion was written to
+      catch same-hue collisions rather than same-lightness ones. Left
+      unchanged deliberately — changing a hue is the owner's call, not a
+      reviewer's. If it does change, note that the contrast figures in
+      `equipment.css` and `tokens.css` are palette-dependent and must be
+      re-derived.
 - [ ] **Class icons have the same six-vs-twelve gap, in a different
       medium.** `adventure.html:99-115` is a six-branch `if/elif` on
       `class_lower` (fighter, mage, rogue, druid, cleric, ranger) with a
