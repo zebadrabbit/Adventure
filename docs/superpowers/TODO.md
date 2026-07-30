@@ -131,17 +131,88 @@ misbehave today.
       768px design floor but reachable on a 768px physical screen once
       scrollback fills.
 
-### One vocabulary, four times over
+### One vocabulary, many times over
 
-- [ ] **Class colours have four sources.** `tokens.css`'s `--class-*`,
-      `class-badges.css`, `equipment.css`'s `.eq-class-bg-*`, and — the live one
-      — a runtime injector (`adventure.js:112-148` with
-      `config_api.py:257-270`) that stamps `--class-{slug}-bg/-fg/-border` and
-      `!important` rules onto `document.documentElement` on every `/adventure`
-      load. It hides from grep because the property name is built by
-      template-literal interpolation, so `--class-fighter-bg` never appears as a
-      searchable string. This is the same shape as the gear-slot vocabularies
-      and deserves the same treatment: spec, single source, migration if needed.
+- [x] ~~**Class colours have four sources.**~~ It was seven —
+      `tokens.css`'s `--class-*` hues (now the single source, with
+      `-bg`/`-fg`/`-border` derived per class); `theme.css:337-417`'s twelve
+      hardcoded badge rules, loaded on every page and the one that actually
+      paints a badge, rewritten to read the tokens (nothing changed visibly
+      until this did); `base.css`'s six-class `--class-*-bg/-fg/-border`
+      block, deleted; `classes.css`, deleted — an orphan loaded by no
+      template, 15 of 18 values disagreeing with `base.css`;
+      `class-badges.css`, deleted — a second orphan, and the only file
+      already reading the tokens correctly; `config_api.CLASS_COLORS` +
+      `/api/config/class_colors` + `adventure.js`'s injector, deleted — it
+      `!important`-overrode the token system on `/adventure` only and hid
+      from grep because it built the property names by interpolation; and
+      `dashboard.css`'s unscoped `.badge` rule, scoped with
+      `:where(:not(.class-badge))` — found only by opening a browser, it
+      tied `.fighter-badge`'s specificity and loaded later, silently
+      stripping the class tint. Visible symptom: a Fighter's badge was
+      `#7a3314` on the dashboard and `#301d0b` in the dungeon. The palette
+      itself was replaced too — `bard` and `paladin` were the same hue,
+      three golds sat within 6°, and `fighter`/`warlock`/`rogue` were below
+      the 4.5:1 contrast floor — with twelve hues solved numerically; worst
+      case is now 5.40:1 against both realm grounds, enforced by
+      `tests/test_class_colour_tokens.py`. A live bug came out in the
+      process: `adventure.html:118` emitted `class-badge-{{ class_lower }}`
+      (one token) where every selector wants two, so the party-rail class
+      badge rendered unstyled from `7dfcf1e` until this fixed it.
+      **It was eight, not seven.** A final review found
+      `glass-theme.css:246-282` — six per-class `!important` gradients, live
+      on `/combat` because `combat.html:127` loads that file in
+      `{% block head %}`, i.e. after `theme.css`. `!important` beat the
+      tokens regardless of order or specificity, so `/combat` rendered six
+      classes from one palette and six from another (a Rogue was a yellow
+      gradient there, slate violet on the dashboard). It survived two sweeps
+      because `DESIGN_SYSTEM.md:401` declares `glass-theme.css` the "admin
+      and account" dialect with an explicit "do not use `.glass-*` on a
+      player-facing screen" — so a sweep that trusted the doc never opened
+      it. Deleted, and the doc now records the `combat.html` violation as a
+      known wart. A **ninth** source exists on disk —
+      `tactical-theme.css:298-333`, six more hardcoded hexes — but that file
+      is loaded by no template and is already marked for deletion in the
+      orphan table; `tests/test_class_colour_tokens.py` exempts it only for
+      as long as it stays unreachable.
+- [ ] **Judgement call for the owner: `fighter` `#d1666d` and `sorcerer`
+      `#d16691` may be too close.** Identical saturation and lightness,
+      separated only by 20.2° of hue. Both clear the stated criterion (the
+      test requires <12° hue *and* <18 lightness to count as a collision, so
+      this pair passes on hue distance alone), and both clear the contrast
+      floor. But on a badge the size of the party rail's they are the pair a
+      player is most likely to conflate, and the criterion was written to
+      catch same-hue collisions rather than same-lightness ones. Left
+      unchanged deliberately — changing a hue is the owner's call, not a
+      reviewer's. If it does change, note that the contrast figures in
+      `equipment.css` and `tokens.css` are palette-dependent and must be
+      re-derived.
+- [ ] **Class icons have the same six-vs-twelve gap, in a different
+      medium.** `adventure.html:99-115` is a six-branch `if/elif` on
+      `class_lower` (fighter, mage, rogue, druid, cleric, ranger) with a
+      letter-avatar fallback, so the other six classes (barbarian, bard,
+      monk, paladin, sorcerer, warlock) render an initial instead of an
+      icon.
+- [ ] The party-rail class badge's fill is only 1.00-1.24:1 against the
+      card — `-bg` mixes 22% of the hue into `--realm-bg` rather than into
+      the card's `--surface-overlay`. Not a defect: the legibility floor is
+      met by the text (7.01:1) and the border (2.11-4.16:1), not the fill —
+      but it means the fill is decorative there and nothing should rely on
+      it.
+- [ ] The rail badge and the dashboard roster badge now agree on colour and
+      disagree on shape: the rail one carries `.badge`, so `app.css:585`
+      rounds it to `0.375rem` against `--radius: 0`. Part of the
+      already-tracked badge-to-chip conversion in `DESIGN_SYSTEM.md`'s
+      migration plan (phase 7 — "chips": square, hairline outline, no
+      radius).
+- [ ] `tactical-theme.css:193` (`.panel-header .badge`, no `:not()`
+      exclusion) would flatten class badges the same way the
+      `dashboard.css` rule above did — but the file is referenced by no
+      template, route or script (a third orphan; `DESIGN_SYSTEM.md`'s
+      appendix already marks it "Superseded — delete"). Unverified in a
+      browser since nothing loads it.
+- [ ] `dashboard.css:210`'s `.badge-open` is dead code — grep finds only its
+      own declaration.
 - [ ] `party-management.css`'s `.rarity-*` block was `!important` and defeated
       the rarity tokens on both screens — fixed, but the same `!important`
       pattern is worth sweeping for elsewhere.

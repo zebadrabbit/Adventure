@@ -547,10 +547,11 @@ a:hover {
     border-radius: 10px;
 }
 
-/* Badges (generic only — .class-badge has its own per-class colors in
-   theme.css; this selector's specificity would otherwise always win over
-   those single-class rules and silently flatten every class badge). */
-.combat-container .badge:not(.class-badge) {
+/* Badges (generic only — .class-badge has its own per-class colours in
+   theme.css; this selector would otherwise always win over those single-class
+   rules and silently flatten every class badge). :where() rather than a bare
+   :not() so the exclusion costs no specificity — see dashboard.css (:68). */
+.combat-container .badge:where(:not(.class-badge)) {
     background: var(--ui-elevated);
     border: 1px solid color-mix(in srgb, var(--ui-accent) 35%, transparent);
     color: var(--ui-text);

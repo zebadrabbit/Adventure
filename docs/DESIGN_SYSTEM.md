@@ -272,7 +272,7 @@ ever need to diverge, this separation makes that a one-line change.
 | `--hostile`, `--ally` | monsters vs party; enemy turn vs your turn |
 | `--coin-gold/-silver/-copper` | **coin gold stays warm in both realms.** Underground it is the only warm thing on screen — down there, gold is the light you came for |
 | `--rarity-common … -legendary` | fixed; a player must be able to learn that purple means epic and have it survive a re-skin |
-| `--class-fighter … -warlock` | one hue per class; badges, header strips and border rings all derive from it |
+| `--class-fighter … -warlock` | one hue per class; badges and the equipment header strip derive from it. There is no border-ring presentation — see [Class identity](#class-identity) |
 | `--viewport-bg`, `--viewport-frame` | the frame around the map canvas. The map's own tile colours live in `dungeon-canvas.js` — do not restate them |
 
 ### Layer 2 — type, space, shape, depth, motion
@@ -407,10 +407,46 @@ apart is what stops them merging into a third thing.
 
 ### Class identity
 
-Twelve classes, one hue each (`--class-fighter` … `--class-warlock`), three
-presentations derived from it: `.class-badge.<class>-badge`,
-`.class-header-<class>`, `.border-<class>`. Never hard-code a class colour at a
-call site.
+Twelve classes, one hue each: `--class-fighter` … `--class-warlock` in
+`tokens.css`. `-bg`, `-fg` and `-border` are derived from that hue with
+`color-mix()`, in `tokens.css`, for all twelve — not restated, not
+hand-picked.
+
+**Two** presentations consume the hue, not three:
+
+| Presentation | Selector | Reads |
+|---|---|---|
+| Roster / party / combat badge | `.class-badge.<class>-badge` (`theme.css`) | the `-bg`/`-fg`/`-border` triplet |
+| Equipment panel header strip | `.eq-class-header` + `.eq-class-bg-<class>` (`equipment.css`) | the hue directly, with its own mix ratios |
+
+`.class-header-<class>` and `.border-<class>` **do not exist.** They were
+defined only in `class-badges.css`, which class-colour-unification deleted, and
+no markup ever emitted either class name — dead selectors for dead markup. An
+earlier version of this section listed them as live; they are not, and a
+`border-<class>` ring resolves for zero classes.
+
+`.adventurer-badge` is the neutral fallback for a party member with no class
+(`dungeon_api.py` falls back to the string `"Adventurer"`); it derives from
+`--surface-raised` / `--ink` rather than a thirteenth hue.
+
+Never hard-code a class colour at a call site — `tests/test_class_colour_tokens.py`
+enforces it: all twelve classes have a hue and derived `-bg/-fg/-border`, the
+derived values reference the hue rather than a hex literal, **no reachable
+stylesheet sets a `.class-badge` or `.<class>-badge` colour outside
+`var(--class-*)`, and none uses `!important`**, every hue clears 4.5:1 against
+both realm grounds, and no two classes sit close in both hue and lightness.
+
+One file is exempt: `tactical-theme.css` still carries six pre-token class
+rules, and is excused **only while it is unreachable** — no template `<link>`s
+it and nothing `@import`s it. The test follows both routes, so linking or
+importing it fails the suite rather than silently reviving a tenth palette.
+Deleting the file (it is already on the orphan list) removes the exemption.
+
+> **Known wart:** `combat.html` loads `glass-theme.css` in its `{% block head %}`,
+> which breaks the admin-and-account boundary stated above. That is how six
+> `!important` per-class gradients in `glass-theme.css` stayed live on `/combat`
+> through two audit sweeps — a sweep that trusted this document would never open
+> that file. The gradients are deleted; the stray `<link>` remains.
 
 ---
 
@@ -521,9 +557,9 @@ revertable.
 |---|---|---|
 | 0 ✅ | `tokens.css`, this document, `auth.css` as reference, `theme.css` alias rewire, the "Lamplight" seed | login + register redesigned; palette changes app-wide |
 | 1 | Fix the three [theme-layer defects](#known-defects-in-the-theme-layer); call `seed-themes` from `bootstrap_db.sh` | **every page** — but it is what stops two palettes rendering at once |
-| 2 | Delete the 1,607 lines of never-loaded CSS; **link** the four orphans whose markup is live and unstyled | small; four screens visibly *improve* |
+| 2 | Delete the 1,422 lines of never-loaded CSS that remain; **link** the four orphans whose markup is live and unstyled | small; four screens visibly *improve* |
 | 3 | Component layer, items 1–3 in [the table above](#designed-replacements--what-they-should-look-like): bars, panel, buttons | dashboard, adventure, combat — the highest-value visual work in the project |
-| 4 | Delete the competing `:root` blocks in `base.css`, `app.css`, `adv-theme.css`, `classes.css`, `footer.css`, `home.css` | every page; do after phase 1, with a rendering pass per screen |
+| 4 | Delete the competing `:root` blocks in `base.css`, `app.css`, `adv-theme.css`, `footer.css`, `home.css` (`classes.css`'s is gone — the file was deleted in class-colour-unification, Task 2) | every page; do after phase 1, with a rendering pass per screen |
 | 5 | Apply `data-realm="dungeon"` to the adventure and combat templates | those two screens go cold — the payoff for all of the above |
 | 6 | The generated-CSS cohort (below): 340 of the 619 hex literals | all dashboard tabs; convert one file per commit |
 | 7 | Component layer, items 4–7: fields, modals, remaining cards, chips | dashboard, adventure, combat |
@@ -573,17 +609,21 @@ The same logic retires the other near-duplicates: greens `#4ade80`/`#48bb78`/
 `--info`, with `#6d9ed6` reserved for `--mp`; reds `#ef4444`/`#e74c3c`/
 `#c0392b` → `--danger`.
 
-### Orphans — 1,607 lines (15%) never loaded
+### Orphans — 1,422 lines remaining, of 1,607 measured
+
+1,607 was the 2026-07-27 measurement. `class-badges.css` (164) and
+`classes.css` (21) have since been deleted, so **1,422 lines remain** — the
+table below is annotated in the present tense and sums to that.
 
 Four of these style markup that is **live in the app right now**:
 
 | File | Lines | Status |
 |---|---|---|
 | `tactical-theme.css` | 688 | Superseded — `theme.css` carries a newer superset. Delete. |
-| `utilities.css` | 220 | Merged into `app.css`. Delete. |
-| `class-badges.css` | 164 | Superseded by `theme.css`'s badges. Delete after diffing. |
+| `utilities.css` | 220 | Merged into `app.css`. Delete. (`wc -l` now reports **211** — a pre-existing 9-line drift from the 2026-07-27 count, not re-tabulated here so the column keeps summing to 1,422. Re-measure the whole column when phase 2 runs.) |
+| `class-badges.css` | 164 | **Deleted** (class-colour-unification, Task 2). Superseded once `theme.css`'s badges were pointed at `tokens.css`. |
 | `adv-theme.css` | 40 | Abandoned CRT palette. Delete. |
-| `classes.css` | 21 | Superseded by `base.css`. Delete. |
+| `classes.css` | 21 | **Deleted** (class-colour-unification, Task 2). Superseded by the twelve-class palette in `tokens.css`, not `base.css` — `base.css`'s own six-class block was dropped in the same task. |
 | `chat-widget.css` | 240 | **Live markup, unstyled.** `.mud-chat-widget` renders on the dashboard with only `dashboard.css`'s partial rules. |
 | `hoard-ui.css` | 128 | **Live markup, unstyled.** `hoard.js` builds `.hoard-layout` / `.hoard-char-strip`; nothing styles them. |
 | `dungeon-config.css` | 63 | **Live markup, unstyled.** `.difficulty-btn-group`, `.affix-grid`, `.fs-heroic-note` are in `dashboard.html`. |

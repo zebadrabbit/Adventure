@@ -65,8 +65,23 @@ body {
     text-shadow: 0 0 2px #33ff33;
 }
 
-/* Badge styling */
-.badge {
+/* Badge styling. :where(:not(.class-badge)) -- same reason as the exclusion
+   in theme.css (:243) and combat.css (:554): an unscoped .badge here would
+   tie the specificity of the single-class .fighter-badge/.warlock-badge/etc
+   rules, and this file loads after theme.css, so it would win and silently
+   flatten a class badge's background/border back to translucent grey
+   wherever markup also carries the plain "badge" class -- as it did on the
+   party rail (adventure.html:118) before this exclusion was added.
+   combat.js's character badges are NOT affected: /combat extends base.html,
+   not dashboard_base.html, so this file never loads there, and combat.css
+   (:554) carries its own equivalent guard.
+   :where(...) rather than a bare :not(...) is deliberate: :not() carries the
+   specificity of its argument, so a bare :not(.class-badge) would raise this
+   rule from (0,1,0) to (0,2,0) and start beating .badge-in-party (:702,
+   still (0,1,0)) -- the same failure mode relocated one selector over.
+   :where() contributes zero specificity, so this rule stays at (0,1,0) and
+   .badge-in-party keeps winning on source order, as before. */
+.badge:where(:not(.class-badge)) {
     background: rgba(255, 255, 255, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.3);
     padding: 0.35rem 0.65rem;

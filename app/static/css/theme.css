@@ -234,10 +234,13 @@ body {
     letter-spacing: 0.5px;
 }
 
-/* :not(.class-badge): this 2-class selector's specificity otherwise always
-   beats the single-class .fighter-badge/.warlock-badge/etc rules below,
-   flattening every class badge to this generic accent color. */
-.panel-header .badge:not(.class-badge) {
+/* :where(:not(.class-badge)): this selector otherwise always beats the
+   single-class .fighter-badge/.warlock-badge/etc rules below, flattening every
+   class badge to this generic accent colour. :where() rather than a bare
+   :not() so the exclusion costs no specificity — see dashboard.css (:68) for
+   the full reasoning; a bare :not() carries its argument's specificity and
+   raises the rule a level for no benefit. */
+.panel-header .badge:where(:not(.class-badge)) {
     font-family: var(--ui-font);
     font-size: 0.75rem;
     padding: 4px 10px;
@@ -343,75 +346,95 @@ body {
 }
 
 .fighter-badge {
-    background: rgba(139, 46, 46, 0.25);
-    color: #d87070;
-    border-color: #8b2e2e;
+    background: var(--class-fighter-bg);
+    color: var(--class-fighter-fg);
+    border-color: var(--class-fighter-border);
 }
 
 .rogue-badge {
-    background: rgba(93, 63, 106, 0.25);
-    color: #b899c7;
-    border-color: #5d3f6a;
+    background: var(--class-rogue-bg);
+    color: var(--class-rogue-fg);
+    border-color: var(--class-rogue-border);
 }
 
 .mage-badge {
-    background: rgba(58, 90, 128, 0.25);
-    color: #7fa8d1;
-    border-color: #3a5a80;
+    background: var(--class-mage-bg);
+    color: var(--class-mage-fg);
+    border-color: var(--class-mage-border);
 }
 
 .cleric-badge {
-    background: rgba(193, 122, 58, 0.25);
-    color: #d4a574;
-    border-color: #c17a3a;
+    background: var(--class-cleric-bg);
+    color: var(--class-cleric-fg);
+    border-color: var(--class-cleric-border);
 }
 
 .ranger-badge {
-    background: rgba(74, 103, 65, 0.25);
-    color: #99b88f;
-    border-color: #4a6741;
+    background: var(--class-ranger-bg);
+    color: var(--class-ranger-fg);
+    border-color: var(--class-ranger-border);
 }
 
 .druid-badge {
-    background: rgba(82, 107, 70, 0.25);
-    color: #a0bf91;
-    border-color: #526b46;
+    background: var(--class-druid-bg);
+    color: var(--class-druid-fg);
+    border-color: var(--class-druid-border);
 }
 
 .barbarian-badge {
-    background: rgba(168, 67, 31, 0.55);
-    color: #ffd8c2;
-    border-color: #d9875c;
+    background: var(--class-barbarian-bg);
+    color: var(--class-barbarian-fg);
+    border-color: var(--class-barbarian-border);
 }
 
 .bard-badge {
-    background: rgba(184, 154, 58, 0.55);
-    color: #fbf0cf;
-    border-color: #d8c178;
+    background: var(--class-bard-bg);
+    color: var(--class-bard-fg);
+    border-color: var(--class-bard-border);
 }
 
 .monk-badge {
-    background: rgba(47, 125, 114, 0.55);
-    color: #d4f3ee;
-    border-color: #7fc4b8;
+    background: var(--class-monk-bg);
+    color: var(--class-monk-fg);
+    border-color: var(--class-monk-border);
 }
 
 .paladin-badge {
-    background: rgba(203, 182, 118, 0.55);
-    color: #fbf5e6;
-    border-color: #e3d6ad;
+    background: var(--class-paladin-bg);
+    color: var(--class-paladin-fg);
+    border-color: var(--class-paladin-border);
 }
 
 .sorcerer-badge {
-    background: rgba(168, 64, 122, 0.55);
-    color: #fbdcec;
-    border-color: #d488b8;
+    background: var(--class-sorcerer-bg);
+    color: var(--class-sorcerer-fg);
+    border-color: var(--class-sorcerer-border);
 }
 
 .warlock-badge {
-    background: rgba(58, 40, 99, 0.55);
-    color: #d8c9f5;
-    border-color: #8a6fd1;
+    background: var(--class-warlock-bg);
+    color: var(--class-warlock-fg);
+    border-color: var(--class-warlock-border);
+}
+
+/* Not a class — the absence of one. dungeon_api.py:2120 falls back to
+   "Adventurer" for a party member with no class and adventure.html:118
+   lowercases it into `adventurer-badge`, which matched nothing here: the badge
+   fell back to .class-badge's bare `border: 1px solid` (resolving to
+   currentColor) with no fill at all. Neutral surface and ink rather than a
+   thirteenth hue, so it reads as "unassigned" instead of as one more class.
+   equipment.css:317's .eq-class-bg-adventurer is the same fallback for the
+   header strip; this is its badge counterpart.
+
+   --edge-strong rather than --edge for the ring: against this fill --edge is
+   1.12:1 (town) / 1.27:1 (dungeon), i.e. invisible, where the twelve class
+   rings sit at 2.22-3.67:1. --edge-strong lands at 2.54:1 / 2.69:1, inside
+   that range, so the fallback reads as the same kind of object as the twelve
+   rather than as a badge someone forgot to outline. */
+.adventurer-badge {
+    background: var(--surface-raised);
+    color: var(--ink);
+    border-color: var(--edge-strong);
 }
 
 .operative-body {

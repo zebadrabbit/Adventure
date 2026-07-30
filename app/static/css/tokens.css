@@ -228,20 +228,118 @@
        has six tiers, but only five existed here. */
 
     /* Class identity — fixed in both realms, for the same reason. One hue per
-       class; badges, header strips and border rings all derive from it.
-       Never hard-code a class colour at a call site. */
-    --class-fighter: #b8503f;
-    --class-rogue: #8a6a9e;
-    --class-mage: #5b8fc9;
-    --class-cleric: #d9a441;
-    --class-ranger: #7a9a5e;
-    --class-druid: #6f9a6a;
-    --class-barbarian: #c46a35;
-    --class-bard: #c9a94a;
-    --class-monk: #4f9a8c;
-    --class-paladin: #cbb676;
-    --class-sorcerer: #b85f7f;
-    --class-warlock: #7b5fa8;
+       class, and two presentations derive from it:
+         - the roster / party / combat badges, via the -bg/-fg/-border triplet
+           below (`.class-badge.<class>-badge`, theme.css);
+         - the equipment panel's header strip, which consumes the hue directly
+           with its own mix ratios (`.eq-class-header` + `.eq-class-bg-*`,
+           equipment.css).
+       Never hard-code a class colour at a call site.
+
+       There is NO border-ring presentation, despite what earlier comments
+       here claimed: `.border-<class>` and `.class-header-<class>` were defined
+       only in class-badges.css, which class-colour-unification deleted. No
+       markup ever emitted either class name, so they were dead selectors for
+       dead markup and nothing broke — but do not describe them as live.
+
+       Replaces a palette where `bard` and `paladin` were the same hue, three
+       golds sat within 6 degrees, and `fighter`, `warlock` and `rogue` fell
+       below the 4.5:1 contrast floor. This set is solved numerically for hue
+       spacing and contrast instead: every hue clears 5.40:1 against both
+       realm grounds (#0f0c09 warm, #0b0d11 cold) and no pair is close in both
+       hue and lightness. Ordered around the hue circle, 356 deg to 336 deg.
+       `cleric` and `mage` are deliberately unchanged — they are the warm and
+       cold accents (cleric is gold because it is the holy colour and matches
+       --ui-accent; mage is steel blue to match --mp / the cold realm accent).
+       See docs/superpowers/specs/2026-07-29-class-colour-unification-design.md */
+    --class-fighter: #d1666d;
+    /* 356deg — blade red */
+    --class-barbarian: #d57434;
+    /*  24deg — burnt orange */
+    --class-cleric: #d8af4f;
+    /*  42deg — lamplight gold (unchanged) */
+    --class-paladin: #e0dcb3;
+    /*  55deg — pale luminous */
+    --class-ranger: #82964a;
+    /*  76deg — olive */
+    --class-druid: #5dac68;
+    /* 128deg — leaf green */
+    --class-monk: #44a796;
+    /* 170deg — jade */
+    --class-mage: #5c94cc;
+    /* 210deg — steel blue (unchanged) */
+    --class-rogue: #908cb5;
+    /* 246deg — slate violet, low saturation */
+    --class-warlock: #b179cd;
+    /* 280deg — violet */
+    --class-bard: #c964b5;
+    /* 312deg — magenta */
+    --class-sorcerer: #d16691;
+    /* 336deg — rose */
+
+    /* Derived per class: -bg (a tinted surface, not a block of colour),
+       -fg (legible text on that -bg) and -border (the hue at partial
+       strength). Declared here, inside the combined `:root, [data-realm]`
+       selector, rather than in the type/space/shape :root block below --
+       `-bg` references --realm-bg, and a custom property that references
+       another resolves on the element that DECLARES it (see --surface-raised,
+       --accent-line, --glow-accent above). A derivation left at the
+       type-scale :root would freeze at the town palette and stay warm
+       underground.
+
+       22% hue / --realm-bg for -bg, 62% hue / white for -fg: the same shape
+       as equipment.css's .eq-class-bg-* (which mixes 27%/62% against
+       --surface-raised, worst case 4.65:1). Mixing against the darker
+       --realm-bg instead of --surface-raised leaves more headroom, so the
+       worst pairing across all twelve classes, both realms, is 7.01:1
+       (fighter, warm) -- comfortably ahead of the 4.65:1 precedent. */
+    --class-fighter-bg: color-mix(in srgb, var(--class-fighter) 22%, var(--realm-bg));
+    --class-fighter-fg: color-mix(in srgb, var(--class-fighter) 62%, white);
+    --class-fighter-border: color-mix(in srgb, var(--class-fighter) 55%, transparent);
+
+    --class-barbarian-bg: color-mix(in srgb, var(--class-barbarian) 22%, var(--realm-bg));
+    --class-barbarian-fg: color-mix(in srgb, var(--class-barbarian) 62%, white);
+    --class-barbarian-border: color-mix(in srgb, var(--class-barbarian) 55%, transparent);
+
+    --class-cleric-bg: color-mix(in srgb, var(--class-cleric) 22%, var(--realm-bg));
+    --class-cleric-fg: color-mix(in srgb, var(--class-cleric) 62%, white);
+    --class-cleric-border: color-mix(in srgb, var(--class-cleric) 55%, transparent);
+
+    --class-paladin-bg: color-mix(in srgb, var(--class-paladin) 22%, var(--realm-bg));
+    --class-paladin-fg: color-mix(in srgb, var(--class-paladin) 62%, white);
+    --class-paladin-border: color-mix(in srgb, var(--class-paladin) 55%, transparent);
+
+    --class-ranger-bg: color-mix(in srgb, var(--class-ranger) 22%, var(--realm-bg));
+    --class-ranger-fg: color-mix(in srgb, var(--class-ranger) 62%, white);
+    --class-ranger-border: color-mix(in srgb, var(--class-ranger) 55%, transparent);
+
+    --class-druid-bg: color-mix(in srgb, var(--class-druid) 22%, var(--realm-bg));
+    --class-druid-fg: color-mix(in srgb, var(--class-druid) 62%, white);
+    --class-druid-border: color-mix(in srgb, var(--class-druid) 55%, transparent);
+
+    --class-monk-bg: color-mix(in srgb, var(--class-monk) 22%, var(--realm-bg));
+    --class-monk-fg: color-mix(in srgb, var(--class-monk) 62%, white);
+    --class-monk-border: color-mix(in srgb, var(--class-monk) 55%, transparent);
+
+    --class-mage-bg: color-mix(in srgb, var(--class-mage) 22%, var(--realm-bg));
+    --class-mage-fg: color-mix(in srgb, var(--class-mage) 62%, white);
+    --class-mage-border: color-mix(in srgb, var(--class-mage) 55%, transparent);
+
+    --class-rogue-bg: color-mix(in srgb, var(--class-rogue) 22%, var(--realm-bg));
+    --class-rogue-fg: color-mix(in srgb, var(--class-rogue) 62%, white);
+    --class-rogue-border: color-mix(in srgb, var(--class-rogue) 55%, transparent);
+
+    --class-warlock-bg: color-mix(in srgb, var(--class-warlock) 22%, var(--realm-bg));
+    --class-warlock-fg: color-mix(in srgb, var(--class-warlock) 62%, white);
+    --class-warlock-border: color-mix(in srgb, var(--class-warlock) 55%, transparent);
+
+    --class-bard-bg: color-mix(in srgb, var(--class-bard) 22%, var(--realm-bg));
+    --class-bard-fg: color-mix(in srgb, var(--class-bard) 62%, white);
+    --class-bard-border: color-mix(in srgb, var(--class-bard) 55%, transparent);
+
+    --class-sorcerer-bg: color-mix(in srgb, var(--class-sorcerer) 22%, var(--realm-bg));
+    --class-sorcerer-fg: color-mix(in srgb, var(--class-sorcerer) 62%, white);
+    --class-sorcerer-border: color-mix(in srgb, var(--class-sorcerer) 55%, transparent);
 
     /* --- The dungeon viewport --------------------------------------------
        The map canvas paints itself from the tile palette in

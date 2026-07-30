@@ -180,13 +180,40 @@ Hooks enforce: trailing whitespace/EOF fixers, no inline `style="..."` attribute
 Full conventions: [docs/STYLE_GUIDE.md](STYLE_GUIDE.md).
 
 ### CSS Theming
-Class colors are centralized as CSS custom properties (also served via `/api/config/class_colors`):
+
+**One hue per class, declared once.** `--class-<name>` in
+`app/static/css/tokens.css` is the single source of truth for all twelve
+classes. The `-bg` / `-fg` / `-border` triplet is *derived* from that hue with
+`color-mix()`, in the same file — it is not a set of independent values:
+
 ```css
---class-fighter-bg / --class-fighter-fg / --class-fighter-border
---class-rogue-bg   / --class-rogue-fg   / --class-rogue-border
-/* ...one triplet per class */
+--class-fighter: #d1666d;                    /* the hue — the only thing you edit */
+--class-fighter-bg: color-mix(in srgb, var(--class-fighter) 22%, var(--realm-bg));
+--class-fighter-fg: color-mix(in srgb, var(--class-fighter) 62%, white);
+--class-fighter-border: color-mix(in srgb, var(--class-fighter) 55%, transparent);
 ```
-Override by loading a CSS file after defaults that redefines the variables under `:root`.
+
+**To change a class colour, change its hue in `tokens.css`.** One line, and
+every badge, header strip and border ring follows. Never hard-code a class
+colour at a call site.
+
+> **Do not "override by loading a CSS file after the defaults that redefines
+> the variables under `:root`."** That instruction used to live here and it is
+> the anti-pattern: it is how this project accumulated *nine* competing class
+> palettes — `classes.css`, `class-badges.css`, `base.css`, a
+> `/api/config/class_colors` route whose JS injector rewrote them with
+> `!important` at runtime, and more. All of it was deleted in
+> class-colour-unification; the route no longer exists. `tokens.css` RULE 1 and
+> [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) rule 1 both say the same thing: **one
+> token file, and never a second `:root`.** Re-skinning is done through the
+> `Theme` DB row (Layer 0 primitives), not by stacking stylesheets.
+
+`tests/test_class_colour_tokens.py` enforces this: all twelve classes have a
+hue and a derived triplet, no derived value restates a literal, no *reachable*
+stylesheet sets a `.class-badge` or `.<class>-badge` colour outside
+`var(--class-*)`, and every hue clears 4.5:1 against both realm grounds. The one
+exemption — `tactical-theme.css`, an orphan awaiting deletion — holds only while
+nothing `<link>`s or `@import`s it; the test checks both routes.
 
 ## Tests
 
