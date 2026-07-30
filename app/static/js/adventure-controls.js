@@ -11,7 +11,6 @@ document.addEventListener('DOMContentLoaded', function () {
     // Wire static Search, Camp & Hearth buttons (now left of log)
     (function bindActionButtons() {
         const searchBtn = document.getElementById('btn-search');
-        const partyInventoryBtn = document.getElementById('btn-party-inventory');
         const campBtn = document.getElementById('btn-camp');
         const hearthBtn = document.getElementById('btn-hearth');
         function appendLog(msg, cls) {
@@ -86,12 +85,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     })
                     .catch(() => appendLog('Hearth failed (network error)', 'text-danger'))
                     .finally(() => { hearthBtn.disabled = false; });
-            });
-        }
-        if (partyInventoryBtn) {
-            partyInventoryBtn.addEventListener('click', () => {
-                // Show party stash modal (simplified for now - can be expanded)
-                alert('Party Stash feature coming soon! This will show shared gold and items that party members can contribute to and withdraw from.');
             });
         }
     })();

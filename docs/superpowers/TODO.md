@@ -14,7 +14,20 @@ Full triage with code pointers:
 - [x] ~~Dead characters stuck in the roster and auto-added to parties~~ —
       delete was FK-blocked by 10 no-cascade tables; party formation took
       "first four by id" which after a wipe is the corpses.
-- [ ] Party Stash button is a `coming soon` alert.
+- [x] ~~Party Stash button is a `coming soon` alert.~~ Deleted, button and
+      handler. A shared party pool is the wrong model for this game: bags are
+      per-character, and **per-character encumbrance** (with its DEX penalty
+      and hard cap) only means something if every item sits in somebody's
+      bag — a communal container is a hole straight through it. Wiring it to
+      the existing Hoard would have been worse: the Hoard is the *safe*
+      balance that survives wipes, so banking mid-run would have nullified
+      both the wipe risk and the early-extraction penalty. The hoard stays a
+      town feature; `Extract` already banks the haul.
+      Owner's model, recorded here because the code does not yet match it:
+      each character carries their own bag; **items can be exchanged between
+      characters outside combat**; in combat a character may only use their
+      own inventory; a character who dies and is not resurrected can be
+      looted, and whatever is left on them is lost.
 - [x] ~~**Item usage in combat** — the service knew 3 hardcoded slugs and the
       UI offered 2 buttons, against 154 potions in the catalogue~~ — one
       resolver, `resolve_potion_effect` in `app/services/item_effects.py`,
@@ -323,6 +336,26 @@ misbehave today.
       share of the UI is vanilla JS and nothing automated covers it;
       `e2e/test_smoke.py` is the only browser-level net. This is how the dungeon
       silently lost potion consumption during the paper-doll port.
+
+## Party inventory model
+
+The intended model (owner, 2026-07-29) is per-character bags with exchange
+between characters outside combat. Two pieces of it do not exist yet.
+
+- [ ] **No character-to-character item exchange.** Nothing hands an item from
+      one party member to another: `trading_api.py` is merchant buy/sell/repair
+      only, and there is no give/take endpoint anywhere in `app/routes/`. So
+      the potions land on whoever looted them and stay there for the whole
+      delve. Needs a give endpoint plus an encumbrance re-check on the
+      receiving side (the giver can only get lighter) and the same
+      `_reject_if_in_combat` lock `equip` uses — in combat a character may only
+      use their own inventory. The paper-doll panel is the natural surface,
+      since it already renders one character's bag and knows the party.
+- [ ] **Looting a corpse has no same-run guard** — already tracked as a Spec 2
+      follow-up: `POST /api/dungeon/loot-body` checks only that both characters
+      belong to the user and the donor `is_dead`, not that they are in the same
+      run. "Anything left on them is lost" is not enforced either; the body
+      keeps its remaining items indefinitely rather than the run consuming them.
 
 ## Gameplay — waiting on playtest verdicts
 - [ ] Tune `EVENT_TUNING` (app/dungeon/room_events.py): shrine/trap/ambush
