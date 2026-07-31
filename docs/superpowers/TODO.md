@@ -94,6 +94,14 @@ Full triage with code pointers:
       hard-capped at level 20, and the `level_reached` achievements never fire
       (`check_achievements` is never called with that key). A 20-level game
       wants things arriving *through* those 20 levels.
+- [ ] **Unique / set items** (owner, 2026-07-30 — explicitly a *later* item, not
+      now). Named uniques across rarity tiers, with set bonuses, so there is
+      something to chase and collect rather than just a better roll of the same
+      procedural gear. Depends on the catalogue having real levels and rarities
+      first — a "set" means nothing while every item is level 0 common. The
+      procedural generator (`app/loot/generator.py`) already produces named
+      instances with a uid, so a unique is closer to a hand-authored instance
+      with a fixed affix list than to a new system.
 - [ ] Item catalogue rarity spread: 225/229 common, almost all level 0-2, so
       loot tiers can only be separated by price.
 - [ ] Maze too spiralling: tune `dead_end_keep` / `extra_connection_chance` /
