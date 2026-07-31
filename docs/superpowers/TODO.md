@@ -589,6 +589,30 @@ misbehave today.
       avoid a cycle. One import deliberately stays inside the loop's `try` and
       now says so, so a later pass does not hoist away its degrade-to-empty
       behaviour.
+- [x] ~~Four dead scripts in `scripts/`~~ — removed 2026-07-30, each verified
+      unreferenced by CI, pre-commit, `manage.sh` and the app, and each with a
+      live replacement: `bump_version.sh` (a shell duplicate of the
+      `bump_version.py` the auto-bump workflow actually runs),
+      `seed_enemy_scaling.py` (wrote `enemy_archetype`, which
+      `sql/enemy_archetypes_seed.sql` seeds through the live loader),
+      `test_hp_mp_persistence.py` (an end-to-end script living in `scripts/`
+      rather than `tests/`), and `manual_exception_fixes.py` (a copy-paste
+      helper for the ratchet `fix_exception_handling.py` enforces in CI).
+      Kept deliberately — unreferenced but genuinely useful by hand:
+      `check_tile.py`, `prune_iconography.py` (companion `keep-icons.txt` lives
+      at the repo root) and `screenshot_adventure.py`.
+- [ ] **`instance/mud.db` was committed to the public repo** and is now
+      untracked (2026-07-30). `.gitignore:10` already listed `instance/`, so it
+      had been tracked *against* the repo's own stated intent since before that
+      rule existed. It holds 26 user rows with `username`/`password`/`role`,
+      6 of them admin, and 2 passwords stored **unhashed**.
+      Mitigating: **no email addresses at all** (0 of 26 populated) and the
+      other 24 passwords are hashed — dev data, not real accounts.
+      **Untracking does not remove it from history.** It remains reachable via
+      `git log` on a public repo. If any of those credentials was ever reused
+      somewhere real, rotating it matters far more than a history rewrite. The
+      rewrite itself (git-filter-repo/BFG + force-push) is an owner decision:
+      destructive, outward-facing, and it breaks every existing clone.
 - [ ] Dev-database throwaway accounts from Playwright verification runs; 11
       removed, more will accumulate. Worth a cleanup helper rather than manual
       FK-walking each time.
