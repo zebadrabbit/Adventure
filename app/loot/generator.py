@@ -203,7 +203,7 @@ def generate_loot_for_seed(cfg: LootConfig, walkable_tiles: Sequence[tuple[int, 
 from app.loot.data.archetypes import ARCHETYPES, SLOTS, archetypes_for_slot  # noqa: E402
 from app.loot.data.prefixes import prefixes_for  # noqa: E402
 from app.loot.data.suffixes import suffixes_for  # noqa: E402
-from app.loot.data.rarities import RARITIES, RARITY_ORDER, rarity_affix_range  # noqa: E402
+from app.loot.data.rarities import RARITIES, RARITY_ORDER, rarity_affix_range, rarity_power  # noqa: E402
 
 # default rarity weighting when none requested
 _DEFAULT_RARITY_WEIGHTS = {
@@ -234,40 +234,69 @@ def _roll_rarity(rng: random.Random) -> str:
     return _weighted_choice(rng, pairs, lambda p: p[1])[0]
 
 
-def _base_stat_block(arch: dict, level: int, rng: random.Random) -> list[dict]:
-    """Innate stat from the archetype (weapon damage / armor)."""
+def _base_stat_block(arch: dict, level: int, rng: random.Random, power: float = 1.0) -> list[dict]:
+    """Innate stat from the archetype (weapon damage / armor).
+
+    Jewelry has neither key, which meant a ring or amulet rolled an empty base
+    block -- and since slot choice is uniform over eight slots, a bare "Ring"
+    and a bare "Amulet" were the two most common drops in the game, and 7.4% of
+    all drops had no stats at all. They get a small innate max_hp instead.
+    """
     out = []
     if "damage" in arch:
         lo, hi = arch["damage"]
-        out.append({"stat": "damage", "val": rng.randint(lo, hi) + level // 3})
+        out.append({"stat": "damage", "val": max(1, int(round((rng.randint(lo, hi) + level // 3) * power)))})
     if "armor" in arch and arch["armor"][1] > 0:
         lo, hi = arch["armor"]
-        out.append({"stat": "armor", "val": rng.randint(lo, hi) + level // 4})
+        out.append({"stat": "armor", "val": max(1, int(round((rng.randint(lo, hi) + level // 4) * power)))})
+    if not out:
+        out.append({"stat": "max_hp", "val": max(1, int(round((3 + level) * power)))})
     return out
 
 
-def _roll_prefix(arch: dict, level: int, rng: random.Random):
+def _roll_prefix(arch: dict, level: int, rng: random.Random, power: float = 1.0):
     pool = prefixes_for(arch["slot"], arch["category"])
     if not pool:
         return None, None
     p = _weighted_choice(rng, pool, lambda x: x["weight"])
-    val = rng.randint(p["min"], p["max"]) + int(p["scale"] * max(0, level - 1))
-    return p["name"], {"stat": p["stat"], "val": max(1, int(val))}
+    val = (rng.randint(p["min"], p["max"]) + int(p["scale"] * max(0, level - 1))) * power
+    return p["name"], {"stat": p["stat"], "val": max(1, int(round(val)))}
 
 
-def _roll_suffix(arch: dict, level: int, rng: random.Random):
+def _roll_suffix(arch: dict, level: int, rng: random.Random, power: float = 1.0):
     pool = suffixes_for(arch.get("affinity", []))
     if not pool:
         return None, []
     s = _weighted_choice(rng, pool, lambda x: x["weight"])
-    # Budget scales with level; split across the theme's stats by weight.
-    budget = 3 + level // 2
+    # Budget scales with level AND rarity; split across the theme's stats by
+    # weight. Rarity multiplies the budget rather than each result so a
+    # two-stat theme and a one-stat theme scale the same way.
+    budget = (3 + level // 2) * power
     wsum = sum(s["stats"].values())
     affixes = []
     for stat, w in s["stats"].items():
         val = max(1, round(budget * w / wsum))
         affixes.append({"stat": stat, "val": val})
     return s["name"], affixes
+
+
+def _merge_affixes(affixes: list[dict]) -> list[dict]:
+    """Collapse repeated stats into one entry, preserving first-seen order.
+
+    Extra affixes are rolled as unnamed prefixes from the same small pool, so a
+    weapon could land "+20 damage, +5 damage, +11 damage" as three separate
+    lines -- three ways of saying +36 that read as a bug in the tooltip. Higher
+    rarities roll more affixes, so this got worse exactly where the item is
+    supposed to feel best.
+    """
+    merged: dict[str, dict] = {}
+    for a in affixes:
+        stat = a["stat"]
+        if stat in merged:
+            merged[stat]["val"] += a["val"]
+        else:
+            merged[stat] = {"stat": stat, "val": a["val"]}
+    return list(merged.values())
 
 
 def generate_item(
@@ -282,31 +311,54 @@ def generate_item(
     arch_key = rng.choice(archetypes_for_slot(slot))
     arch = ARCHETYPES[arch_key]
 
-    affixes = _base_stat_block(arch, level, rng)
+    power = rarity_power(rarity)
+    affixes = _base_stat_block(arch, level, rng, power)
     n_affixes = rng.randint(*rarity_affix_range(rarity))
 
     prefix_name = suffix_name = None
     remaining = n_affixes
-    # Alternate: try a suffix (theme) then a prefix, up to remaining budget.
+    # Prefix FIRST, then the suffix theme. The other order meant the suffix
+    # always ate the first affix slot, so a common item -- 60% of all drops --
+    # could never carry a prefix, and its name was always a bare base or
+    # "Base of the X".
     if remaining > 0:
-        suffix_name, suffix_affixes = _roll_suffix(arch, level, rng)
-        if suffix_name:
-            affixes.extend(suffix_affixes)
-            remaining -= 1
-    if remaining > 0:
-        prefix_name, prefix_affix = _roll_prefix(arch, level, rng)
+        prefix_name, prefix_affix = _roll_prefix(arch, level, rng, power)
         if prefix_affix:
             affixes.append(prefix_affix)
             remaining -= 1
-    # Any further affixes become extra prefixes (single-stat).
+    if remaining > 0:
+        suffix_name, suffix_affixes = _roll_suffix(arch, level, rng, power)
+        if suffix_name:
+            affixes.extend(suffix_affixes)
+            remaining -= 1
+    # Any further affixes become extra prefixes (single-stat, unnamed), and
+    # prefer a stat the item does not already have: a mythic with six different
+    # properties is a better item than one with three big numbers, and the
+    # merge below would otherwise quietly collapse the count anyway. Bounded
+    # retries -- some pools are genuinely small (armour prefixes offer only
+    # `armor` and `resist`), so a duplicate is accepted rather than looped on.
     while remaining > 0:
-        _, extra = _roll_prefix(arch, level, rng)
+        extra = None
+        for _ in range(6):
+            _, candidate = _roll_prefix(arch, level, rng, power)
+            if not candidate:
+                break
+            extra = candidate
+            if candidate["stat"] not in {a["stat"] for a in affixes}:
+                break
         if not extra:
             break
         affixes.append(extra)
         remaining -= 1
 
+    affixes = _merge_affixes(affixes)
+
     _name_parts = []
+    # "Warding Plate Gauntlets of Warding" -- the prefix and the suffix theme
+    # can name the same idea. Drop the adjective when the suffix already says
+    # it; the affix it granted stays, it just is not said twice.
+    if prefix_name and suffix_name and prefix_name.lower() in suffix_name.lower():
+        prefix_name = None
     if prefix_name:
         _name_parts.append(prefix_name)
     _name_parts.append(arch["base_name"])
