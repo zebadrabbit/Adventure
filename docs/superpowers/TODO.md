@@ -589,18 +589,26 @@ misbehave today.
       avoid a cycle. One import deliberately stays inside the loop's `try` and
       now says so, so a later pass does not hoist away its degrade-to-empty
       behaviour.
-- [x] ~~Four dead scripts in `scripts/`~~ — removed 2026-07-30, each verified
-      unreferenced by CI, pre-commit, `manage.sh` and the app, and each with a
-      live replacement: `bump_version.sh` (a shell duplicate of the
-      `bump_version.py` the auto-bump workflow actually runs),
+- [x] ~~Dead scripts in `scripts/`~~ — eight files removed 2026-07-30, in two
+      passes. First the four with live replacements: `bump_version.sh` (a shell
+      duplicate of the `bump_version.py` the auto-bump workflow runs),
       `seed_enemy_scaling.py` (wrote `enemy_archetype`, which
       `sql/enemy_archetypes_seed.sql` seeds through the live loader),
       `test_hp_mp_persistence.py` (an end-to-end script living in `scripts/`
       rather than `tests/`), and `manual_exception_fixes.py` (a copy-paste
       helper for the ratchet `fix_exception_handling.py` enforces in CI).
-      Kept deliberately — unreferenced but genuinely useful by hand:
-      `check_tile.py`, `prune_iconography.py` (companion `keep-icons.txt` lives
-      at the repo root) and `screenshot_adventure.py`.
+      Then six the owner identified as one-off manual-work attempts rather than
+      tools worth keeping: `check_tile.py`, `prune_iconography.py`, its
+      companion `keep-icons.txt`, and all three `screenshot_*.py`. I had kept
+      the first four on the grounds that "unreferenced is not the same as
+      dead" — true in general, wrong here, and only the author could say so.
+      The two screenshot scripts that *were* referenced turned out to be
+      referenced only by an archive and two June plan docs, and both still
+      carried selectors that had already gone stale (`input.party-select`,
+      which no template emits since the lobby restructure, and
+      `#begin-adventure-form`, now `dungeon-enter-form`).
+      Every pre-commit and CI hook was re-checked against a real file after
+      each pass.
 - [x] ~~**`instance/mud.db` was committed to the public repo**~~ — untracked
       and deleted 2026-07-30. `.gitignore:10` already listed `instance/`, so it
       had been tracked *against* the repo's own stated intent since before that
