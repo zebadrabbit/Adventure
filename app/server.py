@@ -345,55 +345,13 @@ def _load_sql_item_seeds():
         except Exception:
             db.session.rollback()
             continue
-    if imported:
-        # Backfill simple heuristics for level/rarity based on name keywords
-        _infer_levels_and_rarity()
-
-
-def _infer_levels_and_rarity():
-    """Infer level/rarity for items lacking them (level=0) via name heuristics.
-
-    This is a coarse fallback until explicit metadata lives in the SQL files.
-    """
-    from app.models.models import Item
-
-    items = Item.query.all()
-    updated = 0
-    for it in items:
-        if getattr(it, "level", 0) and getattr(it, "rarity", "common") != "common":
-            continue
-        name = (it.name or "").lower()
-        lvl = getattr(it, "level", 0)
-        rar = getattr(it, "rarity", "common")
-        if lvl == 0:
-            # Very rough mapping
-            if any(k in name for k in ["mythic", "ancient", "dragon"]):
-                lvl = 18
-                rar = "mythic"
-            elif any(k in name for k in ["legendary", "phoenix", "celestial"]):
-                lvl = 16
-                rar = "legendary"
-            elif any(k in name for k in ["epic", "demon", "void", "starlight"]):
-                lvl = 12
-                rar = "epic"
-            elif any(k in name for k in ["rare", "arcane", "masters", "veteran"]):
-                lvl = 8
-                rar = "rare"
-            elif any(k in name for k in ["uncommon", "fine", "reinforced", "sturdy"]):
-                lvl = 4
-                rar = "uncommon"
-            else:
-                lvl = 1
-                rar = "common"
-        if getattr(it, "level", 0) != lvl or getattr(it, "rarity", "common") != rar:
-            it.level = lvl
-            it.rarity = rar
-            updated += 1
-    if updated:
-        try:
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
+    # No level/rarity backfill here any more. _infer_levels_and_rarity() used to
+    # guess both from name keywords ("mythic"/"ancient"/"dragon" -> level 18),
+    # as a stated stopgap "until explicit metadata lives in the SQL files".
+    # It does now -- sql/items_potions.sql and sql/items_misc.sql carry a real
+    # level and rarity per row -- and the heuristic actively fought it: its skip
+    # condition only spared rows that were BOTH non-zero level and non-common,
+    # so every legitimately common low-level item was rewritten on every boot.
 
 
 def _seed_game_config():

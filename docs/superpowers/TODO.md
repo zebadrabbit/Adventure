@@ -127,20 +127,28 @@ better than another was not.
 
 Still open, in the order I would take them:
 
-- [ ] **The catalogue does not scale with depth.** All 215 rows in
-      `sql/items_misc.sql` and `sql/items_potions.sql` carry no level and no
-      rarity — the loader stamps `, 0, 'common', 1.0` on every one, because all
-      34 INSERT headers use the 5-column form. The loader's 8-column branch
-      exists and has never been exercised. Consequence: the level window, the
-      rarity filter, the rarity draw weights and the dungeon tier's
-      `loot_quality_bonus` are **all** no-ops. Almost no authoring is needed —
-      151 potions carry their tier in the slug (`_l<N>`, spanning exactly 1-20),
-      and misc rows rank by price *within their type*. Only 13 zero-priced rows
-      (keys and quest items) need a hand decision, and those should stay level 0
-      since the generator treats 0 as always-eligible.
-- [ ] **`loot_quality_bonus` is computed and never read.** `spawn_service` puts
-      a `loot_multiplier` on the monster dict; `roll_loot` never looks at it. A
-      deeper tier is supposed to drop better, and currently does not.
+- [x] ~~**The catalogue does not scale with depth.**~~ All 215 rows now carry a
+      real level and rarity, via the loader's 8-column header form (which
+      existed and had never been exercised). Derived, not hand-authored: 151
+      potions from their `_l<N>` slug tier, misc rows by price rank *within
+      their type*, and the 13 zero-priced keys and quest items deliberately left
+      at level 0 — the generator treats 0 as always-eligible, which is what a
+      gate key should be. Rarity bands off the level. The result went from
+      225/229 common at level 0-2 to common 61 / uncommon 49 / rare 50 / epic 43
+      / legendary 26, spread across every band. `tests/test_catalogue_spread.py`
+      reads the seed files (not the DB — `db_isolation` rebuilds leave a minimal
+      catalogue mid-suite) and fails against the old flat data.
+- [x] ~~**`loot_quality_bonus` is computed and never read.**~~ `roll_loot` reads
+      the `loot_multiplier` now. It gives each gear instance a chance at one
+      rarity step up — a 1.30 multiplier is a 30% chance of one step, never more
+      than one — rather than rolling extra drops: the tier bonus is a *quality*
+      bonus, and more drops would inflate encumbrance and vendor income too.
+      Also deleted `app/server.py::_infer_levels_and_rarity`, which guessed
+      level and rarity from name keywords on every boot as a stated stopgap
+      "until explicit metadata lives in the SQL files". It does now, and the
+      heuristic actively fought it: its skip condition only spared rows that
+      were *both* non-zero level and non-common, so every legitimately common
+      low-level item was rewritten each time the server started.
 - [ ] **111 of 154 potions still refuse to be drunk** — 14 of 16 families have
       no handler, and those potions are 50-64% of every monster loot pool. The
       biggest single pool of dead reward in the game.

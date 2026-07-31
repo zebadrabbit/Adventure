@@ -179,7 +179,45 @@ def roll_loot(monster: Dict[str, Any], rng: random.Random | None = None) -> Dict
         rarity_hint = gear_rng.choice(["rare", "epic", "legendary"])
     gear_drops = [generate_item(level=level, rarity=rarity_hint, rng=gear_rng) for _ in range(n_gear)]
 
+    # A deeper dungeon tier is supposed to drop better. spawn_service computes
+    # `loot_multiplier` from the tier's loot_quality_bonus and puts it on the
+    # monster -- and nothing read it, so Mythic and Novice dropped the same
+    # gear. It nudges each instance up the rarity ladder rather than rolling
+    # more of them: the tier bonus is a *quality* bonus, and more drops would
+    # also inflate encumbrance and vendor income, which it is not meant to.
+    multiplier = float(monster.get("loot_multiplier", 1.0) or 1.0)
+    if multiplier > 1.0 and gear_drops:
+        gear_drops = [_upgrade_rarity(inst, multiplier, gear_rng) for inst in gear_drops]
+
     return {"items": qty_map, "items_list": drops, "gear": gear_drops, "rolls": rolls_meta}
+
+
+def _upgrade_rarity(inst: dict, multiplier: float, rng: random.Random) -> dict:
+    """Give an instance a chance to step up one rarity, per the tier bonus.
+
+    A 1.30 multiplier is a 30% chance of one step, not a guarantee and never
+    more than one -- a Mythic tier should make a good drop likelier, not turn
+    every drop legendary. Regenerated at the new rarity rather than edited, so
+    the affix count and magnitude match what that rarity is supposed to roll.
+    """
+    from app.loot.data.rarities import RARITY_ORDER
+    from app.loot.generator import generate_item
+
+    try:
+        idx = RARITY_ORDER.index(inst.get("rarity", "common"))
+    except ValueError:
+        return inst
+    if idx >= len(RARITY_ORDER) - 1:
+        return inst
+    if rng.random() >= min(0.75, multiplier - 1.0):
+        return inst
+    upgraded = generate_item(
+        level=int(inst.get("ilvl", 1) or 1),
+        rarity=RARITY_ORDER[idx + 1],
+        slot=inst.get("slot"),
+        rng=rng,
+    )
+    return upgraded
 
 
 def _item_display_name(slug: str) -> str:
