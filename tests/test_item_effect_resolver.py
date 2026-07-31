@@ -47,14 +47,8 @@ def test_legacy_regen_resolves_to_a_status_effect():
 @pytest.mark.parametrize(
     "slug",
     [
-        "potion_buff_attack_l3",
-        "potion_buff_defense_l1",
-        "potion_buff_speed_l20",
-        "potion_resist_fire_l2",
-        "potion_resist_cold_l1",
-        "potion_resist_lightning_l5",
-        "potion_resist_poison_l4",
-        "potion_antidote_l1",
+        # No mechanic yet, and none of them can be re-themed onto an existing
+        # one without a design decision. Refused, never silently destroyed.
         "potion_stamina_l3",
         "potion_perception_l5",
         "potion_group_battle_l2",
@@ -67,6 +61,53 @@ def test_unimplemented_families_resolve_to_nothing(slug):
     """Refused, not silently destroyed. Each of these needs a mechanic that
     does not exist yet -- see the spec's family table."""
     assert resolve_potion_effect(slug) is None
+
+
+@pytest.mark.parametrize(
+    "slug,name,expected_data",
+    [
+        ("potion_buff_attack_l10", "stat_buff", {"scope": "combat", "mods": {"attack": 10}}),
+        ("potion_buff_defense_l1", "stat_buff", {"scope": "combat", "mods": {"defense": 1}}),
+        # Speed scales at 0.4/tier: the stat is 8 + DEX//2 and barely moves, so
+        # a flat +tier would dwarf it while being trivial on attack.
+        ("potion_buff_speed_l20", "stat_buff", {"scope": "combat", "mods": {"speed": 8}}),
+        # 3 points per tier, so tier 20 lands exactly on the 60-point cap.
+        ("potion_resist_fire_l20", "resist_buff", {"scope": "combat", "element": "fire", "resist_points": 60}),
+        # "cold" is not an element this engine emits -- the spells say "ice",
+        # and apply_resistances silently drops keys it does not know, so
+        # keying this family on "cold" would be a five-potion no-op.
+        ("potion_resist_cold_l5", "resist_buff", {"scope": "combat", "element": "ice", "resist_points": 15}),
+    ],
+)
+def test_buff_families_resolve_to_scoped_effects(slug, name, expected_data):
+    effect = resolve_potion_effect(slug)
+
+    assert effect["kind"] == "status"
+    assert effect["name"] == name
+    assert effect["ticks"] > 0
+    assert effect["data"] == expected_data
+
+
+def test_every_buff_is_combat_scoped():
+    """Combat scope is what makes a buff fall off when the fight ends: the
+    write-back deletes these rows and declines to re-add them. A buff that
+    resolved without a scope would default to world and outlive its fight."""
+    for family in ("buff_attack", "buff_defense", "buff_speed", "resist_fire", "resist_poison"):
+        effect = resolve_potion_effect(f"potion_{family}_l5")
+        assert effect["data"]["scope"] == "combat", family
+
+
+def test_antidote_cures_poison():
+    effect = resolve_potion_effect("potion_antidote_l1")
+
+    assert effect == {"kind": "cure", "removes": ["poison"]}
+
+
+def test_a_higher_tier_buff_is_stronger():
+    for family, stat in (("buff_attack", "attack"), ("buff_defense", "defense"), ("buff_speed", "speed")):
+        values = [resolve_potion_effect(f"potion_{family}_l{t}")["data"]["mods"][stat] for t in range(1, 21)]
+        assert values == sorted(values), f"{family} is not monotonic: {values}"
+        assert values[-1] > values[0], family
 
 
 @pytest.mark.parametrize(

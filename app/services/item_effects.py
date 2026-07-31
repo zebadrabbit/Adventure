@@ -75,9 +75,85 @@ def _mana(tier: int) -> dict:
 # exists for it) is one entry here plus a handler function above -- no other
 # file needs to change. A family absent from this table resolves to None:
 # refused, never guessed at.
+# --- Buffs -----------------------------------------------------------------
+# A buff is a persisted status-effect row whose ``data`` carries what it does.
+# Two scopes exist. "combat" buffs are deleted at the end of a fight and never
+# written back, regardless of ticks remaining -- a draught bought for a fight
+# must not survive it. "world" buffs ride the game clock like poison does.
+#
+# Durations are in ticks of the existing GameClock; there is no second timebase.
+# 12 ticks is roughly a fight plus the walk to the next one, so a buff drunk on
+# sight is still up when the swords meet and gone well before the one after.
+
+_BUFF_TICKS = 12
+
+
+def _stat_buff(stat: str):
+    """A temporary modifier to one derived combat stat.
+
+    The magnitude tracks the stat's own scale rather than one shared number:
+    attack and defense grow roughly one point per level, while speed is
+    8 + DEX//2 and barely moves, so a flat +tier would be trivial on attack and
+    overwhelming on speed.
+    """
+    per_tier = {"attack": 1.0, "defense": 1.0, "speed": 0.4}[stat]
+
+    def handler(tier: int) -> dict:
+        return {
+            "kind": "status",
+            "name": "stat_buff",
+            "ticks": _BUFF_TICKS,
+            "data": {"scope": "combat", "mods": {stat: max(1, round(per_tier * tier))}},
+        }
+
+    return handler
+
+
+def _resist_buff(element: str):
+    """Temporary resistance to one damage type.
+
+    Points, not multipliers -- combat sums points across gear and every active
+    effect and converts once, so two sources cannot compound past the floor.
+    3 points per tier puts a tier-20 draught at 60, which lands exactly on the
+    60% cap the conversion enforces: "brief immunity", as the item promises,
+    without ever reaching true immunity.
+    """
+
+    def handler(tier: int) -> dict:
+        return {
+            "kind": "status",
+            "name": "resist_buff",
+            "ticks": _BUFF_TICKS,
+            "data": {"scope": "combat", "element": element, "resist_points": 3 * tier},
+        }
+
+    return handler
+
+
+def _antidote(tier: int) -> dict:
+    """Cure poison. The one blocked family whose mechanic already existed --
+    ``poison`` is a real status with a handler and a persisted row."""
+    return {"kind": "cure", "removes": ["poison"]}
+
+
 _FAMILY_HANDLERS: Dict[str, Callable[[int], dict]] = {
     "heal": _heal,
     "mana": _mana,
+    # 60 potions, three full 1..20 ladders. The catalogue descriptions ask for
+    # exactly this: "Slightly increases attack briefly."
+    "buff_attack": _stat_buff("attack"),
+    "buff_defense": _stat_buff("defense"),
+    "buff_speed": _stat_buff("speed"),
+    # 20 potions. resist_cold keys on "ice", not "cold": that is the element
+    # string the spell config and the damage pipeline actually use, and
+    # apply_resistances silently drops keys it does not know -- so "cold" would
+    # be a five-potion no-op that looked implemented.
+    "resist_fire": _resist_buff("fire"),
+    "resist_cold": _resist_buff("ice"),
+    "resist_lightning": _resist_buff("lightning"),
+    "resist_poison": _resist_buff("poison"),
+    # 5 potions.
+    "antidote": _antidote,
 }
 
 # Legacy hyphenated slugs predate the tiered catalogue and carry no tier of

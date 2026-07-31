@@ -248,7 +248,10 @@ def test_an_unimplemented_potion_is_refused_and_kept(client, monkeypatch):
     """127 of 154 potions had no effect. They must not vanish for nothing."""
     from app.services.item_effects import REFUSAL_NO_EFFECT
 
-    user, char = _fresh_user_and_char(["potion_buff_speed_l3"])
+    # buff_speed served as the "unimplemented" example until the buff primitive
+    # landed and it started resolving. luck is a genuine one: the seed file's
+    # own header calls it "(affects loot RNG - conceptual)".
+    user, char = _fresh_user_and_char(["potion_luck_l10"])
     char_id = char.id
     _login_as(client, user.id)
     session = _start(user.id, monkeypatch)
@@ -265,7 +268,7 @@ def test_an_unimplemented_potion_is_refused_and_kept(client, monkeypatch):
 
     resp = client.post(
         f"/api/dungeon/combat/{cid}/action",
-        json={"action": "use_item", "version": version, "actor_id": actor_id, "slug": "potion_buff_speed_l3"},
+        json={"action": "use_item", "version": version, "actor_id": actor_id, "slug": "potion_luck_l10"},
     )
     data = resp.get_json()
     assert data.get("error") == "no_effect", data
@@ -273,7 +276,7 @@ def test_an_unimplemented_potion_is_refused_and_kept(client, monkeypatch):
 
     char = db.session.get(Character, char_id)
     items = json.loads(char.items)
-    assert "potion_buff_speed_l3" in items, "an unimplemented potion must be kept, not consumed for nothing"
+    assert "potion_luck_l10" in items, "an unimplemented potion must be kept, not consumed for nothing"
 
     after = combat_service._load_session(cid).to_dict()  # type: ignore
     assert after["party"]["members"][0]["hp"] == hp_before

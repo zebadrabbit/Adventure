@@ -86,11 +86,60 @@ def _now():
 # "physical", and the three offensive spells tag fire / ice / lightning. Note it
 # is "ice", not "cold" -- the monster catalogue's trait vocabulary disagrees, and
 # the traits are decoration, so this list follows the code that runs.
+# Effects that must be carried INTO a fight from the character's persisted rows.
+# Deliberately not the same predicate as "survives the fight" -- what survives is
+# decided at write-back, by the effect's own scope (see _persist_party_resources).
+# This was two function-local copies 1,287 lines apart; a new effect added to one
+# and not the other either failed to hydrate or failed to persist, silently.
+PERSISTED_EFFECT_NAMES = ("poison", "regen_buff", "stat_buff", "resist_buff")
+
 RESISTABLE_ELEMENTS = ("physical", "fire", "ice", "lightning")
 
 # One resist point = one percent off, floored so a stacked set cannot reach
 # immunity. 25 resist is a quarter off; the floor bites past 60 points.
 _RESIST_FLOOR = 0.4
+
+
+def apply_effect_modifiers(member: Dict[str, Any]) -> Dict[str, Any]:
+    """Fold active buff effects into a party member's derived stats, in place.
+
+    One folding point, called wherever the effect list can have changed: after
+    hydration, after a potion is drunk, and at the start of a turn once
+    start-of-turn effects have ticked. Every read site downstream sees the
+    modified numbers without knowing buffs exist.
+
+    Idempotent by construction: the pre-buff values are stashed once in
+    ``_base`` and every recomputation starts from them, so calling this twice
+    cannot stack a buff onto itself.
+    """
+    base = member.get("_base")
+    if base is None:
+        base = {
+            "attack": int(member.get("attack", 0) or 0),
+            "defense": int(member.get("defense", 0) or 0),
+            "speed": int(member.get("speed", 0) or 0),
+            "resist_points": int(member.get("resist_points", 0) or 0),
+        }
+        member["_base"] = base
+
+    mods = {"attack": 0, "defense": 0, "speed": 0}
+    resist_points = 0
+    for eff in member.get("effects", []) or []:
+        if int(eff.get("remaining", 0) or 0) <= 0:
+            continue
+        data = eff.get("data") or {}
+        for stat, delta in (data.get("mods") or {}).items():
+            if stat in mods:
+                mods[stat] += int(delta)
+        resist_points += int(data.get("resist_points", 0) or 0)
+
+    for stat, delta in mods.items():
+        member[stat] = max(0, base[stat] + delta)
+    # Points are summed across gear and every active effect and converted ONCE.
+    # Multiplying two multipliers together (0.8 * 0.75 = 0.60) would slip past
+    # the floor that _resist_map exists to enforce.
+    member["resistances"] = _resist_map(base["resist_points"] + resist_points)
+    return member
 
 
 def _resist_map(resist_all: int) -> Dict[str, float]:
@@ -220,8 +269,6 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
 
     from app.models import CharacterStatusEffect
 
-    PERSISTED_EFFECT_NAMES = ("poison", "regen_buff")
-
     try:
         effects = [
             {"name": row.name, "remaining": row.remaining, "data": json.loads(row.data) if row.data else {}}
@@ -237,7 +284,7 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
 
     effects_display = [describe_status_effect(e) for e in effects]
 
-    return {
+    snapshot = {
         # Controller user id retained separately from participant (character) id.
         "controller_id": char.user_id,
         "char_id": char.id,
@@ -261,6 +308,9 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
         # hardcoded {}, which is why apply_resistances was live code that
         # always no-opped and "of Warding" was an entirely inert suffix.
         "resistances": _resist_map(resist_all),
+        # The raw points, kept so apply_effect_modifiers can re-derive the map
+        # from gear + effects together rather than compounding multipliers.
+        "resist_points": resist_all,
         "crit_bonus": crit_bonus,
         "lifesteal": lifesteal,
         "defending": False,
@@ -268,6 +318,10 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
         "effects": effects,
         "effects_display": effects_display,
     }
+    # A buff carried in from outside combat (drunk in the dungeon, then a fight
+    # starts) has to be folded in here, or it would sit in the effects list
+    # doing nothing until something else happened to recompute.
+    return apply_effect_modifiers(snapshot)
 
 
 def _party_characters(user_id: int) -> List[Character]:
@@ -977,6 +1031,8 @@ def _skip_if_unconscious(session: CombatSession, party: Dict[str, Any], char_id:
     actor_ref = _player_ref(party, char_id)
     if actor_ref:
         effect_logs = apply_start_of_turn(actor_ref)
+        # Ticking may have expired a buff, so re-derive before the actor acts.
+        apply_effect_modifiers(actor_ref)
         if effect_logs:
             for line in effect_logs:
                 _append_log(session, line)
@@ -1507,13 +1563,20 @@ def _persist_party_resources(session: CombatSession):
             # simplest and avoids diffing old vs new rows. Dead characters
             # (hp<=0) don't get effects written back.
             try:
-                PERSISTED_EFFECT_NAMES = ("poison", "regen_buff")
                 CharacterStatusEffect.query.filter(
                     CharacterStatusEffect.character_id == cid,
                     CharacterStatusEffect.name.in_(PERSISTED_EFFECT_NAMES),
                 ).delete(synchronize_session=False)
                 if int(m.get("hp", 0)) > 0:
                     for eff in m.get("effects", []) or []:
+                        # A combat-scoped effect is deleted above and never
+                        # re-added: that IS the "combat buffs fall off when the
+                        # fight ends" rule, with no separate clearing pass to
+                        # forget to call. World-scoped ones (poison, a camp's
+                        # regen buff) keep their remaining ticks and ride the
+                        # game clock as before.
+                        if (eff.get("data") or {}).get("scope") == "combat":
+                            continue
                         if eff.get("name") in PERSISTED_EFFECT_NAMES and int(eff.get("remaining", 0)) > 0:
                             db.session.add(
                                 CharacterStatusEffect(
@@ -2153,8 +2216,21 @@ def player_use_item(
         member["effects"] = replace_effect(
             member.get("effects", []) or [], effect["name"], effect["ticks"], **effect.get("data", {})
         )
+        # A buff is only real once it reaches the derived stats every other
+        # code path reads. Without this the effect sits in the list and the
+        # drinker swings at exactly the strength they had before.
+        apply_effect_modifiers(member)
+    elif kind == "cure":
+        removes = set(effect.get("removes") or [])
+        before = len(member.get("effects", []) or [])
+        member["effects"] = [e for e in (member.get("effects", []) or []) if e.get("name") not in removes]
+        apply_effect_modifiers(member)
+        if len(member["effects"]) == before:
+            # Nothing to cure. Refuse rather than spend the potion and the turn
+            # on a no-op -- an antidote with nothing to purge is a mis-click.
+            return {"error": "nothing_to_cure", "message": "Nothing ails you that this would mend."}
     else:
-        # The resolver's contract only emits the three kinds above; an
+        # The resolver's contract only emits the kinds above; an
         # unrecognised kind is a resolver/combat mismatch, not a player
         # mistake. Refuse rather than silently doing nothing while still
         # spending the potion and the turn.
