@@ -1,4 +1,4 @@
-"""Tests for new combat actions: defend, use_item, cast_spell.
+"""Tests for new combat actions: defend, use_item, cast_skill.
 
 Uses direct session creation via combat_service to avoid dependency on random encounters.
 """
@@ -338,26 +338,3 @@ def test_a_tiered_heal_potion_scales_with_its_suffix(client, monkeypatch):
     delta_l1 = _use_potion_and_measure_heal(client, cid, "potion_heal_l1")
     delta_l4 = _use_potion_and_measure_heal(client, cid, "potion_heal_l4")
     assert delta_l4 > delta_l1, (delta_l1, delta_l4)
-
-
-def test_cast_spell_costs_mana_and_deals_damage(auth_client, monkeypatch):
-    user = User.query.filter_by(username="tester").first()
-    assert user
-    session = _start(user.id, monkeypatch)
-    cid = session.id
-    version = session.version
-    init = session.to_dict().get("initiative", [])
-    actor_id = init[session.active_index]["id"]
-    # Cast spell
-    resp = auth_client.post(
-        f"/api/dungeon/combat/{cid}/action",
-        json={"action": "cast_spell", "version": version, "actor_id": actor_id, "spell": "firebolt"},
-    )
-    data = resp.get_json()
-    assert data.get("ok")
-    st = data["state"]
-    party = st["party"]
-    member = party["members"][0]
-    assert member["mana"] < member["mana_max"]  # mana spent
-    # Monster HP reduced
-    assert st["monster_hp"] < session.monster_hp + 1  # ensure some damage registered

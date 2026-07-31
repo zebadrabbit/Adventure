@@ -377,7 +377,6 @@ def _seed_game_config():
             "move": 1,
             "search": 2,
             "use_item": 1,
-            "cast_spell": 1,
             "equip": 0,
             "unequip": 0,
             "consume": 1,

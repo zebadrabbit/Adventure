@@ -2,7 +2,7 @@
 
 player_attack already guards against this (skips the turn with an
 "is unconscious" log line instead of executing the action). The other five
-action handlers (flee, defend, use_item, cast_spell, cast_skill) historically
+action handlers (flee, defend, use_item, cast_skill) historically
 had no equivalent check at all.
 """
 
@@ -93,13 +93,6 @@ def test_player_use_item_rejects_downed_character(test_app, monkeypatch):
         session = combat_service._load_session(session.id)
         party = json.loads(session.party_snapshot_json)
         assert party["members"][0]["hp"] == 0, "a downed character must not be able to heal themselves"
-
-
-def test_player_cast_spell_rejects_downed_character(test_app, monkeypatch):
-    with test_app.app_context():
-        session, user, char_id = _downed_session(test_app, monkeypatch)
-        result = combat_service.player_cast_spell(session.id, user.id, session.version, "firebolt", actor_id=char_id)
-        assert result.get("skipped") is True, result
 
 
 def test_player_cast_skill_rejects_downed_character(test_app, monkeypatch):

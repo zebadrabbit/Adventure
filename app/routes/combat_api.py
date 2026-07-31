@@ -139,18 +139,8 @@ def combat_defend(combat_id: int):
     return jsonify(result), code
 
 
-@bp_combat.route("/api/combat/<int:combat_id>/cast", methods=["POST"])  # cast spell
-@login_required
-def combat_cast_spell(combat_id: int):
-    version = int(request.json.get("version", 0)) if request.is_json else 0
-    actor_id = request.json.get("actor_id") if request.is_json else None
-    spell = request.json.get("spell") if request.is_json else None
-    target_id = request.json.get("target_id") if request.is_json else None
-    result = combat_service.player_cast_spell(
-        combat_id, current_user.id, version, spell, actor_id=actor_id, target_id=target_id
-    )
-    code = 200 if result.get("ok") or result.get("error") not in ("not_found",) else 404
-    return jsonify(result), code
+# POST /api/combat/<id>/cast is gone with player_cast_spell. Casting is a skill:
+# POST /api/combat/<id>/cast_skill, gated on having unlocked it.
 
 
 @bp_combat.route("/api/combat/<int:combat_id>/cast_skill", methods=["POST"])  # use an unlocked active skill
