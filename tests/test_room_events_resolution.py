@@ -62,7 +62,7 @@ def test_shrine_restores_mana_and_grants_regen_buff(test_app):
         user = create_user("shrine_1")
         inst = create_instance(user, seed=7001)
         char = create_character(user, name="Hero")
-        # int 40 -> compute_hp_mana_max gives 20 + 40*2 = 100 mana. The cap is
+        # int 40, level 1 -> compute_hp_mana_max gives 20 + 40*2 + 1*3 = 103. The cap is
         # computed, never stored, so it is seeded through the stat that feeds
         # it rather than through a "max_mana" key nothing reads.
         _set_stats(char, hp=50, mana=10, **{"int": 40})
@@ -74,12 +74,12 @@ def test_shrine_restores_mana_and_grants_regen_buff(test_app):
 
         assert len(events) == 1
         assert events[0]["kind"] == "shrine"
-        # +50% of the 100 computed cap, capped.
+        # +50% of the 103 computed cap, on top of the 10 already held.
         after = json.loads(db.session.get(type(char), char.id).stats)
-        assert after["mana"] == 60
+        assert after["mana"] == 61
         # Both keys, or combat's _derive_stats reads the stale one and the
         # restore is silently discarded on the next fight.
-        assert after["current_mana"] == 60
+        assert after["current_mana"] == 61
         assert CharacterStatusEffect.query.filter_by(character_id=char.id, name="regen_buff").count() == 1
         assert db.session.get(DungeonEntity, ent_id) is None
 
@@ -99,8 +99,8 @@ def test_shrine_restores_mana_without_a_stored_max_mana(test_app):
         resolve_events_at(inst, 5, 5)
 
         after = json.loads(db.session.get(type(char), char.id).stats)
-        assert after["mana"] == 54, "shrine restored nothing"
-        assert after["current_mana"] == 54
+        assert after["mana"] == 55, "shrine restored nothing"
+        assert after["current_mana"] == 55
 
 
 def test_trap_avoided_when_leader_perception_high(test_app):

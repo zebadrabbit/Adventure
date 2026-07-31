@@ -209,8 +209,13 @@ def test_unimplemented_potion_is_refused_out_of_combat_and_stays_in_the_bag(clie
     """The regression test for the 127 potions destroyed for zero effect: a
     slug the resolver doesn't recognise must be refused, and the potion must
     still be there afterwards -- not silently removed for nothing."""
-    slug = "potion_buff_speed_l3"
-    _ensure_item(slug, name="Standard Swiftness Draught")
+    # buff_speed used to serve as the "unimplemented" example here; it resolves
+    # now. luck is a genuine one -- the seed file's own header calls it
+    # "(affects loot RNG - conceptual)", which is the author saying there is no
+    # mechanic. The sanity check below is what keeps this test honest as
+    # families get implemented.
+    slug = "potion_luck_l10"
+    _ensure_item(slug, name="Fortune Elixir")
     assert resolve_potion_effect(slug) is None, "sanity check: this slug must be one the resolver refuses"
 
     user, char = _fresh_user_and_char([{"slug": slug, "qty": 1}])

@@ -46,12 +46,27 @@ REFUSAL_ITEM_REMOVAL_FAILED = "Something went wrong reaching for that potion. Tr
 _TIERED_SLUG_RE = re.compile(r"potion_(?P<family>.+)_l(?P<tier>\d+)")
 
 
+# The curves target ~35% of the drinker's pool for a tier-matched potion, at
+# every level. 35% so three potions do not refill from empty and a full heal is
+# never one click.
+#
+# What they replaced was measured, not guessed: heal was 5*(tier+1), which is
+# 13% of a level-1 pool and 62% of a level-20 one -- potions got relatively
+# STRONGER as you levelled. Mana was worse: 2*(tier+1) against a pool that had
+# no level term at all, so the tier-20 potion restored 42 into a 40-point bar.
+#
+# The intercepts are large on purpose. The pools have intercepts of their own
+# (70 for HP at CON 10, 40 for mana at INT 10), so a potion that is a constant
+# fraction of the pool must share that shape. The visible consequence is that
+# the ladders compress -- heal spans 26..64 rather than 10..105 -- so a low-tier
+# potion stays useful late instead of becoming vendor trash. Prices were not
+# rebalanced to match; that is a separate decision.
 def _heal(tier: int) -> dict:
-    return {"kind": "restore_hp", "amount": 5 * (tier + 1)}
+    return {"kind": "restore_hp", "amount": 24 + 2 * tier}
 
 
 def _mana(tier: int) -> dict:
-    return {"kind": "restore_mp", "amount": 2 * (tier + 1)}
+    return {"kind": "restore_mp", "amount": 14 + tier}
 
 
 # Families live in one table, mapping a family name to a handler that takes
@@ -60,9 +75,85 @@ def _mana(tier: int) -> dict:
 # exists for it) is one entry here plus a handler function above -- no other
 # file needs to change. A family absent from this table resolves to None:
 # refused, never guessed at.
+# --- Buffs -----------------------------------------------------------------
+# A buff is a persisted status-effect row whose ``data`` carries what it does.
+# Two scopes exist. "combat" buffs are deleted at the end of a fight and never
+# written back, regardless of ticks remaining -- a draught bought for a fight
+# must not survive it. "world" buffs ride the game clock like poison does.
+#
+# Durations are in ticks of the existing GameClock; there is no second timebase.
+# 12 ticks is roughly a fight plus the walk to the next one, so a buff drunk on
+# sight is still up when the swords meet and gone well before the one after.
+
+_BUFF_TICKS = 12
+
+
+def _stat_buff(stat: str):
+    """A temporary modifier to one derived combat stat.
+
+    The magnitude tracks the stat's own scale rather than one shared number:
+    attack and defense grow roughly one point per level, while speed is
+    8 + DEX//2 and barely moves, so a flat +tier would be trivial on attack and
+    overwhelming on speed.
+    """
+    per_tier = {"attack": 1.0, "defense": 1.0, "speed": 0.4}[stat]
+
+    def handler(tier: int) -> dict:
+        return {
+            "kind": "status",
+            "name": "stat_buff",
+            "ticks": _BUFF_TICKS,
+            "data": {"scope": "combat", "mods": {stat: max(1, round(per_tier * tier))}},
+        }
+
+    return handler
+
+
+def _resist_buff(element: str):
+    """Temporary resistance to one damage type.
+
+    Points, not multipliers -- combat sums points across gear and every active
+    effect and converts once, so two sources cannot compound past the floor.
+    3 points per tier puts a tier-20 draught at 60, which lands exactly on the
+    60% cap the conversion enforces: "brief immunity", as the item promises,
+    without ever reaching true immunity.
+    """
+
+    def handler(tier: int) -> dict:
+        return {
+            "kind": "status",
+            "name": "resist_buff",
+            "ticks": _BUFF_TICKS,
+            "data": {"scope": "combat", "element": element, "resist_points": 3 * tier},
+        }
+
+    return handler
+
+
+def _antidote(tier: int) -> dict:
+    """Cure poison. The one blocked family whose mechanic already existed --
+    ``poison`` is a real status with a handler and a persisted row."""
+    return {"kind": "cure", "removes": ["poison"]}
+
+
 _FAMILY_HANDLERS: Dict[str, Callable[[int], dict]] = {
     "heal": _heal,
     "mana": _mana,
+    # 60 potions, three full 1..20 ladders. The catalogue descriptions ask for
+    # exactly this: "Slightly increases attack briefly."
+    "buff_attack": _stat_buff("attack"),
+    "buff_defense": _stat_buff("defense"),
+    "buff_speed": _stat_buff("speed"),
+    # 20 potions. resist_cold keys on "ice", not "cold": that is the element
+    # string the spell config and the damage pipeline actually use, and
+    # apply_resistances silently drops keys it does not know -- so "cold" would
+    # be a five-potion no-op that looked implemented.
+    "resist_fire": _resist_buff("fire"),
+    "resist_cold": _resist_buff("ice"),
+    "resist_lightning": _resist_buff("lightning"),
+    "resist_poison": _resist_buff("poison"),
+    # 5 potions.
+    "antidote": _antidote,
 }
 
 # Legacy hyphenated slugs predate the tiered catalogue and carry no tier of

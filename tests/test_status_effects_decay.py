@@ -62,8 +62,8 @@ def test_compute_hp_mana_max_uses_con_int_level_and_gear():
 
     # base 50 + CON*2 + level*5 = 50 + 28 + 15 = 93
     assert hp_max == 93
-    # base 20 + INT*2 = 20 + 24 = 44
-    assert mana_max == 44
+    # base 20 + INT*2 + level*3 = 20 + 24 + 9 = 53
+    assert mana_max == 53
 
 
 def test_compute_hp_mana_max_defaults_when_stats_missing():
@@ -78,8 +78,8 @@ def test_compute_hp_mana_max_defaults_when_stats_missing():
 
     # base 50 + CON(10)*2 + level(1)*5 = 75
     assert hp_max == 75
-    # base 20 + INT(10)*2 = 40
-    assert mana_max == 40
+    # base 20 + INT(10)*2 + level(1)*3 = 43
+    assert mana_max == 43
 
 
 def test_regen_buff_start_heals_and_caps_at_max_hp_and_mana():

@@ -149,9 +149,57 @@ Still open, in the order I would take them:
       heuristic actively fought it: its skip condition only spared rows that
       were *both* non-zero level and non-common, so every legitimately common
       low-level item was rewritten each time the server started.
-- [ ] **111 of 154 potions still refuse to be drunk** — 14 of 16 families have
-      no handler, and those potions are 50-64% of every monster loot pool. The
-      biggest single pool of dead reward in the game.
+- [x] ~~**111 of 154 potions refuse to be drunk**~~ — **125 of 151 tiered
+      potions resolve now (83%, was 26%)**. One primitive did most of it: a
+      persisted `CharacterStatusEffect` row whose `data` carries
+      `{scope, mods, resist_points}`, folded into the party snapshot at a single
+      point (`combat_service.apply_effect_modifiers`) that runs on hydration, on
+      drinking, and at turn start. **No migration** — `name` is already wide
+      enough and `data` is already JSON-in-Text.
+      The owner's rule (*combat buffs fall off when the fight ends, regardless
+      of the clock*) is implemented by omission rather than a clearing pass: the
+      end-of-combat write-back already deletes every persisted row, so a
+      combat-scoped effect is simply never re-added. Expiry otherwise rides the
+      existing game clock, as decided.
+      Unblocked: `buff_attack`/`buff_defense`/`buff_speed` (60), the four
+      `resist_*` families (20), and `antidote` (5), whose mechanic already
+      existed — `poison` is a real status.
+      Two traps avoided: `resist_cold` keys on **`ice`**, the element the spell
+      config and damage pipeline actually emit (`apply_resistances` silently
+      drops unknown keys, so `cold` would have been a five-potion no-op that
+      looked implemented); and resist is stored as **points**, summed across
+      gear and every effect and converted to a multiplier exactly once, because
+      multiplying two multipliers (0.8 × 0.75 = 0.60) slips past the 0.4 floor
+      each source respects individually.
+      Also fixed on the way: `PERSISTED_EFFECT_NAMES` was two function-local
+      copies **1,287 lines apart**, so a new effect added to one and not the
+      other would silently fail to hydrate or fail to persist. Now one constant.
+
+- [ ] **26 potions still have no mechanic** — `stamina` and `perception` (5
+      each), and `invis`, `regen`, `luck`, `group_battle` (4 each). Each needs a
+      design decision rather than an implementation:
+      - `stamina` — nothing in `app/` references stamina at all. Either a third
+        resource or re-theme onto something that exists.
+      - `perception` — exists in exploration only, and reads `Character.stats`
+        rather than the combat snapshot. Closest to buildable: a world-scoped
+        buff on the perception stat the trap/hidden-cache rolls already use.
+      - `luck` — the seed file's own header says `(affects loot RNG -
+        conceptual)`. That parenthesis is the author admitting there is no
+        mechanic. Would need a hook in `roll_loot`.
+      - `regen` — deliberately unhandled while the regen-buff duration and
+        multipliers were duplicated in four places; those are now behind one
+        constant, so a tiered version is finally cheap.
+      - `invis` — "partial"/"near-perfect" in the descriptions implies a
+        miss-chance percentage, not a boolean.
+      - `group_battle` — the only family that targets anyone but the drinker.
+        Needs party-wide application, which no potion path has.
+- [ ] **The potion naming ladder disagrees with itself.** The dense families
+      (heal/mana/buff_*) use a 20-step ladder where *Superior* is tier 6 and
+      *Greater* is tier 5. Six sparse families call tier 10 *Superior*, and the
+      four late families (invis/regen/luck/group_battle) call tier 15 *Greater*
+      and leave tier 10 unnamed. So the same adjective means three different
+      tiers depending on which potion you are holding, and `luck` is the only
+      family with no *Ultimate* at tier 20. Pure data; nothing reads the names.
 - [ ] **`attack_speed` is defined on all 12 weapon archetypes and read by
       nothing**, so a Dagger is strictly worse than a Greataxe with nothing to
       compensate. Either make it matter or drop it from the data.

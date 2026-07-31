@@ -58,6 +58,7 @@ _REFUSAL_GIVE_IN_COMBAT = "There is no time to pass things about in the middle o
 _REFUSAL_DOWNED = "The dead neither give nor take. Loot the body instead."
 _REFUSAL_NOT_IN_PARTY = "Only those who set out together may share the load."
 _REFUSAL_RECEIVER_LADEN = "They are carrying too much already."
+_REFUSAL_NOTHING_TO_CURE = "Nothing ails you that this would mend."
 
 # The one gear-slot vocabulary. Defined by the loot generator, which is what
 # every procedural item, prefix and suffix keys off, so it is what the player
@@ -690,8 +691,18 @@ def consume_item(cid: int):
         status_name = effect["name"]
         status_ticks = int(effect.get("ticks", 0))
         status_data = effect.get("data", {}) or {}
+    elif kind == "cure":
+        # Out of combat, the effects that matter live as CharacterStatusEffect
+        # rows -- the in-combat path works on the party snapshot instead.
+        removes = list(effect.get("removes") or [])
+        cured = CharacterStatusEffect.query.filter(
+            CharacterStatusEffect.character_id == ch.id,
+            CharacterStatusEffect.name.in_(removes),
+        ).delete(synchronize_session=False)
+        if not cured:
+            return jsonify({"error": "nothing_to_cure", "message": _REFUSAL_NOTHING_TO_CURE}), 400
     else:
-        # The resolver's contract only emits the three kinds above; an
+        # The resolver's contract only emits the kinds above; an
         # unrecognised kind is a resolver/route mismatch, not a player
         # mistake -- refuse rather than consume the potion for an effect
         # nothing here knows how to apply.
