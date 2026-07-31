@@ -186,9 +186,13 @@ Still open, in the order I would take them:
       - `luck` — the seed file's own header says `(affects loot RNG -
         conceptual)`. That parenthesis is the author admitting there is no
         mechanic. Would need a hook in `roll_loot`.
-      - `regen` — deliberately unhandled while the regen-buff duration and
-        multipliers were duplicated in four places; those are now behind one
-        constant, so a tiered version is finally cheap.
+      - `regen` — still blocked on the same thing it always was, and the note
+        claiming otherwise was wrong: the regen-buff literals
+        (`{"hp_mult": 2.0, "mp_mult": 2.0}`) are still copied verbatim in
+        `dungeon_api.py:1707` and `room_events.py:187`, with a third variant
+        (3.0/3.0) in `item_effects`' legacy map. Only `PERSISTED_EFFECT_NAMES`
+        was consolidated. Tiering regen would add a fourth copy; fold them onto
+        one constant first.
       - `invis` — "partial"/"near-perfect" in the descriptions implies a
         miss-chance percentage, not a boolean.
       - `group_battle` — the only family that targets anyone but the drinker.
