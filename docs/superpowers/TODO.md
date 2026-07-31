@@ -116,19 +116,39 @@ Full triage with code pointers:
       archetype tree still defines the early game, and late enough that
       `grant_starting_skill` (which looks for a tier-1 active) cannot hand one
       out at character creation.
-- [ ] **The spell system is vestigial and should fold into the trees.** Three
-      spells — firebolt, ice_shard, lightning — live in a function-local dict
-      inside `player_cast_spell`, with **no class gate, no level gate and no
-      learning step**: a level-1 barbarian can cast Lightning Bolt the moment
-      they have 8 mana. Skills supersede them in every respect (class-gated,
-      level-gated, bought with points, mana cost, cooldowns, `_spell_power`
-      scaling), and Arcana already has Firebolt, Frost Lance and Chain
-      Lightning by name. Two vocabularies for the same idea.
-      **Bigger than it looks, so scoped rather than done:** `monster_ai`
-      references `firebolt` for monster casting, `admin_new.py` carries a
-      `spell_costs` config, there are three server call sites (REST, websocket,
-      dungeon_api) and **seven test files**. Deleting it is its own chunk with
-      its own verification, not a tail-end change.
+- [x] ~~**The spell system is vestigial**~~ — deleted. It turned out to be
+      unreachable from *both* ends, not merely superseded: nothing in the client
+      ever emitted `cast_firebolt`/`cast_ice_shard`/`cast_lightning` (combat.js
+      carried dispatch branches, but no button, template or handler produced
+      those actions), and no monster could reach the monster-side branch either.
+      Gone: `player_cast_spell`, `POST /api/combat/<id>/cast`, the websocket
+      `cast` action, `dungeon_api`'s `cast_spell` action, the admin
+      `spell_costs` config, the dead client dispatch, and a `cast_spell`
+      tick-cost with no caller. Casting lives in the skill trees, which do it
+      properly — class-gated, level-gated, bought with points, mana costs,
+      cooldowns, `_spell_power` scaling.
+      Two spell-only test files went with it (8 tests). The guards mixed into
+      other files were kept by conversion, not deletion: the downed-character
+      case already had a skill equivalent, and `test_cast_skill.py` already
+      covers mana cost, deduction, locked-skill rejection and zero-cost casts on
+      the live path.
+- [ ] **MONSTERS HAVE NO AI AT ALL — `monster_ai` is entirely dead code.**
+      `select_action` is called from exactly one place
+      (`combat_service.monster_auto_turn`), gated on `monster.get("ai_enabled")`
+      — and **`ai_enabled` is set nowhere**: not in `sql/monsters_seed.sql`, not
+      in `spawn_service`, not on the model, not in `encounters`. Nor are
+      `spells`, `enable_monster_spells`, `enable_monster_flee` or
+      `enable_monster_help`. Every monster in the game does
+      `{"type": "attack"}`, every turn, forever. No monster has ever cast a
+      spell, fled at low HP, or called for help, and the firebolt branch in
+      `monster_auto_turn` is unreachable.
+      Deliberately NOT deleted: this is a designed system that was never wired,
+      and monsters doing something other than autoattacking is a feature worth
+      finishing rather than removing. Wiring it is small — set the flags on
+      spawn — but it is a *balance* change (monsters get strictly stronger), so
+      it belongs with the playtest verdicts. `boss_abilities` is a separate,
+      partly-live path and is not affected by this.
+
 - [ ] **Training is guarded against combat, not against being in a dungeon.**
       The wider rule (training belongs in town) needs a signal that does not
       exist: `session["dungeon_instance_id"]` persists after a run to drive the

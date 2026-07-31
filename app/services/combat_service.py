@@ -46,9 +46,6 @@ from .combat_constants import (
     PLAYER_FLEE_FAIL,
     PLAYER_FLEE_SUCCESS,
     PLAYER_SKILL,
-    PLAYER_SPELL_FIZZLE,
-    PLAYER_SPELL_HIT,
-    PLAYER_SPELL_MISS,
     PLAYER_USE_ITEM,
 )
 from .combat_utils import apply_resistances
@@ -2282,133 +2279,22 @@ def player_use_item(
     return {"ok": True, "state": session.to_dict(), "item_used": slug}
 
 
-def player_cast_spell(
-    combat_id: int,
-    user_id: int,
-    version: int,
-    spell: str,
-    actor_id: Optional[int] = None,
-    target_id: Optional[int] = None,
-) -> Dict[str, Any]:
-    """Cast a supported spell (Firebolt, Ice Shard, Lightning) reducing mana and dealing damage.
-
-    Provides miss / crit semantics parallel to physical attacks; applies
-    monster resistances. Unsupported spells return ``{"error":"bad_spell"}``.
-    """
-    session = _load_session(combat_id)
-    if not session:
-        return {"error": "not_found"}
-    if session.status != "active":
-        return {"error": "inactive", "state": session.to_dict()}
-    if session.version != version:
-        return {"error": "version_conflict", "state": session.to_dict()}
-    initiative = json.loads(session.initiative_json or "[]")
-    actor = initiative[session.active_index]
-    if actor["type"] != "player":
-        return {"error": "not_your_turn", "state": session.to_dict()}
-    if actor_id is None:
-        actor_id = actor.get("id")
-    if actor.get("controller_id") != user_id or actor.get("id") != actor_id:
-        return {"error": "not_your_turn", "state": session.to_dict()}
-
-    # Spell configuration
-    spell_config = {
-        "firebolt": {"cost": 5, "damage_dice": (1, 8, 2), "element": "fire", "name": "Firebolt"},
-        "ice_shard": {"cost": 6, "damage_dice": (2, 6, 1), "element": "ice", "name": "Ice Shard"},
-        "lightning": {"cost": 8, "damage_dice": (1, 10, 2), "element": "lightning", "name": "Lightning Bolt"},
-    }
-
-    if spell not in spell_config:
-        return {"error": "bad_spell"}
-
-    config = spell_config[spell]
-    party = json.loads(session.party_snapshot_json or "{}") or {}
-    skip_result = _skip_if_unconscious(session, party, actor_id)
-    if skip_result is not None:
-        return skip_result
-    caster = _player_ref(party, actor_id)
-    if not caster:
-        return {"error": "no_caster"}
-
-    cost = config["cost"]
-    mana_available = caster.get("mana") if "mana" in caster else caster.get("current_mana", 0)
-    if mana_available < cost:
-        return {"error": "no_mana", "mana": mana_available}
-    mana_available -= cost
-    # Normalize storage back into both keys for backward compatibility
-    caster["mana"] = mana_available
-    caster["current_mana"] = mana_available
-    # Persist the spend immediately. The fizzle and miss paths below commit and
-    # return without re-serialising the party, so the deduction -- which only
-    # mutates the in-memory dict -- used to be discarded: a spell that missed
-    # was free, and casting looked like it cost no mana at all.
-    session.party_snapshot_json = json.dumps(party)
-    int_stat = caster.get("int_stat", caster.get("attack", 10))
-    # Spell accuracy: d20 + INT-based attack surrogate vs monster evasion (10 + armor)
-    acc_roll = random.randint(1, 20)
-    evasion = session.monster().get("armor", 0) + 10
-    # Basic hit logic parallel to weapon attacks
-    if acc_roll == 1:
-        _append_log(session, f"Player's {config['name']} fizzles (natural 1).", code=PLAYER_SPELL_FIZZLE)
-        # Track miss for visual effects
-        session.last_damage_json = json.dumps({"to_monster": {"amount": 0, "is_miss": True, "is_critical": False}})
-        _advance_turn(session)
-        _check_end(session)
-        db.session.commit()
-        _emit_session("combat_update", session)
-        if session.status != "active":
-            _emit_session("combat_end", session)
-        session = _auto_progress_monster_after_player(session)
-        return {"ok": True, "state": session.to_dict(), "spell": spell, "miss": True}
-    crit = acc_roll == 20
-    # Always hit on natural 20; otherwise compare INT surrogate + roll to evasion
-    attack_total = int_stat + acc_roll
-    hit = True if crit else attack_total >= evasion
-    if not hit:
-        _append_log(session, f"Player's {config['name']} misses (roll {acc_roll}).", code=PLAYER_SPELL_MISS)
-        # Track miss for visual effects
-        session.last_damage_json = json.dumps({"to_monster": {"amount": 0, "is_miss": True, "is_critical": False}})
-        _advance_turn(session)
-        _check_end(session)
-        db.session.commit()
-        _emit_session("combat_update", session)
-        if session.status != "active":
-            _emit_session("combat_end", session)
-        session = _auto_progress_monster_after_player(session)
-        return {"ok": True, "state": session.to_dict(), "spell": spell, "miss": True}
-
-    # Calculate damage based on spell configuration
-    num_dice, die_size, num_rolls = config["damage_dice"]
-    roll = sum(random.randint(1, die_size) for _ in range(num_dice * num_rolls))
-    dmg = int(roll + _spell_power(caster))
-    if crit:
-        dmg = int(dmg * 1.5)
-    # Apply monster resistances if any
-    resistances = session.monster().get("resistances", {}) or {}
-    try:
-        dmg = int(apply_resistances(dmg, [config["element"]], resistances))
-    except Exception:
-        logger.debug("suppressed_exception", where="player_cast_spell", exc_info=True)
-    hit = _damage_monster(session, dmg, target_id)
-    session.party_snapshot_json = json.dumps(party)
-    # Track damage for visual effects
-    session.last_damage_json = json.dumps({"to_monster": {"amount": dmg, "is_miss": False, "is_critical": crit}})
-    caster_name = caster.get("name", "Player")
-    _append_log(
-        session,
-        f"{caster_name} casts {config['name']} for {dmg}{' (CRIT)' if crit else ''} damage "
-        f"(HP {(hit or {}).get('hp', session.monster_hp)})",
-        code=PLAYER_SPELL_HIT,
-    )
-    session.phase = "end"
-    _progress_phase(session)
-    _check_end(session)
-    db.session.commit()
-    _emit_session("combat_update", session)
-    if session.status != "active":
-        _emit_session("combat_end", session)
-    session = _auto_progress_monster_after_player(session)
-    return {"ok": True, "state": session.to_dict(), "spell": spell, "damage": dmg, "crit": crit}
+# player_cast_spell lived here: three hardcoded spells (firebolt, ice_shard,
+# lightning) in a function-local dict, with no class gate, no level gate and no
+# learning step -- a level-1 barbarian could cast Lightning Bolt the moment they
+# had 8 mana. Deleted 2026-07-30 because it was unreachable AND superseded:
+#
+#   * unreachable -- nothing in the client emitted cast_firebolt/ice_shard/
+#     lightning. combat.js carried dispatch branches for them, but no button,
+#     template or handler ever produced those actions. The endpoints existed;
+#     nothing called them.
+#   * superseded -- skills do all of it properly. They are class-gated,
+#     level-gated, bought with talent points, cost mana, carry cooldowns and
+#     scale with _spell_power, and Arcana already has Firebolt, Frost Lance and
+#     Chain Lightning by name. Casting lives in the trees.
+#
+# Monster spellcasting was never on this path: monster_auto_turn applies its own
+# firebolt below. See the note there about why that branch is also unreachable.
 
 
 def player_cast_skill(

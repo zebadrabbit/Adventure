@@ -1081,9 +1081,6 @@ def combat_action(combat_id: int):
     elif action == "use_item":
         slug = (payload.get("slug") or "").strip()
         result = _combat.player_use_item(combat_id, current_user.id, version, slug, actor_id=actor_id)
-    elif action == "cast_spell":
-        spell = (payload.get("spell") or "").strip()
-        result = _combat.player_cast_spell(combat_id, current_user.id, version, spell, actor_id=actor_id)
     else:
         return jsonify({"error": "bad_action"}), 400
     # If monster's turn now, auto-progress once (simple AI) and refresh state

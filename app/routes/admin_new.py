@@ -112,7 +112,6 @@ DEFAULT_COMBAT_CONFIG = {
     "min_damage": 1,
     "defend_reduction_pct": 50,
     "flee_base_chance": 60,
-    "spell_costs": {"firebolt": 5, "ice_shard": 6, "lightning": 8},
     "spell_int_scaling": 0.6,
     "initiative_bonus": 0,
     # These four mirror into GameConfig["monster_ai"]; defaults match the
@@ -321,9 +320,10 @@ def save_combat_config(config_data):
         if field not in config_data:
             raise ValueError(f"Missing required field: {field}")
 
-    # Validate nested spell_costs
-    if "spell_costs" not in config_data or not isinstance(config_data["spell_costs"], dict):
-        raise ValueError("spell_costs must be a dictionary")
+    # spell_costs was validated here as a required dict. The three spells it
+    # priced (firebolt, ice_shard, lightning) are gone -- casting is a skill,
+    # and a skill's mana cost comes from its tier. It is still accepted if a
+    # caller sends it, so an older admin payload does not start failing.
 
     config = GameConfig.query.filter_by(key="combat_settings").first()
     if not config:

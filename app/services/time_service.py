@@ -28,12 +28,14 @@ def in_combat() -> bool:
         return False
 
 
-# Default per-action tick costs (can be overridden via GameConfig row 'tick_costs')
+# Default per-action tick costs (can be overridden via GameConfig row 'tick_costs').
+# "cast_spell" was here with no caller -- nothing ever passed it to advance_for --
+# and the action it named is gone: casting is a skill now. Note no skill action
+# advances time today either, which may be deliberate or may be an oversight.
 DEFAULT_ACTION_TICK_COSTS: Dict[str, int] = {
     "move": 1,
     "search": 2,
     "use_item": 1,
-    "cast_spell": 1,
     "equip": 0,  # equipment changes might be free (adjust later)
     "unequip": 0,
     "consume": 1,

@@ -722,21 +722,6 @@
 
         if (action === 'attack') endpoint = '/api/combat/' + combatId + '/attack';
         else if (action === 'defend') endpoint = '/api/combat/' + combatId + '/defend';
-        else if (action === 'cast_firebolt') {
-            endpoint = '/api/combat/' + combatId + '/cast';
-            payload.spell = 'firebolt';
-            spellType = 'firebolt';
-        }
-        else if (action === 'cast_ice_shard') {
-            endpoint = '/api/combat/' + combatId + '/cast';
-            payload.spell = 'ice_shard';
-            spellType = 'ice_shard';
-        }
-        else if (action === 'cast_lightning') {
-            endpoint = '/api/combat/' + combatId + '/cast';
-            payload.spell = 'lightning';
-            spellType = 'lightning';
-        }
         else if (action === 'use_item') {
             // Slug comes from the clicked entry (see renderItemButtons) --
             // there is no longer a fixed slug baked into the action itself,
