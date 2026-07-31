@@ -107,12 +107,34 @@ Full triage with code pointers:
       it is a literal, not a reference to the cap), and the `level_reached`
       achievements never fire — `check_achievements` is never called with that
       key anywhere in `app/`.
-- [ ] **12 classes share 7 skill trees**, so 11 of 12 are mechanically identical
-      to at least one other: fighter/barbarian/monk are byte-identical, as are
-      mage/sorcerer, cleric/paladin, druid/ranger and rogue/bard. Only warlock is
-      unique. `SkillTree.class_requirement` already accepts a single class name
-      and `allows_class` already handles it, so per-class signature trees need no
-      schema change — just rows.
+- [x] ~~**12 classes share 7 skill trees**~~ — twelve signature trees added, one
+      per class, three skills each at levels 9/13/18. No schema change:
+      `class_requirement` is a comma list that a single name satisfies. **19
+      trees, 97 skills**; every class now reaches 19 skills costing 46 points
+      against the 20 it earns, and no two classes reach the same set.
+      Signature trees start at level 9 on purpose — late enough that the shared
+      archetype tree still defines the early game, and late enough that
+      `grant_starting_skill` (which looks for a tier-1 active) cannot hand one
+      out at character creation.
+- [ ] **The spell system is vestigial and should fold into the trees.** Three
+      spells — firebolt, ice_shard, lightning — live in a function-local dict
+      inside `player_cast_spell`, with **no class gate, no level gate and no
+      learning step**: a level-1 barbarian can cast Lightning Bolt the moment
+      they have 8 mana. Skills supersede them in every respect (class-gated,
+      level-gated, bought with points, mana cost, cooldowns, `_spell_power`
+      scaling), and Arcana already has Firebolt, Frost Lance and Chain
+      Lightning by name. Two vocabularies for the same idea.
+      **Bigger than it looks, so scoped rather than done:** `monster_ai`
+      references `firebolt` for monster casting, `admin_new.py` carries a
+      `spell_costs` config, there are three server call sites (REST, websocket,
+      dungeon_api) and **seven test files**. Deleting it is its own chunk with
+      its own verification, not a tail-end change.
+- [ ] **Training is guarded against combat, not against being in a dungeon.**
+      The wider rule (training belongs in town) needs a signal that does not
+      exist: `session["dungeon_instance_id"]` persists after a run to drive the
+      Continue flow, so it cannot mean "is delving". Same missing concept —
+      tagging a *living* character with its current run — that blocks
+      loot-body's guard.
 ## Rewards that scale with effort
 
 The 2026-07-30 survey measured the reward layer against 40,000 simulated drops.
