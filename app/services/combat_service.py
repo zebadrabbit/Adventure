@@ -151,7 +151,10 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
     attack = 8 + STR // 2 + level
     defense = 5 + DEX // 3 + level // 2
     speed = 8 + DEX // 2
-    mana_max = 20 + INT * 2
+    # Mirrors character_stats.compute_hp_mana_max, including its level term --
+    # see the note there for why mana scales with level at all. The two must
+    # move together or in-combat and out-of-combat caps diverge.
+    mana_max = 20 + INT * 2 + level * 3
 
     max_hp += int(_gb.get("max_hp", 0))
     attack += int(_gb.get("damage", 0))

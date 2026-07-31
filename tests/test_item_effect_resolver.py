@@ -19,11 +19,14 @@ from app.services.item_effects import REFUSAL_NO_EFFECT, resolve_potion_effect
 @pytest.mark.parametrize(
     "slug,expected",
     [
-        ("potion_heal_l1", {"kind": "restore_hp", "amount": 10}),
-        ("potion_heal_l2", {"kind": "restore_hp", "amount": 15}),
-        ("potion_heal_l20", {"kind": "restore_hp", "amount": 105}),
-        ("potion_mana_l1", {"kind": "restore_mp", "amount": 4}),
-        ("potion_mana_l20", {"kind": "restore_mp", "amount": 42}),
+        # Amounts derived from the curve, not restated: they are tuning values
+        # aimed at ~35% of the drinker's pool (see item_effects). What must hold
+        # is that they rise with the tier and land where the curve says.
+        ("potion_heal_l1", {"kind": "restore_hp", "amount": 24 + 2 * 1}),
+        ("potion_heal_l2", {"kind": "restore_hp", "amount": 24 + 2 * 2}),
+        ("potion_heal_l20", {"kind": "restore_hp", "amount": 24 + 2 * 20}),
+        ("potion_mana_l1", {"kind": "restore_mp", "amount": 14 + 1}),
+        ("potion_mana_l20", {"kind": "restore_mp", "amount": 14 + 20}),
         ("potion-healing", {"kind": "restore_hp", "amount": 25}),
         ("potion-mana", {"kind": "restore_mp", "amount": 5}),
     ],
@@ -75,8 +78,12 @@ def test_malformed_input_resolves_to_nothing_without_raising(slug):
 
 
 def test_tier_is_read_from_the_suffix_not_a_substring():
-    """`potion_heal_l11` is tier 11, not tier 1 -- an anchored parse, not a scan."""
-    assert resolve_potion_effect("potion_heal_l11")["amount"] == 60
+    """`potion_heal_l11` is tier 11, not tier 1 -- an anchored parse, not a scan.
+
+    Asserted as a relationship rather than a magic number: what matters is that
+    the parse reads 11, not whatever the heal curve currently pays for it."""
+    assert resolve_potion_effect("potion_heal_l11")["amount"] == 24 + 2 * 11
+    assert resolve_potion_effect("potion_heal_l11")["amount"] != resolve_potion_effect("potion_heal_l1")["amount"]
 
 
 def test_a_refusal_sentence_exists_and_reads_as_prose():

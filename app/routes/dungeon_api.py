@@ -1168,12 +1168,13 @@ def dungeon_state():
             try:
                 stats = json.loads(char.stats) if char.stats else {}
                 level = getattr(char, "level", 1) or 1
-                con = int(stats.get("con", stats.get("CON", 10)))
-                intelligence = int(stats.get("int", stats.get("INT", 10)))
 
-                # Calculate max values (same formula as combat_service)
-                max_hp = 50 + con * 2 + level * 5
-                max_mana = 20 + intelligence * 2
+                # Through the shared helper, not a fourth copy of the formula.
+                # This block used to restate it under a comment promising it was
+                # "same formula as combat_service" -- a promise a comment cannot
+                # keep, and it silently went stale the moment mana gained a
+                # level term.
+                max_hp, max_mana = compute_hp_mana_max(char)
 
                 # Read current values
                 hp = int(stats.get("hp", max_hp))

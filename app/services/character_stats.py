@@ -34,7 +34,13 @@ def compute_hp_mana_max(character: Character) -> Tuple[int, int]:
     intelligence = int(stats.get("int", stats.get("INT", 10)) or 10)
 
     hp_max = 50 + con * 2 + level * 5
-    mana_max = 20 + intelligence * 2
+    # Mana gains a level term. Without one the pool was a flat 20 + INT*2 --
+    # 40 for a level-20 character with INT 10 -- while the catalogue sells a
+    # twenty-tier mana ladder whose top potion restored 42, more than the whole
+    # bar. Every tier past about 10 was partly wasted, so twenty tiers, five
+    # rarities and a 47x price spread all described the same potion.
+    # Mirrored in combat_service._derive_stats; the two must move together.
+    mana_max = 20 + intelligence * 2 + level * 3
 
     from app.services.loot_service import gear_bonuses
 

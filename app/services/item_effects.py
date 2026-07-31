@@ -46,12 +46,27 @@ REFUSAL_ITEM_REMOVAL_FAILED = "Something went wrong reaching for that potion. Tr
 _TIERED_SLUG_RE = re.compile(r"potion_(?P<family>.+)_l(?P<tier>\d+)")
 
 
+# The curves target ~35% of the drinker's pool for a tier-matched potion, at
+# every level. 35% so three potions do not refill from empty and a full heal is
+# never one click.
+#
+# What they replaced was measured, not guessed: heal was 5*(tier+1), which is
+# 13% of a level-1 pool and 62% of a level-20 one -- potions got relatively
+# STRONGER as you levelled. Mana was worse: 2*(tier+1) against a pool that had
+# no level term at all, so the tier-20 potion restored 42 into a 40-point bar.
+#
+# The intercepts are large on purpose. The pools have intercepts of their own
+# (70 for HP at CON 10, 40 for mana at INT 10), so a potion that is a constant
+# fraction of the pool must share that shape. The visible consequence is that
+# the ladders compress -- heal spans 26..64 rather than 10..105 -- so a low-tier
+# potion stays useful late instead of becoming vendor trash. Prices were not
+# rebalanced to match; that is a separate decision.
 def _heal(tier: int) -> dict:
-    return {"kind": "restore_hp", "amount": 5 * (tier + 1)}
+    return {"kind": "restore_hp", "amount": 24 + 2 * tier}
 
 
 def _mana(tier: int) -> dict:
-    return {"kind": "restore_mp", "amount": 2 * (tier + 1)}
+    return {"kind": "restore_mp", "amount": 14 + tier}
 
 
 # Families live in one table, mapping a family name to a handler that takes
