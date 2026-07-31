@@ -94,6 +94,63 @@ Full triage with code pointers:
       hard-capped at level 20, and the `level_reached` achievements never fire
       (`check_achievements` is never called with that key). A 20-level game
       wants things arriving *through* those 20 levels.
+## Rewards that scale with effort
+
+The 2026-07-30 survey measured the reward layer against 40,000 simulated drops.
+The procedural naming system was fine; everything that should make one drop
+better than another was not.
+
+- [x] ~~**Rarity was decorative.**~~ It changed the affix *count* and the price,
+      never the magnitude — a common `Longsword of the Bear` at level 20 rolled
+      `{str: 9, con: 4}`, byte-identical to a mythic one. Rarity now carries a
+      `power` multiplier that scales every rolled value. Mean stat points at
+      level 20 went common 14.0 -> 29.0 and mythic 59.9 -> 166.7, and epic vs
+      legendary (44.0 vs 48.9, effectively the same item) is now 86.7 vs 118.1.
+- [x] ~~**Three affix stats were read by nothing.**~~ `crit`, `lifesteal` and
+      `resist` were rolled, named and shown in tooltips while 11.4% of every
+      affix point went nowhere — and on rings and amulets it was 100% of the
+      prefix weight, making `of Warding` and `of Precision` entirely inert. All
+      three are wired now. Note `apply_resistances` takes *multipliers*, not
+      flat points, so gear resist converts at one point = one percent, floored
+      at 60% so a stacked set cannot reach immunity.
+- [x] ~~**7.4% of drops had no stats at all**~~, and the two most common items
+      in the game were a bare `Ring` and a bare `Amulet` — jewelry had no base
+      stat block and slot choice is uniform over eight slots. Jewelry gets an
+      innate `max_hp`, and every rarity now rolls at least one affix.
+- [x] ~~**Common items could never carry a prefix**~~ — the suffix always ate
+      the first affix slot, so 60% of drops were a bare base or `Base of the X`.
+      Prefix rolls first now: 27.2% -> 100% of drops have an adjective.
+- [x] ~~**Duplicate affixes read as a bug**~~ — extras roll from the same small
+      prefix pool, so a weapon could show `+20 damage, +5 damage, +11 damage`.
+      Merged into one entry, and a prefix that repeats its suffix's word
+      (`Warding ... of Warding`) is dropped from the name.
+
+Still open, in the order I would take them:
+
+- [ ] **The catalogue does not scale with depth.** All 215 rows in
+      `sql/items_misc.sql` and `sql/items_potions.sql` carry no level and no
+      rarity — the loader stamps `, 0, 'common', 1.0` on every one, because all
+      34 INSERT headers use the 5-column form. The loader's 8-column branch
+      exists and has never been exercised. Consequence: the level window, the
+      rarity filter, the rarity draw weights and the dungeon tier's
+      `loot_quality_bonus` are **all** no-ops. Almost no authoring is needed —
+      151 potions carry their tier in the slug (`_l<N>`, spanning exactly 1-20),
+      and misc rows rank by price *within their type*. Only 13 zero-priced rows
+      (keys and quest items) need a hand decision, and those should stay level 0
+      since the generator treats 0 as always-eligible.
+- [ ] **`loot_quality_bonus` is computed and never read.** `spawn_service` puts
+      a `loot_multiplier` on the monster dict; `roll_loot` never looks at it. A
+      deeper tier is supposed to drop better, and currently does not.
+- [ ] **111 of 154 potions still refuse to be drunk** — 14 of 16 families have
+      no handler, and those potions are 50-64% of every monster loot pool. The
+      biggest single pool of dead reward in the game.
+- [ ] **`attack_speed` is defined on all 12 weapon archetypes and read by
+      nothing**, so a Dagger is strictly worse than a Greataxe with nothing to
+      compensate. Either make it matter or drop it from the data.
+- [ ] `Flaming`, `Frozen` and `Shocking` are byte-identical rolls — same stat,
+      same min/max/scale/weight. Pure reskins. They are the obvious hook for
+      elemental damage now that typed damage and resistances actually resolve.
+
 - [ ] **Unique / set items** (owner, 2026-07-30 — explicitly a *later* item, not
       now). Named uniques across rarity tiers, with set bonuses, so there is
       something to chase and collect rather than just a better roll of the same

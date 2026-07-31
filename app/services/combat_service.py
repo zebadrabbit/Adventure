@@ -82,6 +82,24 @@ def _now():
     return datetime.utcnow()
 
 
+# The damage types the pipeline actually emits: monster and player attacks tag
+# "physical", and the three offensive spells tag fire / ice / lightning. Note it
+# is "ice", not "cold" -- the monster catalogue's trait vocabulary disagrees, and
+# the traits are decoration, so this list follows the code that runs.
+RESISTABLE_ELEMENTS = ("physical", "fire", "ice", "lightning")
+
+# One resist point = one percent off, floored so a stacked set cannot reach
+# immunity. 25 resist is a quarter off; the floor bites past 60 points.
+_RESIST_FLOOR = 0.4
+
+
+def _resist_map(resist_all: int) -> Dict[str, float]:
+    if not resist_all:
+        return {}
+    mult = max(_RESIST_FLOOR, 1.0 - (int(resist_all) / 100.0))
+    return {element: mult for element in RESISTABLE_ELEMENTS}
+
+
 def _derive_stats(char: Character) -> Dict[str, Any]:
     import json as _json
 
@@ -140,6 +158,15 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
     defense += int(_gb.get("armor", 0))
     speed += int(_gb.get("speed", 0))
     mana_max += int(_gb.get("mana", 0))
+
+    # crit / lifesteal / resist were rolled onto gear, named in the item, shown
+    # in the tooltip -- and read by nothing. 11.4% of every affix point a player
+    # earned went into a stat with no consumer, and on rings and amulets it was
+    # 100% of the prefix weight. They are carried through now; see the crit roll
+    # in player_attack and apply_resistances for where each lands.
+    crit_bonus = int(_gb.get("crit", 0))
+    lifesteal = int(_gb.get("lifesteal", 0))
+    resist_all = int(_gb.get("resist", 0))
 
     # Read persisted current HP, fallback to max HP (e.g., new characters)
     hp_source = base.get("hp", max_hp)
@@ -224,7 +251,15 @@ def _derive_stats(char: Character) -> Dict[str, Any]:
         "int_stat": INT,
         "str_stat": STR,
         "dex_stat": DEX,
-        "resistances": {},
+        # Gear resist is an all-element value. apply_resistances takes
+        # MULTIPLIERS (0.5 halves the damage), not flat points, so it is
+        # converted here -- one resist point is one percent off, floored at a
+        # 60% reduction so stacking cannot make a character immune. This was
+        # hardcoded {}, which is why apply_resistances was live code that
+        # always no-opped and "of Warding" was an entirely inert suffix.
+        "resistances": _resist_map(resist_all),
+        "crit_bonus": crit_bonus,
+        "lifesteal": lifesteal,
         "defending": False,
         "buffs": [],
         "effects": effects,
@@ -1558,11 +1593,29 @@ def player_attack(
     base = atk
     variance = random.randint(-atk // 4, atk // 4)
     dmg = max(1, base + variance)
-    crit = acc_roll == 20
+    # A natural 20 always crits; gear crit adds a percentage chance on top.
+    # Before this, `crit` was purely the nat-20 and every point of crit an
+    # affix granted did nothing at all.
+    _crit_bonus = int((attacker or {}).get("crit_bonus", 0) or 0)
+    # Short-circuit deliberately: with no crit gear this consumes no random
+    # draw at all, so it cannot shift any other roll in the turn. A dozen tests
+    # feed a finite iter([...]) to random.randint and depend on the exact
+    # sequence -- an unconditional roll here made three of them StopIteration.
+    crit = acc_roll == 20 or (_crit_bonus > 0 and random.randint(1, 100) <= _crit_bonus)
     if crit:
         dmg = int(dmg * 1.5)
     hit = _damage_monster(session, dmg, target_id)
     monster = hit or monster
+    # Lifesteal returns a percentage of damage dealt, capped by the attacker's
+    # own max HP. Also previously rolled, named ("Vampiric"), and inert.
+    _steal = int((attacker or {}).get("lifesteal", 0) or 0)
+    if attacker and _steal > 0 and dmg > 0:
+        healed = max(1, int(dmg * _steal / 100.0))
+        before = int(attacker.get("hp", 0) or 0)
+        attacker["hp"] = min(int(attacker.get("max_hp", before) or before), before + healed)
+        gained = attacker["hp"] - before
+        if gained > 0:
+            _append_log(session, f"{attacker_name} drains {gained} health.")
     _append_log(
         session,
         f"{attacker_name} hits {monster.get('name')} for {dmg}{' (CRIT)' if crit else ''} damage "
