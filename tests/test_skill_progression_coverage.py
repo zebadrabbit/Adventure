@@ -28,20 +28,35 @@ def _load():
     in the app and a database connection)."""
     tree = ast.parse(SEED.read_text(encoding="utf-8"))
     skills, trees = [], []
+    named = {}  # intermediate lists, e.g. SIGNATURE_TREES, so `TREES += NAME` resolves
+
+    def value_of(node):
+        if isinstance(node, ast.Name):
+            return named.get(node.id, [])
+        try:
+            return ast.literal_eval(node)
+        except ValueError:
+            return []
+
     for node in tree.body:
         target = None
         if isinstance(node, ast.Assign):
             target = getattr(node.targets[0], "id", None)
         elif isinstance(node, ast.AugAssign):
             target = getattr(node.target, "id", None)
+        if target is None:
+            continue
+        value = value_of(node.value)
         if target == "SKILLS":
-            skills += ast.literal_eval(node.value)
+            skills += value
         elif target == "TREES":
-            trees += ast.literal_eval(node.value)
-    return skills, trees
+            trees += value
+        elif isinstance(value, list) and value:
+            named[target] = value
+    return skills, trees, {t["name"] for t in named.get("SIGNATURE_TREES", [])}
 
 
-SKILLS, TREES = _load()
+SKILLS, TREES, SIGNATURE_TREE_NAMES = _load()
 ARCHETYPE_TREES = [t["name"] for t in TREES if t["class_requirement"]]
 UNIVERSAL_TREES = [t["name"] for t in TREES if not t["class_requirement"]]
 
@@ -142,3 +157,71 @@ def test_a_prerequisite_is_never_gated_later_than_the_skill_it_unlocks():
         if s.get("required_skill") and level_of.get(s["required_skill"], 0) > s["required_level"]
     ]
     assert not inverted, inverted
+
+
+# --- one class, one identity ------------------------------------------------
+
+CLASSES = [
+    "fighter", "barbarian", "monk", "mage", "sorcerer", "cleric",
+    "paladin", "druid", "ranger", "rogue", "bard", "warlock",
+]  # fmt: skip
+
+
+def _allows(tree, char_class):
+    """Mirrors SkillTree.allows_class without needing the model or a database."""
+    requirement = tree["class_requirement"]
+    if not requirement:
+        return True
+    return char_class in {c.strip().lower() for c in requirement.split(",")}
+
+
+def _reachable(char_class):
+    trees = [t["name"] for t in TREES if _allows(t, char_class)]
+    return frozenset(s["name"] for s in SKILLS if s["tree"] in trees)
+
+
+def test_every_class_has_a_tree_of_its_own():
+    """`class_requirement` is a comma list, so a single name is a private tree.
+    No schema change was needed for this -- only rows."""
+    for char_class in CLASSES:
+        private = [t for t in TREES if t["class_requirement"] == char_class]
+        assert private, f"{char_class} has no signature tree"
+
+
+def test_no_two_classes_play_identically():
+    """Twelve classes shared seven trees: fighter/barbarian/monk were
+    byte-identical, as were mage/sorcerer, cleric/paladin, druid/ranger and
+    rogue/bard. Eleven of twelve classes were a duplicate of another, so
+    picking one changed the name on the sheet and nothing in a fight."""
+    seen = {}
+    duplicates = []
+    for char_class in CLASSES:
+        key = _reachable(char_class)
+        if key in seen:
+            duplicates.append(f"{char_class} is identical to {seen[key]}")
+        seen[key] = char_class
+    assert not duplicates, duplicates
+
+
+@pytest.mark.parametrize("char_class", CLASSES)
+def test_every_class_can_reach_a_sensible_number_of_skills(char_class):
+    reachable = _reachable(char_class)
+
+    assert len(reachable) >= 12, f"{char_class} can only reach {len(reachable)} skills"
+
+
+def test_a_signature_tree_never_holds_a_starting_skill():
+    """grant_starting_skill picks the first tier-1 ACTIVE in a class-gated tree.
+    A tier-1 active in a signature tree could be handed out at creation, which
+    is not what a signature line is for.
+
+    Identified from the SIGNATURE_TREES list rather than by "has a single class
+    requirement" -- Occult was already warlock-only long before signature trees
+    existed, and its tier-1 Eldritch Bolt is correctly a starting skill."""
+    signature_names = SIGNATURE_TREE_NAMES
+    assert signature_names, "no signature trees found to check"
+
+    early = [
+        s["name"] for s in SKILLS if s["tree"] in signature_names and s["tier"] == 1 and s["skill_type"] == "active"
+    ]
+    assert not early, f"signature trees hold tier-1 actives: {early}"
