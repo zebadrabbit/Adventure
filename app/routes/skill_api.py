@@ -16,6 +16,11 @@ from app.models.skill import CharacterSkill, CharacterTalentPoints, Skill, Skill
 bp_skill = Blueprint("skill", __name__)
 
 
+# Player-facing refusals. Prose, not machine codes -- the panel shows the player
+# whatever `message` comes back (DESIGN_SYSTEM rule 8).
+_REFUSAL_TRAIN_IN_COMBAT = "There is no studying to be done with a blade in your face."
+
+
 @bp_skill.route("/api/skill-trees", methods=["GET"])
 def get_skill_trees():
     """Get all active skill trees."""
@@ -145,6 +150,26 @@ def unlock_skill(character_id):
     character = db.session.get(Character, character_id)
     if not character or character.user_id != current_user.id:
         return jsonify({"error": "Character not found"}), 404
+
+    # No training mid-fight. The skill tree has always been a dashboard modal,
+    # but nothing stopped a POST straight to this endpoint -- so a player could
+    # respec between turns, buying the counter to whatever had just hit them.
+    #
+    # This deliberately guards COMBAT, not "being in a dungeon". The intent was
+    # the wider rule (training belongs in town), but there is no honest signal
+    # for "currently on a run": session["dungeon_instance_id"] persists after a
+    # run ends to drive the Continue flow -- tests/conftest.py's auth_client
+    # sets it for exactly that reason -- so reading it as "is delving" refuses
+    # training to anyone who has ever entered a dungeon. Tagging a *living*
+    # character with the run it is in is the same missing concept that blocks
+    # loot-body's guard (see the Spec 2 follow-ups); when it exists, widen this.
+    from app.models.models import CombatSession
+
+    in_combat = (
+        CombatSession.query.filter_by(user_id=current_user.id, status="active", archived=False).first() is not None
+    )
+    if in_combat:
+        return jsonify({"error": "in_combat", "message": _REFUSAL_TRAIN_IN_COMBAT}), 403
 
     skill = db.session.get(Skill, skill_id)
     if not skill:

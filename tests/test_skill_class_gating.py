@@ -66,3 +66,49 @@ def test_unlock_rejects_wrong_class(auth_client, test_app):
     resp2 = auth_client.post(f"/api/characters/{char.id}/skills", json={"skill_id": combat_skill.id})
     assert resp2.status_code == 200, resp2.get_json()
     assert CharacterSkill.query.filter_by(character_id=char.id, skill_id=combat_skill.id).first() is not None
+
+
+def test_training_is_refused_during_a_fight(auth_client, test_app):
+    """The skill tree is a dashboard modal, but the endpoint was open: a player
+    could POST straight to it between turns and buy the counter to whatever had
+    just hit them. In a game where a run can end a character, committing to a
+    build before going in is the decision worth having.
+
+    Deliberately scoped to combat rather than "in a dungeon" -- see the comment
+    at the guard for why there is no honest signal for the latter yet.
+    """
+    import json as _json
+
+    from app.models.models import CombatSession
+
+    seed_skills(verbose=False)
+    char = Character.query.filter_by(name="Hero").first()
+    stats = _json.loads(char.stats) if char.stats else {}
+    stats["class"] = "mage"
+    char.stats = _json.dumps(stats)
+    char.level = 5
+    db.session.add(char)
+    tp = CharacterTalentPoints.query.filter_by(character_id=char.id).first()
+    if tp is None:
+        tp = CharacterTalentPoints(character_id=char.id, total_earned=10, total_spent=0, available=10)
+        db.session.add(tp)
+    else:
+        tp.available = 10
+    skill = Skill.query.join(SkillTree).filter(SkillTree.name == "Arcana", Skill.required_level == 1).first()
+    db.session.add(
+        CombatSession(
+            user_id=char.user_id,
+            monster_json=_json.dumps({"slug": "m", "name": "M", "hp": 10}),
+            status="active",
+            party_snapshot_json=_json.dumps({"members": []}),
+            monster_hp=10,
+        )
+    )
+    db.session.commit()
+
+    resp = auth_client.post(f"/api/characters/{char.id}/skills", json={"skill_id": skill.id})
+
+    assert resp.status_code == 403
+    body = resp.get_json()
+    assert body["error"] == "in_combat"
+    assert body["message"] and body["message"][0].isupper(), "a refusal is prose, not a machine code"
