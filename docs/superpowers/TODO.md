@@ -89,11 +89,30 @@ Full triage with code pointers:
       nothing reads them for mechanics — `immune_fire` and `vulnerable_cold`
       are decoration. Related: `resistances` and `damage_types` are NULL on
       every row, so `apply_resistances` is a no-op for every monster.
-- [ ] **Level-gated content is thin now that the ladder is short.** Skills top
-      out at `required_level` 5 across all 34 seeded rows, item generation is
-      hard-capped at level 20, and the `level_reached` achievements never fire
-      (`check_achievements` is never called with that key). A 20-level game
-      wants things arriving *through* those 20 levels.
+- [x] ~~**Skills top out at `required_level` 5**~~ — 33 skills to **61**, with
+      unlocks now at levels 1, 3, 5, 7, 8, 10, 11, 14, 17 and 18. Fifteen of the
+      twenty levels used to grant nothing but stat points. A character reaches
+      16 skills costing 37 points against the 20 they earn, so a build is a
+      choice rather than a checklist — it used to be 8 skills costing 13, i.e.
+      buy everything with seven points spare.
+      All new skills use effect kinds the engine already executes. The late
+      passives spend the vocabulary the loot work just made real — `crit`,
+      `lifesteal` and `resist` were folded into combat when the affixes were
+      wired, so Killer Instinct, Blood Pact and Void Armour cost no engine work.
+      `tests/test_skill_progression_coverage.py` reads the seed definitions
+      (not the DB) and fails against the old set with "Nature stops unlocking at
+      level 5" and "a Martial character can buy every skill they can reach".
+- [ ] **The other two level-gated gaps stand.** Item generation is hard-capped
+      at level 20 in `app/loot/generator.py` (fine now that the cap *is* 20, but
+      it is a literal, not a reference to the cap), and the `level_reached`
+      achievements never fire — `check_achievements` is never called with that
+      key anywhere in `app/`.
+- [ ] **12 classes share 7 skill trees**, so 11 of 12 are mechanically identical
+      to at least one other: fighter/barbarian/monk are byte-identical, as are
+      mage/sorcerer, cleric/paladin, druid/ranger and rogue/bard. Only warlock is
+      unique. `SkillTree.class_requirement` already accepts a single class name
+      and `allows_class` already handles it, so per-class signature trees need no
+      schema change — just rows.
 ## Rewards that scale with effort
 
 The 2026-07-30 survey measured the reward layer against 40,000 simulated drops.
