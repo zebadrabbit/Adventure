@@ -601,18 +601,22 @@ misbehave today.
       Kept deliberately — unreferenced but genuinely useful by hand:
       `check_tile.py`, `prune_iconography.py` (companion `keep-icons.txt` lives
       at the repo root) and `screenshot_adventure.py`.
-- [ ] **`instance/mud.db` was committed to the public repo** and is now
-      untracked (2026-07-30). `.gitignore:10` already listed `instance/`, so it
+- [x] ~~**`instance/mud.db` was committed to the public repo**~~ — untracked
+      and deleted 2026-07-30. `.gitignore:10` already listed `instance/`, so it
       had been tracked *against* the repo's own stated intent since before that
-      rule existed. It holds 26 user rows with `username`/`password`/`role`,
-      6 of them admin, and 2 passwords stored **unhashed**.
-      Mitigating: **no email addresses at all** (0 of 26 populated) and the
-      other 24 passwords are hashed — dev data, not real accounts.
-      **Untracking does not remove it from history.** It remains reachable via
-      `git log` on a public repo. If any of those credentials was ever reused
-      somewhere real, rotating it matters far more than a history rewrite. The
-      rewrite itself (git-filter-repo/BFG + force-push) is an owner decision:
-      destructive, outward-facing, and it breaks every existing clone.
+      rule existed; gitignore does not untrack what is already committed.
+      It held 26 user rows (6 admin, 2 passwords unhashed, **no email addresses
+      at all**). **The owner has confirmed every row was generated for testing
+      and none of it was real**, so there is nothing to rotate and no reason to
+      rewrite history — the copy that remains reachable through `git log` is
+      test data. Closed, not deferred.
+      The file is still recoverable if ever wanted:
+      `git show 04798b8:instance/mud.db > instance/mud.db`.
+      `run.py`'s startup banner claimed a fallback of "auto (instance/mud.db)";
+      no such fallback exists — `app/__init__.py` raises when `DATABASE_URL` is
+      unset and rejects sqlite without `ADVENTURE_ALLOW_SQLITE=1` — so the
+      banner named a path it could not have used even while the file existed.
+      Corrected.
 - [ ] Dev-database throwaway accounts from Playwright verification runs; 11
       removed, more will accumulate. Worth a cleanup helper rather than manual
       FK-walking each time.

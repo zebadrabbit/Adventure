@@ -337,8 +337,12 @@ def main(argv: list[str]) -> int:
         os.environ["DATABASE_URL"] = db_uri_cli
     # If env_db is already set, leave it as-is (do not override with a relative default)
 
-    # For display purposes only
-    db_banner = db_uri_cli or env_db or "auto (instance/mud.db)"
+    # For display purposes only. Not "auto (instance/mud.db)" -- there is no
+    # such fallback: app/__init__.py raises when DATABASE_URL is unset and
+    # rejects sqlite unless ADVENTURE_ALLOW_SQLITE=1. That committed SQLite file
+    # was deleted 2026-07-30; the banner outlived it and named a path that could
+    # not have been used even while it existed.
+    db_banner = db_uri_cli or env_db or "unset (DATABASE_URL required)"
 
     def handle_sigint(sig, frame):
         print("\n[INFO] Shutting down server...")
